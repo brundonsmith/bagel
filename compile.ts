@@ -10,6 +10,7 @@ function compileOne(ast: AST): string {
         case "func-declaration": return compileFunc(ast.func);
         case "const-declaration": return `const ${ast.name} = ${compileOne(ast.value)};`;
         case "proc": return compileProc(ast);
+        // case "assignment": return "";
         case "func": return compileFunc(ast);
         case "funcall": return `${compileOne(ast.func)}${ast.args.map(arg => `(${compileOne(arg)})`).join("")}`;
         case "pipe": return compilePipe(ast.expressions, ast.expressions.length - 1);

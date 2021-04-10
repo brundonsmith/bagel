@@ -3,6 +3,7 @@ import { Type } from "./types.ts";
 export type AST =
     | Declaration
     | Expression
+    | Statement
 
 export type Declaration =
     | ProcDeclaration
@@ -52,10 +53,10 @@ export type Proc = {
 }
 
 export type Statement = 
-| Assignment;
+    | Assignment;
 
 export type Assignment = {
-kind: "assignment",
+    kind: "assignment",
 
 }
 
