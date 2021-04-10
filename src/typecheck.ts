@@ -1,6 +1,5 @@
-import { AST } from "./ast.ts";
-import { Type, STRING, NUMBER, BOOLEAN, canBeAssignedTo } from "./types.ts";
-import { Environment } from "./environment.ts";
+import { AST } from "./ast";
+import { Type, STRING, NUMBER, BOOLEAN, canBeAssignedTo } from "./types";
 
 // export function typecheck(environment: Environment, ast: AST): Type | undefined {
 //     switch(ast.kind) {

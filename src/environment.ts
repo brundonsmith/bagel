@@ -1,4 +1,4 @@
-import { NUMBER, STRING } from "./types.ts";
+import { NUMBER, STRING } from "./types";
 
 // export type Environment = { [symbol: string]: FuncdefNative | FuncdefDynamic };
 

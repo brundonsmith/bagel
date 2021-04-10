@@ -1,4 +1,4 @@
-import { Type } from "./types.ts";
+import { Type } from "./types";
 
 export type AST =
     | Declaration

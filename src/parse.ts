@@ -1,6 +1,6 @@
-import { ArrayLiteral, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, NilLiteral, NumberLiteral, ObjectLiteral, Pipe, Proc, ProcDeclaration, Range, Statement, StringLiteral } from "./ast.ts";
-import { consume, consumeWhitespace, consumeWhile, isNumeric, isSymbolic, consumeBinaryOp, isAlpha, ParseResult, parseSeries } from "./parsing-utils.ts";
-import { given, log } from "./utils.ts";
+import { ArrayLiteral, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, NilLiteral, NumberLiteral, ObjectLiteral, Pipe, Proc, ProcDeclaration, Range, Statement, StringLiteral } from "./ast";
+import { consume, consumeWhitespace, consumeWhile, isNumeric, isSymbolic, consumeBinaryOp, isAlpha, ParseResult, parseSeries } from "./parsing-utils";
+import { given, log } from "./utils";
 
 export function parse(code: string): AST[] {
     let index = 0;

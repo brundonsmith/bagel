@@ -1,4 +1,4 @@
-import { AST, Expression, Func, Proc } from "./ast.ts";
+import { AST, Expression, Func, Proc } from "./ast";
 
 export function compile(ast: AST[]): string {
     return ast.map(compileOne).join("\n\n");

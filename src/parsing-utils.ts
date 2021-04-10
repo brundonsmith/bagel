@@ -1,5 +1,5 @@
-import { AST, BinaryOp, BINARY_OPS, KEYWORDS } from "./ast.ts";
-import { given } from "./utils.ts";
+import { AST, BinaryOp, BINARY_OPS, KEYWORDS } from "./ast";
+import { given } from "./utils";
 
 export function consume(code: string, index: number, segment: string): number|undefined {
     for (let i = 0; i < segment.length; i++) {
