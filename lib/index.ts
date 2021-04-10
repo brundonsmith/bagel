@@ -1,5 +1,5 @@
 
-function range(start: number) {
+export function range(start: number) {
     return function*(end: number) {
         for (let i = start; i < end; i++) {
             yield i;
@@ -7,7 +7,7 @@ function range(start: number) {
     }
 }
 
-function map<T, R>(fn: (el: T) => R) {
+export function map<T, R>(fn: (el: T) => R) {
     return function*(iter: Iterable<T>) {
         for (const el of iter) {
             yield fn(el);
@@ -15,7 +15,7 @@ function map<T, R>(fn: (el: T) => R) {
     }
 }
 
-function filter<T>(fn: (el: T) => boolean) {
+export function filter<T>(fn: (el: T) => boolean) {
     return function*(iter: Iterable<T>) {
         for (const el of iter) {
             if (fn(el)) {
@@ -25,10 +25,10 @@ function filter<T>(fn: (el: T) => boolean) {
     }
 }
 
-function* entries(obj: {[key: string]: unknown}): Iterable<[string, unknown]> {
+export function* entries(obj: {[key: string]: unknown}): Iterable<[string, unknown]> {
     for (const key in obj) {
         yield [key, obj[key]];
     }
 }
 
-const fromEntries = Object.fromEntries;
+export const fromEntries = Object.fromEntries;
