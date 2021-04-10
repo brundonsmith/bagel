@@ -1,0 +1,21 @@
+{
+  "name": "bagel-lib",
+  "version": "1.0.0",
+  "description": "Runtime library for bagel language",
+  "main": "dist.js",
+  "scripts": {
+    "build": "npm install ; webpack --mode=production",
+    "build:dev": "webpack --mode=development",
+    "build:prod": "npm install ; webpack --mode=production",
+    "watch": "webpack --watch"
+  },
+  "author": "Brandon Smith",
+  "license": "MIT",
+  "private": true,
+  "devDependencies": {
+    "@webpack-cli/generators": "^2.0.0",
+    "mobx": "^6.2.0",
+    "webpack": "^5.31.2",
+    "webpack-cli": "^4.6.0"
+  }
+}

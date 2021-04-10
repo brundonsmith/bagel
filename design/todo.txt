@@ -1,11 +1,16 @@
-- parsing/compiling "JSX"
-- parsing/compiling classes
-- parsing comments
+core language:
+- parsing
+    - "JSX"
+    - classes
+    - comments
+    - assignments
+    - dot accessors
+    - spread/destructuring
+    - parenthesized expressions
 - types
 - helpful error messages
-- parenthesized expressions
 
-eventually...
+long-term:
 - syntax highlighting
 - full build system
 - language server
