@@ -1,0 +1,12 @@
+- parsing/compiling "JSX"
+- parsing/compiling classes
+- parsing comments
+- types
+- helpful error messages
+- parenthesized expressions
+
+eventually...
+- syntax highlighting
+- full build system
+- language server
+- package manager

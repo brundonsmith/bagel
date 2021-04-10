@@ -1,0 +1,17 @@
+
+MVP:
+- modules, especially external modules
+- standard APIs, especially global APIs
+- async/await (function keyword? what about async procs?)
+- consts are deeply immutable? may be intractable...
+    - but the "const applies to the reference only" is confusing
+    - but we need at least JS-level consts
+    - consts can only be literals? that might make it tractable, because no 
+    external references (TS-style consts)
+    - can pure functions create circular object graphs?
+- passing foreign objects to pure functions (dirty function calls?)
+
+Later:
+- handling concurrent functions when classes are allowed to be passed to 
+functions (limit to serializable only? automatically reapply prototype on the 
+other side?)
