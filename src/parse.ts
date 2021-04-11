@@ -1,4 +1,4 @@
-import { ArrayLiteral, ArrayType, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IndexerType, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcDeclaration, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType } from "./ast";
+import { ArrayLiteral, ArrayType, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IndexerType, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcDeclaration, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType } from "./ast";
 import { consume, consumeWhitespace, consumeWhile, isNumeric, isSymbol, consumeBinaryOp, isAlpha, ParseResult, parseSeries, isSymbolic } from "./parsing-utils";
 import { given, log } from "./utils";
 
@@ -83,6 +83,7 @@ const atomicType = (code: string, index: number): ParseResult<TypeExpression> | 
     ?? objectType(code, index)
     ?? indexerType(code, index)
     ?? tupleType(code, index)
+    ?? unknownType(code, index)
 
 const namedType = (code: string, index: number): ParseResult<NamedType> | undefined =>
     given(identifier(code, index), ({ parsed: name, newIndex: index }) => ({
@@ -185,6 +186,14 @@ const literalType = (code: string, index: number): ParseResult<LiteralType> | un
         newIndex: index,
     }))
 
+const unknownType = (code: string, index: number): ParseResult<UnknownType> | undefined =>
+    given(consume(code, index, "unknown"), index => ({
+        parsed: {
+            kind: "unknown-type",
+        },
+        newIndex: index,
+    }))
+
 const procDeclaration = (code: string, index: number): ParseResult<ProcDeclaration> | undefined =>
     given(consume(code, index, "proc"), index =>
         given(consumeWhitespace(code, index), index =>
@@ -219,6 +228,7 @@ const constDeclaration = (code: string, index: number): ParseResult<ConstDeclara
                                     kind: "const-declaration",
                                     name,
                                     value,
+                                    type: { kind: "unknown-type" }, // TODO: Parse for this
                                 },
                                 newIndex: index,
                             }))))))))
@@ -250,7 +260,7 @@ function proc(code: string, index: number): ParseResult<Proc> | undefined {
         : undefined;
 
     return given(consume(code, indexAfterIdentifier, "("), index =>
-        given(parseSeries(code, index, identifier, ","), ({ items: args, newIndex: index }) =>
+        given(parseSeries(code, index, identifier, ","), ({ items: argNames, newIndex: index }) =>
             given(consume(code, index, ")"), index =>
                 given(consumeWhitespace(code, index), index =>
                     given(consume(code, index, "{"), index =>
@@ -259,8 +269,9 @@ function proc(code: string, index: number): ParseResult<Proc> | undefined {
                                 parsed: {
                                     kind: "proc",
                                     name,
-                                    args: args.map(a => ({ name: a })),
+                                    argNames,
                                     body,
+                                    type: { kind: "unknown-type" }, // TODO: Parse for this
                                 },
                                 newIndex: index,
                             }))))))))
@@ -277,7 +288,7 @@ function func(code: string, index: number): ParseResult<Func> | undefined {
         : undefined;
 
     return given(consume(code, indexAfterIdentifier, "("), index =>
-        given(parseSeries(code, index, identifier, ","), ({ items: args, newIndex: index }) =>
+        given(parseSeries(code, index, identifier, ","), ({ items: argNames, newIndex: index }) =>
             given(consume(code, index, ")"), index =>
                 given(consumeWhitespace(code, index), index =>
                     given(consume(code, index, "=>"), index =>
@@ -285,8 +296,9 @@ function func(code: string, index: number): ParseResult<Func> | undefined {
                             parsed: {
                                 kind: "func",
                                 name,
-                                args: args.map(a => ({ name: a })),
+                                argNames,
                                 body,
+                                type: { kind: "unknown-type" }, // TODO: Parse for this
                             },
                             newIndex: index,
                         })))))))

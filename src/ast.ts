@@ -19,32 +19,33 @@ export type TypeDeclaration = {
 
 export type ProcDeclaration = {
     kind: "proc-declaration",
-    type?: Type,
     proc: Proc,
 }
 
 export type FuncDeclaration = {
     kind: "func-declaration",
-    type?: Type,
     func: Func,
 }
 
 export type ConstDeclaration = {
     kind: "const-declaration",
-    type?: Type,
     name: Identifier,
+    type: TypeExpression | UnknownType,
     value: Expression,
 }
 
 export type TypeExpression =
     | UnionType
     | NamedType
+    | ProcType
+    | FuncType
     | ObjectType
     | IndexerType
     | ArrayType
     | TupleType
     | PrimitiveType
     | LiteralType
+    | UnknownType
 
 export type UnionType = {
     kind: "union-type",
@@ -54,6 +55,17 @@ export type UnionType = {
 export type NamedType = {
     kind: "named-type",
     name: Identifier,
+}
+
+export type ProcType = {
+    kind: "proc-type",
+    argTypes: TypeExpression[],
+}
+
+export type FuncType = {
+    kind: "func-type",
+    argTypes: TypeExpression[],
+    returnType: TypeExpression,
 }
 
 export type ObjectType = {
@@ -87,6 +99,10 @@ export type LiteralType = {
     value: StringLiteral | NumberLiteral | BooleanLiteral,
 }
 
+export type UnknownType = {
+    kind: "unknown-type",
+}
+
 export type Expression = 
     | Proc
     | Func
@@ -107,7 +123,8 @@ export type Expression =
 export type Proc = {
     kind: "proc",
     name?: string,
-    args: Array<{ name: Identifier, type?: Type }>,
+    type: ProcType | UnknownType,
+    argNames: Identifier[],
     body: Statement[],
 }
 
@@ -122,8 +139,8 @@ export type Assignment = {
 export type Func = {
     kind: "func",
     name?: string,
-    args: Array<{ name: Identifier, type?: Type }>,
-    returnType?: Type,
+    type: FuncType | UnknownType,
+    argNames: Identifier[],
     body: Expression,
 }
 
@@ -139,7 +156,7 @@ export type BinaryOperator = {
     operator: BinaryOp,
 }
 
-export const BINARY_OPS = [ "+", "-", "*", "/", "<", ">", "<=", ">=", "&&", "||" ] as const;
+export const BINARY_OPS = [ "+", "-", "*", "/", "<", ">", "<=", ">=", "&&", "||", "??" ] as const;
 export type BinaryOp = typeof BINARY_OPS[number];
 
 export type Funcall = {
