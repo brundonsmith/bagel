@@ -23,6 +23,7 @@ core language:
 - hoisting (types and declarations)
 - named arguments?
 - optional object properties (types)?
+- "with" declarations inside functions?
 
 long-term:
 - syntax highlighting
