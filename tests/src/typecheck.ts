@@ -134,6 +134,61 @@ test(function failsWhenShould() {
     }
 })
 
+test(function passingValidArguments() {
+    testTypecheck(`
+        func foo(a: number, b: number): number => a + b
+        
+        const bar = foo(3, 12)`,
+        [
+            {
+                kind: "func-type",
+                argTypes: [
+                    { kind: "primitive-type", type: "number" },
+                    { kind: "primitive-type", type: "number" },
+                ],
+                returnType: { kind: "primitive-type", type: "number" },
+            },
+            { kind: "primitive-type", type: "number" },
+        ])
+})
+
+test(function passingInvalidArguments() {
+    testTypecheck(`
+        func foo(a: number, b: number): number => a + b
+        
+        const bar = foo('stuff', 12)`,
+        [
+            {
+                kind: "func-type",
+                argTypes: [
+                    { kind: "primitive-type", type: "number" },
+                    { kind: "primitive-type", type: "number" },
+                ],
+                returnType: { kind: "primitive-type", type: "number" },
+            },
+            undefined,
+        ])
+})
+
+
+test(function usingValidReturnType() {
+    testTypecheck(`
+        func foo(a: number, b: number): number => a + b
+        
+        const bar: string = foo(3, 12)`,
+        [
+            {
+                kind: "func-type",
+                argTypes: [
+                    { kind: "primitive-type", type: "number" },
+                    { kind: "primitive-type", type: "number" },
+                ],
+                returnType: { kind: "primitive-type", type: "number" },
+            },
+            undefined,
+        ])
+})
+
 function testTypecheck(code: string, expected: (TypeExpression|undefined)[]): string|undefined {
     const parsed = parse(code);
     const type = typecheckFile(parsed);
