@@ -261,7 +261,7 @@ function proc(code: string, index: number): ParseResult<Proc> | undefined {
     const nameResult = identifier(code, index);
 
     return given(consume(code, nameResult?.newIndex ?? index, "("), index =>
-        given(parseSeries(code, index, identifier, ","), ({ items: argNames, newIndex: index }) =>
+        given(parseSeries(code, index, _argumentDeclaration, ","), ({ items: args, newIndex: index }) =>
             given(consume(code, index, ")"), index =>
                 given(consumeWhitespace(code, index), index =>
                     given(consume(code, index, "{"), index =>
@@ -270,8 +270,11 @@ function proc(code: string, index: number): ParseResult<Proc> | undefined {
                                 parsed: {
                                     kind: "proc",
                                     name: nameResult?.parsed,
-                                    type: { kind: "unknown-type" }, // TODO: Parse for this
-                                    argNames,
+                                    type: {
+                                        kind: "proc-type",
+                                        argTypes: args.map(arg => arg.type ?? { kind: "unknown-type" }),
+                                    },
+                                    argNames: args.map(arg => arg.name),
                                     body,
                                 },
                                 newIndex: index,
@@ -286,22 +289,43 @@ function func(code: string, index: number): ParseResult<Func> | undefined {
     const nameResult = identifier(code, index);
 
     return given(consume(code, nameResult?.newIndex ?? index, "("), index =>
-        given(parseSeries(code, index, identifier, ","), ({ items: argNames, newIndex: index }) =>
+        given(parseSeries(code, index, _argumentDeclaration, ","), ({ items: args, newIndex: index }) =>
             given(consume(code, index, ")"), index =>
                 given(consumeWhitespace(code, index), index =>
-                    given(consume(code, index, "=>"), index =>
-                        given(consumeWhitespace(code, index), index =>
-                            given(expression(code, index), ({ parsed: body, newIndex: index }) => ({
-                                parsed: {
-                                    kind: "func",
-                                    name: nameResult?.parsed,
-                                    type: { kind: "unknown-type" }, // TODO: Parse for this
-                                    argNames,
-                                    body,
-                                },
-                                newIndex: index,
-                            }))))))))
+                    given(parseOptional(code, index, (code, index) =>
+                        given(consume(code, index, ":"), index =>
+                            given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: returnType, newIndex }) =>
+                    given(consumeWhitespace(code, newIndex ?? index), index =>
+                        given(consume(code, index, "=>"), index =>
+                            given(consumeWhitespace(code, index), index =>
+                                given(expression(code, index), ({ parsed: body, newIndex: index }) => ({
+                                    parsed: {
+                                        kind: "func",
+                                        name: nameResult?.parsed,
+                                        type: {
+                                            kind: "func-type",
+                                            argTypes: args.map(arg => arg.type ?? { kind: "unknown-type" }),
+                                            returnType: returnType ?? { kind: "unknown-type" },
+                                        },
+                                        argNames: args.map(arg => arg.name),
+                                        body,
+                                    },
+                                    newIndex: index,
+                                }))))))))))
 }
+
+const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: Identifier, type?: TypeExpression }> | undefined => 
+    given(identifier(code, index), ({ parsed: name, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index => 
+            given(parseOptional(code, index, (code, index) =>
+                given(consume(code, index, ":"), index =>
+                    given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: type, newIndex }) => ({
+                parsed: {
+                    name,
+                    type,
+                },
+                newIndex: newIndex ?? index
+            }))))
 
 const pipe = (code: string, index: number): ParseResult<Pipe> | undefined => 
     given(parseSeries(code, index, atom, "|>", true), ({ items: expressions, newIndex: index }) =>

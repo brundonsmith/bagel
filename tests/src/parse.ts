@@ -15,7 +15,11 @@ test(function simpleFuncDeclaration() {
                     kind: "identifier",
                     name: "uid",
                 },
-                type: { kind: "unknown-type" },
+                type: {
+                    kind: "func-type",
+                    argTypes: [],
+                    returnType: { kind: "unknown-type" },
+                },
                 argNames: [],
                 body: {
                     kind: "string-literal",
@@ -68,7 +72,11 @@ test(function funcDeclarationWithPipe() {
                     kind: "identifier",
                     name: "classNames",
                 },
-                type: { kind: "unknown-type" },
+                type: {
+                    kind: "func-type",
+                    argTypes: [ { kind: "unknown-type" } ],
+                    returnType: { kind: "unknown-type" },
+                },
                 argNames: [
                     {
                         kind: "identifier",
@@ -112,7 +120,11 @@ test(function funcDeclarationWithIteration() {
                     kind: "identifier",
                     name: "myFunc",
                 },
-                type: { kind: "unknown-type" },
+                type: {
+                    kind: "func-type",
+                    argTypes: [ { kind: "unknown-type" }, { kind: "unknown-type" } ],
+                    returnType: { kind: "unknown-type" },
+                },
                 argNames: [
                     {
                         kind: "identifier",
@@ -140,7 +152,11 @@ test(function funcDeclarationWithIteration() {
                             args: [
                                 {
                                     kind: "func",
-                                    type: { kind: "unknown-type" },
+                                    type: {
+                                        kind: "func-type",
+                                        argTypes: [ { kind: "unknown-type" } ],
+                                        returnType: { kind: "unknown-type" },
+                                    },
                                     argNames: [
                                         {
                                             kind: "identifier",
@@ -171,7 +187,11 @@ test(function funcDeclarationWithIteration() {
                             args: [
                                 {
                                     kind: "func",
-                                    type: { kind: "unknown-type" },
+                                    type: {
+                                        kind: "func-type",
+                                        argTypes: [ { kind: "unknown-type" } ],
+                                        returnType: { kind: "unknown-type" },
+                                    },
                                     argNames: [
                                         {
                                             kind: "identifier",
@@ -201,6 +221,96 @@ test(function funcDeclarationWithIteration() {
     );
 })
 
+test(function typedFuncDeclaration() {
+    return testParse(`
+        func foo(a: string, b: number): number => 0
+    `,
+        {
+            kind: "func-declaration",
+            func: {
+                kind: "func",
+                name: {
+                    kind: "identifier",
+                    name: "foo",
+                },
+                type: {
+                    kind: "func-type",
+                    argTypes: [
+                        {
+                            kind: "primitive-type",
+                            type: "string",
+                        },
+                        {
+                            kind: "primitive-type",
+                            type: "number",
+                        }
+                    ],
+                    returnType: {
+                        kind: "primitive-type",
+                        type: "number",
+                    },
+                },
+                argNames: [
+                    { kind: "identifier", name: "a" },
+                    { kind: "identifier", name: "b" },
+                ],
+                body: {
+                    kind: "number-literal",
+                    value: 0,
+                }
+            }
+        },
+        (code, index) => parse(code)[0],
+    );
+})
+
+test(function typedProcDeclaration() {
+    return testParse(`
+        proc bar(a: string[], b: { foo: number }) {
+                    
+        }
+    `,
+        {
+            kind: "proc-declaration",
+            proc: {
+                kind: "proc",
+                name: {
+                    kind: "identifier",
+                    name: "bar",
+                },
+                type: {
+                    kind: "proc-type",
+                    argTypes: [
+                        {
+                            kind: "array-type",
+                            element: {
+                                kind: "primitive-type",
+                                type: "string",
+                            },
+                        },
+                        {
+                            kind: "object-type",
+                            entries: [
+                                [
+                                    { kind: "identifier", name: "foo" },
+                                    { kind: "primitive-type", type: "number" },
+                                ]
+                            ],
+                        },
+                    ],
+                },
+                argNames: [
+                    { kind: "identifier", name: "a" },
+                    { kind: "identifier", name: "b" },
+                ],
+                body: []
+            }
+        },
+        (code, index) => parse(code)[0],
+    );
+})
+
+
 
 function testParse<T extends AST>(code: string, expected: T, parseFn: (code: string, index: number) => T): string|undefined {
     const parsed = parseFn(code, 0);
@@ -209,3 +319,5 @@ function testParse<T extends AST>(code: string, expected: T, parseFn: (code: str
         return `\nParsing: "${code}"\n\nExpected:\n${JSON.stringify(expected, null, 2)}\n\nReceived:\n${JSON.stringify(parsed, null, 2)}`;
     }
 }
+
+console.log("");

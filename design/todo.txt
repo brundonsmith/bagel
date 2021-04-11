@@ -15,15 +15,14 @@ core language:
         - nominal types
         - iterator types
         - promise types
-        - function types
-        - proc types
-- type inference/checking
 - more helpful error messages
 - error handling in procs
 - hoisting (types and declarations)
 - named arguments?
 - optional object properties (types)?
 - "with" declarations inside functions?
+- "typeof X" in type expressions
+- "typeof X" at runtime (add "array" return value, to avoid Array.isArray(), as well as class-name possibility)
 
 long-term:
 - syntax highlighting
