@@ -3,10 +3,19 @@ core language:
     - "JSX"
     - classes
     - comments
-    - assignments
+    - statements
+        - assignment
+        - var decl
+        - if/else
+        - for and while loops (only for/of, because we have ranges!)
     - dot accessors
     - spread/destructuring
-    - nominal types
+    - types
+        - nominal types
+        - iterator types
+        - promise types
+        - function types
+        - proc types
 - type inference/checking
 - more helpful error messages
 
