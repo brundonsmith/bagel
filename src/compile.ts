@@ -6,6 +6,7 @@ export function compile(ast: AST[]): string {
 
 function compileOne(ast: AST): string {
     switch(ast.kind) {
+        case "type-declaration": return ``;
         case "proc-declaration": return compileProc(ast.proc);
         case "func-declaration": return compileFunc(ast.func);
         case "const-declaration": return `const ${ast.name} = ${compileOne(ast.value)};`;

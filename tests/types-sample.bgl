@@ -1,0 +1,8 @@
+
+type Foo = string
+
+type Bar = string | number
+
+type Blah = string[]
+
+type Stuff = { foo: Bar, foo2: Blah }

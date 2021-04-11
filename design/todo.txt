@@ -6,7 +6,7 @@ core language:
     - assignments
     - dot accessors
     - spread/destructuring
-    - types
+    - nominal types
 - type inference/checking
 - more helpful error messages
 

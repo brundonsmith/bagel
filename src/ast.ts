@@ -6,9 +6,16 @@ export type AST =
     | Statement
 
 export type Declaration =
+    | TypeDeclaration
     | ProcDeclaration
     | FuncDeclaration
     | ConstDeclaration
+
+export type TypeDeclaration = {
+    kind: "type-declaration",
+    name: Identifier,
+    type: TypeExpression,
+}
 
 export type ProcDeclaration = {
     kind: "proc-declaration",
@@ -27,6 +34,57 @@ export type ConstDeclaration = {
     type?: Type,
     name: Identifier,
     value: Expression,
+}
+
+export type TypeExpression =
+    | UnionType
+    | NamedType
+    | ObjectType
+    | IndexerType
+    | ArrayType
+    | TupleType
+    | PrimitiveType
+    | LiteralType
+
+export type UnionType = {
+    kind: "union-type",
+    members: TypeExpression[],
+}
+
+export type NamedType = {
+    kind: "named-type",
+    name: Identifier,
+}
+
+export type ObjectType = {
+    kind: "object-type",
+    entries: [Identifier, TypeExpression][],
+}
+
+export type IndexerType = {
+    kind: "indexer-type",
+    keyType: TypeExpression,
+    valueType: TypeExpression,
+}
+
+export type ArrayType = {
+    kind: "array-type",
+    element: TypeExpression,
+}
+
+export type TupleType = {
+    kind: "tuple-type",
+    members: TypeExpression[],
+}
+
+export type PrimitiveType = {
+    kind: "primitive-type",
+    type: "string" | "number" | "boolean" | "nil",
+}
+
+export type LiteralType = {
+    kind: "literal-type",
+    value: StringLiteral | NumberLiteral | BooleanLiteral,
 }
 
 export type Expression = 
@@ -115,7 +173,7 @@ export type Identifier = {
 
 export type ObjectLiteral = {
     kind: "object-literal",
-    entries: {[key: string]: Expression}[],
+    entries: [Identifier, Expression][],
 }
 
 export type ArrayLiteral = {

@@ -23,9 +23,9 @@ export function consumeWhitespace(code: string, index: number): number {
     return consumeWhile(code, index, ch => ch.match(/[\s]/) != null);
 }
 
-export function consumeWhile(code: string, index: number, fn: (ch: string) => boolean): number {
+export function consumeWhile(code: string, index: number, fn: (ch: string, index: number) => boolean): number {
     let newIndex = index;
-    while (code[newIndex] != null && fn(code[newIndex])) {
+    while (code[newIndex] != null && fn(code[newIndex], newIndex)) {
         newIndex++;
     }
 
@@ -41,13 +41,9 @@ export function isNumeric(char: string): boolean {
     return char >= '0' && char <= '9';
 }
 
-export function isSymbolic(str: string): boolean {
-    if (str[0] == null || !isAlpha(str[0])) {
-        return false;
-    }
-
-    for (const ch of str) {
-        if (!isAlpha(ch) && !isNumeric(ch)) {
+export function isSymbol(str: string): boolean {
+    for (let index = 0; index < str.length; index++) {
+        if (!isSymbolic(str[index], index)) {
             return false;
         }
     }
@@ -59,6 +55,10 @@ export function isSymbolic(str: string): boolean {
     }
 
     return true;
+}
+
+export function isSymbolic(ch: string, index: number): boolean {
+    return ch != null && (isAlpha(ch) || (index > 0 && isNumeric(ch)));
 }
 
 export function isBinaryOp(str: string): str is BinaryOp {
