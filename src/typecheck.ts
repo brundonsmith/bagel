@@ -4,51 +4,53 @@ import { deepEquals, given } from "./utils";
 type NamedTypes = Map<string, TypeExpression>;
 type NamedValues = Map<string, TypeExpression>;
 
-export function typecheckFile(declarations: Declaration[]): boolean {
+export function typecheckFile(declarations: Declaration[]): (TypeExpression|undefined)[] {
     const namedTypes: NamedTypes = new Map();
     const namedValues: NamedValues = new Map();
 
-    for(const ast of declarations) {
+    return declarations.map(ast => {
         switch(ast.kind) {
             case "type-declaration":
                 namedTypes.set(ast.name.name, ast.type);
-                break;
+                return ast.type;
             case "func-declaration": {
                 const type = typecheck(namedTypes, namedValues, ast.func);
                 if (type == null) {
-                    return false;
+                    return undefined;
                 }
 
-                namedValues.set((ast.func.name as string), type);
-            } break;
+                namedValues.set((ast.func.name?.name as string), type);
+                return type;
+            }
             case "proc-declaration": {
                 const type = typecheck(namedTypes, namedValues, ast.proc);
                 if (type == null) {
-                    return false;
+                    return undefined;
                 }
 
-                namedValues.set((ast.proc.name as string), type);
-            } break;
+                namedValues.set((ast.proc.name?.name as string), type);
+                return type;
+            }
             case "const-declaration": {
                 const valueType = typecheck(namedTypes, namedValues, ast.value);
                 
                 if (valueType == null) {
-                    return false;
+                    return undefined;
                 } else if (ast.type.kind === "unknown-type") {
                     namedValues.set(ast.name.name, valueType);
+                    return valueType;
                 } else {
                     if (!subsumes(namedTypes, namedValues, ast.type, valueType)) {
-                        return false;
+                        return undefined;
                     } else {
                         namedValues.set(ast.name.name, ast.type); 
+                        return ast.type;
                     }
                 }
 
-            } break;
+            }
         }
-    }
-
-    return true;
+    })
 }
 
 const BINARY_OPERATOR_TYPES: {[key in BinaryOp]: {inputs: TypeExpression, output: TypeExpression}} = {
@@ -205,7 +207,7 @@ function typecheck(namedTypes: NamedTypes, namedValues: NamedValues, ast: AST): 
     return undefined;
 }
 
-function subsumes(namedTypes: NamedTypes, namedValues: NamedValues, destination: TypeExpression, value: TypeExpression): boolean {
+export function subsumes(namedTypes: NamedTypes, namedValues: NamedValues, destination: TypeExpression, value: TypeExpression): boolean {
     const resolvedDestination = resolve(namedTypes, destination);
     const resolvedValue = resolve(namedTypes, value);
 
