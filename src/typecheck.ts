@@ -30,12 +30,20 @@ export function typecheckFile(declarations: Declaration[]): boolean {
                 namedValues.set((ast.proc.name as string), type);
             } break;
             case "const-declaration": {
-                const type = typecheck(namedTypes, namedValues, ast.value);
-                if (type == null) {
+                const valueType = typecheck(namedTypes, namedValues, ast.value);
+                
+                if (valueType == null) {
                     return false;
+                } else if (ast.type.kind === "unknown-type") {
+                    namedValues.set(ast.name.name, valueType);
+                } else {
+                    if (!subsumes(namedTypes, namedValues, ast.type, valueType)) {
+                        return false;
+                    } else {
+                        namedValues.set(ast.name.name, ast.type); 
+                    }
                 }
 
-                namedValues.set(ast.name.name, type);
             } break;
         }
     }
@@ -198,8 +206,8 @@ function typecheck(namedTypes: NamedTypes, namedValues: NamedValues, ast: AST): 
 }
 
 function subsumes(namedTypes: NamedTypes, namedValues: NamedValues, destination: TypeExpression, value: TypeExpression): boolean {
-    const resolvedDestination = resolve(namedTypes, namedValues, destination);
-    const resolvedValue = resolve(namedTypes, namedValues, value);
+    const resolvedDestination = resolve(namedTypes, destination);
+    const resolvedValue = resolve(namedTypes, value);
 
     if (resolvedDestination == null || resolvedValue == null) {
         return false;
@@ -229,9 +237,56 @@ function subsumes(namedTypes: NamedTypes, namedValues: NamedValues, destination:
             // NOTE: Value and destination are flipped on purpose for args!
             && resolvedValue.argTypes.every((valueArg, index) => subsumes(namedTypes, namedValues, valueArg, resolvedDestination.argTypes[index]))) {
         return true;
+    } else if (resolvedDestination.kind === "array-type" && resolvedValue.kind === "array-type") {
+        return subsumes(namedTypes, namedValues, resolvedDestination.element, resolvedValue.element)
+    } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
+        return resolvedDestination.entries.every(([key, destinationValue]) => 
+            given(resolvedValue.entries.find(e => deepEquals(e[0], key))?.[1], value => subsumes(namedTypes, namedValues, destinationValue, value)));
     }
 
     return false;
+}
+
+function resolve(namedTypes: NamedTypes, type: TypeExpression): TypeExpression | undefined {
+    if (type.kind === "named-type") {
+        return given(namedTypes.get(type.name.name), named => resolve(namedTypes, named));
+    } else if(type.kind === "union-type") {
+        const members = type.members.map(member => resolve(namedTypes, member));
+
+        if (members.some(member => member == null)) {
+            return undefined;
+        }
+
+        return {
+            kind: "union-type",
+            members: members as TypeExpression[],
+        }
+    } else if(type.kind === "object-type") {
+        const entries = type.entries.map(([ key, valueType ]) => [key, resolve(namedTypes, valueType)]);
+
+        if (entries.some(entry => entry[1] == null)) {
+            return undefined;
+        }
+
+        return {
+            kind: "object-type",
+            entries: entries as [Identifier, TypeExpression][],
+        }
+    } else if(type.kind === "array-type") {
+        const element = resolve(namedTypes, type.element);
+
+        if (element == null) {
+            return undefined;
+        }
+
+        return {
+            kind: "array-type",
+            element: element as TypeExpression,
+        }
+    } else {
+        // TODO: Recurse on ProcType, FuncType, IndexerType, TupleType
+        return type;
+    }
 }
 
 function flattenUnions(type: TypeExpression): TypeExpression {
@@ -249,15 +304,6 @@ function flattenUnions(type: TypeExpression): TypeExpression {
             kind: "union-type",
             members,
         }
-    } else {
-        return type;
-    }
-}
-
-function resolve(namedTypes: NamedTypes, namedValues: NamedValues, type: TypeExpression): TypeExpression | undefined {
-    // TODO: recurse
-    if (type.kind === "named-type") {
-        return namedTypes.get(type.name.name);
     } else {
         return type;
     }
