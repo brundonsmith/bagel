@@ -3,6 +3,7 @@ core language:
     - "JSX"
     - classes
     - comments
+    - template strings
     - statements
         - assignment
         - var decl
@@ -18,6 +19,10 @@ core language:
         - proc types
 - type inference/checking
 - more helpful error messages
+- error handling in procs
+- hoisting (types and declarations)
+- named arguments?
+- optional object properties (types)?
 
 long-term:
 - syntax highlighting
