@@ -17,6 +17,7 @@ function compileOne(ast: AST): string {
         case "binary-operator": return `${compileOne(ast.left)} ${ast.operator} ${compileOne(ast.right)}`;
         case "if-else-expression": return `(${compileOne(ast.ifCondition)}) ? (${compileOne(ast.ifResult)}) : (${ast.elseResult == null ? NIL : compileOne(ast.elseResult)})`;
         case "range": return `range(${ast.start})(${ast.end})`;
+        case "parenthesized-expression": return `(${compileOne(ast.inner)})`;
         case "identifier": return ast.name;
         case "object-literal":  return JSON.stringify(ast.entries);
         case "array-literal":   return JSON.stringify(ast.entries);

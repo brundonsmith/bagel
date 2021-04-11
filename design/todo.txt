@@ -6,9 +6,9 @@ core language:
     - assignments
     - dot accessors
     - spread/destructuring
-    - parenthesized expressions
-- types
-- helpful error messages
+    - types
+- type inference/checking
+- more helpful error messages
 
 long-term:
 - syntax highlighting

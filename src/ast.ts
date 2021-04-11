@@ -37,6 +37,7 @@ export type Expression =
     | BinaryOperator
     | IfElseExpression
     | Range
+    | ParenthesizedExpression
     | Identifier
     | ObjectLiteral
     | ArrayLiteral
@@ -102,6 +103,10 @@ export type Range = {
     end: number,
 }
 
+export type ParenthesizedExpression = {
+    kind: "parenthesized-expression",
+    inner: Expression,
+}
 
 export type Identifier = {
     kind: "identifier",

@@ -1,4 +1,4 @@
-import { ArrayLiteral, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, NilLiteral, NumberLiteral, ObjectLiteral, Pipe, Proc, ProcDeclaration, Range, Statement, StringLiteral } from "./ast";
+import { ArrayLiteral, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, ProcDeclaration, Range, Statement, StringLiteral } from "./ast";
 import { consume, consumeWhitespace, consumeWhile, isNumeric, isSymbolic, consumeBinaryOp, isAlpha, ParseResult, parseSeries } from "./parsing-utils";
 import { given, log } from "./utils";
 
@@ -77,6 +77,7 @@ function unary(code: string, index: number): ParseResult<Expression> | undefined
     return funcall(code, index)
         ?? ifElseExpression(code, index)
         ?? range(code, index)
+        ?? parenthesized(code, index)
         ?? identifier(code, index)
         ?? objectLiteral(code, index)
         ?? arrayLiteral(code, index)
@@ -216,6 +217,17 @@ const range = (code: string, index: number): ParseResult<Range> | undefined =>
                 },
                 newIndex: index,
             }))));
+
+const parenthesized = (code: string, index: number): ParseResult<ParenthesizedExpression> | undefined =>
+    given(consume(code, index, "("), index =>
+        given(expression(code, index), ({ parsed: inner, newIndex: index }) =>
+            given(consume(code, index, ")"), index => ({
+                parsed: {
+                    kind: "parenthesized-expression",
+                    inner,
+                },
+                newIndex: index,
+            }))))
 
 function identifier(code: string, index: number): ParseResult<Identifier> | undefined {
     let nameResult = identifierSegment(code, index);
