@@ -6,3 +6,14 @@ type Bar = string | number
 type Blah = string[]
 
 type Stuff = { foo: Bar, foo2: Blah }
+
+const foo: Foo = 'stuff'
+
+const bar: Bar = 12
+
+const blah: Blah = [ '1', '2', '3' ]
+
+const stuff: Stuff = {
+    foo: 12,
+    foo2: [ 'other' ]
+}

@@ -1,5 +1,7 @@
 func uuid() => '12345'
 
+const foo: FooType = 'stuff'
+
 func classNames(cn) =>
     cn
         |> entries 
