@@ -1,5 +1,4 @@
-import { AST, BinaryOp, Declaration, FuncType, Identifier, NilLiteral, TypeExpression, UnknownType } from "./ast";
-import { Type, STRING, NUMBER, BOOLEAN, canBeAssignedTo } from "./types";
+import { AST, BinaryOp, Declaration, FuncType, Identifier, NamedType, NilLiteral, TypeExpression, UnknownType } from "./ast";
 import { deepEquals, given } from "./utils";
 
 type NamedTypes = Map<string, TypeExpression>;

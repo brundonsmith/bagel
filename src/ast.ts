@@ -1,4 +1,3 @@
-import { Type } from "./types";
 
 export type AST =
     | Declaration
