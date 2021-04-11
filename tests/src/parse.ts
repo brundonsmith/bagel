@@ -4,6 +4,8 @@ import { parse } from "../../src/parse";
 import { AST, FuncDeclaration } from "../../src/ast";
 import { deepEquals } from "../../src/utils";
 
+console.log("parse.ts")
+
 test(function simpleFuncDeclaration() {
     return testParse(
         "func uid() => '12345'",
@@ -31,6 +33,35 @@ test(function simpleFuncDeclaration() {
     );
 })
 
+test(function simpleProcDeclaration() {
+    return testParse(
+        `proc doStuff(a) {
+            
+        }`,
+        {
+            kind: "proc-declaration",
+            proc: {
+                kind: "proc",
+                name: {
+                    kind: "identifier",
+                    name: "doStuff",
+                },
+                type: {
+                    kind: "proc-type",
+                    argTypes: [{ kind: "unknown-type" }],
+                },
+                argNames: [
+                    {
+                        kind: "identifier",
+                        name: "a",
+                    }
+                ],
+                body: []
+            }
+        },
+        (code, index) => parse(code)[0],
+    );
+})
 
 test(function simpleConstDeclaration() {
     return testParse(
@@ -51,6 +82,39 @@ test(function simpleConstDeclaration() {
             value: {
                 kind: "string-literal",
                 value: "stuff",
+            }
+        },
+        (code, index) => parse(code)[0],
+    );
+})
+
+
+test(function basicPropertyAccess() {
+    return testParse(
+        "const foo = bar.prop1.prop2",
+        {
+            kind: "const-declaration",
+            name: {
+                kind: "identifier",
+                name: "foo",
+            },
+            type: { kind: "unknown-type" },
+            value: {
+                kind: "property-accessor",
+                base: {
+                    kind: "identifier",
+                    name: "bar",
+                },
+                properties: [
+                    {
+                        kind: "identifier",
+                        name: "prop1",
+                    },
+                    {
+                        kind: "identifier",
+                        name: "prop2",
+                    }
+                ]
             }
         },
         (code, index) => parse(code)[0],

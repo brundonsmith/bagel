@@ -9,12 +9,12 @@ core language:
         - var decl
         - if/else
         - for and while loops (only for/of, because we have ranges!)
-    - dot accessors
     - spread/destructuring
     - types
         - nominal types
         - iterator types
         - promise types
+    - dynamic property definition/access (square brackets)
 - more helpful error messages
 - error handling in procs
 - hoisting (types and declarations)

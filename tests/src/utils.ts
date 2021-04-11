@@ -1,6 +1,8 @@
 import { test } from "./testing-utils";
 import { deepEquals } from "../../src/utils";
 
+console.log("utils.ts")
+
 test(function deepEqualsWithUndefined() {
     const val1 = {
 

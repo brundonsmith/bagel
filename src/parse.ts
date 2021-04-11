@@ -1,4 +1,4 @@
-import { ArrayLiteral, ArrayType, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IndexerType, KEYWORDS, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcDeclaration, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType } from "./ast";
+import { ArrayLiteral, ArrayType, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IndexerType, KEYWORDS, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcDeclaration, PropertyAccessor, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType } from "./ast";
 import { consume, consumeWhitespace, consumeWhile, isNumeric, consumeBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional } from "./parsing-utils";
 import { given, log } from "./utils";
 
@@ -65,7 +65,7 @@ const nonArrayType = (code: string, index: number): ParseResult<TypeExpression> 
 
 const unionType = (code: string, index: number): ParseResult<UnionType> | undefined =>
     // TODO: Allow leading |
-    given(parseSeries(code, index, atomicType, "|", true), ({ items: members, newIndex: index }) =>
+    given(parseSeries(code, index, atomicType, "|", { leadingDelimiter: "optional", trailingDelimiter: "forbidden" }), ({ parsed: members, newIndex: index }) =>
         members.length >= 2
             ? {
                 parsed: {
@@ -97,7 +97,7 @@ const namedType = (code: string, index: number): ParseResult<NamedType> | undefi
 const objectType = (code: string, index: number): ParseResult<ObjectType> | undefined =>
     given(consume(code, index, "{"), index =>
         given(consumeWhitespace(code, index), index =>
-            given(parseSeries(code, index, _objectTypeEntry, ","), ({ items: entries, newIndex: index }) =>
+            given(parseSeries(code, index, _objectTypeEntry, ","), ({ parsed: entries, newIndex: index }) =>
                 given(consumeWhitespace(code, index), index =>
                     given(consume(code, index, "}"), index => ({
                         parsed: {
@@ -135,7 +135,7 @@ const indexerType = (code: string, index: number): ParseResult<IndexerType> | un
 
 const tupleType = (code: string, index: number): ParseResult<TupleType> | undefined =>
     given(consume(code, index, "["), index =>
-        given(parseSeries(code, index, typeExpression, ","), ({ items: members, newIndex: index }) =>
+        given(parseSeries(code, index, typeExpression, ","), ({ parsed: members, newIndex: index }) =>
             given(consume(code, index, "]"), index => ({
                 parsed: {
                     kind: "tuple-type",
@@ -242,9 +242,23 @@ const expression = (code: string, index: number): ParseResult<Expression> | unde
     ?? func(code, index)
     ?? pipe(code, index)
     ?? binaryOperator(code, index)
-    ?? atom(code, index)
+    ?? beneathBinaryOperator(code, index)
 
-const atom = (code: string, index: number): ParseResult<Expression> | undefined =>
+const beneathBinaryOperator = (code: string, index: number): ParseResult<Expression> | undefined =>
+    propertyAccessor(code, index)
+    ?? funcall(code, index)
+    ?? ifElseExpression(code, index)
+    ?? range(code, index)
+    ?? parenthesized(code, index)
+    ?? identifier(code, index)
+    ?? objectLiteral(code, index)
+    ?? arrayLiteral(code, index)
+    ?? stringLiteral(code, index)
+    ?? numberLiteral(code, index)
+    ?? booleanLiteral(code, index)
+    ?? nilLiteral(code, index)
+
+const beneathPropertyAccessor = (code: string, index: number): ParseResult<Expression> | undefined =>
     funcall(code, index)
     ?? ifElseExpression(code, index)
     ?? range(code, index)
@@ -261,24 +275,25 @@ function proc(code: string, index: number): ParseResult<Proc> | undefined {
     const nameResult = identifier(code, index);
 
     return given(consume(code, nameResult?.newIndex ?? index, "("), index =>
-        given(parseSeries(code, index, _argumentDeclaration, ","), ({ items: args, newIndex: index }) =>
+        given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
             given(consume(code, index, ")"), index =>
                 given(consumeWhitespace(code, index), index =>
                     given(consume(code, index, "{"), index =>
-                        given(parseSeries(code, index, statement), ({ items: body, newIndex: index }) => 
-                            given(consume(code, index, "}"), index =>({
-                                parsed: {
-                                    kind: "proc",
-                                    name: nameResult?.parsed,
-                                    type: {
-                                        kind: "proc-type",
-                                        argTypes: args.map(arg => arg.type ?? { kind: "unknown-type" }),
+                        given(parseSeries(code, index, statement, ";", { trailingDelimiter: "required" }), ({ parsed: body, newIndex: index }) => 
+                            given(consumeWhitespace(code, index), index =>
+                                given(consume(code, index, "}"), index =>({
+                                    parsed: {
+                                        kind: "proc",
+                                        name: nameResult?.parsed,
+                                        type: {
+                                            kind: "proc-type",
+                                            argTypes: args.map(arg => arg.type ?? { kind: "unknown-type" }),
+                                        },
+                                        argNames: args.map(arg => arg.name),
+                                        body,
                                     },
-                                    argNames: args.map(arg => arg.name),
-                                    body,
-                                },
-                                newIndex: index,
-                            }))))))))
+                                    newIndex: index,
+                                })))))))))
 }
 
 function statement(code: string, index: number): ParseResult<Statement> | undefined {
@@ -289,7 +304,7 @@ function func(code: string, index: number): ParseResult<Func> | undefined {
     const nameResult = identifier(code, index);
 
     return given(consume(code, nameResult?.newIndex ?? index, "("), index =>
-        given(parseSeries(code, index, _argumentDeclaration, ","), ({ items: args, newIndex: index }) =>
+        given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
             given(consume(code, index, ")"), index =>
                 given(consumeWhitespace(code, index), index =>
                     given(parseOptional(code, index, (code, index) =>
@@ -328,7 +343,7 @@ const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: 
             }))))
 
 const pipe = (code: string, index: number): ParseResult<Pipe> | undefined => 
-    given(parseSeries(code, index, atom, "|>", true), ({ items: expressions, newIndex: index }) =>
+    given(parseSeries(code, index, beneathBinaryOperator, "|>", { trailingDelimiter: "forbidden" }), ({ parsed: expressions, newIndex: index }) =>
         expressions.length >= 2
             ? {
                 parsed: {
@@ -340,7 +355,7 @@ const pipe = (code: string, index: number): ParseResult<Pipe> | undefined =>
             : undefined)
 
 const binaryOperator = (code: string, index: number): ParseResult<BinaryOperator> | undefined => 
-    given(atom(code, index), ({ parsed: left, newIndex: index }) => 
+    given(beneathBinaryOperator(code, index), ({ parsed: left, newIndex: index }) => 
         given(consumeWhitespace(code, index), index =>
             given(consumeBinaryOp(code, index), endOfOpIndex =>
             given(code.substring(index, endOfOpIndex) as BinaryOp, operator =>
@@ -358,7 +373,7 @@ const binaryOperator = (code: string, index: number): ParseResult<BinaryOperator
 const funcall = (code: string, index: number): ParseResult<Funcall> | undefined =>
     given(identifier(code, index), ({ parsed: func, newIndex: index }) =>
         given(consume(code, index, "("), index => 
-            given(parseSeries(code, index, expression, ","), ({ items: args, newIndex: index }) =>
+            given(parseSeries(code, index, expression, ","), ({ parsed: args, newIndex: index }) =>
                 given(consume(code, index, ")"), index => ({
                     parsed: {
                         kind: "funcall",
@@ -420,6 +435,20 @@ const parenthesized = (code: string, index: number): ParseResult<ParenthesizedEx
                 newIndex: index,
             }))))
 
+const propertyAccessor = (code: string, index: number): ParseResult<PropertyAccessor> | undefined =>
+    given(beneathPropertyAccessor(code, index), ({ parsed: base, newIndex: index }) =>
+        given(parseSeries(code, index, identifier, ".", { leadingDelimiter: "required", trailingDelimiter: "forbidden", whitespace: "forbidden" }), ({ parsed: properties, newIndex: index }) => 
+            properties.length > 0
+                ? {
+                    parsed: {
+                        kind: "property-accessor",
+                        base,
+                        properties,
+                    },
+                    newIndex: index
+                }
+                : undefined))
+
 function identifier(code: string, index: number): ParseResult<Identifier> | undefined {
     let nameResult = identifierSegment(code, index);
     if (nameResult = identifierSegment(code, index)) {
@@ -434,7 +463,7 @@ function identifier(code: string, index: number): ParseResult<Identifier> | unde
 
 const objectLiteral = (code: string, index: number): ParseResult<ObjectLiteral> | undefined =>
     given(consume(code, index, "{"), index =>
-        given(parseSeries(code, index, _objectEntry, ","), ({ items: entries, newIndex: index }) =>
+        given(parseSeries(code, index, _objectEntry, ","), ({ parsed: entries, newIndex: index }) =>
             given(consume(code, index, "}"), index => ({
                 parsed: {
                     kind: "object-literal",
@@ -455,7 +484,7 @@ const _objectEntry = (code: string, index: number): ParseResult<[Identifier, Exp
 
 const arrayLiteral = (code: string, index: number): ParseResult<ArrayLiteral> | undefined =>
     given(consume(code, index, "["), index =>
-        given(parseSeries(code, index, expression, ","), ({ items: entries, newIndex: index }) =>
+        given(parseSeries(code, index, expression, ","), ({ parsed: entries, newIndex: index }) =>
             given(consume(code, index, "]"), index => ({
                 parsed: {
                     kind: "array-literal",

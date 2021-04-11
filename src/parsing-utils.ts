@@ -67,35 +67,67 @@ export function isBinaryOp(str: string): str is BinaryOp {
 
 export type ParseResult<T> = { parsed: T, newIndex: number };
 
-export function parseSeries<T>(code: string, index: number, parseFn: (code: string, index: number) => ParseResult<T>|undefined, delimiter?: string, forbidTrailing = false): { items: T[], newIndex: number } | undefined {
-    const items: T[] = [];
+export function parseSeries<T>(code: string, index: number, itemParseFn: (code: string, index: number) => ParseResult<T>|undefined, delimiter: string, options: Partial<SeriesOptions> = {}): ParseResult<T[]> {
+    const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], newIndex: index };
+
+    const { leadingDelimiter, trailingDelimiter, whitespace } = { ...DEAFULT_SERIES_OPTIONS, ...options };
+    const parsed: T[] = [];
+
+    if (leadingDelimiter === "required" || leadingDelimiter === "optional") {
+        const indexAfterLeadingDelimiter = consume(code, index, delimiter);
+
+        if (leadingDelimiter === "required" && indexAfterLeadingDelimiter == null) {
+            return EMPTY_RESULT;
+        } else if (indexAfterLeadingDelimiter != null) {
+            index = indexAfterLeadingDelimiter;
+        }
+    }
+
     let foundDelimiter = false;
-    index = consumeWhitespace(code, index);
-    let elementResult = parseFn(code, index);
-    while (elementResult != null) {
-        index = elementResult.newIndex;
-        items.push(elementResult.parsed);
+
+    if (whitespace === "optional") index = consumeWhitespace(code, index);
+
+    let itemResult = itemParseFn(code, index);
+    while (itemResult != null) {
+        index = itemResult.newIndex;
+        parsed.push(itemResult.parsed);
 
         foundDelimiter = false;
-        elementResult = undefined;
+        itemResult = undefined;
 
-        index = consumeWhitespace(code, index);
+        if (whitespace === "optional") index = consumeWhitespace(code, index);
+
         if (delimiter != null) {
-            given(consume(code, index, delimiter), newIndex => {
+            given(consume(code, index, delimiter), index => {
                 foundDelimiter = true;
 
-                index = consumeWhitespace(code, newIndex);
-                elementResult = parseFn(code, index);
-                index = consumeWhitespace(code, index);
+                if (whitespace === "optional") index = consumeWhitespace(code, index);
+                itemResult = itemParseFn(code, index);
+                if (whitespace === "optional") index = consumeWhitespace(code, index);
             });
         }
     }
 
-    if (foundDelimiter && forbidTrailing) {  // found delimiter but element undefined -> trailing delimiter
-        return undefined;
+    // element undefined but found delimiter means trailing delimiter
+    if (foundDelimiter && trailingDelimiter === "forbidden") {
+        return EMPTY_RESULT;
+    } else if (!foundDelimiter && trailingDelimiter === "required") {
+        return EMPTY_RESULT;
     }
 
-    return { items, newIndex: index };
+    return { parsed, newIndex: index };
+}
+
+type SeriesOptions = {
+    leadingDelimiter: "required"|"optional"|"forbidden",
+    trailingDelimiter: "required"|"optional"|"forbidden",
+    whitespace: "optional"|"forbidden",
+}
+
+const DEAFULT_SERIES_OPTIONS: SeriesOptions = {
+    leadingDelimiter: "forbidden",
+    trailingDelimiter: "optional",
+    whitespace: "optional",
 }
 
 export function parseOptional<T>(code: string, index: number, parseFn: (code: string, index: number) => ParseResult<T>|undefined): Partial<ParseResult<T>> {

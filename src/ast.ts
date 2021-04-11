@@ -111,6 +111,7 @@ export type Expression =
     | IfElseExpression
     | Range
     | ParenthesizedExpression
+    | PropertyAccessor
     | Identifier
     | ObjectLiteral
     | ArrayLiteral
@@ -180,6 +181,12 @@ export type Range = {
 export type ParenthesizedExpression = {
     kind: "parenthesized-expression",
     inner: Expression,
+}
+
+export type PropertyAccessor = {
+    kind: "property-accessor",
+    base: Expression,
+    properties: Identifier[],
 }
 
 export type Identifier = {

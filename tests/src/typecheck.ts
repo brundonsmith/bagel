@@ -4,6 +4,8 @@ import { typecheckFile } from "../../src/typecheck";
 import { deepEquals } from "../../src/utils";
 import { test } from "./testing-utils";
 
+console.log("typecheck.ts")
+
 test(function typeDeclarations() {
     return testTypecheck(`type Foo = string`, [ {
             kind: "primitive-type",
