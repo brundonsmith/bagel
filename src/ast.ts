@@ -121,7 +121,7 @@ export type Expression =
 
 export type Proc = {
     kind: "proc",
-    name?: string,
+    name?: Identifier,
     type: ProcType | UnknownType,
     argNames: Identifier[],
     body: Statement[],
@@ -137,7 +137,7 @@ export type Assignment = {
 
 export type Func = {
     kind: "func",
-    name?: string,
+    name?: Identifier,
     type: FuncType | UnknownType,
     argNames: Identifier[],
     body: Expression,

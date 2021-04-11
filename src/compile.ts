@@ -34,11 +34,11 @@ function compileOne(ast: AST): string {
 const NIL = `undefined`;
 
 function compileProc(proc: Proc): string {
-    return `function ${proc.name == null ? '' : proc.name}(${proc.argNames.map(compileOne)}) {${proc.body.map(compileOne).join("; ")}}`;
+    return `function ${proc.name == null ? '' : proc.name.name}(${proc.argNames.map(compileOne)}) {${proc.body.map(compileOne).join("; ")}}`;
 }
 
 function compileFunc(func: Func): string {
-    return `function ${func.name == null ? '' : func.name}(${func.argNames.map(compileOne)}) { return ${compileOne(func.body)}; }`;
+    return `function ${func.name == null ? '' : func.name.name}(${func.argNames.map(compileOne)}) { return ${compileOne(func.body)}; }`;
 }
 
 function compilePipe(expressions: readonly Expression[], end: number): string {

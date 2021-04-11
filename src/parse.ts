@@ -1,5 +1,5 @@
 import { ArrayLiteral, ArrayType, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IndexerType, KEYWORDS, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcDeclaration, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType } from "./ast";
-import { consume, consumeWhitespace, consumeWhile, isNumeric, isSymbol, consumeBinaryOp, isAlpha, ParseResult, parseSeries, isSymbolic, parseOptional } from "./parsing-utils";
+import { consume, consumeWhitespace, consumeWhile, isNumeric, consumeBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional } from "./parsing-utils";
 import { given, log } from "./utils";
 
 export function parse(code: string): Declaration[] {
@@ -217,17 +217,17 @@ const funcDeclaration = (code: string, index: number): ParseResult<FuncDeclarati
             }))))
 
 const constDeclaration = (code: string, index: number): ParseResult<ConstDeclaration> | undefined =>
-    given(log(consume(code, index, "const")), index =>
+    given(consume(code, index, "const"), index =>
         given(consumeWhitespace(code, index), index =>
-            given(log(identifier(code, index)), ({ parsed: name, newIndex: index}) =>
-                given(log(consumeWhitespace(code, index), x => "`" + code.substr(index) + "`"), index =>
+            given(identifier(code, index), ({ parsed: name, newIndex: index}) =>
+                given(consumeWhitespace(code, index), index =>
                     given(parseOptional(code, index, (code, index) =>
-                        given(log(consume(code, index, ":")), index =>
-                            given(consumeWhitespace(code, index), index => log(typeExpression(code, index))))), ({ parsed: type, newIndex }) =>
+                        given(consume(code, index, ":"), index =>
+                            given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: type, newIndex }) =>
                     given(consumeWhitespace(code, newIndex ?? index), index =>
-                        given(log(consume(code, index, "=")), index =>
+                        given(consume(code, index, "="), index =>
                             given(consumeWhitespace(code, index), index =>
-                                given(log(expression(code, index)), ({ parsed: value, newIndex: index }) => ({
+                                given(expression(code, index), ({ parsed: value, newIndex: index }) => ({
                                     parsed: {
                                         kind: "const-declaration",
                                         name,
@@ -258,12 +258,9 @@ const atom = (code: string, index: number): ParseResult<Expression> | undefined 
     ?? nilLiteral(code, index)
 
 function proc(code: string, index: number): ParseResult<Proc> | undefined {
-    const indexAfterIdentifier = consumeWhile(code, index, isSymbolic);
-    const name = indexAfterIdentifier > index 
-        ? code.substring(index, indexAfterIdentifier) 
-        : undefined;
+    const nameResult = identifier(code, index);
 
-    return given(consume(code, indexAfterIdentifier, "("), index =>
+    return given(consume(code, nameResult?.newIndex ?? index, "("), index =>
         given(parseSeries(code, index, identifier, ","), ({ items: argNames, newIndex: index }) =>
             given(consume(code, index, ")"), index =>
                 given(consumeWhitespace(code, index), index =>
@@ -272,7 +269,7 @@ function proc(code: string, index: number): ParseResult<Proc> | undefined {
                             given(consume(code, index, "}"), index =>({
                                 parsed: {
                                     kind: "proc",
-                                    name,
+                                    name: nameResult?.parsed,
                                     type: { kind: "unknown-type" }, // TODO: Parse for this
                                     argNames,
                                     body,
@@ -286,12 +283,9 @@ function statement(code: string, index: number): ParseResult<Statement> | undefi
 }
 
 function func(code: string, index: number): ParseResult<Func> | undefined {
-    const indexAfterIdentifier = consumeWhile(code, index, isSymbolic);
-    const name = indexAfterIdentifier > index 
-        ? code.substring(index, indexAfterIdentifier) 
-        : undefined;
+    const nameResult = identifier(code, index);
 
-    return given(consume(code, indexAfterIdentifier, "("), index =>
+    return given(consume(code, nameResult?.newIndex ?? index, "("), index =>
         given(parseSeries(code, index, identifier, ","), ({ items: argNames, newIndex: index }) =>
             given(consume(code, index, ")"), index =>
                 given(consumeWhitespace(code, index), index =>
@@ -300,7 +294,7 @@ function func(code: string, index: number): ParseResult<Func> | undefined {
                             given(expression(code, index), ({ parsed: body, newIndex: index }) => ({
                                 parsed: {
                                     kind: "func",
-                                    name,
+                                    name: nameResult?.parsed,
                                     type: { kind: "unknown-type" }, // TODO: Parse for this
                                     argNames,
                                     body,
