@@ -506,12 +506,20 @@ function nilLiteral(code: string, index: number): ParseResult<NilLiteral> | unde
 function identifierSegment(code: string, index: number): { segment: string, newIndex: number} | undefined {
     const startIndex = index;
 
-    while (isSymbolic(code[index], index)) {
+    while (isSymbolic(code[index], index - startIndex)) {
         index++;
     }
 
+    const segment = code.substring(startIndex, index);
+
+    for (const keyword of KEYWORDS) {
+        if (segment === keyword) {
+            return undefined;
+        }
+    }
+
     if (index - startIndex > 0) {
-        return { segment: code.substring(startIndex, index), newIndex: index };
+        return { segment, newIndex: index };
     }
 }
 
