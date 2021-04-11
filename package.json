@@ -13,6 +13,7 @@
     "build": "webpack --mode=production",
     "build:dev": "webpack --mode=development",
     "build:prod": "webpack --mode=production",
+    "build-and-run": "webpack --mode=development ; node dist.js tests/types-sample.bgl tests/types-sample.js",
     "watch": "webpack --watch"
   }
 }
