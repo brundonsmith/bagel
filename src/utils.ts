@@ -21,18 +21,19 @@ type BasicData =
     | boolean
     | undefined
 
-export function deepEquals<T extends BasicData>(a: BasicData, b: BasicData): boolean {
+export function deepEquals<T extends BasicData>(a: T, b: T): boolean {
     if (a === b) {
         return true;
-    } else if (a != null && b != null && typeof a === "object" && typeof b === "object") {
-        if (Array.isArray(a) == Array.isArray(b)) {
-            // TODO: Make this more efficient
-            const aEntries = Object.entries(a);
-            const bEntries = Object.entries(b);
+    } else if (a != null && b != null 
+            && typeof a === "object" && typeof b === "object" 
+            && Array.isArray(a) == Array.isArray(b)) {
+        // @ts-ignore
+        const aEntries = Object.entries(a);
+        // @ts-ignore
+        const bEntries = Object.entries(b);
 
-            return aEntries.length === bEntries.length && aEntries.every((entry, index) => 
-                bEntries[index][0] === entry[0] && bEntries[index][1] === entry[1])
-        }
+        return aEntries.length === bEntries.length && aEntries.every((entry, index) => 
+            bEntries[index][0] === entry[0] && deepEquals(bEntries[index][1], entry[1]))
     }
 
     return false;
