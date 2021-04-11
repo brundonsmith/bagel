@@ -70,6 +70,7 @@ export type ParseResult<T> = { parsed: T, newIndex: number };
 export function parseSeries<T>(code: string, index: number, parseFn: (code: string, index: number) => ParseResult<T>|undefined, delimiter?: string, forbidTrailing = false): { items: T[], newIndex: number } | undefined {
     const items: T[] = [];
     let foundDelimiter = false;
+    index = consumeWhitespace(code, index);
     let elementResult = parseFn(code, index);
     while (elementResult != null) {
         index = elementResult.newIndex;
@@ -95,4 +96,13 @@ export function parseSeries<T>(code: string, index: number, parseFn: (code: stri
     }
 
     return { items, newIndex: index };
+}
+
+export function parseOptional<T>(code: string, index: number, parseFn: (code: string, index: number) => ParseResult<T>|undefined): Partial<ParseResult<T>> {
+    const result = parseFn(code, index);
+
+    return {
+        parsed: result?.parsed,
+        newIndex: result?.newIndex,
+    };
 }
