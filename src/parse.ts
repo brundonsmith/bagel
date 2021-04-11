@@ -1,13 +1,13 @@
-import { ArrayLiteral, ArrayType, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IndexerType, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcDeclaration, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType } from "./ast";
-import { consume, consumeWhitespace, consumeWhile, isNumeric, isSymbol, consumeBinaryOp, isAlpha, ParseResult, parseSeries, isSymbolic } from "./parsing-utils";
+import { ArrayLiteral, ArrayType, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IndexerType, KEYWORDS, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcDeclaration, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType } from "./ast";
+import { consume, consumeWhitespace, consumeWhile, isNumeric, isSymbol, consumeBinaryOp, isAlpha, ParseResult, parseSeries, isSymbolic, parseOptional } from "./parsing-utils";
 import { given, log } from "./utils";
 
-export function parse(code: string): AST[] {
+export function parse(code: string): Declaration[] {
     let index = 0;
 
-    const results: AST[] = [];
+    const results: Declaration[] = [];
     index = consumeWhitespace(code, index);
-    for (let result = ast(code, index); result != null; result = ast(code, index)) {
+    for (let result = declaration(code, index); result != null; result = declaration(code, index)) {
         results.push(result.parsed);
         index = result.newIndex;
         index = consumeWhitespace(code, index);
@@ -16,11 +16,11 @@ export function parse(code: string): AST[] {
     return results;
 }
 
-function ast(code: string, index: number): ParseResult<AST> | undefined {
-    index = consumeWhitespace(code, index);
-    return declaration(code, index)
-        ?? expression(code, index);
-}
+// function ast(code: string, index: number): ParseResult<AST> | undefined {
+//     index = consumeWhitespace(code, index);
+//     return declaration(code, index)
+//         ?? expression(code, index);
+// }
 
 const declaration = (code: string, index: number): ParseResult<Declaration> | undefined =>
     typeDeclaration(code, index)
@@ -217,30 +217,34 @@ const funcDeclaration = (code: string, index: number): ParseResult<FuncDeclarati
             }))))
 
 const constDeclaration = (code: string, index: number): ParseResult<ConstDeclaration> | undefined =>
-    given(consume(code, index, "const"), index =>
+    given(log(consume(code, index, "const")), index =>
         given(consumeWhitespace(code, index), index =>
-            given(identifier(code, index), ({ parsed: name, newIndex: index}) =>
-                given(consumeWhitespace(code, index), index =>
-                    given(consume(code, index, "="), index =>
-                        given(consumeWhitespace(code, index), index =>
-                            given(expression(code, index), ({ parsed: value, newIndex: index }) => ({
-                                parsed: {
-                                    kind: "const-declaration",
-                                    name,
-                                    value,
-                                    type: { kind: "unknown-type" }, // TODO: Parse for this
-                                },
-                                newIndex: index,
-                            }))))))))
+            given(log(identifier(code, index)), ({ parsed: name, newIndex: index}) =>
+                given(log(consumeWhitespace(code, index), x => "`" + code.substr(index) + "`"), index =>
+                    given(parseOptional(code, index, (code, index) =>
+                        given(log(consume(code, index, ":")), index =>
+                            given(consumeWhitespace(code, index), index => log(typeExpression(code, index))))), ({ parsed: type, newIndex }) =>
+                    given(consumeWhitespace(code, newIndex ?? index), index =>
+                        given(log(consume(code, index, "=")), index =>
+                            given(consumeWhitespace(code, index), index =>
+                                given(log(expression(code, index)), ({ parsed: value, newIndex: index }) => ({
+                                    parsed: {
+                                        kind: "const-declaration",
+                                        name,
+                                        type: type ?? { kind: "unknown-type" },
+                                        value,
+                                    },
+                                    newIndex: index,
+                                }))))))))))
 
 const expression = (code: string, index: number): ParseResult<Expression> | undefined =>
     proc(code, index)
     ?? func(code, index)
     ?? pipe(code, index)
     ?? binaryOperator(code, index)
-    ?? unary(code, index)
+    ?? atom(code, index)
 
-const unary = (code: string, index: number): ParseResult<Expression> | undefined =>
+const atom = (code: string, index: number): ParseResult<Expression> | undefined =>
     funcall(code, index)
     ?? ifElseExpression(code, index)
     ?? range(code, index)
@@ -248,7 +252,7 @@ const unary = (code: string, index: number): ParseResult<Expression> | undefined
     ?? identifier(code, index)
     ?? objectLiteral(code, index)
     ?? arrayLiteral(code, index)
-    ?? stringLiteral(code, index) 
+    ?? stringLiteral(code, index)
     ?? numberLiteral(code, index)
     ?? booleanLiteral(code, index)
     ?? nilLiteral(code, index)
@@ -269,9 +273,9 @@ function proc(code: string, index: number): ParseResult<Proc> | undefined {
                                 parsed: {
                                     kind: "proc",
                                     name,
+                                    type: { kind: "unknown-type" }, // TODO: Parse for this
                                     argNames,
                                     body,
-                                    type: { kind: "unknown-type" }, // TODO: Parse for this
                                 },
                                 newIndex: index,
                             }))))))))
@@ -292,20 +296,21 @@ function func(code: string, index: number): ParseResult<Func> | undefined {
             given(consume(code, index, ")"), index =>
                 given(consumeWhitespace(code, index), index =>
                     given(consume(code, index, "=>"), index =>
-                        given(expression(code, index), ({ parsed: body, newIndex: index }) => ({
-                            parsed: {
-                                kind: "func",
-                                name,
-                                argNames,
-                                body,
-                                type: { kind: "unknown-type" }, // TODO: Parse for this
-                            },
-                            newIndex: index,
-                        })))))))
+                        given(consumeWhitespace(code, index), index =>
+                            given(expression(code, index), ({ parsed: body, newIndex: index }) => ({
+                                parsed: {
+                                    kind: "func",
+                                    name,
+                                    type: { kind: "unknown-type" }, // TODO: Parse for this
+                                    argNames,
+                                    body,
+                                },
+                                newIndex: index,
+                            }))))))))
 }
 
 const pipe = (code: string, index: number): ParseResult<Pipe> | undefined => 
-    given(parseSeries(code, index, unary, "|>", true), ({ items: expressions, newIndex: index }) =>
+    given(parseSeries(code, index, atom, "|>", true), ({ items: expressions, newIndex: index }) =>
         expressions.length >= 2
             ? {
                 parsed: {
@@ -317,7 +322,7 @@ const pipe = (code: string, index: number): ParseResult<Pipe> | undefined =>
             : undefined)
 
 const binaryOperator = (code: string, index: number): ParseResult<BinaryOperator> | undefined => 
-    given(unary(code, index), ({ parsed: left, newIndex: index }) => 
+    given(atom(code, index), ({ parsed: left, newIndex: index }) => 
         given(consumeWhitespace(code, index), index =>
             given(consumeBinaryOp(code, index), endOfOpIndex =>
             given(code.substring(index, endOfOpIndex) as BinaryOp, operator =>
@@ -325,9 +330,9 @@ const binaryOperator = (code: string, index: number): ParseResult<BinaryOperator
                 given(expression(code, index), ({ parsed: right, newIndex: index }) => ({
                     parsed: {
                         kind: "binary-operator",
+                        operator,
                         left,
                         right,
-                        operator,
                     },
                     newIndex: index,
                 })))))))
