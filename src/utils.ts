@@ -11,3 +11,29 @@ export function log<T>(expr: T, fn?: (expr: T) => string): T {
     console.log(fn == null ? expr : fn(expr));
     return expr;
 }
+
+
+type BasicData =
+    | {[key: string]: BasicData}
+    | BasicData[]
+    | string
+    | number
+    | boolean
+    | undefined
+
+export function deepEquals<T extends BasicData>(a: BasicData, b: BasicData): boolean {
+    if (a === b) {
+        return true;
+    } else if (a != null && b != null && typeof a === "object" && typeof b === "object") {
+        if (Array.isArray(a) == Array.isArray(b)) {
+            // TODO: Make this more efficient
+            const aEntries = Object.entries(a);
+            const bEntries = Object.entries(b);
+
+            return aEntries.length === bEntries.length && aEntries.every((entry, index) => 
+                bEntries[index][0] === entry[0] && bEntries[index][1] === entry[1])
+        }
+    }
+
+    return false;
+}
