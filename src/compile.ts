@@ -9,7 +9,7 @@ function compileOne(ast: AST): string {
         case "type-declaration": return ``;
         case "proc-declaration": return compileProc(ast.proc);
         case "func-declaration": return compileFunc(ast.func);
-        case "const-declaration": return `const ${ast.name} = ${compileOne(ast.value)};`;
+        case "const-declaration": return `const ${ast.name.name} = ${compileOne(ast.value)};`;
         case "proc": return compileProc(ast);
         // case "assignment": return "";
         case "func": return compileFunc(ast);
@@ -20,9 +20,9 @@ function compileOne(ast: AST): string {
         case "range": return `range(${ast.start})(${ast.end})`;
         case "parenthesized-expression": return `(${compileOne(ast.inner)})`;
         case "identifier": return ast.name;
-        case "object-literal":  return JSON.stringify(ast.entries);
-        case "array-literal":   return JSON.stringify(ast.entries);
-        case "string-literal":  return JSON.stringify(ast.value);
+        case "object-literal":  return `{ ${ast.entries.map(([ key, value ]) => `${compileOne(key)}: ${compileOne(value)}`).join(", ")} }`;
+        case "array-literal":   return `[${ast.entries.map(compileOne).join(", ")}]`;
+        case "string-literal":  return `\`${ast.value}\``;
         case "number-literal":  return JSON.stringify(ast.value);
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
