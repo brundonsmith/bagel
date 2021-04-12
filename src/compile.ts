@@ -11,7 +11,12 @@ function compileOne(ast: AST): string {
         case "func-declaration": return compileFunc(ast.func);
         case "const-declaration": return `const ${ast.name.name} = ${compileOne(ast.value)};`;
         case "proc": return compileProc(ast);
-        // case "assignment": return "";
+        case "let-declaration": return `let ${compileOne(ast.name)} = ${compileOne(ast.value)};`; // TODO: Make this an observable
+        case "assignment": return `${compileOne(ast.target)} = ${compileOne(ast.value)};`; // This needs to change too when observable
+        case "proc-call": return `${compileOne(ast.proc)}${ast.args.map(arg => `(${compileOne(arg)})`).join("")}`;
+        case "if-else-statement": return `if(${compileOne(ast.ifCondition)}) { ${ast.ifResult.map(compileOne).join(" ")} }` + (ast.elseResult != null ? ` else { ${ast.elseResult.map(compileOne).join(" ")} }` : ``);
+        case "for-loop": return `for (const ${compileOne(ast.itemIdentifier)} of ${compileOne(ast.iterator)}) { ${ast.body.map(compileOne).join(" ")} }`;
+        case "while-loop": return `while (${compileOne(ast.condition)}) { ${ast.body.map(compileOne).join(" ")} }`;
         case "func": return compileFunc(ast);
         case "funcall": return `${compileOne(ast.func)}${ast.args.map(arg => `(${compileOne(arg)})`).join("")}`;
         case "pipe": return compilePipe(ast.expressions, ast.expressions.length - 1);
@@ -29,7 +34,7 @@ function compileOne(ast: AST): string {
         case "nil-literal": return NIL;
     }
 
-    throw Error("Couldn't compile: " + ast.kind)
+    throw Error("Couldn't compile")//: " + ast.kind)
 }
 
 const NIL = `undefined`;
