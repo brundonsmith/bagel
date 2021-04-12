@@ -27,13 +27,18 @@ export function deepEquals<T extends BasicData>(a: T, b: T): boolean {
     } else if (a != null && b != null 
             && typeof a === "object" && typeof b === "object" 
             && Array.isArray(a) == Array.isArray(b)) {
+        // TODO: Make this more efficient
+
         // @ts-ignore
         const aEntries = Object.entries(a).filter(([key, value]) => value != null);
         // @ts-ignore
         const bEntries = Object.entries(b).filter(([key, value]) => value != null);
         
-        return aEntries.length === bEntries.length && aEntries.every((entry, index) => 
-            bEntries[index][0] === entry[0] && deepEquals(bEntries[index][1], entry[1]))
+        return aEntries.length === bEntries.length && aEntries.every(entry => {
+            const otherEntry = bEntries.find(other => entry[0] === other[0]);
+
+            return otherEntry != null && deepEquals(entry[1], otherEntry[1]);
+        })
     }
 
     return false;
