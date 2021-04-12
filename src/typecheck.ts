@@ -154,6 +154,21 @@ function typecheck(namedTypes: NamedTypes, namedValues: NamedValues, ast: AST): 
         case "range": return undefined; //{ kind: "primitive-type", type: "number" };  TODO: Iterator type
         case "parenthesized-expression": return typecheck(namedTypes, namedValues, ast.inner);
         case "identifier": return namedValues.get(ast.name);
+        case "property-accessor": {
+            return given(typecheck(namedTypes, namedValues, ast.base), type => {
+                let currentType: TypeExpression|undefined = type;
+
+                for(const prop of ast.properties) {
+                    if (currentType == null || currentType.kind !== "object-type") {
+                        return undefined;
+                    }
+
+                    currentType = currentType.entries.find(entry => deepEquals(entry[0], prop))?.[1];
+                }
+
+                return currentType;
+            })
+        };
         case "object-literal": {
             const entryTypes = ast.entries.map(([key, value]) => [key, typecheck(namedTypes, namedValues, value)]);
 

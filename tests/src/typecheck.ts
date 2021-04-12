@@ -191,6 +191,39 @@ test(function usingValidReturnType() {
         ])
 })
 
+
+test(function propertyAccessorType() {
+    testTypecheck(`
+        const obj = {
+            foo: {
+                bar: 12
+            }
+        }
+        
+        const other = obj.foo.bar`,
+        [
+            {
+                kind: "object-type",
+                entries: [
+                    [
+                        { kind: "identifier", name: "foo" },
+                        {
+                            kind: "object-type",
+                            entries: [
+                                [
+                                    { kind: "identifier", name: "bar" },
+                                    { kind: "primitive-type", type: "number" },
+                                ]
+                            ],
+                        }
+                    ]
+                ],
+            },
+            { kind: "primitive-type", type: "number" },
+        ])
+})
+
+
 function testTypecheck(code: string, expected: (TypeExpression|undefined)[]): string|undefined {
     const parsed = parse(code);
     const type = typecheckFile(parsed);

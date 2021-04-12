@@ -19,6 +19,7 @@ function compileOne(ast: AST): string {
         case "if-else-expression": return `(${compileOne(ast.ifCondition)}) ? (${compileOne(ast.ifResult)}) : (${ast.elseResult == null ? NIL : compileOne(ast.elseResult)})`;
         case "range": return `range(${ast.start})(${ast.end})`;
         case "parenthesized-expression": return `(${compileOne(ast.inner)})`;
+        case "property-accessor": return `${compileOne(ast.base)}.${ast.properties.map(compileOne).join(".")}`;
         case "identifier": return ast.name;
         case "object-literal":  return `{ ${ast.entries.map(([ key, value ]) => `${compileOne(key)}: ${compileOne(value)}`).join(", ")} }`;
         case "array-literal":   return `[${ast.entries.map(compileOne).join(", ")}]`;
