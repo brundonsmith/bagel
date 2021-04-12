@@ -67,13 +67,13 @@ export function isBinaryOp(str: string): str is BinaryOp {
 
 export type ParseResult<T> = { parsed: T, newIndex: number };
 
-export function parseSeries<T>(code: string, index: number, itemParseFn: (code: string, index: number) => ParseResult<T>|undefined, delimiter: string, options: Partial<SeriesOptions> = {}): ParseResult<T[]> {
+export function parseSeries<T>(code: string, index: number, itemParseFn: (code: string, index: number) => ParseResult<T>|undefined, delimiter?: string, options: Partial<SeriesOptions> = {}): ParseResult<T[]> {
     const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], newIndex: index };
 
     const { leadingDelimiter, trailingDelimiter, whitespace } = { ...DEAFULT_SERIES_OPTIONS, ...options };
     const parsed: T[] = [];
 
-    if (leadingDelimiter === "required" || leadingDelimiter === "optional") {
+    if (delimiter != null && (leadingDelimiter === "required" || leadingDelimiter === "optional")) {
         const indexAfterLeadingDelimiter = consume(code, index, delimiter);
 
         if (leadingDelimiter === "required" && indexAfterLeadingDelimiter == null) {
@@ -98,14 +98,18 @@ export function parseSeries<T>(code: string, index: number, itemParseFn: (code: 
         if (whitespace === "optional") index = consumeWhitespace(code, index);
 
         if (delimiter != null) {
-            given(consume(code, index, delimiter), index => {
+            given(consume(code, index, delimiter), newIndex => {
                 foundDelimiter = true;
-
+                index = newIndex;
                 if (whitespace === "optional") index = consumeWhitespace(code, index);
+                
                 itemResult = itemParseFn(code, index);
-                if (whitespace === "optional") index = consumeWhitespace(code, index);
             });
+        } else {
+            itemResult = itemParseFn(code, index);
         }
+
+        if (whitespace === "optional") index = consumeWhitespace(code, index);
     }
 
     // element undefined but found delimiter means trailing delimiter
