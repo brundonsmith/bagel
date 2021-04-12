@@ -63,6 +63,199 @@ test(function simpleProcDeclaration() {
     );
 })
 
+test(function basicProcDeclaration() {
+    return testParse(
+        `proc doStuff(a) {
+            let count = 0;
+            
+            for (item of items) {
+            }
+
+            console.log(count);
+        }`,
+        {
+            kind: "proc-declaration",
+            proc: {
+                kind: "proc",
+                name: {
+                    kind: "identifier",
+                    name: "doStuff",
+                },
+                type: {
+                    kind: "proc-type",
+                    argTypes: [{ kind: "unknown-type" }],
+                },
+                argNames: [
+                    {
+                        kind: "identifier",
+                        name: "a",
+                    }
+                ],
+                body: [
+                    {
+                        kind: "let-declaration",
+                        name: { kind: "identifier", name: "count" },
+                        type: { kind: "unknown-type" },
+                        value: { kind: "number-literal", value: 0 },
+                    },
+                    {
+                        kind: "for-loop",
+                        itemIdentifier: { kind: "identifier", name: "item" },
+                        iterator: { kind: "identifier", name: "items" },
+                        body: []
+                    },
+                    {
+                        kind: "proc-call",
+                        proc: {
+                            kind: "property-accessor",
+                            base: { kind: "identifier", name: "console" },
+                            properties: [
+                                { kind: "identifier", name: "log" },
+                            ],
+                        },
+                        args: [
+                            { kind: "identifier", name: "count" }
+                        ]
+                    }
+                ]
+            }
+        },
+        (code, index) => parse(code)[0],
+    );
+})
+
+test(function procDeclarationWithStatements() {
+    return testParse(
+        `proc doStuff(a) {
+            let count = 0;
+
+            for (item of items) {
+                if (item.foo) {
+                    count = count + 1;
+                }
+
+                if (count > 12) {
+                    console.log(a);
+                } else {
+                    console.log(nil);
+                }
+            }
+
+            console.log(count);
+        }`,
+        {
+            kind: "proc-declaration",
+            proc: {
+                kind: "proc",
+                name: {
+                    kind: "identifier",
+                    name: "doStuff",
+                },
+                type: {
+                    kind: "proc-type",
+                    argTypes: [{ kind: "unknown-type" }],
+                },
+                argNames: [
+                    {
+                        kind: "identifier",
+                        name: "a",
+                    }
+                ],
+                body: [
+                    {
+                        kind: "let-declaration",
+                        name: { kind: "identifier", name: "count" },
+                        type: { kind: "unknown-type" },
+                        value: { kind: "number-literal", value: 0 },
+                    },
+                    {
+                        kind: "for-loop",
+                        itemIdentifier: { kind: "identifier", name: "item" },
+                        iterator: { kind: "identifier", name: "items" },
+                        body: [
+                            {
+                                kind: "if-else-statement",
+                                ifCondition: {
+                                    kind: "property-accessor",
+                                    base: { kind: "identifier", name: "item" },
+                                    properties: [
+                                        { kind: "identifier", name: "foo" },
+                                    ],
+                                },
+                                ifResult: [
+                                    {
+                                        kind: "assignment",
+                                        target: { kind: "identifier", name: "count" },
+                                        value: {
+                                            kind: "binary-operator",
+                                            operator: "+",
+                                            left: { kind: "identifier", name: "count" },
+                                            right: { kind: "number-literal", value: 1 }
+                                        }
+                                    }
+                                ],
+                            },
+                            {
+                                kind: "if-else-statement",
+                                ifCondition: {
+                                    kind: "binary-operator",
+                                    operator: ">",
+                                    left: { kind: "identifier", name: "count" },
+                                    right: { kind: "number-literal", value: 12 },
+                                },
+                                ifResult: [
+                                    {
+                                        kind: "proc-call",
+                                        proc: {
+                                            kind: "property-accessor",
+                                            base: { kind: "identifier", name: "console" },
+                                            properties: [
+                                                { kind: "identifier", name: "log" },
+                                            ],
+                                        },
+                                        args: [
+                                            { kind: "identifier", name: "a" }
+                                        ]
+                                    }
+                                ],
+                                elseResult: [
+                                    {
+                                        kind: "proc-call",
+                                        proc: {
+                                            kind: "property-accessor",
+                                            base: { kind: "identifier", name: "console" },
+                                            properties: [
+                                                { kind: "identifier", name: "log" },
+                                            ],
+                                        },
+                                        args: [
+                                            { kind: "nil-literal" }
+                                        ]
+                                    }
+                                ],
+                            }
+                        ],
+                    },
+                    {
+                        kind: "proc-call",
+                        proc: {
+                            kind: "property-accessor",
+                            base: { kind: "identifier", name: "console" },
+                            properties: [
+                                { kind: "identifier", name: "log" },
+                            ],
+                        },
+                        args: [
+                            { kind: "identifier", name: "count" }
+                        ]
+                    }
+                ]
+            }
+        },
+        (code, index) => parse(code)[0],
+    );
+})
+
 test(function simpleConstDeclaration() {
     return testParse(
         "const foo: FooType = 'stuff'",

@@ -29,8 +29,55 @@ export type FuncDeclaration = {
 export type ConstDeclaration = {
     kind: "const-declaration",
     name: Identifier,
-    type: TypeExpression | UnknownType,
+    type: TypeExpression,
     value: Expression,
+}
+
+export type Statement = 
+    | LetDeclaration
+    | Assignment
+    | ProcCall
+    | IfElseStatement
+    | ForLoop
+    | WhileLoop;
+
+export type LetDeclaration = {
+    kind: "let-declaration",
+    name: Identifier,
+    type: TypeExpression,
+    value: Expression,
+}
+
+export type Assignment = {
+    kind: "assignment",
+    target: Identifier | PropertyAccessor,
+    value: Expression,
+}
+
+export type ProcCall = {
+    kind: "proc-call",
+    proc: Expression,
+    args: Expression[],
+}
+
+export type IfElseStatement = {
+    kind: "if-else-statement",
+    ifCondition: Expression,
+    ifResult: Statement[],
+    elseResult?: Statement[],
+}
+
+export type ForLoop = {
+    kind: "for-loop",
+    itemIdentifier: Identifier,
+    iterator: Expression,
+    body: Statement[],
+}
+
+export type WhileLoop = {
+    kind: "while-loop",
+    condition: Expression,
+    body: Statement[],
 }
 
 export type TypeExpression =
@@ -128,14 +175,6 @@ export type Proc = {
     body: Statement[],
 }
 
-export type Statement = 
-    | Assignment;
-
-export type Assignment = {
-    kind: "assignment",
-
-}
-
 export type Func = {
     kind: "func",
     name?: Identifier,
@@ -223,4 +262,6 @@ export type NilLiteral = {
     kind: "nil-literal",
 }
 
-export const KEYWORDS = [ "func", "proc", "if", "else", "type", "class", "let", "const" ] as const;
+export const KEYWORDS = [ "func", "proc", "if", "else", 
+"type", "typeof", "class", "let", "const", "for", "while", 
+"let", "of", "nil" ] as const;

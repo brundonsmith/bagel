@@ -1,4 +1,4 @@
-import { ArrayLiteral, ArrayType, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IndexerType, KEYWORDS, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcDeclaration, PropertyAccessor, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType } from "./ast";
+import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IfElseStatement, IndexerType, KEYWORDS, LetDeclaration, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop } from "./ast";
 import { consume, consumeWhitespace, consumeWhile, isNumeric, consumeBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional } from "./parsing-utils";
 import { given, log } from "./utils";
 
@@ -260,7 +260,10 @@ const beneathBinaryOperator = (code: string, index: number): ParseResult<Express
 
 const beneathPropertyAccessor = (code: string, index: number): ParseResult<Expression> | undefined =>
     funcall(code, index)
-    ?? ifElseExpression(code, index)
+    ?? beneathFuncall(code, index)
+
+const beneathFuncall = (code: string, index: number): ParseResult<Expression> | undefined =>
+    ifElseExpression(code, index)
     ?? range(code, index)
     ?? parenthesized(code, index)
     ?? identifier(code, index)
@@ -279,26 +282,175 @@ function proc(code: string, index: number): ParseResult<Proc> | undefined {
             given(consume(code, index, ")"), index =>
                 given(consumeWhitespace(code, index), index =>
                     given(consume(code, index, "{"), index =>
-                        given(parseSeries(code, index, statement, ";", { trailingDelimiter: "required" }), ({ parsed: body, newIndex: index }) => 
-                            given(consumeWhitespace(code, index), index =>
-                                given(consume(code, index, "}"), index =>({
-                                    parsed: {
-                                        kind: "proc",
-                                        name: nameResult?.parsed,
-                                        type: {
-                                            kind: "proc-type",
-                                            argTypes: args.map(arg => arg.type ?? { kind: "unknown-type" }),
+                        given(consumeWhitespace(code, index), index =>
+                            given(parseSeries(code, index, statement), ({ parsed: body, newIndex: index }) => 
+                                given(consumeWhitespace(code, index), index =>
+                                    given(consume(code, index, "}"), index =>({
+                                        parsed: {
+                                            kind: "proc",
+                                            name: nameResult?.parsed,
+                                            type: {
+                                                kind: "proc-type",
+                                                argTypes: args.map(arg => arg.type ?? { kind: "unknown-type" }),
+                                            },
+                                            argNames: args.map(arg => arg.name),
+                                            body,
                                         },
-                                        argNames: args.map(arg => arg.name),
-                                        body,
-                                    },
-                                    newIndex: index,
-                                })))))))))
+                                        newIndex: index,
+                                    }))))))))))
 }
 
-function statement(code: string, index: number): ParseResult<Statement> | undefined {
-    return undefined;
-}
+const statement = (code: string, index: number): ParseResult<Statement> | undefined =>
+    letDeclaration(code, index)
+    ?? assignment(code, index)
+    ?? procCall(code, index)
+    ?? ifElseStatement(code, index)
+    ?? forLoop(code, index)
+    ?? whileLoop(code, index)
+
+const letDeclaration = (code: string, index: number): ParseResult<LetDeclaration> | undefined =>
+    given(consume(code, index, "let"), index =>
+        given(consumeWhitespace(code, index), index =>
+            given(identifier(code, index), ({ parsed: name, newIndex: index }) =>
+                given(consumeWhitespace(code, index), index =>
+                    given(parseOptional(code, index, (code, index) =>
+                        given(consume(code, index, ":"), index =>
+                            given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: type, newIndex }) =>
+                    given(consumeWhitespace(code, newIndex ?? index), index =>
+                        given(consume(code, index, "="), index =>
+                            given(consumeWhitespace(code, index), index =>
+                                given(expression(code, index), ({ parsed: value, newIndex: index }) =>
+                                    given(consumeWhitespace(code, index), index =>
+                                        given(consume(code, index, ";"), index => ({
+                                                parsed: {
+                                                    kind: "let-declaration",
+                                                    name,
+                                                    value,
+                                                    type: type ?? { kind: "unknown-type" },
+                                                },
+                                                newIndex: index,
+                                            }))))))))))))
+
+const assignment = (code: string, index: number): ParseResult<Assignment> | undefined =>
+    given(identifier(code, index) ?? propertyAccessor(code, index), ({ parsed: target, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index =>
+            given(consume(code, index, "="), index =>
+                given(consumeWhitespace(code, index), index =>
+                    given(expression(code, index), ({ parsed: value, newIndex: index }) => 
+                        given(consumeWhitespace(code, index), index =>
+                            given(consume(code, index, ";"), index => ({
+                                parsed: {
+                                    kind: "assignment",
+                                    target,
+                                    value,
+                                },
+                                newIndex: index,
+                            }))))))))
+
+const procCall = (code: string, index: number): ParseResult<ProcCall> | undefined =>
+    given(expression(code, index), ({ parsed: proc, newIndex: index }) =>
+        given(consume(code, index, "("), index => 
+            given(parseSeries(code, index, expression, ","), ({ parsed: args, newIndex: index }) =>
+                given(consume(code, index, ")"), index =>
+                    given(consumeWhitespace(code, index), index =>
+                        given(consume(code, index, ";"), index => ({
+                            parsed: {
+                                kind: "proc-call",
+                                proc,
+                                args,
+                            },
+                            newIndex: index,
+                        })))))))
+
+const ifElseStatement = (code: string, index: number): ParseResult<IfElseStatement> | undefined =>
+    given(consume(code, index, "if"), index =>
+        given(consumeWhitespace(code, index), index =>
+            given(consume(code, index, "("), index =>
+                given(consumeWhitespace(code, index), index =>
+                    given(expression(code, index), ({ parsed: ifCondition, newIndex: index }) =>
+                        given(consumeWhitespace(code, index), index =>
+                            given(consume(code, index, ")"), index =>
+                                given(consumeWhitespace(code, index), index =>
+                                    given(consume(code, index, "{"), index =>
+                                        given(consumeWhitespace(code, index), index =>
+                                            given(parseSeries(code, index, statement), ({ parsed: ifResult, newIndex: index }) => 
+                                                given(consumeWhitespace(code, index), index =>
+                                                    given(consume(code, index, "}"), index =>
+                                                        given(consumeWhitespace(code, index), index => {
+                                                            const elseResultResult = given(consume(code, index, "else"), index => 
+                                                                given(consumeWhitespace(code, index), index =>
+                                                                    given(consume(code, index, "{"), index =>
+                                                                        given(parseSeries(code, index, statement), ({ parsed, newIndex: index }) =>
+                                                                            given(consume(code, index, "}"), index => ({ parsed, newIndex: index }))))));
+
+                                                            if (elseResultResult == null || elseResultResult.parsed.length === 0) {
+                                                                return {
+                                                                    parsed: {
+                                                                        kind: "if-else-statement",
+                                                                        ifCondition,
+                                                                        ifResult,
+                                                                    },
+                                                                    newIndex: index,
+                                                                }
+                                                            } else {
+                                                                return  {
+                                                                    parsed: {
+                                                                        kind: "if-else-statement",
+                                                                        ifCondition,
+                                                                        ifResult,
+                                                                        elseResult: elseResultResult.parsed,
+                                                                    },
+                                                                    newIndex: elseResultResult.newIndex,
+                                                                }
+                                                            }
+                                                        }))))))))))))))
+
+const forLoop = (code: string, index: number): ParseResult<ForLoop> | undefined =>
+    given(consume(code, index, "for"), index =>
+        given(consumeWhitespace(code, index), index =>
+            given(consume(code, index, "("), index =>
+                given(consumeWhitespace(code, index), index =>
+                    given(identifier(code, index), ({ parsed: itemIdentifier, newIndex: index }) =>
+                        given(consumeWhitespace(code, index), index =>
+                            given(consume(code, index, "of"), index =>
+                                given(consumeWhitespace(code, index), index =>
+                                    given(expression(code, index), ({ parsed: iterator, newIndex: index }) =>
+                                        given(consumeWhitespace(code, index), index =>
+                                            given(consume(code, index, ")"), index =>
+                                                given(consumeWhitespace(code, index), index =>
+                                                    given(consume(code, index, "{"), index =>
+                                                        given(parseSeries(code, index, statement), ({ parsed: body, newIndex: index }) =>
+                                                            given(consumeWhitespace(code, index), index =>
+                                                                given(consume(code, index, "}"), index => ({
+                                                                    parsed: {
+                                                                        kind: "for-loop",
+                                                                        itemIdentifier,
+                                                                        iterator,
+                                                                        body,
+                                                                    },
+                                                                    newIndex: index,
+                                                                })))))))))))))))))
+
+const whileLoop = (code: string, index: number): ParseResult<WhileLoop> | undefined =>
+    given(consume(code, index, "while"), index =>
+        given(consumeWhitespace(code, index), index =>
+            given(consume(code, index, "("), index =>
+                given(consumeWhitespace(code, index), index =>
+                    given(expression(code, index), ({ parsed: condition, newIndex: index }) =>
+                        given(consumeWhitespace(code, index), index =>
+                            given(consume(code, index, ")"), index =>
+                                given(consumeWhitespace(code, index), index =>
+                                    given(consume(code, index, "{"), index =>
+                                        given(parseSeries(code, index, statement), ({ parsed: body, newIndex: index }) =>
+                                            given(consumeWhitespace(code, index), index =>
+                                                given(consume(code, index, "}"), index => ({
+                                                    parsed: {
+                                                        kind: "while-loop",
+                                                        condition,
+                                                        body,
+                                                    },
+                                                    newIndex: index,
+                                                })))))))))))))
 
 function func(code: string, index: number): ParseResult<Func> | undefined {
     const nameResult = identifier(code, index);
@@ -371,7 +523,7 @@ const binaryOperator = (code: string, index: number): ParseResult<BinaryOperator
                 })))))))
                             
 const funcall = (code: string, index: number): ParseResult<Funcall> | undefined =>
-    given(identifier(code, index), ({ parsed: func, newIndex: index }) =>
+    given(beneathFuncall(code, index), ({ parsed: func, newIndex: index }) =>
         given(consume(code, index, "("), index => 
             given(parseSeries(code, index, expression, ","), ({ parsed: args, newIndex: index }) =>
                 given(consume(code, index, ")"), index => ({
@@ -384,33 +536,47 @@ const funcall = (code: string, index: number): ParseResult<Funcall> | undefined 
                 })))))
                 
 const ifElseExpression = (code: string, index: number): ParseResult<IfElseExpression> | undefined =>
-    given(consume(code, index, "if("), index =>
-        given(expression(code, index), ({ parsed: ifCondition, newIndex: index }) =>
-            given(consume(code, index, ")"), index =>
-                given(expression(code, index), ({ parsed: ifResult, newIndex: index }) => {
-                    const elseResult = given(consume(code, index, "else"), index => expression(code, index));
+    given(consume(code, index, "if"), index =>
+        given(consumeWhitespace(code, index), index =>
+            given(consume(code, index, "("), index =>
+                given(consumeWhitespace(code, index), index =>
+                    given(expression(code, index), ({ parsed: ifCondition, newIndex: index }) =>
+                        given(consumeWhitespace(code, index), index =>
+                            given(consume(code, index, ")"), index =>
+                                given(consumeWhitespace(code, index), index =>
+                                    given(consume(code, index, "{"), index =>
+                                        given(consumeWhitespace(code, index), index =>
+                                            given(expression(code, index), ({ parsed: ifResult, newIndex: index }) => 
+                                                given(consumeWhitespace(code, index), index =>
+                                                    given(consume(code, index, "}"), index =>
+                                                        given(consumeWhitespace(code, index), index => {
+                                                            const elseResultResult = given(consume(code, index, "else"), index => 
+                                                                given(consumeWhitespace(code, index), index =>
+                                                                    given(consume(code, index, "{"), index =>
+                                                                        given(expression(code, index), ({ parsed, newIndex: index }) =>
+                                                                            given(consume(code, index, "}"), index => ({ parsed, newIndex: index }))))));
 
-                    if (elseResult == null) {
-                        return {
-                            parsed: {
-                                kind: "if-else-expression",
-                                ifCondition,
-                                ifResult,
-                            },
-                            newIndex: index,
-                        }
-                    } else {
-                        return  {
-                            parsed: {
-                                kind: "if-else-expression",
-                                ifCondition,
-                                ifResult,
-                                elseResult: elseResult.parsed,
-                            },
-                            newIndex: elseResult.newIndex,
-                        }
-                    }
-                }))))
+                                                            if (elseResultResult == null) {
+                                                                return {
+                                                                    parsed: {
+                                                                        kind: "if-else-expression",
+                                                                        ifCondition,
+                                                                        ifResult,
+                                                                    },
+                                                                    newIndex: index,
+                                                                }
+                                                            } else {
+                                                                return  {
+                                                                    parsed: {
+                                                                        kind: "if-else-expression",
+                                                                        ifCondition,
+                                                                        ifResult,
+                                                                        elseResult: elseResultResult.parsed,
+                                                                    },
+                                                                    newIndex: elseResultResult.newIndex,
+                                                                }
+                                                            }
+                                                        }))))))))))))))
 
 const range = (code: string, index: number): ParseResult<Range> | undefined =>
     given(numberLiteral(code, index), ({ parsed: firstNumber, newIndex: index }) =>
