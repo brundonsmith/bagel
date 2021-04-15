@@ -8,7 +8,7 @@ func classNames(cn) =>
         |> fromEntries
 
 
-myFunc(a, b) => 0..10 |> map((n) => n * 2) |> filter((n) => n < 10)
+func myFunc(a, b) => 0..10 |> map((n) => n * a) |> filter((n) => n < b)
 
 concat(add(1, 2), 'stuff')
 
