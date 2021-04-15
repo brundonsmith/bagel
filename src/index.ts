@@ -18,11 +18,13 @@ fs.readFile(entry).then(async code => {
     const compiled = compile(parsed)
     console.log(compiled)
     
-    const bagelLibBundle = await fs.readFile(path.resolve(__dirname, "lib.js")).toString();
+    const bagelLibBundle = (await fs.readFile(path.resolve(__dirname, "lib.js"))).toString();
 
     const compiledWithLib = `${bagelLibBundle}
 
-Object.entries(this["bagel-lib"]).forEach(([key, value]) => this[key] = value);`;
+Object.entries(this["bagel-lib"]).forEach(([key, value]) => this[key] = value);
+
+${compiled}`;
 
     console.log(typecheckFile(parsed))
     fs.writeFile(output, compiledWithLib);
