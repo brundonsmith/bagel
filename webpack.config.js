@@ -5,8 +5,8 @@ module.exports = {
     mode: 'development',
     entry: './src/index.ts',
     output: {
-        path: __dirname,
-        filename: "dist.js",
+        path: path.resolve(__dirname, "build"),
+        filename: "compiler.js",
     },
     target: "node",
     plugins: [

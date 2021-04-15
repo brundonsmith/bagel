@@ -10,10 +10,10 @@
   "description": "My webpack project",
   "name": "my-webpack-project",
   "scripts": {
-    "build": "webpack --mode=production",
-    "build:dev": "webpack --mode=development",
-    "build:prod": "webpack --mode=production",
-    "build-and-run": "webpack --mode=development ; node dist.js tests/types-sample.bgl tests/types-sample.js",
+    "build": "webpack --mode=production ; cd lib ; npm run build",
+    "build:dev": "webpack --mode=development ; cd lib ; npm run build:dev",
+    "build:prod": "webpack --mode=production ; cd lib ; npm run build:prod",
+    "build-and-run": "webpack --mode=development ; cd lib ; npm run build:dev ; cd ../build ; node compiler.js ../tests/sample.bgl ../tests/sample.js",
     "watch": "webpack --watch",
     "test": "cd tests ; npm run build-and-run"
   }

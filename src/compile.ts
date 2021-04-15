@@ -3,7 +3,7 @@ import path from "path";
 import { AST, Expression, Func, Proc } from "./ast";
 
 export function compile(ast: AST[]): string {
-    const bagelLibBundle = fs.readFileSync(path.resolve(__filename, "..\\lib\\dist.js"));
+    const bagelLibBundle = fs.readFileSync(path.resolve(__dirname, "lib.js"));
     return `${bagelLibBundle}
 
 Object.entries(this["bagel-lib"]).forEach(([key, value]) => window[key] = value);` + 

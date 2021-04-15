@@ -1,9 +1,11 @@
+const path = require("path")
+
 module.exports = {
     mode: 'development',
     entry: './src/index.ts',
     output: {
-        path: __dirname,
-        filename: "dist.js",
+        path: path.resolve(__dirname, "../build"),
+        filename: "tests.js",
     },
     optimization: {
         minimize: false

@@ -1,4 +1,4 @@
 dist
 .vscode
 node_modules
-dist.js
+build
