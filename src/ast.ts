@@ -264,4 +264,4 @@ export type NilLiteral = {
 
 export const KEYWORDS = [ "func", "proc", "if", "else", 
 "type", "typeof", "class", "let", "const", "for", "while", 
-"let", "of", "nil" ] as const;
+"of", "nil", "public", "visible", "private" ] as const;
