@@ -1,4 +1,8 @@
-core language:
+MVP:
+- more helpful error messages
+- error handling system for procs
+- hoisting (types and declarations)
+- reactivity
 - parsing
     - "JSX"
     - classes
@@ -11,22 +15,21 @@ core language:
         - promise types
     - dynamic property definition/access (square brackets)
     - anonymous blocks
-- more helpful error messages
-- error handling system for procs
-- hoisting (types and declarations)
-- named arguments?
-- optional object properties (types)?
-- "with" declarations inside functions?
 - "typeof X" in type expressions
 - "typeof X" at runtime (add "array" return value, to avoid Array.isArray(), as well as class-name possibility)
 - array indexing (and slicing? (into iterators??))
-- JS embedding
+- JS embedding/interop
 - config file (bagel.config.json)
     - allowIOInFunctions
     - allowJSInFunctions
 
-long-term:
-- syntax highlighting
+Ideas:
+- named arguments?
+- optional object properties (types)?
+- "with" declarations inside functions?
+- other numeric types like hex?
+
+Long-term:
 - full build system
 - language server
 - package manager
