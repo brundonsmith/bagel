@@ -1,7 +1,13 @@
+import fs from "fs";
+import path from "path";
 import { AST, Expression, Func, Proc } from "./ast";
 
 export function compile(ast: AST[]): string {
-    return ast.map(compileOne).join("\n\n");
+    const bagelLibBundle = fs.readFileSync(path.resolve(__filename, "..\\lib\\dist.js"));
+    return `${bagelLibBundle}
+
+Object.entries(this["bagel-lib"]).forEach(([key, value]) => window[key] = value);` + 
+        ast.map(compileOne).join("\n\n");
 }
 
 function compileOne(ast: AST): string {
