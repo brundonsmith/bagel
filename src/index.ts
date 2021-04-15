@@ -10,7 +10,9 @@ const entry = process.argv[2];
 const output = process.argv[3];
 
 fs.readFile(entry).then(code => {
+    const start = Date.now();
     const parsed = parse(code.toString());
+    console.log(`Parsed in ${Date.now() - start}ms`)
     console.log(JSON.stringify(parsed, null, 2))
     const compiled = compile(parsed)
     console.log(compiled)
