@@ -1,5 +1,5 @@
 import { AST, BinaryOp, BINARY_OPS, KEYWORDS } from "./ast";
-import { BagelSyntaxError } from "./utils";
+import { BagelSyntaxError, isError } from "./utils";
 
 export function consume(code: string, index: number, segment: string): number|undefined {
     for (let i = 0; i < segment.length; i++) {
@@ -89,7 +89,7 @@ export function parseSeries<T>(code: string, index: number, itemParseFn: ParseFu
 
     let itemResult = itemParseFn(code, index);
     while (itemResult != null) {
-        if (itemResult instanceof Error) {
+        if (isError(itemResult)) {
             return itemResult;
         }
 
@@ -141,7 +141,7 @@ const DEAFULT_SERIES_OPTIONS: SeriesOptions = {
 export function parseOptional<T>(code: string, index: number, parseFn: ParseFunction<T>): Partial<ParseResult<T>> | BagelSyntaxError {
     const result = parseFn(code, index);
 
-    if (result instanceof Error) {
+    if (isError(result)) {
         return result;
     } else {
         return {
@@ -152,7 +152,7 @@ export function parseOptional<T>(code: string, index: number, parseFn: ParseFunc
 }
 
 export function given<T, R>(val: T|BagelSyntaxError|undefined, fn: (val: T) => R): R|BagelSyntaxError|undefined {
-    if (val != null && !(val instanceof Error)) {
+    if (val != null && !(isError(val))) {
         return fn(val);
     } else {
         return val as BagelSyntaxError|undefined;

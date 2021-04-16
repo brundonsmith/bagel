@@ -7,16 +7,35 @@ export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
     }
 }
 
-export class BagelSyntaxError extends Error {
-    constructor(
-        message: string, 
-    ) {
-        super(message);
-    }
+export type BagelSyntaxError = {
+    kind: "bagel-syntax-error",
+    code: string,
+    index: number,
+    expected: string,
 }
 
+export function errorMessage(error: BagelSyntaxError): string {
+    let line = 1;
+    let column = 0;
+    for (let i = 0; i <= error.index; i++) {
+        if (error.code[i] === "\n") {
+            line++;
+            column = 0;
+        } else {
+            column++;
+        }
+    }
+
+    return `${line}:${column} ${error.expected} expected`;
+}
+
+export function isError(x: unknown): x is BagelSyntaxError {
+    return x != null && typeof x === "object" && (x as any).kind === "bagel-syntax-error";
+}
+
+
 export function expec<T, R>(val: T|BagelSyntaxError|undefined, err: BagelSyntaxError, fn: (val: T) => R): R|BagelSyntaxError {
-    if (val instanceof Error) {
+    if (isError(val)) {
         return val;
     } else if (val != null) {
         return fn(val);
@@ -27,20 +46,7 @@ export function expec<T, R>(val: T|BagelSyntaxError|undefined, err: BagelSyntaxE
 }
 
 export function err(code: string, index: number, expected: string): BagelSyntaxError {
-    let line = 1;
-    let column = 0;
-    for (let i = 0; i <= index; i++) {
-        if (code[i] === "\n") {
-            line++;
-            column = 0;
-        } else {
-            column++;
-        }
-    }
-
-    const message = `${line}:${column} ${expected} expected`;
-
-    return new BagelSyntaxError(message);
+    return { kind: "bagel-syntax-error", code, index, expected };
 }
 
 export function log<T>(expr: T, fn?: (expr: T) => string): T {

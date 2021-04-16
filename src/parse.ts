@@ -1,6 +1,6 @@
 import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IfElseStatement, IndexerType, KEYWORDS, LetDeclaration, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop } from "./ast";
 import { given, consume, consumeWhitespace, consumeWhile, isNumeric, consumeBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction } from "./parsing-utils";
-import { err, expec, BagelSyntaxError, log } from "./utils";
+import { err, expec, BagelSyntaxError, log, isError, errorMessage } from "./utils";
 
 export function parse(code: string): Declaration[] {
     let index = 0;
@@ -8,7 +8,7 @@ export function parse(code: string): Declaration[] {
     const results: Declaration[] = [];
     index = consumeWhitespace(code, index);
     let result = declaration(code, index);
-    while (result != null && !(result instanceof Error)) {
+    while (result != null && !(isError(result))) {
         results.push(result.parsed);
         index = result.newIndex;
         index = consumeWhitespace(code, index);
@@ -17,9 +17,9 @@ export function parse(code: string): Declaration[] {
     }
 
     
-    if (result instanceof Error) {
+    if (isError(result)) {
         // throw result;
-        console.log("Syntax error:", result.message);
+        console.log("Syntax error:", errorMessage(result));
     }
 
     return results;
@@ -375,7 +375,7 @@ const ifElseStatement: ParseFunction<IfElseStatement> = (code, index) =>
             given(parseSeries(code, index, statement), ({ parsed, newIndex: index }) =>
             expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({ parsed, newIndex: index }))))));
 
-        if (elseResultResult instanceof Error) {
+        if (isError(elseResultResult)) {
             return elseResultResult
         } else if (elseResultResult == null || elseResultResult.parsed.length === 0) {
             return {
@@ -504,7 +504,7 @@ const binaryOperator: ParseFunction<BinaryOperator> = (code, index) =>
     given(consumeBinaryOp(code, index), endOfOpIndex =>
     given(code.substring(index, endOfOpIndex) as BinaryOp, operator =>
     given(consumeWhitespace(code, endOfOpIndex), index =>
-    given(expression(code, index), ({ parsed: right, newIndex: index }) => ({
+    expec(expression(code, index), err(code, index, "Right operand"), ({ parsed: right, newIndex: index }) => ({
         parsed: {
             kind: "binary-operator",
             operator,
@@ -552,7 +552,7 @@ const ifElseExpression: ParseFunction<IfElseExpression> = (code, index) =>
             expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({ parsed, newIndex: index }))))))));
 
         
-        if (elseResultResult instanceof Error) {
+        if (isError(elseResultResult)) {
             return elseResultResult
         } else if (elseResultResult == null) {
             return {
