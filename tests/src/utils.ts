@@ -10,9 +10,58 @@ test(function deepEqualsWithUndefined() {
     const val2 = {
         foo: undefined
     };
-    
+
     if (!deepEquals(val1, val2)) {
         return "Values should be considered equal but were not"
+    }
+})
+
+test(function deepEqualsArrays() {
+    const val1 = [
+        {
+            "kind": "func-type",
+            "argTypes": [
+                {
+                    "kind": "primitive-type",
+                    "type": "number"
+                },
+                {
+                    "kind": "primitive-type",
+                    "type": "number"
+                }
+            ],
+            "returnType": {
+                "kind": "primitive-type",
+                "type": "number"
+            }
+        }
+    ]
+    const val2 = [
+        {
+            "kind": "func-type",
+            "argTypes": [
+                {
+                    "kind": "primitive-type",
+                    "type": "number"
+                },
+                {
+                    "kind": "primitive-type",
+                    "type": "number"
+                }
+            ],
+            "returnType": {
+                "kind": "primitive-type",
+                "type": "number"
+            }
+        },
+        {
+            "kind": "primitive-type",
+            "type": "number"
+        }
+    ]
+    
+    if (deepEquals(val1, val2)) {
+        return "Values should be considered inequal but were not"
     }
 })
 
