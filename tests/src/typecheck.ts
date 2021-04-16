@@ -137,7 +137,7 @@ test(function failsWhenShould() {
 })
 
 test(function passingValidArguments() {
-    testTypecheck(`
+    return testTypecheck(`
         func foo(a: number, b: number): number => a + b
         
         const bar = foo(3, 12)`,
@@ -155,7 +155,7 @@ test(function passingValidArguments() {
 })
 
 test(function passingInvalidArguments() {
-    testTypecheck(`
+    return testTypecheck(`
         func foo(a: number, b: number): number => a + b
         
         const bar = foo('stuff', 12)`,
@@ -174,7 +174,7 @@ test(function passingInvalidArguments() {
 
 
 test(function usingValidReturnType() {
-    testTypecheck(`
+    return testTypecheck(`
         func foo(a: number, b: number): number => a + b
         
         const bar: string = foo(3, 12)`,
@@ -193,7 +193,7 @@ test(function usingValidReturnType() {
 
 
 test(function propertyAccessorType() {
-    testTypecheck(`
+    return testTypecheck(`
         const obj = {
             foo: {
                 bar: 12
@@ -224,9 +224,11 @@ test(function propertyAccessorType() {
 })
 
 
-function testTypecheck(code: string, expected: (TypeExpression|undefined)[]): string|undefined {
+function testTypecheck(code: string, expected: (TypeExpression|undefined)[], debug?: boolean): string|undefined {
     const parsed = parse(code);
     const type = typecheckFile(parsed);
+
+    if(debug) console.log("PARSED: ", JSON.stringify(parsed, null, 2))
 
     if (!deepEquals(type, expected)) {
         return `\nTypechecking: "${code}"\n\nExpected:\n${JSON.stringify(expected, null, 2)}\n\nReceived:\n${JSON.stringify(type, null, 2)}`;
