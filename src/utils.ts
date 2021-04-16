@@ -7,6 +7,42 @@ export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
     }
 }
 
+export class BagelSyntaxError extends Error {
+    constructor(
+        message: string, 
+    ) {
+        super(message);
+    }
+}
+
+export function expec<T, R>(val: T|BagelSyntaxError|undefined, err: BagelSyntaxError, fn: (val: T) => R): R|BagelSyntaxError {
+    if (val instanceof Error) {
+        return val;
+    } else if (val != null) {
+        return fn(val);
+    } else {
+        throw err;
+        return err;
+    }
+}
+
+export function err(code: string, index: number, expected: string): BagelSyntaxError {
+    let line = 1;
+    let column = 0;
+    for (let i = 0; i <= index; i++) {
+        if (code[i] === "\n") {
+            line++;
+            column = 0;
+        } else {
+            column++;
+        }
+    }
+
+    const message = `${line}:${column} ${expected} expected`;
+
+    return new BagelSyntaxError(message);
+}
+
 export function log<T>(expr: T, fn?: (expr: T) => string): T {
     console.log(fn == null ? expr : fn(expr));
     return expr;
@@ -40,7 +76,7 @@ export function deepEquals(a: BasicData, b: BasicData): boolean {
             }
         } else if(!Array.isArray(a) && !Array.isArray(b)) {
             const keysSet = Array.from(new Set([...Object.keys(a as {}), ...Object.keys(b as {})]));
-
+            
             for (const key of keysSet) {
                 if (!deepEquals(a[key], b[key])) {
                     return false;

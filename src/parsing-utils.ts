@@ -1,5 +1,5 @@
 import { AST, BinaryOp, BINARY_OPS, KEYWORDS } from "./ast";
-import { given } from "./utils";
+import { BagelSyntaxError } from "./utils";
 
 export function consume(code: string, index: number, segment: string): number|undefined {
     for (let i = 0; i < segment.length; i++) {
@@ -67,7 +67,7 @@ export function isBinaryOp(str: string): str is BinaryOp {
 
 export type ParseResult<T> = { parsed: T, newIndex: number };
 
-export function parseSeries<T>(code: string, index: number, itemParseFn: (code: string, index: number) => ParseResult<T>|undefined, delimiter?: string, options: Partial<SeriesOptions> = {}): ParseResult<T[]> {
+export function parseSeries<T>(code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string, options: Partial<SeriesOptions> = {}): ParseResult<T[]>|BagelSyntaxError {
     const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], newIndex: index };
 
     const { leadingDelimiter, trailingDelimiter, whitespace } = { ...DEAFULT_SERIES_OPTIONS, ...options };
@@ -89,6 +89,10 @@ export function parseSeries<T>(code: string, index: number, itemParseFn: (code: 
 
     let itemResult = itemParseFn(code, index);
     while (itemResult != null) {
+        if (itemResult instanceof Error) {
+            return itemResult;
+        }
+
         index = itemResult.newIndex;
         parsed.push(itemResult.parsed);
 
@@ -134,11 +138,25 @@ const DEAFULT_SERIES_OPTIONS: SeriesOptions = {
     whitespace: "optional",
 }
 
-export function parseOptional<T>(code: string, index: number, parseFn: (code: string, index: number) => ParseResult<T>|undefined): Partial<ParseResult<T>> {
+export function parseOptional<T>(code: string, index: number, parseFn: ParseFunction<T>): Partial<ParseResult<T>> | BagelSyntaxError {
     const result = parseFn(code, index);
 
-    return {
-        parsed: result?.parsed,
-        newIndex: result?.newIndex,
-    };
+    if (result instanceof Error) {
+        return result;
+    } else {
+        return {
+            parsed: result?.parsed,
+            newIndex: result?.newIndex,
+        };
+    }
 }
+
+export function given<T, R>(val: T|BagelSyntaxError|undefined, fn: (val: T) => R): R|BagelSyntaxError|undefined {
+    if (val != null && !(val instanceof Error)) {
+        return fn(val);
+    } else {
+        return val as BagelSyntaxError|undefined;
+    }
+}
+
+export type ParseFunction<T> = (code: string, index: number) => ParseResult<T> | BagelSyntaxError | undefined;
