@@ -40,7 +40,6 @@ export function expec<T, R>(val: T|BagelSyntaxError|undefined, err: BagelSyntaxE
     } else if (val != null) {
         return fn(val);
     } else {
-        throw err;
         return err;
     }
 }

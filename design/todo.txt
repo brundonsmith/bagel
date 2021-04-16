@@ -1,5 +1,7 @@
 MVP:
 - more helpful error messages
+    - Type errors
+    - "error productions" for common errors; ESPECIALLY things that are different from JS
 - error handling system for procs
 - hoisting (types and declarations)
 - reactivity
@@ -18,7 +20,7 @@ MVP:
 - "typeof X" in type expressions
 - "typeof X" at runtime (add "array" return value, to avoid Array.isArray(), as well as class-name possibility)
 - array indexing (and slicing? (into iterators??))
-- JS embedding/interop
+- JS interop
 - config file (bagel.config.json)
     - allowIOInFunctions
     - allowJSInFunctions

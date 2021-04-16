@@ -34,12 +34,13 @@ export type ConstDeclaration = {
 }
 
 export type Statement = 
+    | IfElseStatement
+    | ForLoop
+    | WhileLoop
+    | JavascriptEscape
     | LetDeclaration
     | Assignment
     | ProcCall
-    | IfElseStatement
-    | ForLoop
-    | WhileLoop;
 
 export type LetDeclaration = {
     kind: "let-declaration",
@@ -150,6 +151,7 @@ export type UnknownType = {
 }
 
 export type Expression = 
+    | JavascriptEscape
     | Proc
     | Func
     | Funcall
@@ -265,3 +267,10 @@ export type NilLiteral = {
 export const KEYWORDS = [ "func", "proc", "if", "else", 
 "type", "typeof", "class", "let", "const", "for", "while", 
 "of", "nil", "public", "visible", "private" ] as const;
+
+
+
+export type JavascriptEscape = {
+    kind: "javascript-escape",
+    js: string,
+}

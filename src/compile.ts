@@ -32,6 +32,7 @@ function compileOne(ast: AST): string {
         case "number-literal":  return JSON.stringify(ast.value);
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
+        case "javascript-escape": return ast.js;
     }
 
     throw Error("Couldn't compile")//: " + ast.kind)

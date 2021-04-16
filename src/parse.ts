@@ -1,4 +1,4 @@
-import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IfElseStatement, IndexerType, KEYWORDS, LetDeclaration, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop } from "./ast";
+import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, Identifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NamedType, NilLiteral, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop } from "./ast";
 import { given, consume, consumeWhitespace, consumeWhile, isNumeric, consumeBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction } from "./parsing-utils";
 import { err, expec, BagelSyntaxError, log, isError, errorMessage } from "./utils";
 
@@ -241,7 +241,8 @@ const constDeclaration: ParseFunction<ConstDeclaration> = (code, index) =>
     }))))))))))
 
 const expression: ParseFunction<Expression> = (code, index) =>
-    proc(code, index)
+    javascriptEscape(code, index)
+    ?? proc(code, index)
     ?? func(code, index)
     ?? pipe(code, index)
     ?? binaryOperator(code, index)
@@ -292,7 +293,8 @@ const proc: ParseFunction<Proc> = (code, index) =>
     })))))))))))
 
 const statement: ParseFunction<Statement> = (code, index) =>
-    letDeclaration(code, index)
+    javascriptEscape(code, index)
+    ?? letDeclaration(code, index)
     ?? ifElseStatement(code, index)
     ?? forLoop(code, index)
     ?? whileLoop(code, index)
@@ -718,6 +720,17 @@ const nilLiteral: ParseFunction<NilLiteral> = (code, index) => {
         }
     }
 }
+
+const javascriptEscape: ParseFunction<JavascriptEscape> = (code, index) =>
+    given(consume(code, index, "js#"), jsStartIndex =>
+    given(consumeWhile(code, jsStartIndex, ch => ch !== "#"), jsEndIndex =>
+    expec(consume(code, jsEndIndex, "#"), err(code, index, '"#"'), index => ({
+        parsed: {
+            kind: "javascript-escape",
+            js: code.substring(jsStartIndex, jsEndIndex),
+        },
+        newIndex: index,
+    }))))
 
 function identifierSegment(code: string, index: number): { segment: string, newIndex: number} | undefined {
     const startIndex = index;
