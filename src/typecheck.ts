@@ -118,7 +118,24 @@ function typecheck(namedTypes: NamedTypes, namedValues: NamedValues, ast: AST): 
                 return (funcType as FuncType).returnType;
             }
         };
-        // case "pipe": return compilePipe(ast.expressions, ast.expressions.length - 1);
+        case "pipe": {
+            let inputType = typecheck(namedTypes, namedValues, ast.expressions[0]);
+            for (const expr of ast.expressions.slice(1)) {
+                if (inputType == null) {
+                    return undefined;
+                }
+
+                const typeOfPipe = typecheck(namedTypes, namedValues, expr);
+
+                if (typeOfPipe?.kind !== "func-type" || !subsumes(namedTypes, namedValues, typeOfPipe.argTypes[0], inputType)) {
+                    return undefined;
+                }
+
+                inputType = typeOfPipe.returnType;
+            }
+
+            return inputType;
+        };
         case "binary-operator": {
             return given(typecheck(namedTypes, namedValues, ast.left), leftType =>
                 given(typecheck(namedTypes, namedValues, ast.right), rightType => {
