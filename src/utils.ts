@@ -21,24 +21,33 @@ type BasicData =
     | boolean
     | undefined
 
-export function deepEquals<T extends BasicData>(a: T, b: T): boolean {
+export function deepEquals(a: BasicData, b: BasicData): boolean {
     if (a === b) {
         return true;
-    } else if (a != null && b != null 
-            && typeof a === "object" && typeof b === "object" 
-            && Array.isArray(a) == Array.isArray(b)) {
-        // TODO: Make this more efficient
+    } else if(a == null && b == null) {
+        return true;
+    } else if (a != null && b != null && typeof a === "object" && typeof b === "object") {
+        if (Array.isArray(a) && Array.isArray(b)) {
+            if (a.length !== b.length) {
+                return false;
+            } else {
+                for (let i = 0; i < a.length; i++) {
+                    if (!deepEquals(a[i], b[i])) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        } else if(!Array.isArray(a) && !Array.isArray(b)) {
+            const keysSet = Array.from(new Set([...Object.keys(a as {}), ...Object.keys(b as {})]));
 
-        // @ts-ignore
-        const aEntries = Object.entries(a).filter(([key, value]) => value != null);
-        // @ts-ignore
-        const bEntries = Object.entries(b).filter(([key, value]) => value != null);
-        
-        return aEntries.length === bEntries.length && aEntries.every(entry => {
-            const otherEntry = bEntries.find(other => entry[0] === other[0]);
-
-            return otherEntry != null && deepEquals(entry[1], otherEntry[1]);
-        })
+            for (const key of keysSet) {
+                if (!deepEquals(a[key], b[key])) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     return false;
