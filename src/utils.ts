@@ -12,6 +12,7 @@ export type BagelSyntaxError = {
     code: string,
     index: number,
     expected: string,
+    stack: string|undefined,
 }
 
 export function errorMessage(error: BagelSyntaxError): string {
@@ -26,7 +27,7 @@ export function errorMessage(error: BagelSyntaxError): string {
         }
     }
 
-    return `${line}:${column} ${error.expected} expected`;
+    return `${line}:${column} ${error.expected} expected\n${error.stack}`;
 }
 
 export function isError(x: unknown): x is BagelSyntaxError {
@@ -45,7 +46,7 @@ export function expec<T, R>(val: T|BagelSyntaxError|undefined, err: BagelSyntaxE
 }
 
 export function err(code: string, index: number, expected: string): BagelSyntaxError {
-    return { kind: "bagel-syntax-error", code, index, expected };
+    return { kind: "bagel-syntax-error", code, index, expected, stack: Error().stack };
 }
 
 export function log<T>(expr: T, fn?: (expr: T) => string): T {
