@@ -9,6 +9,7 @@ MVP:
     - "JSX"
     - classes
     - comments
+    - string escapes
     - template strings
     - spread/destructuring
     - types
