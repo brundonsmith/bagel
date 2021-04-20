@@ -58,7 +58,7 @@ export function isSymbol(str: string): boolean {
 }
 
 export function isSymbolic(ch: string, index: number): boolean {
-    return ch != null && (isAlpha(ch) || (index > 0 && isNumeric(ch)));
+    return ch != null && (isAlpha(ch) || ch === "_" || (index > 0 && (isNumeric(ch) || ch === "$")));
 }
 
 export function isBinaryOp(str: string): str is BinaryOp {
