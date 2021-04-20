@@ -26,12 +26,12 @@ test(function typeDeclarations() {
             kind: "object-type",
             entries: [
                 [
-                    { kind: "identifier", name: "foo" },
-                    { kind: "named-type", name: { kind: "identifier", name: "Bar"} },
+                    { kind: "plain-identifier", name: "foo" },
+                    { kind: "named-type", name: { kind: "plain-identifier", name: "Bar"} },
                 ],
                 [
-                    { kind: "identifier", name: "foo2" },
-                    { kind: "named-type", name: { kind: "identifier", name: "Blah"} },
+                    { kind: "plain-identifier", name: "foo2" },
+                    { kind: "named-type", name: { kind: "plain-identifier", name: "Blah"} },
                 ]
             ],
         } ])
@@ -57,11 +57,11 @@ test(function constDeclarationsInference() {
             kind: "object-type",
             entries: [
                 [
-                    { kind: "identifier", name: "foo" },
+                    { kind: "plain-identifier", name: "foo" },
                     { kind: "primitive-type", type: "number" },
                 ],
                 [
-                    { kind: "identifier", name: "foo2" },
+                    { kind: "plain-identifier", name: "foo2" },
                     {
                         kind: "array-type",
                         element: { kind: "primitive-type", type: "string" },
@@ -206,12 +206,12 @@ test(function propertyAccessorType() {
                 kind: "object-type",
                 entries: [
                     [
-                        { kind: "identifier", name: "foo" },
+                        { kind: "plain-identifier", name: "foo" },
                         {
                             kind: "object-type",
                             entries: [
                                 [
-                                    { kind: "identifier", name: "bar" },
+                                    { kind: "plain-identifier", name: "bar" },
                                     { kind: "primitive-type", type: "number" },
                                 ]
                             ],

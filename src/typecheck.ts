@@ -1,4 +1,4 @@
-import { AST, BinaryOp, Declaration, FuncType, Identifier, NamedType, NilLiteral, TypeExpression, UnknownType } from "./ast";
+import { AST, BinaryOp, Declaration, FuncType, LocalIdentifier, NamedType, NilLiteral, PlainIdentifier, TypeExpression, UnknownType } from "./ast";
 import { deepEquals, given } from "./utils";
 
 type NamedTypes = Map<string, TypeExpression>;
@@ -170,7 +170,7 @@ function typecheck(namedTypes: NamedTypes, namedValues: NamedValues, ast: AST): 
         };
         case "range": return undefined; //{ kind: "primitive-type", type: "number" };  TODO: Iterator type
         case "parenthesized-expression": return typecheck(namedTypes, namedValues, ast.inner);
-        case "identifier": return namedValues.get(ast.name);
+        case "local-identifier": return namedValues.get(ast.name);
         case "property-accessor": {
             return given(typecheck(namedTypes, namedValues, ast.base), type => {
                 let currentType: TypeExpression|undefined = type;
@@ -194,7 +194,7 @@ function typecheck(namedTypes: NamedTypes, namedValues: NamedValues, ast: AST): 
             } else {
                 return {
                     kind: "object-type",
-                    entries: entryTypes as [Identifier, TypeExpression][],
+                    entries: entryTypes as [PlainIdentifier, TypeExpression][],
                 };
             }
         };
@@ -304,7 +304,7 @@ function resolve(namedTypes: NamedTypes, type: TypeExpression): TypeExpression |
 
         return {
             kind: "object-type",
-            entries: entries as [Identifier, TypeExpression][],
+            entries: entries as [PlainIdentifier, TypeExpression][],
         }
     } else if(type.kind === "array-type") {
         const element = resolve(namedTypes, type.element);

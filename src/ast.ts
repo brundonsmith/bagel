@@ -3,6 +3,7 @@ export type AST =
     | Declaration
     | Expression
     | Statement
+    | PlainIdentifier
 
 export type Declaration =
     | TypeDeclaration
@@ -12,7 +13,7 @@ export type Declaration =
 
 export type TypeDeclaration = {
     kind: "type-declaration",
-    name: Identifier,
+    name: PlainIdentifier,
     type: TypeExpression,
 }
 
@@ -28,12 +29,18 @@ export type FuncDeclaration = {
 
 export type ConstDeclaration = {
     kind: "const-declaration",
-    name: Identifier,
+    name: PlainIdentifier,
     type: TypeExpression,
     value: Expression,
 }
 
+export type PlainIdentifier = {
+    kind: "plain-identifier",
+    name: string,
+}
+
 export type Statement = 
+    | Reaction
     | IfElseStatement
     | ForLoop
     | WhileLoop
@@ -42,16 +49,22 @@ export type Statement =
     | Assignment
     | ProcCall
 
+export type Reaction = {
+    kind: "reaction",
+    data: Expression,
+    effect: Expression,
+}
+
 export type LetDeclaration = {
     kind: "let-declaration",
-    name: Identifier,
+    name: LocalIdentifier,
     type: TypeExpression,
     value: Expression,
 }
 
 export type Assignment = {
     kind: "assignment",
-    target: Identifier | PropertyAccessor,
+    target: LocalIdentifier | PropertyAccessor,
     value: Expression,
 }
 
@@ -70,7 +83,7 @@ export type IfElseStatement = {
 
 export type ForLoop = {
     kind: "for-loop",
-    itemIdentifier: Identifier,
+    itemIdentifier: PlainIdentifier,
     iterator: Expression,
     body: Statement[],
 }
@@ -92,6 +105,7 @@ export type TypeExpression =
     | TupleType
     | PrimitiveType
     | LiteralType
+    | NominalType
     | UnknownType
 
 export type UnionType = {
@@ -101,7 +115,7 @@ export type UnionType = {
 
 export type NamedType = {
     kind: "named-type",
-    name: Identifier,
+    name: PlainIdentifier,
 }
 
 export type ProcType = {
@@ -117,7 +131,7 @@ export type FuncType = {
 
 export type ObjectType = {
     kind: "object-type",
-    entries: [Identifier, TypeExpression][],
+    entries: [PlainIdentifier, TypeExpression][],
 }
 
 export type IndexerType = {
@@ -146,6 +160,12 @@ export type LiteralType = {
     value: StringLiteral | NumberLiteral | BooleanLiteral,
 }
 
+export type NominalType = {
+    kind: "nominal-type",
+    name: string,
+    inner: TypeExpression,
+}
+
 export type UnknownType = {
     kind: "unknown-type",
 }
@@ -161,7 +181,7 @@ export type Expression =
     | Range
     | ParenthesizedExpression
     | PropertyAccessor
-    | Identifier
+    | LocalIdentifier
     | ObjectLiteral
     | ArrayLiteral
     | StringLiteral
@@ -171,17 +191,17 @@ export type Expression =
 
 export type Proc = {
     kind: "proc",
-    name?: Identifier,
+    name?: PlainIdentifier,
     type: ProcType | UnknownType,
-    argNames: Identifier[],
+    argNames: PlainIdentifier[],
     body: Statement[],
 }
 
 export type Func = {
     kind: "func",
-    name?: Identifier,
+    name?: PlainIdentifier,
     type: FuncType | UnknownType,
-    argNames: Identifier[],
+    argNames: PlainIdentifier[],
     body: Expression,
 }
 
@@ -227,17 +247,17 @@ export type ParenthesizedExpression = {
 export type PropertyAccessor = {
     kind: "property-accessor",
     base: Expression,
-    properties: Identifier[],
+    properties: PlainIdentifier[],
 }
 
-export type Identifier = {
-    kind: "identifier",
+export type LocalIdentifier = {
+    kind: "local-identifier",
     name: string,
 }
 
 export type ObjectLiteral = {
     kind: "object-literal",
-    entries: [Identifier, Expression][],
+    entries: [PlainIdentifier, Expression][],
 }
 
 export type ArrayLiteral = {
@@ -247,7 +267,7 @@ export type ArrayLiteral = {
 
 export type StringLiteral = {
     kind: "string-literal",
-    value: string,
+    segments: (string|Expression)[],
 }
 
 export type NumberLiteral = {
@@ -266,7 +286,8 @@ export type NilLiteral = {
 
 export const KEYWORDS = [ "func", "proc", "if", "else", 
 "type", "typeof", "class", "let", "const", "for", "while", 
-"of", "nil", "public", "visible", "private" ] as const;
+"of", "nil", "public", "visible", "private", "reaction", 
+"triggers" ] as const;
 
 
 
