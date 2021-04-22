@@ -11,12 +11,17 @@ export function consume(code: string, index: number, segment: string): number|un
     return index + segment.length;
 }
 
-export function consumeBinaryOp(code: string, index: number): number|undefined {
+export function parseBinaryOp(code: string, index: number): ParseResult<BinaryOp>|undefined {
     for (const op of BINARY_OPS) {
         if (code.substr(index, op.length) === op) {
-            return index + op.length;
+            return {
+                parsed: op,
+                newIndex: index + op.length,
+            };
         }
     }
+
+    return undefined;
 }
 
 export function consumeWhitespace(code: string, index: number): number {
