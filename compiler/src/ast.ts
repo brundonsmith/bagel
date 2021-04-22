@@ -187,6 +187,7 @@ export type Expression =
     | Proc
     | Func
     | Funcall
+    | Indexer
     | Pipe
     | BinaryOperator
     | IfElseExpression
@@ -229,13 +230,19 @@ export type BinaryOperator = {
     operator: BinaryOp,
 }
 
-export const BINARY_OPS = [ "+", "-", "*", "/", "<", ">", "<=", ">=", "&&", "||", "??" ] as const;
+export const BINARY_OPS = [ "+", "-", "*", "/", "<=", ">=", "<", ">", "==", "&&", "||", "??" ] as const;
 export type BinaryOp = typeof BINARY_OPS[number];
 
 export type Funcall = {
     kind: "funcall",
     func: Expression,
     args: Expression[],
+}
+
+export type Indexer = {
+    kind: "indexer",
+    base: Expression,
+    indexer: Expression,
 }
 
 export type IfElseExpression = {
