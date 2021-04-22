@@ -64,6 +64,7 @@ const BINARY_OPERATOR_TYPES: {[key in BinaryOp]: {inputs: TypeExpression, output
     ">=": { inputs: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } },
     "&&": { inputs: { kind: "primitive-type", type: "boolean" }, output: { kind: "primitive-type", type: "boolean" } },
     "||": { inputs: { kind: "primitive-type", type: "boolean" }, output: { kind: "primitive-type", type: "boolean" } },
+    "==": { inputs: { kind: "unknown-type" }, output: { kind: "primitive-type", type: "boolean" } },
     "??": { inputs: { kind: "unknown-type" }, output: { kind: "unknown-type" } },
     // "??": {
     //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
@@ -218,6 +219,24 @@ function typecheck(namedTypes: NamedTypes, namedValues: NamedValues, ast: AST): 
                     },
             };
         }
+        case "indexer": {
+            const baseType = typecheck(namedTypes, namedValues, ast.base);
+            const indexerType = typecheck(namedTypes, namedValues, ast.indexer);
+
+            if (baseType?.kind === "array-type" && indexerType?.kind === "primitive-type" && indexerType?.type === "number") {
+                return baseType.element;
+            } else if (baseType?.kind === "object-type") {
+                if (indexerType?.kind === "primitive-type" && indexerType?.type === "string") {
+                    return {
+                        kind: "union-type",
+                        members: baseType.entries.map(entry => entry[1])
+                    };
+                }
+                // TODO: Literal (primitive) types for specific properties
+            } else if (baseType?.kind === "indexer-type" && indexerType != null && subsumes(namedTypes, namedValues, baseType.keyType, indexerType)) {
+                return baseType?.valueType;
+            }
+        }
         case "string-literal":  return {
             kind: "primitive-type",
             type: "string",
@@ -235,7 +254,7 @@ function typecheck(namedTypes: NamedTypes, namedValues: NamedValues, ast: AST): 
             type: "nil",
         };
     }
-        
+    
     return undefined;
 }
 
