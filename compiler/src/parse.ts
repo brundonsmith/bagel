@@ -249,19 +249,6 @@ const constDeclaration: ParseFunction<ConstDeclaration> = (code, index) =>
             newIndex: index,
     }))))))))))
 
-const expressionPrecedenceTiers: () => ParseFunction<Expression>[][] = () => [
-    [ javascriptEscape, pipe ],
-    [ func, proc, range, binaryOperator ],
-    [ funcall ],
-    [ indexer ],
-    [ parenthesized, propertyAccessor ],
-    [ localIdentifier ],
-    [ ifElseExpression, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
-        stringLiteral, numberLiteral ],
-];
-
-const expression: ParseFunction<Expression> = (code, index) => parseStartingFromTier(0)(code, index)
-
 const proc: ParseFunction<Proc> = (code, index) =>
     given(parseOptional(code, index, plainIdentifier), ({ parsed: name, newIndex }) =>
     given(consume(code, newIndex ?? index, "("), index =>
@@ -354,7 +341,7 @@ const assignment: ParseFunction<Assignment> = (code, index) =>
     }))))))))
 
 const procCall: ParseFunction<ProcCall> = (code, index) =>
-    given(parseFromNextTier(code, index, funcall), ({ parsed: proc, newIndex: index }) =>
+    given(parseBeneath(code, index, funcall), ({ parsed: proc, newIndex: index }) =>
     given(parseSeries(code, index, _argExpressions), ({ parsed: argLists, newIndex: index }) => 
         argLists.length > 0 ?
             expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
@@ -463,6 +450,57 @@ const whileLoop: ParseFunction<WhileLoop> = (code, index) =>
         newIndex: index,
     })))))))))))))
 
+
+const expressionPrecedenceTiers: () => ParseFunction<Expression>[][] = () => [
+    [ javascriptEscape, pipe ],
+    [ func, proc, range, binaryOperator ],
+    [ funcall ],
+    [ indexer ],
+    [ parenthesized, propertyAccessor ],
+    [ localIdentifier ],
+    [ ifElseExpression, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
+        stringLiteral, numberLiteral ],
+];
+
+class ParseMemo {
+    private memo = new Map<ParseFunction<Expression>, Map<string, Map<number, ParseResult<Expression>>>>();
+
+    memoize(fn: ParseFunction<Expression>, code: string, index: number, result: ParseResult<Expression>|BagelSyntaxError|undefined) {
+        if (result != null && !isError(result)) {
+            if (!this.memo.has(fn)) {
+                this.memo.set(fn, new Map());
+            }
+            if (!this.memo.get(fn)?.has(code)) {
+                this.memo.get(fn)?.set(code, new Map());
+            }
+            
+            this.memo.get(fn)?.get(code)?.set(index, result);
+        }
+    }
+
+    get(fn: ParseFunction<Expression>, code: string, index: number) {
+        return this.memo.get(fn)?.get(code)?.get(index);
+    }
+
+    cachedOrParse<T extends Expression>(fn: ParseFunction<T>): ParseFunction<T> {
+        return (code: string, index: number): ParseResult<T>|BagelSyntaxError|undefined => {
+            const cached = this.get(fn, code, index);
+
+            if (cached != null) {
+                return cached as ParseResult<T>;
+            } else {
+                const result = fn(code, index);
+                this.memoize(fn, code, index, result);
+                return result;
+            }
+        }
+    }
+}
+const memo = new ParseMemo();
+
+const expression: ParseFunction<Expression> = 
+    memo.cachedOrParse((code, index) => parseStartingFromTier(0)(code, index))
+
 const func: ParseFunction<Func> = (code, index) =>
     given(parseOptional(code, index, plainIdentifier), ({ parsed: name, newIndex }) =>
     given(consume(code, newIndex ?? index, "("), index =>
@@ -516,7 +554,7 @@ const pipe: ParseFunction<Pipe> = (code, index) =>
             : undefined)
 
 const binaryOperator: ParseFunction<BinaryOperator> = (code, index) => 
-    given(parseFromNextTier(code, index, binaryOperator), ({ parsed: left, newIndex: index }) => 
+    given(parseBeneath(code, index, binaryOperator), ({ parsed: left, newIndex: index }) => 
     given(consumeWhitespace(code, index), index =>
     given(parseBinaryOp(code, index), ({ parsed: operator, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -531,7 +569,7 @@ const binaryOperator: ParseFunction<BinaryOperator> = (code, index) =>
     }))))))
 
 const funcall: ParseFunction<Funcall> = (code, index) =>
-    given(parseFromNextTier(code, index, funcall), ({ parsed: func, newIndex: index }) =>
+    given(parseBeneath(code, index, funcall), ({ parsed: func, newIndex: index }) =>
     given(parseSeries(code, index, _argExpressions), ({ parsed: argLists, newIndex: index }) => 
         argLists.length > 0 ? 
             {
@@ -554,7 +592,7 @@ const _argExpressions: ParseFunction<Expression[]> = (code, index) =>
     }))))
 
 const indexer: ParseFunction<Indexer> = (code, index) =>
-    given(parseFromNextTier(code, index, indexer), ({ parsed: base, newIndex: index }) =>
+    given(parseBeneath(code, index, indexer), ({ parsed: base, newIndex: index }) =>
     given(parseSeries(code, index, _indexerExpression), ({ parsed: indexers, newIndex: index }) => 
         indexers.length > 0 ? 
             {
@@ -588,20 +626,19 @@ const ifElseExpression: ParseFunction<IfElseExpression> = (code, index) =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(code, index), err(code, index, 'Result expression for if clause'), ({ parsed: ifResult, newIndex: index }) => 
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "}"), err(code, index, '"}"'), index =>
-    given(consumeWhitespace(code, index), index => {
+    expec(consume(code, index, "}"), err(code, index, '"}"'), index => {
         const elseResultResult = 
+            given(consumeWhitespace(code, index), index =>
             given(consume(code, index, "else"), index => 
             given(consumeWhitespace(code, index), index =>
             expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
             given(consumeWhitespace(code, index), index =>
             expec(expression(code, index), err(code, index, 'Result expression for else clause'), ({ parsed, newIndex: index }) =>
             given(consumeWhitespace(code, index), index =>
-            expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({ parsed, newIndex: index }))))))));
-
+            expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({ parsed, newIndex: index })))))))));
 
         if (isError(elseResultResult)) {
-            return elseResultResult
+            return elseResultResult;
         } else if (elseResultResult == null) {
             return {
                 parsed: {
@@ -648,7 +685,7 @@ const parenthesized: ParseFunction<ParenthesizedExpression> = (code, index) =>
     }))))
 
 const propertyAccessor: ParseFunction<PropertyAccessor> = (code, index) =>
-    given(parseFromNextTier(code, index, propertyAccessor), ({ parsed: base, newIndex: index }) =>
+    given(parseBeneath(code, index, propertyAccessor), ({ parsed: base, newIndex: index }) =>
     given(parseSeries(code, index, plainIdentifier, ".", { leadingDelimiter: "required", trailingDelimiter: "forbidden" }), ({ parsed: properties, newIndex: index }) => 
         properties.length > 0
             ? {
@@ -871,5 +908,5 @@ const parseStartingFromTier = (tier: number): ParseFunction<Expression> => (code
     return undefined;
 }
 
-const parseFromNextTier = (code: string, index: number, fn: ParseFunction<Expression>) =>
+const parseBeneath = (code: string, index: number, fn: ParseFunction<Expression>) =>
     parseStartingFromTier(NEXT_TIER.get(fn))(code, index)
