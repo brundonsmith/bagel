@@ -33,6 +33,100 @@ test(function simpleFuncDeclaration() {
     );
 })
 
+test(function ifExpression() {
+    return testParse(
+        `func merge() =>
+            if (arr1.length <= 0) {
+                2
+            }`,
+        {
+            kind: "func-declaration",
+            func: {
+                kind: "func",
+                name: {
+                    kind: "plain-identifier",
+                    name: "merge",
+                },
+                type: {
+                    kind: "func-type",
+                    argTypes: [],
+                    returnType: { kind: "unknown-type" },
+                },
+                argNames: [],
+                body: {
+                    kind: "if-else-expression",
+                    ifCondition: {
+                        kind: "binary-operator",
+                        operator: "<=",
+                        left: {
+                            kind: "property-accessor",
+                            base: { kind: "local-identifier", name: "arr1" },
+                            properties: [
+                                { kind: "plain-identifier", name: "length" }
+                            ]
+                        },
+                        right: {
+                            kind: "number-literal",
+                            value: 0
+                        }
+                    },
+                    ifResult: {
+                        kind: "number-literal",
+                        value: 2
+                    }
+                }
+            }
+        },
+        (code, index) => parse(code)[0],
+    );
+})
+
+test(function indexerExpression() {
+    return testParse(
+        "func uid(arr, i) => arr[i]",
+        {
+            kind: "func-declaration",
+            func: {
+                kind: "func",
+                name: {
+                    kind: "plain-identifier",
+                    name: "uid",
+                },
+                type: {
+                    kind: "func-type",
+                    argTypes: [
+                        { kind: "unknown-type" },
+                        { kind: "unknown-type" },
+                    ],
+                    returnType: { kind: "unknown-type" },
+                },
+                argNames: [
+                  {
+                    kind: "plain-identifier",
+                    name: "arr"
+                  },
+                  {
+                    kind: "plain-identifier",
+                    name: "i"
+                  }
+                ],
+                body: {
+                    kind: "indexer",
+                    base: {
+                        kind: "local-identifier",
+                        name: "arr",
+                    },
+                    indexer: {
+                        kind: "local-identifier",
+                        name: "i",
+                    }
+                }
+            }
+        },
+        (code, index) => parse(code)[0],
+    );
+})
+
 test(function funcCallCall() {
     return testParse(
         "const foo = fn()()",
