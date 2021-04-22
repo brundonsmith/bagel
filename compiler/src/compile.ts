@@ -41,6 +41,7 @@ function compileOne(ast: AST): string {
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
         case "reaction": return `disposers.push(__locals.crowdx.reaction(() => ${compileOne(ast.data)}(${LOCALS_OBJ}), (data) => ${compileOne(ast.effect)}(${LOCALS_OBJ}, data)))`;
+        case "indexer": return `${compileOne(ast.base)}[${compileOne(ast.indexer)}]`;
     }
 
     throw Error("Couldn't compile")//: " + ast.kind)
