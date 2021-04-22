@@ -1,0 +1,72 @@
+
+func itemsDone(appState) => 
+    appState.todos |> filter((todo) => todo.done) |> count
+
+func renderHtml(appState) => '
+    <div>
+        ${itemsDone(appState)} items done
+    </div>
+
+    <ul>
+        ${appState.todos 
+            |> map((todo, index) =>
+                '<li class="todo-item">
+                    <input type="text" value="${todo.text}" data-index="${index}">
+                    <input type="checkbox" ${if (todo.done) { 'checked' } else { '' }} data-index="${index}">
+                    <button data-index="${index}">X</button>
+                </li>')
+            |> join('')}
+    </ul>
+
+    <div>
+        <input id="new-todo-text" value="${appState.newTodo.text}">
+        <input id="new-todo-done" ${if (appState.newTodo.done) { 'checked' } else { '' }} type="checkbox">
+        <button id="add-button">Add</button>
+    </div>
+'
+
+proc main() {
+    let appState = {
+        todos: [],
+        newTodo: { text: '', done: false },
+    };
+
+    reaction () => renderHtml(appState) 
+    triggers (html) { 
+        js#
+            console.log("reacted")
+            console.log(__locals.appState.newTodo)
+            console.log(__locals.appState.newTodo.text)
+
+            // render html to document
+            document.body.innerHTML = html
+
+
+            // setup event listeners
+            document.querySelector('#new-todo-text').addEventListener('change', (e) => __locals.appState.newTodo.text = e.target.value)
+            document.querySelector('#new-todo-done').addEventListener('change', (e) => __locals.appState.newTodo.done = e.target.checked)
+            document.querySelector('#add-button').addEventListener('click', __locals.crowdx.action(() => {
+                __locals.appState.todos.push(__locals.appState.newTodo);
+                __locals.appState.newTodo = { text: '', done: false };
+            }))
+            
+            document.querySelectorAll(`.todo-item input[type="text"]`).forEach(input => {
+                const index = Number(input.dataset.index);
+
+                input.addEventListener('change', () => __locals.appState.todos[index].text = input.value)
+            })
+            
+            document.querySelectorAll(`.todo-item input[type="checkbox"]`).forEach(checkbox => {
+                const index = Number(checkbox.dataset.index);
+
+                checkbox.addEventListener('change', () => __locals.appState.todos[index].done = checkbox.checked)
+            })
+
+            document.querySelectorAll(`.todo-item button`).forEach(checkbox => {
+                const index = Number(checkbox.dataset.index);
+
+                checkbox.addEventListener('click', () => __locals.appState.todos.splice(index, 1))
+            })
+        #js
+    };
+}

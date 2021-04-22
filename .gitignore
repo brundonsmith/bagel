@@ -2,3 +2,4 @@ dist
 .vscode
 node_modules
 build
+sample-files/*.js
