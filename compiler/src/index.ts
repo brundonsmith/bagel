@@ -4,11 +4,14 @@ import path from "path";
 import { parse } from "./parse";
 // import { typecheck } from "./typecheck";
 // import { DEFAULT_ENVIRONMENT } from "./environment";
-import { compile } from "./compile";
+import { compile, LOCALS_OBJ } from "./compile";
 import { typecheckFile } from "./typecheck";
 
+// @ts-ignore
+// window.parse = parse;
+
 const entry = process.argv[2];
-const output = process.argv[3];
+const output = process.argv[3] || path.resolve(path.dirname(entry), path.basename(entry).split(".")[0] + ".js");
 
 fs.readFile(entry).then(async code => {
     const startParse = Date.now();
@@ -22,12 +25,8 @@ fs.readFile(entry).then(async code => {
     const bagelLibBundle = (await fs.readFile(path.resolve(__dirname, "lib.js"))).toString();
 
     const compiledWithLib = `${bagelLibBundle}
-
-Object.entries(this["bagel-lib"]).forEach(([key, value]) => this[key] = value);
-
-${compiled}
-
-main();`;
+    
+${compiled}`;
 
     const startTypecheck = Date.now();
     const types = typecheckFile(parsed);

@@ -36,3 +36,5 @@ Long-term:
 - full build system
 - language server
 - package manager
+- tail recursion?
+- proper slices?

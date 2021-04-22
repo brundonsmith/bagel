@@ -1,5 +1,5 @@
 import { test } from "./testing-utils";
-import { deepEquals } from "../../src/utils";
+import { deepEquals } from "../../compiler/src/utils";
 
 console.log("utils.ts")
 

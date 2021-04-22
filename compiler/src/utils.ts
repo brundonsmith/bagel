@@ -46,7 +46,7 @@ export function expec<T, R>(val: T|BagelSyntaxError|undefined, err: BagelSyntaxE
 }
 
 export function err(code: string, index: number, expected: string): BagelSyntaxError {
-    return { kind: "bagel-syntax-error", code, index, expected, stack: Error().stack };
+    return { kind: "bagel-syntax-error", code, index, expected, stack: undefined };
 }
 
 export function log<T>(expr: T, fn?: (expr: T) => string): T {

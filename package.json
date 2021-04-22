@@ -1,20 +1,20 @@
 {
-  "devDependencies": {
-    "@webpack-cli/generators": "^2.0.0",
-    "ts-loader": "^8.1.0",
-    "typescript": "^4.2.4",
-    "webpack": "^5.31.2",
-    "webpack-cli": "^4.6.0"
-  },
-  "version": "1.0.0",
-  "description": "My webpack project",
-  "name": "my-webpack-project",
-  "scripts": {
-    "build": "webpack --mode=production ; cd lib ; npm run build",
-    "build:dev": "webpack --mode=development ; cd lib ; npm run build:dev",
-    "build:prod": "webpack --mode=production ; cd lib ; npm run build:prod",
-    "build-and-run": "webpack --mode=development ; cd lib ; npm run build ; cd ../build ; node compiler.js ../tests/sample.bgl ../tests/sample.js",
-    "watch": "webpack --watch",
-    "test": "cd tests ; npm run build-and-run"
+    "devDependencies": {
+      "@webpack-cli/generators": "^2.0.0",
+      "ts-loader": "^8.1.0",
+      "typescript": "^4.2.4",
+      "webpack": "^5.31.2",
+      "webpack-cli": "^4.6.0"
+    },
+    "version": "1.0.0",
+    "description": "Bagel programming language",
+    "name": "bagel",
+    "scripts": {
+      "build":         "cd compiler ; npm run build ; cd ../ ; cd lib ; npm run build",
+      "build:dev":     "cd compiler ; npm run build:dev ; cd ../ ; cd lib ; npm run build:dev",
+      "build:prod":    "cd compiler ; npm run build:prod ; cd ../ ; cd lib ; npm run build:prod",
+      "build-and-run": "cd compiler ; npm run build ; cd ../ ; cd lib ; npm run build ; cd ../ ; node build/compiler.js",
+      "test": "cd tests ; npm run build-and-run"
+    }
   }
-}
+  

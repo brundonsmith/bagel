@@ -34,6 +34,18 @@ export type ConstDeclaration = {
     value: Expression,
 }
 
+export function declarationName(decl: Declaration): PlainIdentifier {
+    switch(decl.kind) {
+        case "type-declaration":
+        case "const-declaration":
+            return decl.name;
+        case "proc-declaration":
+            return decl.proc.name as PlainIdentifier;
+        case "func-declaration":
+            return decl.func.name as PlainIdentifier;
+    }
+}
+
 export type PlainIdentifier = {
     kind: "plain-identifier",
     name: string,
@@ -287,7 +299,7 @@ export type NilLiteral = {
 export const KEYWORDS = [ "func", "proc", "if", "else", 
 "type", "typeof", "class", "let", "const", "for", "while", 
 "of", "nil", "public", "visible", "private", "reaction", 
-"triggers" ] as const;
+"triggers", "true", "false" ] as const;
 
 
 

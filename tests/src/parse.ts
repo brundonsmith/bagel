@@ -1,8 +1,8 @@
 
 import { test } from "./testing-utils";
-import { parse } from "../../src/parse";
-import { AST, FuncDeclaration } from "../../src/ast";
-import { deepEquals } from "../../src/utils";
+import { parse } from "../../compiler/src/parse";
+import { AST, FuncDeclaration } from "../../compiler/src/ast";
+import { deepEquals } from "../../compiler/src/utils";
 
 console.log("parse.ts")
 

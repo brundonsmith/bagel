@@ -651,7 +651,7 @@ const parenthesized: ParseFunction<ParenthesizedExpression> = (code, index) =>
 
 const propertyAccessor: ParseFunction<PropertyAccessor> = (code, index) =>
     given(beneathPropertyAccessor(code, index), ({ parsed: base, newIndex: index }) =>
-    given(parseSeries(code, index, plainIdentifier, ".", { leadingDelimiter: "required", trailingDelimiter: "forbidden", whitespace: "forbidden" }), ({ parsed: properties, newIndex: index }) => 
+    given(parseSeries(code, index, plainIdentifier, ".", { leadingDelimiter: "required", trailingDelimiter: "forbidden" }), ({ parsed: properties, newIndex: index }) => 
         properties.length > 0
             ? {
                 parsed: {
@@ -798,15 +798,21 @@ const nilLiteral: ParseFunction<NilLiteral> = (code, index) => {
 }
 
 const javascriptEscape: ParseFunction<JavascriptEscape> = (code, index) =>
-    given(consume(code, index, "js#"), jsStartIndex =>
-    given(consumeWhile(code, jsStartIndex, ch => ch !== "#"), jsEndIndex =>
-    expec(consume(code, jsEndIndex, "#"), err(code, index, '"#"'), index => ({
-        parsed: {
-            kind: "javascript-escape",
-            js: code.substring(jsStartIndex, jsEndIndex),
-        },
-        newIndex: index,
-    }))))
+    given(consume(code, index, "js#"), jsStartIndex => {
+        let jsEndIndex = jsStartIndex;
+
+        while (code[jsEndIndex] !== "#" || code[jsEndIndex+1] !== "j" || code[jsEndIndex+2] !== "s") {
+            jsEndIndex++;
+        }
+
+        return expec(consume(code, jsEndIndex, "#js"), err(code, index, '"#js"'), index => ({
+            parsed: {
+                kind: "javascript-escape",
+                js: code.substring(jsStartIndex, jsEndIndex),
+            },
+            newIndex: index,
+        }));
+})
 
 function identifierSegment(code: string, index: number): { segment: string, newIndex: number} | undefined {
     const startIndex = index;

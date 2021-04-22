@@ -1,7 +1,7 @@
-import { TypeExpression } from "../../src/ast";
-import { parse } from "../../src/parse";
-import { typecheckFile } from "../../src/typecheck";
-import { deepEquals } from "../../src/utils";
+import { TypeExpression } from "../../compiler/src/ast";
+import { parse } from "../../compiler/src/parse";
+import { typecheckFile } from "../../compiler/src/typecheck";
+import { deepEquals } from "../../compiler/src/utils";
 import { test } from "./testing-utils";
 
 console.log("typecheck.ts")
