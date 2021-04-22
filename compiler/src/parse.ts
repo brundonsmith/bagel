@@ -1,5 +1,5 @@
-import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType } from "./ast";
-import { given, consume, consumeWhitespace, consumeWhile, isNumeric, consumeBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction } from "./parsing-utils";
+import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer } from "./ast";
+import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction } from "./parsing-utils";
 import { err, expec, BagelSyntaxError, log, isError, errorMessage } from "./utils";
 
 export function parse(code: string): Declaration[] {
@@ -266,6 +266,10 @@ const beneathBinaryOperator: ParseFunction<Expression> = (code, index) =>
     ?? beneathFuncall(code, index)
 
 const beneathFuncall: ParseFunction<Expression> = (code, index) =>
+    indexer(code, index)
+    ?? beneathIndexer(code, index)
+
+const beneathIndexer: ParseFunction<Expression> = (code, index) =>
     parenthesized(code, index)
     ?? propertyAccessor(code, index)
     ?? beneathPropertyAccessor(code, index)
@@ -541,9 +545,8 @@ const pipe: ParseFunction<Pipe> = (code, index) =>
 const binaryOperator: ParseFunction<BinaryOperator> = (code, index) => 
     given(beneathBinaryOperator(code, index), ({ parsed: left, newIndex: index }) => 
     given(consumeWhitespace(code, index), index =>
-    given(consumeBinaryOp(code, index), endOfOpIndex =>
-    given(code.substring(index, endOfOpIndex) as BinaryOp, operator =>
-    given(consumeWhitespace(code, endOfOpIndex), index =>
+    given(parseBinaryOp(code, index), ({ parsed: operator, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(expression(code, index), err(code, index, "Right operand"), ({ parsed: right, newIndex: index }) => ({
         parsed: {
             kind: "binary-operator",
@@ -552,8 +555,8 @@ const binaryOperator: ParseFunction<BinaryOperator> = (code, index) =>
             right,
         },
         newIndex: index,
-    })))))))
-                            
+    }))))))
+
 const funcall: ParseFunction<Funcall> = (code, index) =>
     given(beneathFuncall(code, index), ({ parsed: func, newIndex: index }) =>
     given(parseSeries(code, index, _argExpressions), ({ parsed: argLists, newIndex: index }) => 
@@ -576,7 +579,29 @@ const _argExpressions: ParseFunction<Expression[]> = (code, index) =>
         parsed: args,
         newIndex: index
     }))))
-                
+
+const indexer: ParseFunction<Indexer> = (code, index) =>
+    given(beneathIndexer(code, index), ({ parsed: base, newIndex: index }) =>
+    given(parseSeries(code, index, _indexerExpression), ({ parsed: indexers, newIndex: index }) => 
+        indexers.length > 0 ? 
+            {
+                parsed: indexers.reduce((base: Expression, indexer: Expression) => ({
+                    kind: "indexer",
+                    base,
+                    indexer,
+                }), base) as Indexer,
+                newIndex: index,
+            }
+        : undefined))
+
+const _indexerExpression: ParseFunction<Expression> = (code, index) =>
+    given(consume(code, index, "["), index => 
+    expec(expression(code, index), err(code, index, 'Indexer expression'),({ parsed: indexer, newIndex: index }) =>
+    expec(consume(code, index, "]"), err(code, index, '"]"'), index => ({
+        parsed: indexer,
+        newIndex: index
+    }))))
+
 const ifElseExpression: ParseFunction<IfElseExpression> = (code, index) =>
     given(consume(code, index, "if"), index =>
     given(consumeWhitespace(code, index), index =>
