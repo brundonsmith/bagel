@@ -38,6 +38,8 @@ test(function ifExpression() {
         `func merge() =>
             if (arr1.length <= 0) {
                 2
+            } else {
+                3
             }`,
         {
             kind: "func-declaration",
@@ -73,6 +75,10 @@ test(function ifExpression() {
                     ifResult: {
                         kind: "number-literal",
                         value: 2
+                    },
+                    elseResult: {
+                        kind: "number-literal",
+                        value: 3,
                     }
                 }
             }
@@ -150,6 +156,33 @@ test(function funcCallCall() {
                         name: "fn",
                     }
                 }
+            }
+        },
+        (code, index) => parse(code)[0],
+    );
+})
+
+test(function indexer() {
+    return testParse(
+        "const foo = [ arr1[0] ]",
+        {
+            kind: "const-declaration",
+            name: {
+                kind: "plain-identifier",
+                name: "foo"
+            },
+            type: {
+                "kind": "unknown-type"
+            },
+            value: {
+                kind: "array-literal",
+                entries: [
+                    {
+                        kind: "indexer",
+                        base: { kind: "local-identifier", name: "arr1" },
+                        indexer: { kind: "number-literal", value: 0 },
+                    }
+                ]
             }
         },
         (code, index) => parse(code)[0],
