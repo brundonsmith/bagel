@@ -53,19 +53,46 @@ export function typecheckFile(declarations: Declaration[]): (TypeExpression|unde
     })
 }
 
-const BINARY_OPERATOR_TYPES: {[key in BinaryOp]: {inputs: TypeExpression, output: TypeExpression}} = {
-    "+": { inputs: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } },
-    "-": { inputs: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } },
-    "*": { inputs: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } },
-    "/": { inputs: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } },
-    "<": { inputs: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } },
-    ">": { inputs: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } },
-    "<=": { inputs: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } },
-    ">=": { inputs: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } },
-    "&&": { inputs: { kind: "primitive-type", type: "boolean" }, output: { kind: "primitive-type", type: "boolean" } },
-    "||": { inputs: { kind: "primitive-type", type: "boolean" }, output: { kind: "primitive-type", type: "boolean" } },
-    "==": { inputs: { kind: "unknown-type" }, output: { kind: "primitive-type", type: "boolean" } },
-    "??": { inputs: { kind: "unknown-type" }, output: { kind: "unknown-type" } },
+const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
+    "+": [
+        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } },
+        { left: { kind: "primitive-type", type: "string" }, right: { kind: "primitive-type", type: "string" }, output: { kind: "primitive-type", type: "string" } },
+        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "string" }, output: { kind: "primitive-type", type: "string" } },
+        { left: { kind: "primitive-type", type: "string" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "string" } },
+    ],
+    "-": [
+        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } }
+    ],
+    "*": [
+        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } }
+    ],
+    "/": [
+        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } }
+    ],
+    "<": [
+        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } }
+    ],
+    ">": [
+        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } }
+    ],
+    "<=": [
+        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } }
+    ],
+    ">=": [
+        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } }
+    ],
+    "&&": [
+        { left: { kind: "primitive-type", type: "boolean" }, right: { kind: "primitive-type", type: "boolean" }, output: { kind: "primitive-type", type: "boolean" } }
+    ],
+    "||": [
+        { left: { kind: "primitive-type", type: "boolean" }, right: { kind: "primitive-type", type: "boolean" }, output: { kind: "primitive-type", type: "boolean" } }
+    ],
+    "==": [
+        { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "primitive-type", type: "boolean" } }
+    ],
+    "??": [
+        { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "unknown-type" } }
+    ],
     // "??": {
     //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
     //     output: { kind: "primitive-type", type: "boolean" }
@@ -140,13 +167,15 @@ function typecheck(namedTypes: NamedTypes, namedValues: NamedValues, ast: AST): 
         case "binary-operator": {
             return given(typecheck(namedTypes, namedValues, ast.left), leftType =>
                 given(typecheck(namedTypes, namedValues, ast.right), rightType => {
-                    const { inputs, output } = BINARY_OPERATOR_TYPES[ast.operator];
+                    for (const types of BINARY_OPERATOR_TYPES[ast.operator]) {
+                        const { left, right, output } = types;
 
-                    if (!subsumes(namedTypes, namedValues, inputs, leftType) || !subsumes(namedTypes, namedValues, inputs, rightType)) {
-                        return undefined;
+                        if (subsumes(namedTypes, namedValues, left, leftType) && subsumes(namedTypes, namedValues, right, rightType)) {
+                            return output;
+                        }
                     }
 
-                    return output;
+                    return undefined;
                 }));
         };
         case "if-else-expression": {
@@ -237,11 +266,11 @@ function typecheck(namedTypes: NamedTypes, namedValues: NamedValues, ast: AST): 
                 return baseType?.valueType;
             }
         }
-        case "string-literal":  return {
+        case "string-literal": return {
             kind: "primitive-type",
             type: "string",
         };
-        case "number-literal":  return {
+        case "number-literal": return {
             kind: "primitive-type",
             type: "number",
         };
