@@ -56,23 +56,21 @@ export const LOCALS_OBJ = "__locals";
 //.map(name => `${name}:{value:${name}}`)
 // let ${LOCALS_OBJ} = __locals.crowdx.observable(Object.create(${LOCALS_OBJ}, {${proc.argNames.map(compileOne).map(arg => `${arg}: {value: ${arg}}`).join(", ")}}));
 function compileProc(proc: Proc): string {
-    return `function ${proc.name == null ? '' : proc.name.name}(${proc.argNames[0] != null ? compileOne(proc.argNames[0]) : ''}) {
-    ${proc.argNames.length > 1 ? ` return (${proc.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(arg)}) => `).join("")}{` : ''}
+    return `function ${proc.name == null ? '' : proc.name.name}(${proc.argNames[0] != null ? compileOne(proc.argNames[0]) : ''}) {${proc.argNames.length > 1 ? ` return (${proc.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(arg)}) => `).join("")}{\n` : ''}
     const disposers = [];
 
     ${proc.body.map(compileOne).join("; ")}
 
     // disposers.forEach(crowdx.dispose);
-    ${proc.argNames.length > 1 ? `});` : ''}
-}`;
+${proc.argNames.length > 1 ? `});` : ''}}`;
 }
 // TODO: dispose of reactions somehow... at some point...
 
 // TODO: Don't pass __parent_locals to top-level declared functions/procs
 function compileFunc(func: Func): string {
-    return `function ${func.name == null ? '' : func.name.name}(${func.argNames[0] != null ? compileOne(func.argNames[0]) : ''}) {
-        return ${func.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(arg)}) => `).join("")}${compileOne(func.body)};
-    }`;
+    return `function ${func.name == null ? '' : func.name.name}(${func.argNames[0] != null ? compileOne(func.argNames[0]) : ''}) { return (${func.argNames.map((arg, index, arr) => index === 0 ? '' : `(${compileOne(arg)}) => `).join("")}
+    ${compileOne(func.body)}
+);}`;
 }
 
 function compilePipe(expressions: readonly Expression[], end: number): string {
