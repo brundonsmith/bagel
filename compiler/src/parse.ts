@@ -22,6 +22,8 @@ export function parse(code: string): Declaration[] {
         console.log("Syntax error:", errorMessage(result));
     }
 
+    memo.delete(code);
+
     return results;
 }
 
@@ -463,23 +465,27 @@ const expressionPrecedenceTiers: () => ParseFunction<Expression>[][] = () => [
 ];
 
 class ParseMemo {
-    private memo = new Map<ParseFunction<Expression>, Map<string, Map<number, ParseResult<Expression>>>>();
+    private memo = new Map<string, Map<ParseFunction<Expression>, Map<number, ParseResult<Expression>>>>();
 
     memoize(fn: ParseFunction<Expression>, code: string, index: number, result: ParseResult<Expression>|BagelSyntaxError|undefined) {
         if (result != null && !isError(result)) {
-            if (!this.memo.has(fn)) {
-                this.memo.set(fn, new Map());
+            if (!this.memo.has(code)) {
+                this.memo.set(code, new Map());
             }
-            if (!this.memo.get(fn)?.has(code)) {
-                this.memo.get(fn)?.set(code, new Map());
+            if (!this.memo.get(code)?.has(fn)) {
+                this.memo.get(code)?.set(fn, new Map());
             }
             
-            this.memo.get(fn)?.get(code)?.set(index, result);
+            this.memo.get(code)?.get(fn)?.set(index, result);
         }
     }
 
     get(fn: ParseFunction<Expression>, code: string, index: number) {
-        return this.memo.get(fn)?.get(code)?.get(index);
+        return this.memo.get(code)?.get(fn)?.get(index);
+    }
+
+    delete(code: string) {
+        this.memo.delete(code);
     }
 
     cachedOrParse<T extends Expression>(fn: ParseFunction<T>): ParseFunction<T> {
