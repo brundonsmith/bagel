@@ -1,9 +1,13 @@
 {
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
+    "noImplicitAny": true,
+    "downlevelIteration": true,
+    "strict": true,
     "module": "es6",
     "target": "es5",
+    "lib": ["es2019"],
     "allowJs": true
   },
-  "include": ["src"]
+  "include": ["*/src/**/*"]
 }

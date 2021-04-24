@@ -1,9 +1,27 @@
 
+export type BasicData =
+    | BasicObj
+    | BasicData[]
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+
+type BasicObj = { [key: string]: BasicData }
+
 /**
  * This singleton holds all global state related to creating, maintaining, and
  * triggering subscriptions
  */
  class CrowdXTrackingStore {
+
+    reactionSubscriptionSets: Map<() => unknown, Set<Set<() => unknown>>>;
+    currentTracking: null | {
+        trackedFunction: () => unknown,
+        reactionSets: Set<Set<() => unknown>>,
+    };
+    currentActionReactionSets: null | Set<Set<() => unknown>>;
 
     constructor() {
         this.reactionSubscriptionSets = new Map();
@@ -18,7 +36,7 @@
      * reaction is added to all found observables, and these pieces of state 
      * get cleared.
      */
-    beginTracking(func) {
+    beginTracking(func: () => unknown) {
         this.currentTracking = {
             trackedFunction: func,
             reactionSets: new Set(),
@@ -43,10 +61,10 @@
      * Given an observable's reaction set, tracks it in the context of the 
      * currently-running tracked function, if any.
      */
-    track(reactionSet) {
+    track(reactionSet: Set<() => unknown>) {
         if (this.currentTracking != null) {
             this.currentTracking.reactionSets.add(reactionSet);
-            this.reactionSubscriptionSets.get(this.currentTracking.trackedFunction).add(reactionSet);
+            this.reactionSubscriptionSets.get(this.currentTracking.trackedFunction)?.add(reactionSet);
         }
     }
 
@@ -58,7 +76,7 @@
      * important to do when you no longer want the reaction because it allows any 
      * memory being referenced by it to be cleaned up, preventing memory-leaks.
      */
-    dispose(reaction) {
+    dispose(reaction: () => unknown) {
         const reactionSets = this.reactionSubscriptionSets.get(reaction);
 
         if (reactionSets != null) {
@@ -84,7 +102,9 @@
         const observables = this.currentActionReactionSets;
         this.currentActionReactionSets = null;
 
-        this.publishAll(observables);
+        if (observables != null) {
+            this.publishAll(observables);
+        }
     }
 
 
@@ -93,7 +113,7 @@
      * the appropriate course of action depending on whether or not we're 
      * currently inside an action.
      */
-    publish(reactionSet) {
+    publish(reactionSet: Set<() => unknown>) {
         if (this.currentActionReactionSets != null) {
             // If we're in an action, set the reactions aside for later
             this.currentActionReactionSets.add(reactionSet);
@@ -110,7 +130,7 @@
      * Same as publish(), but for multiple sets of reaction. De-dupes reactions
      * to avoid redundant calls.
      */
-    publishAll(reactionSets) {
+    publishAll(reactionSets: Set<Set<() => unknown>>) {
         if (this.currentActionReactionSets != null) {
             // If we're in an action, set all reactions aside for later
             for (const reactionSet of reactionSets) {
@@ -118,7 +138,7 @@
             }
         } else {
             // Else, go ahead and trigger them
-            const allReactions = new Set();
+            const allReactions = new Set<() => unknown>();
 
             // Reactions get combined into a single Set so that if there are 
             // duplicates (multiple observables trigger the same reaction), 
@@ -165,13 +185,18 @@ const PROPERTY_REACTIONS = Symbol("OBSERVABLE_REACTIONS");
  * that causes the entire array to be published as a whole, not just one of its 
  * members.
  */
-const ARRAY_MUTATION_METHODS = [ "push", "pop", "fill", "splice", "sort", 
-"reverse", "shift", "unshift" ];
+const ARRAY_MUTATION_METHODS: Array<string|symbol> = [ "push", "pop", "fill", 
+"splice", "sort", "reverse", "shift", "unshift" ];
+
+type Observable = { 
+    [PARENT_REACTIONS]: Set<() => unknown>, 
+    [PROPERTY_REACTIONS]: {[key: string]: Set<() => unknown>} 
+} & (BasicObj | BasicData[]);
 
 /**
  * This defines the JS Proxy behavior for our observable objects.
  */
-const proxyHandler = {
+const proxyHandler: ProxyHandler<Observable> = {
 
     /**
      * We override the property getter so that if we're currently running a 
@@ -182,10 +207,10 @@ const proxyHandler = {
      * for ones that will publish their mutations correctly 
      * (see ARRAY_MUTATION_METHODS).
      */
-    get: function (target, prop) {
+    get: function (target, prop: string) {
         if (Array.isArray(target) && ARRAY_MUTATION_METHODS.includes(prop)) {
-            return function(...args) {
-                const res = target[prop](...args);
+            return function(...args: any[]) {
+                const res = (target[prop as any] as any)(...args);
                 subscriptionsStore.publish(target[PARENT_REACTIONS]);
                 return res;
             };
@@ -194,7 +219,7 @@ const proxyHandler = {
                 subscriptionsStore.track(target[PROPERTY_REACTIONS][prop]);
             }
     
-            return target[prop];
+            return (target as BasicObj)[prop];
         }
     },
 
@@ -205,11 +230,11 @@ const proxyHandler = {
      * We also call observable() on the provided value, to make sure our entire
      * object tree remains observable all the way down.
      */
-    set: function (target, prop, value) {
+    set: function (target, prop: string, value) {
 
         // if the value didn't actually change, do 
         // nothing (importantly: don't publish)
-        if (target[prop] !== value) {
+        if ((target as any)[prop] !== value) {
             const newProperty = !target.hasOwnProperty(prop);
             
             // if there isn't already an observable reaction-set for this 
@@ -219,7 +244,7 @@ const proxyHandler = {
             }
     
             // assign the new value, wrapping it in an observable if needed
-            target[prop] = observable(value, target[PROPERTY_REACTIONS][prop]);
+            (target as any)[prop] = observable(value, target[PROPERTY_REACTIONS][prop]);
     
             if (newProperty) {
                 // if this is a new property, notify the parent that the 
@@ -255,7 +280,7 @@ const proxyHandler = {
  * only. It is used to allow child objects/arrays to publish changes to their 
  * entire selves (as opposed to changes to one of their members).
  */
-export function observable(val, parentReactionSet) {
+export function observable<T extends BasicData>(val: T, parentReactionSet?: Set<() => unknown>): T {
     if (typeof val === "object" && val != null && !Object.hasOwnProperty(PROPERTY_REACTIONS)) {
         const observableVal = Array.isArray(val) ? [] : {};
 
@@ -279,16 +304,16 @@ export function observable(val, parentReactionSet) {
         });
         
         // Apply the proxy (see proxyHandler above)
-        const proxy = new Proxy(observableVal, proxyHandler);
+        const proxy = new Proxy(observableVal, proxyHandler) as T;
 
         // Copy the values from the original object into the new, proxied object
         if (Array.isArray(val)) {
             for (let i = 0; i < val.length; i++) {
-                proxy.push(val[i]);
+                (proxy as BasicData[]).push(val[i]);
             }
         } else {
-            for (const key of Object.keys(val)) {
-                proxy[key] = val[key];
+            for (const key of Object.keys(val as BasicObj)) {
+                (proxy as BasicObj)[key] = val[key];
             }
         }
 
@@ -322,7 +347,7 @@ export function observable(val, parentReactionSet) {
  * another effect on the world. This is the key useful mechanism of this 
  * library.
  */
-export function reaction(trackedFn, effectFn) {
+export function reaction<T>(trackedFn: () => T, effectFn: (val: T) => void): DisposalHandle {
     const reactionFn = function() {
         subscriptionsStore.beginTracking(reactionFn);
         const result = trackedFn();
@@ -341,10 +366,12 @@ export function reaction(trackedFn, effectFn) {
     });
 
     // We return the reaction so it can be cleaned up later by calling dispose()
-    return disposalHandle;
+    return disposalHandle as DisposalHandle;
 }
 
 const REACTION_FOR_DISPOSAL = Symbol("REACTION_FOR_DISPOSAL");
+
+type DisposalHandle = { [REACTION_FOR_DISPOSAL]: () => void };
 
 /**
  * An action is a function that mutates observables, but doesn't publish on 
@@ -357,7 +384,7 @@ const REACTION_FOR_DISPOSAL = Symbol("REACTION_FOR_DISPOSAL");
  * 2) Performance. Changing multiple properties in sequence won't cause extra 
  * work to be done and then immediately discarded.
  */
-export function action(fn) {
+export function action<TParams extends any[]>(fn: (...params: TParams) => void): (...params: TParams) => void {
     return function(...args) {
         subscriptionsStore.beginAction();
         fn(...args);
@@ -376,10 +403,10 @@ export function action(fn) {
  * only the parts of the graph that actually need to be re-computed get 
  * recomputed. This is where this paradigm really gets powerful.
  */
-export function computed(fn) {
+export function computed<T extends BasicData>(fn: () => T) {
     
     // We store the most recently-computed value in an observable in scope
-    const cache = observable({ value: undefined });
+    const cache = observable<{ value: T|undefined }>({ value: undefined });
     
     // We eagerly set up our reaction, computing the initial cache value 
     // immediately by calling fn()
@@ -418,7 +445,7 @@ export function computed(fn) {
  * important to do when you no longer want the reaction because it allows any 
  * memory being referenced by it to be cleaned up, preventing memory-leaks.
  */
-export function dispose(disposalHandle) {
+export function dispose(disposalHandle: DisposalHandle) {
     if (disposalHandle[REACTION_FOR_DISPOSAL] != null) {
         subscriptionsStore.dispose(disposalHandle[REACTION_FOR_DISPOSAL]);
     }

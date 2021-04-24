@@ -10,9 +10,7 @@
   "description": "",
   "name": "bagel-compiler",
   "scripts": {
-    "build": "webpack --mode=production",
-    "build:dev": "webpack --mode=development",
-    "build:prod": "webpack --mode=production",
-    "watch": "webpack --watch"
+    "build": "esbuild src/index.ts --bundle --platform=node --outfile=../build/compiler.js",
+    "watch": "esbuild src/index.ts --bundle --platform=node --outfile=../build/compiler.js --watch"
   }
 }

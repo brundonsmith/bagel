@@ -3,23 +3,20 @@
 
 export * as crowdx from "./crowdx";
 
-export function range(start) {
-    return function*(end) {
+export function range(start: number) {
+    return function*(end: number) {
         for (let i = start; i < end; i++) {
             yield i;
         }
     }
 }
 
-export function slice(start) {
-    return function(end) {
-        return function*(iter) {
-            const noStart = start == null;
-            const noEnd = end == null || end < 0
-
+export function slice<T>(start: number|undefined) {
+    return function(end: number|undefined) {
+        return function*(iter: Iterable<T>) {
             let index = 0;
             for (const el of iter) {
-                if ((noStart || index >= start) && (noEnd || index < end)) {
+                if ((start == null || index >= start) && (end == null || index < end)) {
                     yield el;
                 }
                 index++;
@@ -28,16 +25,16 @@ export function slice(start) {
     }
 }
 
-export function map(fn) {
-    return function*(iter) {
+export function map<T, R>(fn: (el: T) => R) {
+    return function*(iter: Iterable<T>) {
         for (const el of iter) {
             yield fn(el);
         }
     }
 }
 
-export function filter(fn) {
-    return function*(iter) {
+export function filter<T>(fn: (el: T) => boolean) {
+    return function*(iter: Iterable<T>) {
         for (const el of iter) {
             if (fn(el)) {
                 yield el;
@@ -46,13 +43,13 @@ export function filter(fn) {
     }
 }
 
-export function* entries(obj) {
+export function* entries<V>(obj: {[key: string]: V}): Generator<[string, V], void, unknown> {
     for (const key in obj) {
         yield [key, obj[key]];
     }
 }
 
-export function count(iter) {
+export function count<T>(iter: Iterable<T>) {
     let count = 0;
 
     for (const key in iter) {
@@ -62,8 +59,8 @@ export function count(iter) {
     return count;
 }
 
-export function join(delimiter) {
-    return function(iter) {
+export function join<T extends string>(delimiter: string) {
+    return function(iter: Iterable<T>) {
         let str = "";
         let first = true;
 
@@ -81,9 +78,9 @@ export function join(delimiter) {
     }
 }
 
-export function concat(iter1) {
-    return function(iter2) {
-        const result = [];
+export function concat<T>(iter1: Iterable<T>) {
+    return function(iter2: Iterable<T>) {
+        const result: T[] = [];
     
         for (const el of iter1) {
             result.push(el);
@@ -97,7 +94,7 @@ export function concat(iter1) {
     }
 }
 
-export function log(expr) {
+export function log<T>(expr: T): T {
     console.log(expr);
     return expr;
 }
