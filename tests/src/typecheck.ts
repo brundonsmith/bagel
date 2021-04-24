@@ -1,59 +1,59 @@
 import { TypeExpression } from "../../compiler/src/ast";
 import { parse } from "../../compiler/src/parse";
-import { typecheckFile } from "../../compiler/src/typecheck";
+import { BagelTypeError, isError, typecheckFile } from "../../compiler/src/typecheck";
 import { deepEquals } from "../../compiler/src/utils";
 import { test } from "./testing-utils";
 
 console.log("typecheck.ts")
 
 test(function typeDeclarations() {
-    return testTypecheck(`type Foo = string`, [ {
-            kind: "primitive-type",
-            type: "string",
-        } ])
-        ?? testTypecheck(`type Bar = string | number`, [ {
+    return testTypecheck(`type Foo = string`, [{
+        kind: "primitive-type",
+        type: "string",
+    }])
+        ?? testTypecheck(`type Bar = string | number`, [{
             kind: "union-type",
             members: [
                 { kind: "primitive-type", type: "string" },
                 { kind: "primitive-type", type: "number" },
             ],
-        } ])
-        ?? testTypecheck(`type Blah = string[]`, [ {
+        }])
+        ?? testTypecheck(`type Blah = string[]`, [{
             kind: "array-type",
             element: { kind: "primitive-type", type: "string" },
-        } ])
-        ?? testTypecheck(`type Stuff = { foo: Bar, foo2: Blah }`, [ {
+        }])
+        ?? testTypecheck(`type Stuff = { foo: Bar, foo2: Blah }`, [{
             kind: "object-type",
             entries: [
                 [
                     { kind: "plain-identifier", name: "foo" },
-                    { kind: "named-type", name: { kind: "plain-identifier", name: "Bar"} },
+                    { kind: "named-type", name: { kind: "plain-identifier", name: "Bar" } },
                 ],
                 [
                     { kind: "plain-identifier", name: "foo2" },
-                    { kind: "named-type", name: { kind: "plain-identifier", name: "Blah"} },
+                    { kind: "named-type", name: { kind: "plain-identifier", name: "Blah" } },
                 ]
             ],
-        } ])
+        }])
 })
 
 test(function constDeclarationsInference() {
-    return testTypecheck(`const foo = 'stuff'`, [ {
-            kind: "primitive-type",
-            type: "string",
-        } ])
-        ?? testTypecheck(`const bar = 12`, [ {
+    return testTypecheck(`const foo = 'stuff'`, [{
+        kind: "primitive-type",
+        type: "string",
+    }])
+        ?? testTypecheck(`const bar = 12`, [{
             kind: "primitive-type",
             type: "number",
-        } ])
-        ?? testTypecheck(`const bar = [ '1', '2', '3' ]`, [ {
+        }])
+        ?? testTypecheck(`const bar = [ '1', '2', '3' ]`, [{
             kind: "array-type",
             element: { kind: "primitive-type", type: "string" },
-        } ])
+        }])
         ?? testTypecheck(`const stuff = {
             foo: 12,
             foo2: [ 'other' ]
-        }`, [ {
+        }`, [{
             kind: "object-type",
             entries: [
                 [
@@ -68,7 +68,7 @@ test(function constDeclarationsInference() {
                     },
                 ]
             ],
-        } ])
+        }])
 })
 
 test(function nameResolutions() {
@@ -91,7 +91,7 @@ test(function nameResolutions() {
         foo: 12,
         foo2: [ 'other' ]
     }`
-    
+
     const parsed = parse(code);
     const type = typecheckFile(parsed);
 
@@ -122,17 +122,17 @@ test(function failsWhenShould() {
         foo: 12,
         foo2: [ 'other' ]
     }`
-    
+
     const parsed = parse(code);
     const type = typecheckFile(parsed);
 
-    const expectedToSucceed = [ true, true, true, true, false, true, false, true ];
-    const mismatch = type.findIndex((t, index) => (t != null) !== expectedToSucceed[index]);
+    const expectedToSucceed = [true, true, true, true, false, true, false, true];
+    const mismatch = type.findIndex((t, index) => !isError(t) !== expectedToSucceed[index]);
 
     if (mismatch >= 0) {
         const expected = expectedToSucceed[mismatch];
 
-        return `Type check should have ${expected ? 'succeeded' : 'failed'} on declaration ${mismatch}, but it ${expected ? 'failed': 'succeeded'}`;
+        return `Type check should have ${expected ? 'succeeded' : 'failed'} on declaration ${mismatch}, but it ${expected ? 'failed' : 'succeeded'}`;
     }
 })
 
@@ -168,12 +168,28 @@ test(function passingInvalidArguments() {
                 ],
                 returnType: { kind: "primitive-type", type: "number" },
             },
-            undefined,
+            {
+                kind: "bagel-assignable-to-error",
+                ast: {
+                    kind: "string-literal",
+                    segments: [
+                        "stuff"
+                    ]
+                },
+                destination: {
+                    kind: "primitive-type",
+                    type: "number"
+                },
+                value: {
+                    kind: "primitive-type",
+                    type: "string"
+                }
+            }
         ])
 })
 
 
-test(function usingValidReturnType() {
+test(function usingInvalidReturnType() {
     return testTypecheck(`
         func foo(a: number, b: number): number => a + b
         
@@ -187,7 +203,45 @@ test(function usingValidReturnType() {
                 ],
                 returnType: { kind: "primitive-type", type: "number" },
             },
-            undefined,
+            {
+                kind: "bagel-assignable-to-error",
+                ast: {
+                    kind: "const-declaration",
+                    name: {
+                        kind: "plain-identifier",
+                        name: "bar"
+                    },
+                    type: {
+                        kind: "primitive-type",
+                        type: "string"
+                    },
+                    value: {
+                        kind: "funcall",
+                        func: {
+                            kind: "local-identifier",
+                            name: "foo"
+                        },
+                        args: [
+                            {
+                                kind: "number-literal",
+                                value: 3
+                            },
+                            {
+                                kind: "number-literal",
+                                value: 12
+                            }
+                        ]
+                    }
+                },
+                destination: {
+                    kind: "primitive-type",
+                    type: "string"
+                },
+                value: {
+                    kind: "primitive-type",
+                    type: "number"
+                }
+            },
         ])
 })
 
@@ -224,13 +278,13 @@ test(function propertyAccessorType() {
 })
 
 
-function testTypecheck(code: string, expected: (TypeExpression|undefined)[], debug?: boolean): string|undefined {
+function testTypecheck(code: string, expected: (TypeExpression | BagelTypeError)[], debug?: boolean): string | undefined {
     const parsed = parse(code);
     const type = typecheckFile(parsed);
 
-    if(debug) console.log("PARSED: ", JSON.stringify(parsed, null, 2))
+    if (debug) console.log("PARSED: ", JSON.stringify(parsed, null, 4))
 
     if (!deepEquals(type, expected)) {
-        return `\nTypechecking: "${code}"\n\nExpected:\n${JSON.stringify(expected, null, 2)}\n\nReceived:\n${JSON.stringify(type, null, 2)}`;
+        return `\nTypechecking: "${code}"\n\nExpected:\n${JSON.stringify(expected, null, 4)}\n\nReceived:\n${JSON.stringify(type, null, 4)}`;
     }
 }

@@ -1,5 +1,4 @@
 import { AST, BinaryOp, BINARY_OPS, KEYWORDS } from "./ast";
-import { BagelSyntaxError, isError } from "./utils";
 
 export function consume(code: string, index: number, segment: string): number|undefined {
     for (let i = 0; i < segment.length; i++) {
@@ -162,6 +161,48 @@ export function given<T, R>(val: T|BagelSyntaxError|undefined, fn: (val: T) => R
     } else {
         return val as BagelSyntaxError|undefined;
     }
+}
+
+export type BagelSyntaxError = {
+    kind: "bagel-syntax-error",
+    code: string,
+    index: number,
+    expected: string,
+    stack: string|undefined,
+}
+
+export function errorMessage(error: BagelSyntaxError): string {
+    let line = 1;
+    let column = 0;
+    for (let i = 0; i <= error.index; i++) {
+        if (error.code[i] === "\n") {
+            line++;
+            column = 0;
+        } else {
+            column++;
+        }
+    }
+
+    return `${line}:${column} ${error.expected} expected\n${error.stack}`;
+}
+
+export function isError(x: unknown): x is BagelSyntaxError {
+    return x != null && typeof x === "object" && (x as any).kind === "bagel-syntax-error";
+}
+
+
+export function expec<T, R>(val: T|BagelSyntaxError|undefined, err: BagelSyntaxError, fn: (val: T) => R): R|BagelSyntaxError {
+    if (isError(val)) {
+        return val;
+    } else if (val != null) {
+        return fn(val);
+    } else {
+        return err;
+    }
+}
+
+export function err(code: string, index: number, expected: string): BagelSyntaxError {
+    return { kind: "bagel-syntax-error", code, index, expected, stack: undefined };
 }
 
 export type ParseFunction<T> = (code: string, index: number) => ParseResult<T> | BagelSyntaxError | undefined;

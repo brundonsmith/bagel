@@ -1,6 +1,5 @@
 import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer } from "./ast";
-import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction } from "./parsing-utils";
-import { err, expec, BagelSyntaxError, log, isError, errorMessage } from "./utils";
+import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction, err, expec, BagelSyntaxError, isError, errorMessage } from "./parsing-utils";
 
 export function parse(code: string): Declaration[] {
     let index = 0;

@@ -729,7 +729,7 @@ function testParse<T extends AST>(code: string, expected: T, parseFn: (code: str
     const parsed = parseFn(code, 0);
 
     if (!deepEquals(parsed, expected)) {
-        return `\nParsing: "${code}"\n\nExpected:\n${JSON.stringify(expected, null, 2)}\n\nReceived:\n${JSON.stringify(parsed, null, 2)}`;
+        return `\nParsing: "${code}"\n\nExpected:\n${JSON.stringify(expected, null, 4)}\n\nReceived:\n${JSON.stringify(parsed, null, 4)}`;
     }
 }
 
