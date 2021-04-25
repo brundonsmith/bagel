@@ -72,7 +72,7 @@ export type Reaction = {
 export type LetDeclaration = {
     kind: "let-declaration",
     name: LocalIdentifier,
-    type: TypeExpression,
+    type?: TypeExpression,
     value: Expression,
 }
 
@@ -207,7 +207,7 @@ export type Expression =
 export type Proc = {
     kind: "proc",
     name?: PlainIdentifier,
-    type: ProcType | UnknownType,
+    type: ProcType,
     argNames: PlainIdentifier[],
     body: Statement[],
 }
@@ -215,7 +215,7 @@ export type Proc = {
 export type Func = {
     kind: "func",
     name?: PlainIdentifier,
-    type: FuncType | UnknownType,
+    type: FuncType,
     argNames: PlainIdentifier[],
     body: Expression,
 }
