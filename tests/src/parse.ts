@@ -27,7 +27,8 @@ test(function simpleFuncDeclaration() {
                     kind: "string-literal",
                     segments: ["12345"],
                 }
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -81,7 +82,8 @@ test(function ifExpression() {
                         value: 3,
                     }
                 }
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -127,7 +129,8 @@ test(function indexerExpression() {
                         name: "i",
                     }
                 }
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -156,7 +159,8 @@ test(function funcCallCall() {
                         name: "fn",
                     }
                 }
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -183,7 +187,8 @@ test(function indexer() {
                         indexer: { kind: "number-literal", value: 0 },
                     }
                 ]
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -213,7 +218,8 @@ test(function simpleProcDeclaration() {
                     }
                 ],
                 body: []
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -274,7 +280,8 @@ test(function basicProcDeclaration() {
                         ]
                     }
                 ]
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -406,7 +413,8 @@ test(function procDeclarationWithStatements() {
                         ]
                     }
                 ]
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -431,7 +439,8 @@ test(function simpleConstDeclaration() {
             value: {
                 kind: "string-literal",
                 segments: ["stuff"],
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -464,7 +473,8 @@ test(function basicPropertyAccess() {
                         name: "prop2",
                     }
                 ]
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -513,7 +523,8 @@ test(function funcDeclarationWithPipe() {
                         }
                     ]
                 }
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -628,7 +639,8 @@ test(function funcDeclarationWithIteration() {
                         },
                     ]
                 }
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -671,7 +683,8 @@ test(function typedFuncDeclaration() {
                     kind: "number-literal",
                     value: 0,
                 }
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );
@@ -717,7 +730,8 @@ test(function typedProcDeclaration() {
                     { kind: "plain-identifier", name: "b" },
                 ],
                 body: []
-            }
+            },
+            exported: false
         },
         (code, index) => parse(code)[0],
     );

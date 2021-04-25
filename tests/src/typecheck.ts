@@ -231,7 +231,8 @@ test(function usingInvalidReturnType() {
                                 value: 12
                             }
                         ]
-                    }
+                    },
+                    exported: false
                 },
                 destination: {
                     kind: "primitive-type",
