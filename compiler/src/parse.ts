@@ -1,4 +1,4 @@
-import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer } from "./ast";
+import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration } from "./ast";
 import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction, err, expec, BagelSyntaxError, isError, errorMessage } from "./parsing-utils";
 
 export function parse(code: string): Declaration[] {
@@ -27,26 +27,57 @@ export function parse(code: string): Declaration[] {
 }
 
 const declaration: ParseFunction<Declaration> = (code, index) =>
-    typeDeclaration(code, index)
+    importDeclaration(code, index)
+    ?? typeDeclaration(code, index)
     ?? procDeclaration(code, index)
     ?? funcDeclaration(code, index)
     ?? constDeclaration(code, index)
 
-const typeDeclaration: ParseFunction<TypeDeclaration> = (code, index) =>
-    given(consume(code, index, "type"), index => 
+const importDeclaration: ParseFunction<ImportDeclaration> = (code, index) =>
+    given(consume(code, index, "from"), index =>
     given(consumeWhitespace(code, index), index =>
-    expec(plainIdentifier(code, index), err(code, index, 'Type name'), ({ parsed: name, newIndex: index }) =>
+    expec(stringLiteral(code, index), err(code, index, 'Import path'), ({ parsed: path, newIndex: index }) => 
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "="), err(code, index, '"="'), index =>
+    expec(consume(code, index, "import"), err(code, index, '"import"'), index =>
     given(consumeWhitespace(code, index), index =>
-    expec(typeExpression(code, index), err(code, index, 'Type expression'), ({ parsed: type, newIndex: index }) => ({
+    expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
+    given(parseSeries(code, index, plainIdentifier, ","), ({ parsed: imports, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
         parsed: {
-            kind: "type-declaration",
-            name,
-            type,
+            kind: "import-declaration",
+            imports: imports.map(name => ({ name })),
+            path,
         },
-        newIndex: index,
-    }))))))))
+        newIndex: index
+    })))))))))))
+
+const typeDeclaration: ParseFunction<TypeDeclaration> = (code, index) => {
+    const indexAfterExport = given(consume(code, index, "export"), index =>
+        consumeWhitespace(code, index));
+
+    if (isError(indexAfterExport)) {
+        return indexAfterExport;
+    }
+
+    const exported = indexAfterExport != null;
+    
+    return given(consume(code, indexAfterExport ?? index, "type"), index => 
+        given(consumeWhitespace(code, index), index =>
+        expec(plainIdentifier(code, index), err(code, index, 'Type name'), ({ parsed: name, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index =>
+        expec(consume(code, index, "="), err(code, index, '"="'), index =>
+        given(consumeWhitespace(code, index), index =>
+        expec(typeExpression(code, index), err(code, index, 'Type expression'), ({ parsed: type, newIndex: index }) => ({
+            parsed: {
+                kind: "type-declaration",
+                name,
+                type,
+                exported,
+            },
+            newIndex: index,
+        }))))))))
+}
 
 const typeExpression: ParseFunction<TypeExpression> = (code, index) =>
     arrayType(code, index)
@@ -207,48 +238,81 @@ const unknownType: ParseFunction<UnknownType> = (code, index) =>
         newIndex: index,
     }))
 
-const procDeclaration: ParseFunction<ProcDeclaration> = (code, index) =>
-    given(consume(code, index, "proc"), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(proc(code, index), err(code, index, 'Procedure'), ({ parsed: proc, newIndex: index }) => ({
-        parsed: {
-            kind: "proc-declaration",
-            proc,
-        },
-        newIndex: index,
-    }))))
+const procDeclaration: ParseFunction<ProcDeclaration> = (code, index) => {
+    const indexAfterExport = given(consume(code, index, "export"), index =>
+        consumeWhitespace(code, index));
 
-const funcDeclaration: ParseFunction<FuncDeclaration> = (code, index) =>
-    given(consume(code, index, "func"), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(func(code, index), err(code, index, 'Function'), ({ parsed: func, newIndex: index }) => ({
-        parsed: {
-            kind: "func-declaration",
-            func,
-        },
-        newIndex: index,
-    }))))
+    if (isError(indexAfterExport)) {
+        return indexAfterExport;
+    }
 
-const constDeclaration: ParseFunction<ConstDeclaration> = (code, index) =>
-    given(consume(code, index, "const"), index =>
-    given(consumeWhitespace(code, index), index =>
-    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index}) =>
-    given(consumeWhitespace(code, index), index =>
-    given(parseOptional(code, index, (code, index) =>
-        given(consume(code, index, ":"), index =>
-        given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: type, newIndex }) =>
-    given(consumeWhitespace(code, newIndex ?? index), index =>
-    expec(consume(code, index, "="), err(code, index, '"="'), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(expression(code, index), err(code, index, 'Expression'), ({ parsed: value, newIndex: index }) => ({
+    const exported = indexAfterExport != null;
+    
+    return given(consume(code, indexAfterExport ?? index, "proc"), index =>
+        given(consumeWhitespace(code, index), index =>
+        expec(proc(code, index), err(code, index, 'Procedure'), ({ parsed: proc, newIndex: index }) => ({
             parsed: {
-                kind: "const-declaration",
-                name,
-                type: type ?? { kind: "unknown-type" },
-                value,
+                kind: "proc-declaration",
+                proc,
+                exported,
             },
             newIndex: index,
-    }))))))))))
+        }))))
+}
+
+const funcDeclaration: ParseFunction<FuncDeclaration> = (code, index) => {
+    const indexAfterExport = given(consume(code, index, "export"), index =>
+        consumeWhitespace(code, index));
+
+    if (isError(indexAfterExport)) {
+        return indexAfterExport;
+    }
+
+    const exported = indexAfterExport != null;
+    
+    return given(consume(code, indexAfterExport ?? index, "func"), index =>
+        given(consumeWhitespace(code, index), index =>
+        expec(func(code, index), err(code, index, 'Function'), ({ parsed: func, newIndex: index }) => ({
+            parsed: {
+                kind: "func-declaration",
+                func,
+                exported,
+            },
+            newIndex: index,
+        }))))
+}
+
+const constDeclaration: ParseFunction<ConstDeclaration> = (code, index) => {
+    const indexAfterExport = given(consume(code, index, "export"), index =>
+        consumeWhitespace(code, index));
+
+    if (isError(indexAfterExport)) {
+        return indexAfterExport;
+    }
+
+    const exported = indexAfterExport != null;
+    
+    return given(consume(code, indexAfterExport ?? index, "const"), index =>
+        given(consumeWhitespace(code, index), index =>
+        given(plainIdentifier(code, index), ({ parsed: name, newIndex: index}) =>
+        given(consumeWhitespace(code, index), index =>
+        given(parseOptional(code, index, (code, index) =>
+            given(consume(code, index, ":"), index =>
+            given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: type, newIndex }) =>
+        given(consumeWhitespace(code, newIndex ?? index), index =>
+        expec(consume(code, index, "="), err(code, index, '"="'), index =>
+        given(consumeWhitespace(code, index), index =>
+        expec(expression(code, index), err(code, index, 'Expression'), ({ parsed: value, newIndex: index }) => ({
+                parsed: {
+                    kind: "const-declaration",
+                    name,
+                    type: type ?? { kind: "unknown-type" },
+                    value,
+                    exported,
+                },
+                newIndex: index,
+        }))))))))))
+}
 
 const proc: ParseFunction<Proc> = (code, index) =>
     given(parseOptional(code, index, plainIdentifier), ({ parsed: name, newIndex }) =>

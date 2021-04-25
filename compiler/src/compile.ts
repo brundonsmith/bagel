@@ -1,20 +1,18 @@
-import { AST, Declaration, declarationName, Expression, Func, LocalIdentifier, Proc } from "./ast";
+import { AST, Declaration, Expression, Func, LocalIdentifier, Proc } from "./ast";
 
 export function compile(declarations: Declaration[]): string {
-    return `
-Object.entries(window["bagel-lib"]).forEach(([key, value]) => window[key] = value)
-
-${declarations.map(compileOne).join("\n\n")}
-
-main();`;
+    return declarations.map(compileOne).join("\n\n");
 }
 
 function compileOne(ast: AST): string {
     switch(ast.kind) {
+        case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
+            compileOne(name) + (alias ? ` as ${compileOne(alias)}` : ``)
+        ).join(", ")} } from ${compileOne(ast.path)};`;
         case "type-declaration": return ``;
-        case "proc-declaration": return compileProc(ast.proc);
-        case "func-declaration": return compileFunc(ast.func);
-        case "const-declaration": return `const ${ast.name.name} = ${compileOne(ast.value)};`;
+        case "proc-declaration": return (ast.exported ? `export ` : ``) + compileProc(ast.proc);
+        case "func-declaration": return (ast.exported ? `export ` : ``) + compileFunc(ast.func);
+        case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(ast.name)} = ${compileOne(ast.value)};`;
         case "proc": return compileProc(ast);
         case "let-declaration": return `${compileOne(ast.name)} = ${compileOne(ast.value)}`;
         case "assignment": return `${compileOne(ast.target)} = ${compileOne(ast.value)}`;
@@ -46,7 +44,7 @@ function compileOne(ast: AST): string {
         case "indexer": return `${compileOne(ast.base)}[${compileOne(ast.indexer)}]`;
     }
 
-    throw Error("Couldn't compile")//: " + ast.kind)
+    throw Error("Couldn't compile '" + (ast as any).kind + "'");
 }
 
 const NIL = `undefined`;

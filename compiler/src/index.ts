@@ -18,21 +18,23 @@ fs.readFile(entry).then(async code => {
     const parsed = parse(code.toString());
     const endParse = Date.now();
     
-    console.log(JSON.stringify(parsed, null, 2))
+    // console.log(JSON.stringify(parsed, null, 4))
     const compiled = compile(parsed)
-    console.log(compiled)
+    // console.log(compiled)
     
-    const bagelLibBundle = (await fs.readFile(path.resolve(__dirname, "lib.js"))).toString();
+    
 
-    const compiledWithLib = `${bagelLibBundle}
-    
-${compiled}`;
+    // Add this stuff when bundling:
+    // Object.entries(window["bagel-lib"]).forEach(([key, value]) => window[key] = value)
+    // main();
+    //
+    // const bagelLibBundle = (await fs.readFile(path.resolve(__dirname, "lib.js"))).toString();
 
     const startTypecheck = Date.now();
     const types = typecheckFile(parsed);
     const endTypecheck = Date.now();
     console.log(types);
-    fs.writeFile(output, compiledWithLib);
+    fs.writeFile(output, compiled);
     // console.log(eval(compiled))
     
     console.log();

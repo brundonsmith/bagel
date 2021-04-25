@@ -6,25 +6,38 @@ export type AST =
     | PlainIdentifier
 
 export type Declaration =
+    | ImportDeclaration
     | TypeDeclaration
     | ProcDeclaration
     | FuncDeclaration
     | ConstDeclaration
 
+export type ImportDeclaration = {
+    kind: "import-declaration",
+    imports: Array<{
+        name: PlainIdentifier,
+        alias?: PlainIdentifier,
+    }>,
+    path: StringLiteral,
+}
+
 export type TypeDeclaration = {
     kind: "type-declaration",
     name: PlainIdentifier,
     type: TypeExpression,
+    exported: boolean,
 }
 
 export type ProcDeclaration = {
     kind: "proc-declaration",
     proc: Proc,
+    exported: boolean,
 }
 
 export type FuncDeclaration = {
     kind: "func-declaration",
     func: Func,
+    exported: boolean,
 }
 
 export type ConstDeclaration = {
@@ -32,18 +45,7 @@ export type ConstDeclaration = {
     name: PlainIdentifier,
     type: TypeExpression,
     value: Expression,
-}
-
-export function declarationName(decl: Declaration): PlainIdentifier {
-    switch(decl.kind) {
-        case "type-declaration":
-        case "const-declaration":
-            return decl.name;
-        case "proc-declaration":
-            return decl.proc.name as PlainIdentifier;
-        case "func-declaration":
-            return decl.func.name as PlainIdentifier;
-    }
+    exported: boolean,
 }
 
 export type PlainIdentifier = {
@@ -306,7 +308,7 @@ export type NilLiteral = {
 export const KEYWORDS = [ "func", "proc", "if", "else", 
 "type", "typeof", "class", "let", "const", "for", "while", 
 "of", "nil", "public", "visible", "private", "reaction", 
-"triggers", "true", "false" ] as const;
+"triggers", "true", "false", "import", "export", "from", "as" ] as const;
 
 
 
