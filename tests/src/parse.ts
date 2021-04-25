@@ -166,7 +166,7 @@ test(function funcCallCall() {
     );
 })
 
-test(function indexer() {
+test(function indexArray() {
     return testParse(
         "const foo = [ arr1[0] ]",
         {
@@ -723,6 +723,28 @@ test(function typedProcDeclaration() {
         },
         (code, index) => parse(code)[0],
     );
+})
+
+test(function funcTypeType() {
+    return testParse(`
+        export type MyFn = (number, string) => string[]
+    `, {
+        kind: "type-declaration",
+        name: { kind: "plain-identifier", name: "MyFn" },
+        exported: true,
+        type: {
+            kind: "func-type",
+            argTypes: [
+                { kind: "number-type" },
+                { kind: "string-type" },
+            ],
+            returnType: {
+                kind: "array-type",
+                element: { kind: "string-type" }
+            }
+        }
+    },
+    (code, index) => parse(code)[0])
 })
 
 

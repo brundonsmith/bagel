@@ -1,4 +1,4 @@
-import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration, PrimitiveType } from "./ast";
+import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration, PrimitiveType, FuncType } from "./ast";
 import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction, err, expec, BagelSyntaxError, isError, errorMessage } from "./parsing-utils";
 
 export function parse(code: string): Declaration[] {
@@ -113,6 +113,7 @@ const unionType: ParseFunction<UnionType> = (code, index) =>
 
 const atomicType: ParseFunction<TypeExpression> = (code, index) =>
     primitiveType(code, index)
+    ?? funcType(code, index)
     ?? literalType(code, index)
     ?? namedType(code, index)
     ?? objectType(code, index)
@@ -196,6 +197,24 @@ const primitiveType: ParseFunction<PrimitiveType> = (code, index) =>
         parsed: { kind: "nil-type" },
         newIndex: index,
     }))
+
+const funcType: ParseFunction<FuncType> = (code, index) =>
+    given(consume(code, index, "("), index  =>
+    given(consumeWhitespace(code, index), index =>
+    given(parseSeries(code, index, typeExpression, ","), ({ parsed: argTypes, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, ")"), err(code, index, '")"'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "=>"), err(code, index, '"=>"'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(typeExpression(code, index), err(code, index, 'Return type'), ({ parsed: returnType, newIndex: index }) => ({
+        parsed: {
+            kind: "func-type",
+            argTypes,
+            returnType
+        },
+        newIndex: index
+    }))))))))))
 
 const literalType: ParseFunction<LiteralType> = (code, index) =>
     given(stringLiteral(code, index) 
