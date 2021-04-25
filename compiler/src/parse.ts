@@ -1,4 +1,4 @@
-import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, PrimitiveType, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration } from "./ast";
+import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration, PrimitiveType } from "./ast";
 import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction, err, expec, BagelSyntaxError, isError, errorMessage } from "./parsing-utils";
 
 export function parse(code: string): Declaration[] {
@@ -181,31 +181,19 @@ const tupleType: ParseFunction<TupleType> = (code, index) =>
 
 const primitiveType: ParseFunction<PrimitiveType> = (code, index) =>
     given(consume(code, index, "string"), index => ({
-        parsed: {
-            kind: "primitive-type",
-            type: "string",
-        },
+        parsed: { kind: "string-type" },
         newIndex: index,
     }))
     ?? given(consume(code, index, "number"), index => ({
-        parsed: {
-            kind: "primitive-type",
-            type: "number",
-        },
+        parsed: { kind: "number-type" },
         newIndex: index,
     }))
     ?? given(consume(code, index, "boolean"), index => ({
-        parsed: {
-            kind: "primitive-type",
-            type: "boolean",
-        },
+        parsed: { kind: "boolean-type" },
         newIndex: index,
     }))
     ?? given(consume(code, index, "nil"), index => ({
-        parsed: {
-            kind: "primitive-type",
-            type: "nil",
-        },
+        parsed: { kind: "nil-type" },
         newIndex: index,
     }))
 

@@ -661,19 +661,10 @@ test(function typedFuncDeclaration() {
                 type: {
                     kind: "func-type",
                     argTypes: [
-                        {
-                            kind: "primitive-type",
-                            type: "string",
-                        },
-                        {
-                            kind: "primitive-type",
-                            type: "number",
-                        }
+                        { kind: "string-type" },
+                        { kind: "number-type" },
                     ],
-                    returnType: {
-                        kind: "primitive-type",
-                        type: "number",
-                    },
+                    returnType: { kind: "number-type" },
                 },
                 argNames: [
                     { kind: "plain-identifier", name: "a" },
@@ -709,17 +700,14 @@ test(function typedProcDeclaration() {
                     argTypes: [
                         {
                             kind: "array-type",
-                            element: {
-                                kind: "primitive-type",
-                                type: "string",
-                            },
+                            element: { kind: "string-type" },
                         },
                         {
                             kind: "object-type",
                             entries: [
                                 [
                                     { kind: "plain-identifier", name: "foo" },
-                                    { kind: "primitive-type", type: "number" },
+                                    { kind: "number-type" },
                                 ]
                             ],
                         },

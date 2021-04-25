@@ -7,20 +7,17 @@ import { test } from "./testing-utils";
 console.log("typecheck.ts")
 
 test(function typeDeclarations() {
-    return testTypecheck(`type Foo = string`, [{
-        kind: "primitive-type",
-        type: "string",
-    }])
+    return testTypecheck(`type Foo = string`, [{ kind: "string-type" }])
         ?? testTypecheck(`type Bar = string | number`, [{
             kind: "union-type",
             members: [
-                { kind: "primitive-type", type: "string" },
-                { kind: "primitive-type", type: "number" },
+                { kind: "string-type" },
+                { kind: "number-type" },
             ],
         }])
         ?? testTypecheck(`type Blah = string[]`, [{
             kind: "array-type",
-            element: { kind: "primitive-type", type: "string" },
+            element: { kind: "string-type" },
         }])
         ?? testTypecheck(`type Stuff = { foo: Bar, foo2: Blah }`, [{
             kind: "object-type",
@@ -38,17 +35,11 @@ test(function typeDeclarations() {
 })
 
 test(function constDeclarationsInference() {
-    return testTypecheck(`const foo = 'stuff'`, [{
-        kind: "primitive-type",
-        type: "string",
-    }])
-        ?? testTypecheck(`const bar = 12`, [{
-            kind: "primitive-type",
-            type: "number",
-        }])
+    return testTypecheck(`const foo = 'stuff'`, [{ kind: "string-type" }])
+        ?? testTypecheck(`const bar = 12`, [{ kind: "number-type" }])
         ?? testTypecheck(`const bar = [ '1', '2', '3' ]`, [{
             kind: "array-type",
-            element: { kind: "primitive-type", type: "string" },
+            element: { kind: "string-type" },
         }])
         ?? testTypecheck(`const stuff = {
             foo: 12,
@@ -58,13 +49,13 @@ test(function constDeclarationsInference() {
             entries: [
                 [
                     { kind: "plain-identifier", name: "foo" },
-                    { kind: "primitive-type", type: "number" },
+                    { kind: "number-type" },
                 ],
                 [
                     { kind: "plain-identifier", name: "foo2" },
                     {
                         kind: "array-type",
-                        element: { kind: "primitive-type", type: "string" },
+                        element: { kind: "string-type" },
                     },
                 ]
             ],
@@ -145,12 +136,12 @@ test(function passingValidArguments() {
             {
                 kind: "func-type",
                 argTypes: [
-                    { kind: "primitive-type", type: "number" },
-                    { kind: "primitive-type", type: "number" },
+                    { kind: "number-type" },
+                    { kind: "number-type" },
                 ],
-                returnType: { kind: "primitive-type", type: "number" },
+                returnType: { kind: "number-type" },
             },
-            { kind: "primitive-type", type: "number" },
+            { kind: "number-type" },
         ])
 })
 
@@ -163,10 +154,10 @@ test(function passingInvalidArguments() {
             {
                 kind: "func-type",
                 argTypes: [
-                    { kind: "primitive-type", type: "number" },
-                    { kind: "primitive-type", type: "number" },
+                    { kind: "number-type" },
+                    { kind: "number-type" },
                 ],
-                returnType: { kind: "primitive-type", type: "number" },
+                returnType: { kind: "number-type" },
             },
             {
                 kind: "bagel-assignable-to-error",
@@ -176,14 +167,8 @@ test(function passingInvalidArguments() {
                         "stuff"
                     ]
                 },
-                destination: {
-                    kind: "primitive-type",
-                    type: "number"
-                },
-                value: {
-                    kind: "primitive-type",
-                    type: "string"
-                }
+                destination: { kind: "number-type" },
+                value: { kind: "string-type" }
             }
         ])
 })
@@ -198,10 +183,10 @@ test(function usingInvalidReturnType() {
             {
                 kind: "func-type",
                 argTypes: [
-                    { kind: "primitive-type", type: "number" },
-                    { kind: "primitive-type", type: "number" },
+                    { kind: "number-type" },
+                    { kind: "number-type" },
                 ],
-                returnType: { kind: "primitive-type", type: "number" },
+                returnType: { kind: "number-type" },
             },
             {
                 kind: "bagel-assignable-to-error",
@@ -211,10 +196,7 @@ test(function usingInvalidReturnType() {
                         kind: "plain-identifier",
                         name: "bar"
                     },
-                    type: {
-                        kind: "primitive-type",
-                        type: "string"
-                    },
+                    type: { kind: "string-type" },
                     value: {
                         kind: "funcall",
                         func: {
@@ -234,14 +216,8 @@ test(function usingInvalidReturnType() {
                     },
                     exported: false
                 },
-                destination: {
-                    kind: "primitive-type",
-                    type: "string"
-                },
-                value: {
-                    kind: "primitive-type",
-                    type: "number"
-                }
+                destination: { kind: "string-type" },
+                value: { kind: "number-type" }
             },
         ])
 })
@@ -267,14 +243,14 @@ test(function propertyAccessorType() {
                             entries: [
                                 [
                                     { kind: "plain-identifier", name: "bar" },
-                                    { kind: "primitive-type", type: "number" },
+                                    { kind: "number-type" },
                                 ]
                             ],
                         }
                     ]
                 ],
             },
-            { kind: "primitive-type", type: "number" },
+            { kind: "number-type" },
         ])
 })
 

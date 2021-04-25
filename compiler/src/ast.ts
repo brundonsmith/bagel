@@ -117,7 +117,10 @@ export type TypeExpression =
     | IndexerType
     | ArrayType
     | TupleType
-    | PrimitiveType
+    | StringType
+    | NumberType
+    | BooleanType
+    | NilType
     | LiteralType
     | NominalType
     | UnknownType
@@ -164,9 +167,26 @@ export type TupleType = {
     members: TypeExpression[],
 }
 
-export type PrimitiveType = {
-    kind: "primitive-type",
-    type: "string" | "number" | "boolean" | "nil",
+export type PrimitiveType = 
+    | StringType
+    | NumberType
+    | BooleanType
+    | NilType
+
+export type StringType = {
+    kind: "string-type",
+}
+
+export type NumberType = {
+    kind: "number-type",
+}
+
+export type BooleanType = {
+    kind: "boolean-type",
+}
+
+export type NilType = {
+    kind: "nil-type",
 }
 
 export type LiteralType = {

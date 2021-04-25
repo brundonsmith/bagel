@@ -68,47 +68,47 @@ export function typecheckFile(declarations: Declaration[]): (TypeExpression|Bage
 
 const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
     "+": [
-        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } },
-        { left: { kind: "primitive-type", type: "string" }, right: { kind: "primitive-type", type: "string" }, output: { kind: "primitive-type", type: "string" } },
-        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "string" }, output: { kind: "primitive-type", type: "string" } },
-        { left: { kind: "primitive-type", type: "string" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "string" } },
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } },
+        { left: { kind: "string-type" }, right: { kind: "string-type" }, output: { kind: "string-type" } },
+        { left: { kind: "number-type" }, right: { kind: "string-type" }, output: { kind: "string-type" } },
+        { left: { kind: "string-type" }, right: { kind: "number-type" }, output: { kind: "string-type" } },
     ],
     "-": [
-        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } }
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
     ],
     "*": [
-        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } }
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
     ],
     "/": [
-        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "number" } }
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
     ],
     "<": [
-        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } }
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
     ],
     ">": [
-        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } }
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
     ],
     "<=": [
-        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } }
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
     ],
     ">=": [
-        { left: { kind: "primitive-type", type: "number" }, right: { kind: "primitive-type", type: "number" }, output: { kind: "primitive-type", type: "boolean" } }
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
     ],
     "&&": [
-        { left: { kind: "primitive-type", type: "boolean" }, right: { kind: "primitive-type", type: "boolean" }, output: { kind: "primitive-type", type: "boolean" } }
+        { left: { kind: "boolean-type" }, right: { kind: "boolean-type" }, output: { kind: "boolean-type" } }
     ],
     "||": [
-        { left: { kind: "primitive-type", type: "boolean" }, right: { kind: "primitive-type", type: "boolean" }, output: { kind: "primitive-type", type: "boolean" } }
+        { left: { kind: "boolean-type" }, right: { kind: "boolean-type" }, output: { kind: "boolean-type" } }
     ],
     "==": [
-        { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "primitive-type", type: "boolean" } }
+        { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "boolean-type" } }
     ],
     "??": [
         { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "unknown-type" } }
     ],
     // "??": {
     //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
-    //     output: { kind: "primitive-type", type: "boolean" }
+    //     output: { kind: "boolean-type" }
     // },
 }
 
@@ -254,9 +254,9 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
 
                 return {
                     kind: "union-type",
-                    members: [ baseType.valueType, { kind: "primitive-type", type: "nil" } ]
+                    members: [ baseType.valueType, { kind: "nil-type" } ]
                 };
-            } else if (baseType.kind === "array-type" && indexerType.kind === "primitive-type" && indexerType.type === "number") {
+            } else if (baseType.kind === "array-type" && indexerType.kind === "number-type") {
                 return baseType.element;
             }
 
@@ -264,7 +264,7 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
         };
         case "if-else-expression": {
             const ifConditionType = typecheck(scope, ast.ifCondition);
-            if (ifConditionType?.kind !== "primitive-type" || ifConditionType?.type !== "boolean") {
+            if (ifConditionType?.kind !== "boolean-type") {
                 return miscError(ast, "Condition for if expression must be boolean");
             }
 
@@ -276,7 +276,7 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
             if (ast.elseResult == null) {
                 return {
                     kind: "union-type",
-                    members: [ ifType, { kind: "primitive-type", type: "nil" } ],
+                    members: [ ifType, { kind: "nil-type" } ],
                 };
             } else {
                 const elseType = typecheck(scope, ast.elseResult);
@@ -364,21 +364,17 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
             }
 
             return {
-                kind: "primitive-type",
-                type: "string",
+                kind: "string-type",
             }
         };
         case "number-literal": return {
-            kind: "primitive-type",
-            type: "number",
+            kind: "number-type",
         };
         case "boolean-literal": return {
-            kind: "primitive-type",
-            type: "boolean",
+            kind: "boolean-type",
         };
         case "nil-literal": return {
-            kind: "primitive-type",
-            type: "nil",
+            kind: "nil-type",
         };
 
         // not expressions, but should have their contents checked
@@ -487,7 +483,7 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
             if (isError(conditionType)) {
                 return conditionType;
             }
-            if (conditionType.kind !== "primitive-type" || conditionType.type !== "boolean") {
+            if (conditionType.kind !== "boolean-type") {
                 return miscError(ast.ifCondition, `Condition for if statement must be boolean`);
             }
 
@@ -535,7 +531,7 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
             if (isError(conditionType)) {
                 return conditionType;
             }
-            if (conditionType.kind !== "primitive-type" || conditionType.type !== "boolean") {
+            if (conditionType.kind !== "boolean-type") {
                 return miscError(ast.condition, `Condition for while loop must be boolean`);
             }
 
@@ -565,9 +561,9 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
 const STRING_TEMPLATE_TYPE: TypeExpression = {
     kind: "union-type",
     members: [
-        { kind: "primitive-type", type: "string" },
-        { kind: "primitive-type", type: "number" },
-        { kind: "primitive-type", type: "boolean" },
+        { kind: "string-type" },
+        { kind: "number-type" },
+        { kind: "boolean-type" },
     ]
 }
 
@@ -708,7 +704,10 @@ function serialize(typeExpression: TypeExpression): string {
         case "indexer-type": return `{ [${serialize(typeExpression.keyType)}]: ${serialize(typeExpression.valueType)} }`;
         case "array-type": return `${serialize(typeExpression.element)}[]`;
         case "tuple-type": return `[${typeExpression.members.map(serialize).join(", ")}]`;
-        case "primitive-type": return typeExpression.type;
+        case "string-type": return `string`;
+        case "number-type": return `number`;
+        case "boolean-type": return `boolean`;
+        case "nil-type": return `nil`;
         case "literal-type": return String(typeExpression.value);
         case "nominal-type": return typeExpression.name;
         case "unknown-type": return "unknown";
