@@ -123,6 +123,8 @@ export type TypeExpression =
     | NilType
     | LiteralType
     | NominalType
+    | IteratorType
+    | PromiseType
     | UnknownType
 
 export type UnionType = {
@@ -198,6 +200,16 @@ export type NominalType = {
     kind: "nominal-type",
     name: string,
     inner: TypeExpression,
+}
+
+export type IteratorType = {
+    kind: "iterator-type",
+    itemType: TypeExpression,
+}
+
+export type PromiseType = {
+    kind: "promise-type",
+    resultType: TypeExpression,
 }
 
 export type UnknownType = {

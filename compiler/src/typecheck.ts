@@ -194,7 +194,7 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
                 }
             }
 
-            return miscError(ast, `Operator ${ast.operator} cannot be applied to types ${serialize(leftType)} and ${serialize(rightType)}`);
+            return miscError(ast, `Operator '${ast.operator}' cannot be applied to types '${serialize(leftType)}' and '${serialize(rightType)}'`);
         };
         case "funcall": {
             const funcType = typecheck(scope, ast.func);
@@ -243,7 +243,7 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
                 const key = indexerType.value.segments[0];
                 const valueType = baseType.entries.find(entry => entry[0].name === key)?.[1];
                 if (valueType == null) {
-                    return miscError(ast.indexer, `Property "${key}" doesn't exist on type ${serialize(baseType)}`);
+                    return miscError(ast.indexer, `Property '${key}' doesn't exist on type '${serialize(baseType)}'`);
                 }
 
                 return valueType;
@@ -260,7 +260,7 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
                 return baseType.element;
             }
 
-            return miscError(ast.indexer, `Expression of type ${indexerType} can't be used to index type ${serialize(baseType)}`);
+            return miscError(ast.indexer, `Expression of type '${indexerType}' can't be used to index type '${serialize(baseType)}'`);
         };
         case "if-else-expression": {
             const ifConditionType = typecheck(scope, ast.ifCondition);
@@ -290,7 +290,10 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
                 };
             }
         };
-        case "range": return { kind: "unknown-type" }; // TODO: Iterator type
+        case "range": return {
+            kind: "iterator-type",
+            itemType: { kind: "number-type" },
+        };
         case "parenthesized-expression": return typecheck(scope, ast.inner);
         case "property-accessor": {
             const baseType = typecheck(scope, ast.base);
@@ -306,7 +309,7 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
 
                 const valueType = lastPropType.entries.find(entry => entry[0].name === prop.name)?.[1];
                 if (valueType == null) {
-                    return miscError(prop, `Property "${prop.name}" doesn't exist on type ${serialize(baseType)}`);
+                    return miscError(prop, `Property '${prop.name}' doesn't exist on type '${serialize(baseType)}'`);
                 }
 
                 lastPropType = valueType;
@@ -512,13 +515,15 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
             if (isError(iteratorType)) {
                 return iteratorType;
             }
+            if (iteratorType.kind !== "iterator-type") {
+                return miscError(ast.iterator, `Expected iterator after "of" in for loop`);
+            }
 
-            // TODO: Check that it's an iterator type (once we know how that's represented)
-
-            scope.values[ast.itemIdentifier.name] = { kind: "unknown-type" }; // TODO: Get the item type from the iterator
+            const bodyScope = extendScope(scope);
+            bodyScope.values[ast.itemIdentifier.name] = iteratorType.itemType;
 
             for (const statement of ast.body) {
-                const statementType = typecheck(scope, statement);
+                const statementType = typecheck(bodyScope, statement);
                 if (isError(statementType)) {
                     return statementType;
                 }
@@ -620,6 +625,8 @@ export function subsumes(scope: Scope, destination: TypeExpression, value: TypeE
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
         return resolvedDestination.entries.every(([key, destinationValue]) => 
             given(resolvedValue.entries.find(e => deepEquals(e[0], key))?.[1], value => subsumes(scope, destinationValue, value)));
+    } else if (resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") {
+        return subsumes(scope, resolvedDestination.itemType, resolvedValue.itemType);
     }
 
     return false;
@@ -710,6 +717,8 @@ function serialize(typeExpression: TypeExpression): string {
         case "nil-type": return `nil`;
         case "literal-type": return String(typeExpression.value);
         case "nominal-type": return typeExpression.name;
+        case "iterator-type": return `Iterator<${typeExpression.itemType}>`;
+        case "promise-type": return `Promise<${typeExpression.resultType}>`;
         case "unknown-type": return "unknown";
     }
 }
@@ -740,7 +749,7 @@ export type BagelMiscTypeError = {
 
 export function errorMessage(error: BagelTypeError): string {
     switch (error.kind) {
-        case "bagel-assignable-to-error": return `${serialize(error.value)} is not assignable to ${serialize(error.destination)}`;
+        case "bagel-assignable-to-error": return `Type '${serialize(error.value)}' is not assignable to type '${serialize(error.destination)}'`;
         case "bagel-cannot-find-name-error": return `Cannot find name '${error.ast.name}'`;
         case "bagel-misc-type-error": return error.message;
     }
