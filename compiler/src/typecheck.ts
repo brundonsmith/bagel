@@ -349,9 +349,24 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
                     },
             };
         }
-        case "string-literal": return {
-            kind: "primitive-type",
-            type: "string",
+        case "string-literal": {
+            for (const segment of ast.segments) {
+                if (typeof segment !== "string") {
+                    const segmentType = typecheck(scope, segment);
+                    if (isError(segmentType)) {
+                        return segmentType;
+                    }
+
+                    if (!subsumes(scope, STRING_TEMPLATE_TYPE, segmentType)) {
+                        return assignmentError(segment, STRING_TEMPLATE_TYPE, segmentType);
+                    }
+                }
+            }
+
+            return {
+                kind: "primitive-type",
+                type: "string",
+            }
         };
         case "number-literal": return {
             kind: "primitive-type",
@@ -545,6 +560,15 @@ function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
     }
     
     return miscError(ast, "Failed to typecheck");
+}
+
+const STRING_TEMPLATE_TYPE: TypeExpression = {
+    kind: "union-type",
+    members: [
+        { kind: "primitive-type", type: "string" },
+        { kind: "primitive-type", type: "number" },
+        { kind: "primitive-type", type: "boolean" },
+    ]
 }
 
 const REACTION_DATA_TYPE: TypeExpression = {
