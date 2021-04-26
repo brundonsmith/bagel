@@ -1,7 +1,7 @@
-import { AST, Declaration, Expression, Func, LocalIdentifier, Proc } from "./ast";
+import { AST, Declaration, Expression, Func, LocalIdentifier, Module, Proc } from "./ast";
 
-export function compile(declarations: Declaration[]): string {
-    return declarations.map(compileOne).join("\n\n");
+export function compile(module: Module): string {
+    return module.declarations.map(compileOne).join("\n\n");
 }
 
 function compileOne(ast: AST): string {

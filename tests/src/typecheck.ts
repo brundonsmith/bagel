@@ -1,6 +1,6 @@
 import { TypeExpression } from "../../compiler/src/ast";
 import { parse } from "../../compiler/src/parse";
-import { BagelTypeError, isError, typecheckFile } from "../../compiler/src/typecheck";
+import { BagelTypeError, isError, typecheckModule } from "../../compiler/src/typecheck";
 import { deepEquals } from "../../compiler/src/utils";
 import { test } from "./testing-utils";
 
@@ -84,7 +84,7 @@ test(function nameResolutions() {
     }`
 
     const parsed = parse(code);
-    const type = typecheckFile(parsed);
+    const type = typecheckModule(parsed);
 
     const failureIndex = type.findIndex(t => t == null);
 
@@ -115,7 +115,7 @@ test(function failsWhenShould() {
     }`
 
     const parsed = parse(code);
-    const type = typecheckFile(parsed);
+    const type = typecheckModule(parsed);
 
     const expectedToSucceed = [true, true, true, true, false, true, false, true];
     const mismatch = type.findIndex((t, index) => !isError(t) !== expectedToSucceed[index]);
@@ -255,9 +255,23 @@ test(function propertyAccessorType() {
 })
 
 
+// test(function preventsIteratorMisuse() {
+//     return testTypecheck(`
+//         func myFunc(map, filter) => 
+//             0..10 |> map((n) => n * 2) |> filter((n) => n < 10) |> map((n) => '\${n}')
+//         `,
+//         [
+//             {
+//                 kind: "func-type",
+//                 argTypes: []
+//             }
+//         ])
+// })
+
+
 function testTypecheck(code: string, expected: (TypeExpression | BagelTypeError)[], debug?: boolean): string | undefined {
     const parsed = parse(code);
-    const type = typecheckFile(parsed);
+    const type = typecheckModule(parsed);
 
     if (debug) console.log("PARSED: ", JSON.stringify(parsed, null, 4))
 

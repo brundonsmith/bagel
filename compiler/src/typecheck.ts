@@ -1,3 +1,4 @@
+import { AST, BinaryOp, Declaration, FuncType, LocalIdentifier, Module, NamedType, NilLiteral, PlainIdentifier, Proc, ProcType, TypeExpression, UnknownType } from "./ast";
 import { AST, BinaryOp, Declaration, FuncType, LocalIdentifier, NamedType, NilLiteral, PlainIdentifier, Proc, ProcType, TypeExpression, UnknownType } from "./ast";
 import { deepEquals, given } from "./utils";
 
@@ -13,13 +14,13 @@ function extendScope(scope: Scope): Scope {
     }
 }
 
-export function typecheckFile(declarations: Declaration[]): (TypeExpression|BagelTypeError)[] {
+export function typecheckModule(module: Module): (TypeExpression|BagelTypeError)[] {
     const scope: Scope = {
         types: {},
         values: {},
     };
 
-    return declarations.map(ast => {
+    return module.declarations.map(ast => {
         switch(ast.kind) {
             case "import-declaration":
                 return { kind: "unknown-type" }; // TODO
@@ -64,52 +65,6 @@ export function typecheckFile(declarations: Declaration[]): (TypeExpression|Bage
             }
         }
     })
-}
-
-const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
-    "+": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } },
-        { left: { kind: "string-type" }, right: { kind: "string-type" }, output: { kind: "string-type" } },
-        { left: { kind: "number-type" }, right: { kind: "string-type" }, output: { kind: "string-type" } },
-        { left: { kind: "string-type" }, right: { kind: "number-type" }, output: { kind: "string-type" } },
-    ],
-    "-": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
-    ],
-    "*": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
-    ],
-    "/": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
-    ],
-    "<": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
-    ],
-    ">": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
-    ],
-    "<=": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
-    ],
-    ">=": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
-    ],
-    "&&": [
-        { left: { kind: "boolean-type" }, right: { kind: "boolean-type" }, output: { kind: "boolean-type" } }
-    ],
-    "||": [
-        { left: { kind: "boolean-type" }, right: { kind: "boolean-type" }, output: { kind: "boolean-type" } }
-    ],
-    "==": [
-        { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "boolean-type" } }
-    ],
-    "??": [
-        { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "unknown-type" } }
-    ],
-    // "??": {
-    //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
-    //     output: { kind: "boolean-type" }
-    // },
 }
 
 function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
@@ -769,4 +724,50 @@ export function cannotFindName(ast: LocalIdentifier): BagelCannotFindNameError {
 
 export function miscError(ast: AST|undefined, message: string): BagelMiscTypeError {
     return { kind: "bagel-misc-type-error", ast, message }
+}
+
+const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
+    "+": [
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } },
+        { left: { kind: "string-type" }, right: { kind: "string-type" }, output: { kind: "string-type" } },
+        { left: { kind: "number-type" }, right: { kind: "string-type" }, output: { kind: "string-type" } },
+        { left: { kind: "string-type" }, right: { kind: "number-type" }, output: { kind: "string-type" } },
+    ],
+    "-": [
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
+    ],
+    "*": [
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
+    ],
+    "/": [
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
+    ],
+    "<": [
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
+    ],
+    ">": [
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
+    ],
+    "<=": [
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
+    ],
+    ">=": [
+        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
+    ],
+    "&&": [
+        { left: { kind: "boolean-type" }, right: { kind: "boolean-type" }, output: { kind: "boolean-type" } }
+    ],
+    "||": [
+        { left: { kind: "boolean-type" }, right: { kind: "boolean-type" }, output: { kind: "boolean-type" } }
+    ],
+    "==": [
+        { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "boolean-type" } }
+    ],
+    "??": [
+        { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "unknown-type" } }
+    ],
+    // "??": {
+    //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
+    //     output: { kind: "boolean-type" }
+    // },
 }

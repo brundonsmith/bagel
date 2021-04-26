@@ -1,9 +1,15 @@
 
 export type AST =
+    | Module
     | Declaration
     | Expression
     | Statement
     | PlainIdentifier
+
+export type Module = {
+    kind: "module",
+    declarations: Declaration[],
+}
 
 export type Declaration =
     | ImportDeclaration
