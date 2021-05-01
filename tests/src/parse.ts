@@ -1,7 +1,7 @@
 
 import { test } from "./testing-utils";
 import { parse } from "../../compiler/src/parse";
-import { AST, FuncDeclaration } from "../../compiler/src/ast";
+import { AST, FuncDeclaration, NUMBER_TYPE, STRING_TYPE, UNKNOWN_TYPE } from "../../compiler/src/ast";
 import { deepEquals } from "../../compiler/src/utils";
 
 console.log("parse.ts")
@@ -20,7 +20,7 @@ test(function simpleFuncDeclaration() {
                 type: {
                     kind: "func-type",
                     argTypes: [],
-                    returnType: { kind: "unknown-type" },
+                    returnType: UNKNOWN_TYPE,
                 },
                 argNames: [],
                 body: {
@@ -53,7 +53,7 @@ test(function ifExpression() {
                 type: {
                     kind: "func-type",
                     argTypes: [],
-                    returnType: { kind: "unknown-type" },
+                    returnType: UNKNOWN_TYPE,
                 },
                 argNames: [],
                 body: {
@@ -103,10 +103,10 @@ test(function indexerExpression() {
                 type: {
                     kind: "func-type",
                     argTypes: [
-                        { kind: "unknown-type" },
-                        { kind: "unknown-type" },
+                        UNKNOWN_TYPE,
+                        UNKNOWN_TYPE,
                     ],
-                    returnType: { kind: "unknown-type" },
+                    returnType: UNKNOWN_TYPE,
                 },
                 argNames: [
                   {
@@ -145,9 +145,7 @@ test(function funcCallCall() {
                 kind: "plain-identifier",
                 name: "foo"
             },
-            type: {
-                "kind": "unknown-type"
-            },
+            type: UNKNOWN_TYPE,
             value: {
                 kind: "funcall",
                 args: [],
@@ -175,9 +173,7 @@ test(function indexArray() {
                 kind: "plain-identifier",
                 name: "foo"
             },
-            type: {
-                "kind": "unknown-type"
-            },
+            type: UNKNOWN_TYPE,
             value: {
                 kind: "array-literal",
                 entries: [
@@ -209,7 +205,7 @@ test(function simpleProcDeclaration() {
                 },
                 type: {
                     kind: "proc-type",
-                    argTypes: [{ kind: "unknown-type" }],
+                    argTypes: [UNKNOWN_TYPE],
                 },
                 argNames: [
                     {
@@ -217,7 +213,10 @@ test(function simpleProcDeclaration() {
                         name: "a",
                     }
                 ],
-                body: []
+                body: {
+                    kind: "block",
+                    statements: []
+                }
             },
             exported: false
         },
@@ -245,7 +244,7 @@ test(function basicProcDeclaration() {
                 },
                 type: {
                     kind: "proc-type",
-                    argTypes: [{ kind: "unknown-type" }],
+                    argTypes: [UNKNOWN_TYPE],
                 },
                 argNames: [
                     {
@@ -253,33 +252,39 @@ test(function basicProcDeclaration() {
                         name: "a",
                     }
                 ],
-                body: [
-                    {
-                        kind: "let-declaration",
-                        name: { kind: "local-identifier", name: "count" },
-                        type: { kind: "unknown-type" },
-                        value: { kind: "number-literal", value: 0 },
-                    },
-                    {
-                        kind: "for-loop",
-                        itemIdentifier: { kind: "plain-identifier", name: "item" },
-                        iterator: { kind: "local-identifier", name: "items" },
-                        body: []
-                    },
-                    {
-                        kind: "proc-call",
-                        proc: {
-                            kind: "property-accessor",
-                            base: { kind: "local-identifier", name: "console" },
-                            properties: [
-                                { kind: "plain-identifier", name: "log" },
-                            ],
+                body: {
+                    kind: "block",
+                    statements: [
+                        {
+                            kind: "let-declaration",
+                            name: { kind: "local-identifier", name: "count" },
+                            type: UNKNOWN_TYPE,
+                            value: { kind: "number-literal", value: 0 },
                         },
-                        args: [
-                            { kind: "local-identifier", name: "count" }
-                        ]
-                    }
-                ]
+                        {
+                            kind: "for-loop",
+                            itemIdentifier: { kind: "plain-identifier", name: "item" },
+                            iterator: { kind: "local-identifier", name: "items" },
+                            body: {
+                                kind: "block",
+                                statements: []
+                            }
+                        },
+                        {
+                            kind: "proc-call",
+                            proc: {
+                                kind: "property-accessor",
+                                base: { kind: "local-identifier", name: "console" },
+                                properties: [
+                                    { kind: "plain-identifier", name: "log" },
+                                ],
+                            },
+                            args: [
+                                { kind: "local-identifier", name: "count" }
+                            ]
+                        }
+                    ]
+                }
             },
             exported: false
         },
@@ -316,7 +321,7 @@ test(function procDeclarationWithStatements() {
                 },
                 type: {
                     kind: "proc-type",
-                    argTypes: [{ kind: "unknown-type" }],
+                    argTypes: [UNKNOWN_TYPE],
                 },
                 argNames: [
                     {
@@ -324,95 +329,110 @@ test(function procDeclarationWithStatements() {
                         name: "a",
                     }
                 ],
-                body: [
-                    {
-                        kind: "let-declaration",
-                        name: { kind: "local-identifier", name: "count" },
-                        type: { kind: "unknown-type" },
-                        value: { kind: "number-literal", value: 0 },
-                    },
-                    {
-                        kind: "for-loop",
-                        itemIdentifier: { kind: "plain-identifier", name: "item" },
-                        iterator: { kind: "local-identifier", name: "items" },
-                        body: [
-                            {
-                                kind: "if-else-statement",
-                                ifCondition: {
-                                    kind: "property-accessor",
-                                    base: { kind: "local-identifier", name: "item" },
-                                    properties: [
-                                        { kind: "plain-identifier", name: "foo" },
-                                    ],
-                                },
-                                ifResult: [
+                body: {
+                    kind: "block",
+                    statements: [
+                        {
+                            kind: "let-declaration",
+                            name: { kind: "local-identifier", name: "count" },
+                            type: UNKNOWN_TYPE,
+                            value: { kind: "number-literal", value: 0 },
+                        },
+                        {
+                            kind: "for-loop",
+                            itemIdentifier: { kind: "plain-identifier", name: "item" },
+                            iterator: { kind: "local-identifier", name: "items" },
+                            body: {
+                                kind: "block",
+                                statements: [
                                     {
-                                        kind: "assignment",
-                                        target: { kind: "local-identifier", name: "count" },
-                                        value: {
+                                        kind: "if-else-statement",
+                                        ifCondition: {
+                                            kind: "property-accessor",
+                                            base: { kind: "local-identifier", name: "item" },
+                                            properties: [
+                                                { kind: "plain-identifier", name: "foo" },
+                                            ],
+                                        },
+                                        ifResult: {
+                                            kind: "block",
+                                            statements: [
+                                                {
+                                                    kind: "assignment",
+                                                    target: { kind: "local-identifier", name: "count" },
+                                                    value: {
+                                                        kind: "binary-operator",
+                                                        operator: "+",
+                                                        left: { kind: "local-identifier", name: "count" },
+                                                        right: { kind: "number-literal", value: 1 }
+                                                    }
+                                                }
+                                            ],
+                                        }
+                                    },
+                                    {
+                                        kind: "if-else-statement",
+                                        ifCondition: {
                                             kind: "binary-operator",
-                                            operator: "+",
+                                            operator: ">",
                                             left: { kind: "local-identifier", name: "count" },
-                                            right: { kind: "number-literal", value: 1 }
+                                            right: { kind: "number-literal", value: 12 },
+                                        },
+                                        ifResult: {
+                                            kind: "block",
+                                            statements: [
+                                                {
+                                                    kind: "proc-call",
+                                                    proc: {
+                                                        kind: "property-accessor",
+                                                        base: { kind: "local-identifier", name: "console" },
+                                                        properties: [
+                                                            { kind: "plain-identifier", name: "log" },
+                                                        ],
+                                                    },
+                                                    args: [
+                                                        { kind: "local-identifier", name: "a" }
+                                                    ]
+                                                }
+                                            ],
+                                        },
+                                        elseResult: {
+                                            kind: "block",
+                                            statements: [
+                                                {
+                                                    kind: "proc-call",
+                                                    proc: {
+                                                        kind: "property-accessor",
+                                                        base: { kind: "local-identifier", name: "console" },
+                                                        properties: [
+                                                            { kind: "plain-identifier", name: "log" },
+                                                        ],
+                                                    },
+                                                    args: [
+                                                        { kind: "nil-literal" }
+                                                    ]
+                                                }
+                                            ],
                                         }
                                     }
                                 ],
-                            },
-                            {
-                                kind: "if-else-statement",
-                                ifCondition: {
-                                    kind: "binary-operator",
-                                    operator: ">",
-                                    left: { kind: "local-identifier", name: "count" },
-                                    right: { kind: "number-literal", value: 12 },
-                                },
-                                ifResult: [
-                                    {
-                                        kind: "proc-call",
-                                        proc: {
-                                            kind: "property-accessor",
-                                            base: { kind: "local-identifier", name: "console" },
-                                            properties: [
-                                                { kind: "plain-identifier", name: "log" },
-                                            ],
-                                        },
-                                        args: [
-                                            { kind: "local-identifier", name: "a" }
-                                        ]
-                                    }
-                                ],
-                                elseResult: [
-                                    {
-                                        kind: "proc-call",
-                                        proc: {
-                                            kind: "property-accessor",
-                                            base: { kind: "local-identifier", name: "console" },
-                                            properties: [
-                                                { kind: "plain-identifier", name: "log" },
-                                            ],
-                                        },
-                                        args: [
-                                            { kind: "nil-literal" }
-                                        ]
-                                    }
-                                ],
                             }
-                        ],
-                    },
-                    {
-                        kind: "proc-call",
-                        proc: {
-                            kind: "property-accessor",
-                            base: { kind: "local-identifier", name: "console" },
-                            properties: [
-                                { kind: "plain-identifier", name: "log" },
-                            ],
                         },
-                        args: [
-                            { kind: "local-identifier", name: "count" }
-                        ]
-                    }
-                ]
+                        {
+                            kind: "proc-call",
+                            proc: {
+                                kind: "property-accessor",
+                                base: { kind: "local-identifier", name: "console" },
+                                properties: [
+                                    { kind: "plain-identifier", name: "log" },
+                                ],
+                            },
+                            args: [
+                                { kind: "local-identifier", name: "count" }
+                            ]
+                        }
+                    ]
+                }
             },
             exported: false
         },
@@ -456,7 +476,7 @@ test(function basicPropertyAccess() {
                 kind: "plain-identifier",
                 name: "foo",
             },
-            type: { kind: "unknown-type" },
+            type: UNKNOWN_TYPE,
             value: {
                 kind: "property-accessor",
                 base: {
@@ -497,8 +517,8 @@ test(function funcDeclarationWithPipe() {
                 },
                 type: {
                     kind: "func-type",
-                    argTypes: [ { kind: "unknown-type" } ],
-                    returnType: { kind: "unknown-type" },
+                    argTypes: [ UNKNOWN_TYPE ],
+                    returnType: UNKNOWN_TYPE,
                 },
                 argNames: [
                     {
@@ -546,8 +566,8 @@ test(function funcDeclarationWithIteration() {
                 },
                 type: {
                     kind: "func-type",
-                    argTypes: [ { kind: "unknown-type" }, { kind: "unknown-type" } ],
-                    returnType: { kind: "unknown-type" },
+                    argTypes: [ UNKNOWN_TYPE, UNKNOWN_TYPE ],
+                    returnType: UNKNOWN_TYPE,
                 },
                 argNames: [
                     {
@@ -578,8 +598,8 @@ test(function funcDeclarationWithIteration() {
                                     kind: "func",
                                     type: {
                                         kind: "func-type",
-                                        argTypes: [ { kind: "unknown-type" } ],
-                                        returnType: { kind: "unknown-type" },
+                                        argTypes: [ UNKNOWN_TYPE ],
+                                        returnType: UNKNOWN_TYPE,
                                     },
                                     argNames: [
                                         {
@@ -613,8 +633,8 @@ test(function funcDeclarationWithIteration() {
                                     kind: "func",
                                     type: {
                                         kind: "func-type",
-                                        argTypes: [ { kind: "unknown-type" } ],
-                                        returnType: { kind: "unknown-type" },
+                                        argTypes: [ UNKNOWN_TYPE ],
+                                        returnType: UNKNOWN_TYPE,
                                     },
                                     argNames: [
                                         {
@@ -661,10 +681,10 @@ test(function typedFuncDeclaration() {
                 type: {
                     kind: "func-type",
                     argTypes: [
-                        { kind: "string-type" },
-                        { kind: "number-type" },
+                        STRING_TYPE,
+                        NUMBER_TYPE,
                     ],
-                    returnType: { kind: "number-type" },
+                    returnType: NUMBER_TYPE,
                 },
                 argNames: [
                     { kind: "plain-identifier", name: "a" },
@@ -700,14 +720,14 @@ test(function typedProcDeclaration() {
                     argTypes: [
                         {
                             kind: "array-type",
-                            element: { kind: "string-type" },
+                            element: STRING_TYPE,
                         },
                         {
                             kind: "object-type",
                             entries: [
                                 [
                                     { kind: "plain-identifier", name: "foo" },
-                                    { kind: "number-type" },
+                                    NUMBER_TYPE,
                                 ]
                             ],
                         },
@@ -717,7 +737,10 @@ test(function typedProcDeclaration() {
                     { kind: "plain-identifier", name: "a" },
                     { kind: "plain-identifier", name: "b" },
                 ],
-                body: []
+                body: {
+                    kind: "block",
+                    statements: [],
+                }
             },
             exported: false
         },
@@ -735,12 +758,12 @@ test(function funcTypeType() {
         type: {
             kind: "func-type",
             argTypes: [
-                { kind: "number-type" },
-                { kind: "string-type" },
+                NUMBER_TYPE,
+                STRING_TYPE,
             ],
             returnType: {
                 kind: "array-type",
-                element: { kind: "string-type" }
+                element: STRING_TYPE
             }
         }
     },

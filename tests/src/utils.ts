@@ -1,5 +1,6 @@
 import { test } from "./testing-utils";
 import { deepEquals } from "../../compiler/src/utils";
+import { UNKNOWN_TYPE } from "../../compiler/src/ast";
 
 console.log("utils.ts")
 
@@ -74,7 +75,7 @@ test(function deepEqualsBig() {
                 kind: "identifier",
                 name: "myFunc",
             },
-            type: { kind: "unknown-type" },
+            type: UNKNOWN_TYPE,
             argNames: [
                 {
                     kind: "identifier",
@@ -102,7 +103,7 @@ test(function deepEqualsBig() {
                         args: [
                             {
                                 kind: "func",
-                                type: { kind: "unknown-type" },
+                                type: UNKNOWN_TYPE,
                                 argNames: [
                                     {
                                         kind: "identifier",
@@ -133,7 +134,7 @@ test(function deepEqualsBig() {
                         args: [
                             {
                                 kind: "func",
-                                type: { kind: "unknown-type" },
+                                type: UNKNOWN_TYPE,
                                 argNames: [
                                     {
                                         kind: "identifier",

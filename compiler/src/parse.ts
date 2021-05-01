@@ -1,4 +1,4 @@
-import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration, PrimitiveType, FuncType, Module, Block } from "./ast";
+import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration, PrimitiveType, FuncType, Module, Block, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, UNKNOWN_TYPE } from "./ast";
 import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction, err, expec, BagelSyntaxError, isError, errorMessage } from "./parsing-utils";
 
 export function parse(code: string): Module {
@@ -185,19 +185,19 @@ const tupleType: ParseFunction<TupleType> = (code, index) =>
 
 const primitiveType: ParseFunction<PrimitiveType> = (code, index) =>
     given(consume(code, index, "string"), index => ({
-        parsed: { kind: "string-type" },
+        parsed: STRING_TYPE,
         newIndex: index,
     }))
     ?? given(consume(code, index, "number"), index => ({
-        parsed: { kind: "number-type" },
+        parsed: NUMBER_TYPE,
         newIndex: index,
     }))
     ?? given(consume(code, index, "boolean"), index => ({
-        parsed: { kind: "boolean-type" },
+        parsed: BOOLEAN_TYPE,
         newIndex: index,
     }))
     ?? given(consume(code, index, "nil"), index => ({
-        parsed: { kind: "nil-type" },
+        parsed: NIL_TYPE,
         newIndex: index,
     }))
 
@@ -316,7 +316,7 @@ const constDeclaration: ParseFunction<ConstDeclaration> = (code, index) => {
                 parsed: {
                     kind: "const-declaration",
                     name,
-                    type: type ?? { kind: "unknown-type" },
+                    type: type ?? UNKNOWN_TYPE,
                     value,
                     exported,
                 },
@@ -330,13 +330,13 @@ const proc: ParseFunction<Proc> = (code, index) =>
     given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
-    expec(parseBlock(code, index), err(code, index, 'Procedure body'), ({ parsed: body, newIndex: index }) => ({
+    given(parseBlock(code, index), ({ parsed: body, newIndex: index }) => ({
         parsed: {
             kind: "proc",
             name,
             type: {
                 kind: "proc-type",
-                argTypes: args.map(arg => arg.type ?? { kind: "unknown-type" }),
+                argTypes: args.map(arg => arg.type ?? UNKNOWN_TYPE),
             },
             argNames: args.map(arg => arg.name),
             body,
@@ -390,7 +390,7 @@ const letDeclaration: ParseFunction<LetDeclaration> = (code, index) =>
                 kind: "let-declaration",
                 name,
                 value,
-                type: type ?? { kind: "unknown-type" },
+                type: type ?? UNKNOWN_TYPE,
             },
             newIndex: index,
         }))))))))))))
@@ -594,8 +594,8 @@ const func: ParseFunction<Func> = (code, index) =>
             name,
             type: {
                 kind: "func-type",
-                argTypes: args.map(arg => arg.type ?? { kind: "unknown-type" }),
-                returnType: returnType ?? { kind: "unknown-type" },
+                argTypes: args.map(arg => arg.type ?? UNKNOWN_TYPE),
+                returnType: returnType ?? UNKNOWN_TYPE,
             },
             argNames: args.map(arg => arg.name),
             body,

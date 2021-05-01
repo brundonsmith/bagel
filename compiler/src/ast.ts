@@ -228,6 +228,72 @@ export type UnknownType = {
     kind: "unknown-type",
 }
 
+export const STRING_TYPE: StringType = {
+    kind: "string-type"
+}
+export const NUMBER_TYPE: NumberType = {
+    kind: "number-type"
+}
+export const BOOLEAN_TYPE: BooleanType = {
+    kind: "boolean-type"
+}
+export const NIL_TYPE: NilType = {
+    kind: "nil-type"
+}
+export const UNKNOWN_TYPE: UnknownType = {
+    kind: "unknown-type"
+}
+export const ITERATOR_OF_NUMBERS_TYPE: IteratorType = {
+    kind: "iterator-type",
+    itemType: NUMBER_TYPE,
+}
+export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
+    kind: "union-type",
+    members: [
+        STRING_TYPE,
+        NUMBER_TYPE,
+        BOOLEAN_TYPE,
+    ]
+}
+export const REACTION_DATA_TYPE: TypeExpression = {
+    kind: "func-type",
+    argTypes: [],
+    returnType: {
+        kind: "unknown-type"
+    },
+}
+export const REACTION_EFFECT_TYPE: TypeExpression = {
+    kind: "proc-type",
+    argTypes: [
+        UNKNOWN_TYPE
+    ],
+}
+
+const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
+    "proc": undefined,
+    "func": undefined,
+    "pipe": undefined,
+    "binary-operator": undefined,
+    "funcall": undefined,
+    "indexer": undefined,
+    "if-else-expression": undefined,
+    "range": undefined,
+    "parenthesized-expression": undefined,
+    "property-accessor": undefined,
+    "local-identifier": undefined,
+    "object-literal": undefined,
+    "array-literal": undefined,
+    "string-literal": undefined,
+    "number-literal": undefined,
+    "boolean-literal": undefined,
+    "nil-literal": undefined,
+    "javascript-escape": undefined,
+};
+
+export function isExpression(ast: AST): ast is Expression {
+    return ALL_EXPRESSION_TYPES.hasOwnProperty(ast.kind);
+}
+
 export type Expression = 
     | JavascriptEscape
     | Proc
@@ -349,14 +415,12 @@ export type NilLiteral = {
     kind: "nil-literal",
 }
 
-export const KEYWORDS = [ "func", "proc", "if", "else", 
-"type", "typeof", "class", "let", "const", "for", "while", 
-"of", "nil", "public", "visible", "private", "reaction", 
-"triggers", "true", "false", "import", "export", "from", "as" ] as const;
-
-
-
 export type JavascriptEscape = {
     kind: "javascript-escape",
     js: string,
 }
+
+export const KEYWORDS = [ "func", "proc", "if", "else", 
+"type", "typeof", "class", "let", "const", "for", "while", 
+"of", "nil", "public", "visible", "private", "reaction", 
+"triggers", "true", "false", "import", "export", "from", "as" ] as const;

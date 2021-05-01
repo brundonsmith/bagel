@@ -1,551 +1,244 @@
-import { AST, BinaryOp, Declaration, FuncType, LocalIdentifier, Module, NamedType, NilLiteral, PlainIdentifier, Proc, ProcType, TypeExpression, UnknownType } from "./ast";
-import { AST, BinaryOp, Declaration, FuncType, LocalIdentifier, NamedType, NilLiteral, PlainIdentifier, Proc, ProcType, TypeExpression, UnknownType } from "./ast";
-import { deepEquals, given } from "./utils";
+import { AST, LocalIdentifier, Module, PlainIdentifier, Proc, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, REACTION_DATA_TYPE, REACTION_EFFECT_TYPE } from "./ast";
+import { ModulesStore, Scope } from "./modules-store";
+import { deepEquals, DeepReadonly, given, walkParseTree } from "./utils";
 
-type Scope = {
-    types: {[key: string]: TypeExpression},
-    values: {[key: string]: TypeExpression},
-}
-
-function extendScope(scope: Scope): Scope {
-    return {
-        types: Object.create(scope.types, {}),
-        values: Object.create(scope.values, {}),
-    }
-}
-
-export function typecheckModule(module: Module): (TypeExpression|BagelTypeError)[] {
-    const scope: Scope = {
-        types: {},
-        values: {},
-    };
-
-    return module.declarations.map(ast => {
+export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: (error: BagelTypeError) => void) {
+    walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         switch(ast.kind) {
-            case "import-declaration":
-                return { kind: "unknown-type" }; // TODO
-            case "type-declaration":
-                scope.types[ast.name.name] = ast.type;
-                return ast.type;
-            case "func-declaration": {
-                const type = typecheck(scope, ast.func);
-                if (isError(type)) {
-                    return type;
-                }
-
-                scope.values[ast.func.name?.name as string] = type;
-                return type;
-            }
-            case "proc-declaration": {
-                const type = typecheck(scope, ast.proc);
-                if (isError(type)) {
-                    return type;
-                }
-
-                scope.values[ast.proc.name?.name as string] = type;
-                return type;
-            }
-            case "const-declaration": {
-                const valueType = typecheck(scope, ast.value);
-                
-                if (isError(valueType)) {
-                    return valueType;
-                } else if (ast.type.kind === "unknown-type") {
-                    scope.values[ast.name?.name as string] = valueType;
-                    return valueType;
-                } else {
-                    if (!subsumes(scope, ast.type, valueType)) {
-                        return assignmentError(ast, ast.type, valueType);
-                    } else {
-                        scope.values[ast.name?.name as string] = ast.type;
-                        return ast.type;
-                    }
-                }
-
-            }
-        }
-    })
-}
-
-function typecheck(scope: Scope, ast: AST): TypeExpression | BagelTypeError {
-    switch(ast.kind) {
-        case "proc": {
-            const bodyScope = extendScope(scope);
-            for (let i = 0; i < ast.argNames.length; i++) {
-                bodyScope.values[ast.argNames[i].name] = ast.type.argTypes[i];
-            }
-
-            for (const statement of ast.body) {
-                const statementType = typecheck(bodyScope, statement);
-
-                if (isError(statementType)) {
-                    return statementType;
-                }
-            }
-
-            return {
-                kind: "proc-type",
-                argTypes: new Array(ast.argNames.length).fill({ kind: "unknown-type" }),
-            }
-        };
-        case "func": {
-            const bodyScope = extendScope(scope);
-            for (let i = 0; i < ast.argNames.length; i++) {
-                bodyScope.values[ast.argNames[i].name] = ast.type.argTypes[i];
-            }
-
-            const bodyType = typecheck(bodyScope, ast.body);
-
-            if (isError(bodyType)) {
-                return bodyType;
-            }
-
-            if (ast.type.returnType.kind !== "unknown-type" && !subsumes(scope, ast.type.returnType, bodyType)) {
-                return assignmentError(ast.body, ast.type.returnType, bodyType);
-            }
-            
-            return {
-                ...ast.type,
-                returnType: ast.type.returnType.kind === "unknown-type" ? bodyType : ast.type.returnType,
-            }
-        };
-        case "pipe": {
-            let inputType = typecheck(scope, ast.expressions[0]);
-            for (const expr of ast.expressions.slice(1)) {
-                if (isError(inputType)) {
-                    return inputType;
-                }
-
-                const typeOfPipe = typecheck(scope, expr);
-
-                if (typeOfPipe?.kind !== "func-type") {
-                    return miscError(ast, `Each transformation in pipeline expression must be a function`);
-                }
-                if (!subsumes(scope, typeOfPipe.argTypes[0], inputType)) {
-                    return assignmentError(ast, typeOfPipe.argTypes[0], inputType);
-                }
-
-                inputType = typeOfPipe.returnType;
-            }
-
-            return inputType;
-        };
-        case "binary-operator": {
-            const leftType = typecheck(scope, ast.left);
-            if (isError(leftType)) {
-                return leftType;
-            }
-
-            const rightType = typecheck(scope, ast.right);
-            if (isError(rightType)) {
-                return rightType;
-            }
-
-            for (const types of BINARY_OPERATOR_TYPES[ast.operator]) {
-                const { left, right, output } = types;
-
-                if (subsumes(scope, left, leftType) && subsumes(scope, right, rightType)) {
-                    return output;
-                }
-            }
-
-            return miscError(ast, `Operator '${ast.operator}' cannot be applied to types '${serialize(leftType)}' and '${serialize(rightType)}'`);
-        };
-        case "funcall": {
-            const funcType = typecheck(scope, ast.func);
-
-            if (isError(funcType)) {
-                return funcType;
-            }
-
-            if (funcType.kind !== "func-type") {
-                return miscError(ast, "Expression must be a function to be called");
-            }
-
-            // TODO: infer what types arguments are allowed to be based on function body
-
-            const argValueTypes = ast.args.map(arg => typecheck(scope, arg));
-
-            const argError = argValueTypes.find(isError);
-            if (argError != null) {
-                return argError;
-            }
-
-            for (let index = 0; index < argValueTypes.length; index++) {
-                const argValueType = argValueTypes[index];
-                if (isError(argValueType)) {
-                    return argValueType;
-                }
-                if (!subsumes(scope, funcType.argTypes[index], argValueType)) {
-                    return assignmentError(ast.args[index], funcType.argTypes[index], argValueType);
-                }
-            }
-
-            return funcType.returnType;
-        };
-        case "indexer": {
-            const baseType = typecheck(scope, ast.base);
-            if (isError(baseType)) {
-                return baseType;
-            }
-
-            const indexerType = typecheck(scope, ast.indexer);
-            if (isError(indexerType)) {
-                return indexerType;
-            }
-
-            if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
-                const key = indexerType.value.segments[0];
-                const valueType = baseType.entries.find(entry => entry[0].name === key)?.[1];
-                if (valueType == null) {
-                    return miscError(ast.indexer, `Property '${key}' doesn't exist on type '${serialize(baseType)}'`);
-                }
-
-                return valueType;
-            } else if (baseType.kind === "indexer-type") {
-                if (!subsumes(scope, baseType.keyType, indexerType)) {
-                    return assignmentError(ast.indexer, baseType.keyType, indexerType);
-                }
-
-                return {
-                    kind: "union-type",
-                    members: [ baseType.valueType, { kind: "nil-type" } ]
-                };
-            } else if (baseType.kind === "array-type" && indexerType.kind === "number-type") {
-                return baseType.element;
-            }
-
-            return miscError(ast.indexer, `Expression of type '${indexerType}' can't be used to index type '${serialize(baseType)}'`);
-        };
-        case "if-else-expression": {
-            const ifConditionType = typecheck(scope, ast.ifCondition);
-            if (ifConditionType?.kind !== "boolean-type") {
-                return miscError(ast, "Condition for if expression must be boolean");
-            }
-
-            const ifType = typecheck(scope, ast.ifResult);
-            if (isError(ifType)) {
-                return ifType;
-            }
-
-            if (ast.elseResult == null) {
-                return {
-                    kind: "union-type",
-                    members: [ ifType, { kind: "nil-type" } ],
-                };
-            } else {
-                const elseType = typecheck(scope, ast.elseResult);
-                if (isError(elseType)) {
-                    return elseType;
-                }
-
-                return {
-                    kind: "union-type",
-                    members: [ ifType, elseType ],
-                };
-            }
-        };
-        case "range": return {
-            kind: "iterator-type",
-            itemType: { kind: "number-type" },
-        };
-        case "parenthesized-expression": return typecheck(scope, ast.inner);
-        case "property-accessor": {
-            const baseType = typecheck(scope, ast.base);
-            if (isError(baseType)) {
-                return baseType;
-            }
-
-            let lastPropType = baseType;
-            for (const prop of ast.properties) {
-                if (lastPropType.kind !== "object-type") {
-                    return miscError(prop, `Can only use dot operator (".") on objects with known properties`);
-                }
-
-                const valueType = lastPropType.entries.find(entry => entry[0].name === prop.name)?.[1];
-                if (valueType == null) {
-                    return miscError(prop, `Property '${prop.name}' doesn't exist on type '${serialize(baseType)}'`);
-                }
-
-                lastPropType = valueType;
-            }
-            
-            return lastPropType;
-        };
-        case "local-identifier": return scope.values[ast.name] ?? cannotFindName(ast);
-        case "object-literal": {
-            const entryTypes = ast.entries.map(([key, value]) => [key, typecheck(scope, value)]);
-
-            const entryErr = entryTypes.find(([_, value]) => isError(value)) as [PlainIdentifier, BagelTypeError] | undefined;
-            if (entryErr != null) {
-                return entryErr[1];
-            } else {
-                return {
-                    kind: "object-type",
-                    entries: entryTypes as [PlainIdentifier, TypeExpression][],
-                };
-            }
-        };
-        case "array-literal": {
-            const entriesTypes = ast.entries.map(entry => typecheck(scope, entry));
-
-            const entryErr = entriesTypes.find(isError);
-            if (entryErr != null) {
-                return entryErr;
-            }
-
-            // NOTE: This could be slightly better where different element types overlap each other
-            const uniqueEntryTypes = entriesTypes.filter((el, index, arr) => arr.findIndex(other => deepEquals(el, other)) === index) as TypeExpression[];
-
-            return {
-                kind: "array-type",
-                element: uniqueEntryTypes.length === 1
-                    ? uniqueEntryTypes[0]
-                    : {
-                        kind: "union-type",
-                        members: uniqueEntryTypes,
-                    },
+            case "block": {
+                return modulesStore.getScopeFor(ast);
             };
-        }
-        case "string-literal": {
-            for (const segment of ast.segments) {
-                if (typeof segment !== "string") {
-                    const segmentType = typecheck(scope, segment);
-                    if (isError(segmentType)) {
-                        return segmentType;
-                    }
+            case "func": {
+                const funcScope = modulesStore.getScopeFor(ast);
+                const bodyType = modulesStore.getTypeOf(ast.body);
 
-                    if (!subsumes(scope, STRING_TEMPLATE_TYPE, segmentType)) {
-                        return assignmentError(segment, STRING_TEMPLATE_TYPE, segmentType);
-                    }
+                if (ast.type.returnType.kind !== "unknown-type" && !subsumes(funcScope, ast.type.returnType, bodyType)) {
+                    reportError(assignmentError(ast.body, ast.type.returnType, bodyType));
                 }
-            }
+                
+                return funcScope;
+            };
+            case "pipe": {
+                let inputType = modulesStore.getTypeOf(ast.expressions[0]);
 
-            return {
-                kind: "string-type",
-            }
-        };
-        case "number-literal": return {
-            kind: "number-type",
-        };
-        case "boolean-literal": return {
-            kind: "boolean-type",
-        };
-        case "nil-literal": return {
-            kind: "nil-type",
-        };
+                for (const expr of ast.expressions.slice(1)) {
+                    const typeOfPipe = modulesStore.getTypeOf(expr);
 
-        // not expressions, but should have their contents checked
-        case "reaction": {
-            const dataType = typecheck(scope, ast.data);
-            if (isError(dataType)) {
-                return dataType;
-            }
-            if (!subsumes(scope, REACTION_DATA_TYPE, dataType)) {
-                return assignmentError(ast.data, REACTION_DATA_TYPE, dataType);
-            }
-            if (dataType.kind !== "func-type") {
-                return miscError(ast.data, `Expected function in reaction clause`);
-            }
-
-            const effectType = typecheck(scope, ast.data);
-            if (isError(effectType)) {
-                return effectType;
-            }
-            if (!subsumes(scope, REACTION_EFFECT_TYPE, effectType)) {
-                return assignmentError(ast.data, REACTION_EFFECT_TYPE, effectType);
-            }
-            if (effectType.kind !== "proc-type") {
-                return miscError(ast.data, `Expected procedure in effect clause`);
-            }
-
-            // TODO: This may become generalized later by generics/inverted inference
-            if (!subsumes(scope, effectType.argTypes[0], dataType.returnType)) {
-                return assignmentError((ast.effect as Proc).argNames[0], effectType.argTypes[0], dataType.returnType);
-            }
-
-            return { kind: "unknown-type" };
-        };
-        case "let-declaration": {
-            const valueType = typecheck(scope, ast.value);
-            if (isError(valueType)) {
-                return valueType;
-            }
-
-            if (ast.type != null) {
-                const declaredType = resolve(scope, ast.type);
-                if (isError(declaredType)) {
-                    return declaredType;
-                }
-
-                if (!subsumes(scope, declaredType, valueType)) {
-                    return assignmentError(ast.value, declaredType, valueType);
-                }
-
-                scope.values[ast.name.name] = declaredType;
-            } else {
-                scope.values[ast.name.name] = valueType;
-            }
-            
-            return { kind: "unknown-type" };
-        };
-        case "assignment": {
-            // TODO: Check we're not assigning to a const
-
-            const targetType = typecheck(scope, ast.target);
-            if (isError(targetType)) {
-                return targetType;
-            }
-
-            const valueType = typecheck(scope, ast.value);
-            if (isError(valueType)) {
-                return valueType;
-            }
-
-            if (!subsumes(scope, targetType, valueType)) {
-                return assignmentError(ast.value, targetType, valueType);
-            }
-
-            return { kind: "unknown-type" };
-        };
-        case "proc-call": {
-            const procType = typecheck(scope, ast.proc);
-            if (isError(procType)) {
-                return procType;
-            }
-            if (procType.kind !== "proc-type") {
-                return miscError(ast.proc, `Expression must be a procedure to be called`);
-            }
-
-            const argValueTypes = ast.args.map(arg => typecheck(scope, arg));
-
-            const argError = argValueTypes.find(isError);
-            if (argError != null) {
-                return argError;
-            }
-
-            for (let index = 0; index < argValueTypes.length; index++) {
-                const argValueType = argValueTypes[index];
-                if (isError(argValueType)) {
-                    return argValueType;
-                }
-                if (!subsumes(scope, procType.argTypes[index], argValueType)) {
-                    return assignmentError(ast.args[index], procType.argTypes[index], argValueType);
-                }
-            }
-
-            return { kind: "unknown-type" };
-        };
-        case "if-else-statement": {
-            const conditionType = typecheck(scope, ast.ifCondition);
-            if (isError(conditionType)) {
-                return conditionType;
-            }
-            if (conditionType.kind !== "boolean-type") {
-                return miscError(ast.ifCondition, `Condition for if statement must be boolean`);
-            }
-
-            for (const statement of ast.ifResult) {
-                const statementType = typecheck(scope, statement);
-                if (isError(statementType)) {
-                    return statementType;
-                }
-            }
-
-            if (ast.elseResult != null) {
-                for (const statement of ast.elseResult) {
-                    const statementType = typecheck(scope, statement);
-                    if (isError(statementType)) {
-                        return statementType;
+                    if (typeOfPipe?.kind !== "func-type") {
+                        reportError(miscError(ast, `Each transformation in pipeline expression must be a function`));
+                    } else if (!subsumes(scope, typeOfPipe.argTypes[0], inputType)) {
+                        reportError(assignmentError(ast, typeOfPipe.argTypes[0], inputType));
+                    } else {
+                        inputType = typeOfPipe.returnType;
                     }
                 }
-            }
-            
-            return { kind: "unknown-type" };
-        };
-        case "for-loop": {
-            // TODO: Disallow shadowing? Not sure
 
-            const iteratorType = typecheck(scope, ast.iterator);
-            if (isError(iteratorType)) {
-                return iteratorType;
-            }
-            if (iteratorType.kind !== "iterator-type") {
-                return miscError(ast.iterator, `Expected iterator after "of" in for loop`);
-            }
+                return scope;
+            };
+            case "binary-operator": {
+                if (modulesStore.getTypeOf(ast).kind === "unknown-type") {
+                    const leftType = modulesStore.getTypeOf(ast.left);
+                    const rightType = modulesStore.getTypeOf(ast.right);
 
-            const bodyScope = extendScope(scope);
-            bodyScope.values[ast.itemIdentifier.name] = iteratorType.itemType;
-
-            for (const statement of ast.body) {
-                const statementType = typecheck(bodyScope, statement);
-                if (isError(statementType)) {
-                    return statementType;
+                    reportError(miscError(ast, `Operator '${ast.operator}' cannot be applied to types '${serialize(leftType)}' and '${serialize(rightType)}'`));
                 }
-            }
 
-            return { kind: "unknown-type" };
-        };
-        case "while-loop": {
-            const conditionType = typecheck(scope, ast.condition);
-            if (isError(conditionType)) {
-                return conditionType;
-            }
-            if (conditionType.kind !== "boolean-type") {
-                return miscError(ast.condition, `Condition for while loop must be boolean`);
-            }
+                return scope;
+            };
+            case "funcall": {
+                const funcType = modulesStore.getTypeOf(ast.func);
 
-            for (const statement of ast.body) {
-                const statementType = typecheck(scope, statement);
-                if (isError(statementType)) {
-                    return statementType;
+                if (funcType.kind !== "func-type") {
+                    reportError(miscError(ast, "Expression must be a function to be called"));
+                } else {
+                    // TODO: infer what types arguments are allowed to be based on function body
+
+                    const argValueTypes = ast.args.map(arg => modulesStore.getTypeOf(arg));
+
+                    for (let index = 0; index < argValueTypes.length; index++) {
+                        const argValueType = argValueTypes[index];
+                        if (!subsumes(scope, funcType.argTypes[index], argValueType)) {
+                            reportError(assignmentError(ast.args[index], funcType.argTypes[index], argValueType));
+                        }
+                    }
                 }
-            }
-            
-            return { kind: "unknown-type" };
-        };
 
-        // nonsense; should be handled elsewhere or ignored
-        case "import-declaration":
-        case "type-declaration":
-        case "proc-declaration":
-        case "func-declaration":
-        case "const-declaration":
-        case "plain-identifier":
-            return { kind: "unknown-type" };
-    }
+                return scope;
+            };
+            case "indexer": {
+                const baseType = modulesStore.getTypeOf(ast.base);
+                const indexerType = modulesStore.getTypeOf(ast.indexer);
+                
+                if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
+                    const key = indexerType.value.segments[0];
+                    const valueType = baseType.entries.find(entry => entry[0].name === key)?.[1];
+                    if (valueType == null) {
+                        reportError(miscError(ast.indexer, `Property '${key}' doesn't exist on type '${serialize(baseType)}'`));
+                    }
+                } else if (baseType.kind === "indexer-type") {
+                    if (!subsumes(scope, baseType.keyType, indexerType)) {
+                        reportError(assignmentError(ast.indexer, baseType.keyType, indexerType));
+                    }
+                } else {
+                    reportError(miscError(ast.indexer, `Expression of type '${indexerType}' can't be used to index type '${serialize(baseType)}'`));
+                }
+
+                return scope;
+            };
+            case "if-else-expression": {
+                const ifConditionType = modulesStore.getTypeOf(ast.ifCondition);
+                if (ifConditionType?.kind !== "boolean-type") {
+                    reportError(miscError(ast, "Condition for if expression must be boolean"));
+                }
+
+                return scope;
+            };
+            case "property-accessor": {
+                const baseType = modulesStore.getTypeOf(ast.base);
+
+                let lastPropType = baseType;
+                for (const prop of ast.properties) {
+                    if (lastPropType.kind !== "object-type") {
+                        reportError(miscError(prop, `Can only use dot operator (".") on objects with known properties`));
+                        return scope;
+                    }
+
+                    const valueType = lastPropType.entries.find(entry => entry[0].name === prop.name)?.[1];
+                    if (valueType == null) {
+                        reportError(miscError(prop, `Property '${prop.name}' doesn't exist on type '${serialize(baseType)}'`));
+                        return scope;
+                    }
+
+                    lastPropType = valueType;
+                }
+                
+                return scope;
+            };
+            case "local-identifier": {
+                if (!scope.values.hasOwnProperty(ast.name)) {
+                    reportError(cannotFindName(ast));
+                }
+
+                return scope;
+            };
+            case "string-literal": {
+                for (const segment of ast.segments) {
+                    if (typeof segment !== "string") {
+                        const segmentType = modulesStore.getTypeOf(segment);
+
+                        if (!subsumes(scope, STRING_TEMPLATE_INSERT_TYPE, segmentType)) {
+                            reportError(assignmentError(segment, STRING_TEMPLATE_INSERT_TYPE, segmentType));
+                        }
+                    }
+                }
+
+                return scope;
+            };
+
+            // not expressions, but should have their contents checked
+            case "reaction": {
+                const dataType = modulesStore.getTypeOf(ast.data);
+                if (dataType.kind !== "func-type") {
+                    reportError(miscError(ast.data, `Expected function in reaction clause`));
+                } else if (!subsumes(scope, REACTION_DATA_TYPE, dataType)) {
+                    reportError(assignmentError(ast.data, REACTION_DATA_TYPE, dataType));
+                }
+
+                const effectType = modulesStore.getTypeOf(ast.data);
+                if (effectType.kind !== "proc-type") {
+                    reportError(miscError(ast.data, `Expected procedure in effect clause`));
+                } else if (!subsumes(scope, REACTION_EFFECT_TYPE, effectType)) {
+                    reportError(assignmentError(ast.data, REACTION_EFFECT_TYPE, effectType));
+                }
+
+                // TODO: This may become generalized later by generics/inverted inference
+                if (dataType.kind === "func-type" && effectType.kind === "proc-type" && !subsumes(scope, effectType.argTypes[0], dataType.returnType)) {
+                    reportError(assignmentError((ast.effect as Proc).argNames[0], effectType.argTypes[0], dataType.returnType));
+                }
+
+                return scope;
+            };
+            case "let-declaration": {
+                const valueType = modulesStore.getTypeOf(ast.value);
+
+                if (ast.type != null) {
+                    const declaredType = ast.type;
+
+                    if (!subsumes(scope, declaredType, valueType)) {
+                        reportError(assignmentError(ast.value, declaredType, valueType));
+                    }
+                }
+                
+                return scope;
+            };
+            case "assignment": {
+                // TODO: Check we're not assigning to a const
+
+                const targetType = modulesStore.getTypeOf(ast.target);
+                const valueType = modulesStore.getTypeOf(ast.value);
+
+                if (!subsumes(scope, targetType, valueType)) {
+                    reportError(assignmentError(ast.value, targetType, valueType));
+                }
+
+                return scope;
+            };
+            case "proc-call": {
+                const procType = modulesStore.getTypeOf(ast.proc);
+
+                if (procType.kind !== "proc-type") {
+                    reportError(miscError(ast.proc, `Expression must be a procedure to be called`));
+                } else {
+                    const argValueTypes = ast.args.map(arg => modulesStore.getTypeOf(arg));
     
-    return miscError(ast, "Failed to typecheck");
+                    for (let index = 0; index < argValueTypes.length; index++) {
+                        const argValueType = argValueTypes[index];
+                        if (!subsumes(scope, procType.argTypes[index], argValueType)) {
+                            reportError(assignmentError(ast.args[index], procType.argTypes[index], argValueType));
+                        }
+                    }
+                }
+
+                return scope;
+            };
+            case "if-else-statement": {
+                const conditionType = modulesStore.getTypeOf(ast.ifCondition);
+
+                if (conditionType.kind !== "boolean-type") {
+                    reportError(miscError(ast.ifCondition, `Condition for if statement must be boolean`));
+                }
+
+                return scope;
+            };
+            case "for-loop": {
+                // TODO: Disallow shadowing? Not sure
+
+                const iteratorType = modulesStore.getTypeOf(ast.iterator);
+                if (iteratorType.kind !== "iterator-type") {
+                    reportError(miscError(ast.iterator, `Expected iterator after "of" in for loop`));
+                }
+
+                return scope;
+            };
+            case "while-loop": {
+                const conditionType = modulesStore.getTypeOf(ast.condition);
+                if (conditionType.kind !== "boolean-type") {
+                    reportError(miscError(ast.condition, `Condition for while loop must be boolean`));
+                }
+                
+                return scope;
+            };
+            default:
+                return scope;
+        }        
+    });
 }
 
-const STRING_TEMPLATE_TYPE: TypeExpression = {
-    kind: "union-type",
-    members: [
-        { kind: "string-type" },
-        { kind: "number-type" },
-        { kind: "boolean-type" },
-    ]
-}
-
-const REACTION_DATA_TYPE: TypeExpression = {
-    kind: "func-type",
-    argTypes: [],
-    returnType: {
-        kind: "unknown-type"
-    },
-}
-const REACTION_EFFECT_TYPE: TypeExpression = {
-    kind: "proc-type",
-    argTypes: [
-        { kind: "unknown-type" }
-    ],
-}
-
-export function subsumes(scope: Scope, destination: TypeExpression, value: TypeExpression): boolean {
+export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression, value: TypeExpression): boolean {
     const resolvedDestination = resolve(scope, destination);
     const resolvedValue = resolve(scope, value);
 
-    if (isError(resolvedDestination) || isError(resolvedValue)) {
+    if (resolvedDestination == null || resolvedValue == null) {
         return false;
     }
 
@@ -587,71 +280,35 @@ export function subsumes(scope: Scope, destination: TypeExpression, value: TypeE
     return false;
 }
 
-function resolve(scope: Scope, type: TypeExpression): TypeExpression | BagelTypeError {
+function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpression>): DeepReadonly<TypeExpression> | undefined {
     if (type.kind === "named-type") {
         const namedType = scope.types[type.name.name];
-        if (namedType == null) {
-            return miscError(undefined, `Cannot find name '${type.name.name}'`);
-        }
-
-        return resolve(scope, namedType);
+        return given(namedType, namedType => resolve(scope, namedType));
     } else if(type.kind === "union-type") {
-        const members = type.members.map(member => resolve(scope, member));
-
-        const memberErr = members.find(isError);
-        if (memberErr != null) {
-            return memberErr;
-        }
-
-        return {
-            kind: "union-type",
-            members: members as TypeExpression[],
+        const memberTypes = type.members.map(member => resolve(scope, member));
+        if (memberTypes.some(member => member == null)) {
+            return undefined;
+        } else {
+            return {
+                kind: "union-type",
+                members: memberTypes as DeepReadonly<TypeExpression>[],
+            };
         }
     } else if(type.kind === "object-type") {
-        const entries = type.entries.map(([ key, valueType ]) => [key, resolve(scope, valueType)]);
-
-        const entryErr = entries.find(entry => isError(entry[1])) as [PlainIdentifier, BagelTypeError] | undefined;
-        if (entryErr != null) {
-            return entryErr[1];
-        }
+        const entries: [PlainIdentifier, DeepReadonly<TypeExpression>][] = type.entries.map(([ key, valueType ]) => 
+            [key, resolve(scope, valueType as DeepReadonly<TypeExpression>)] as [PlainIdentifier, DeepReadonly<TypeExpression>]);
 
         return {
             kind: "object-type",
-            entries: entries as [PlainIdentifier, TypeExpression][],
+            entries,
         }
     } else if(type.kind === "array-type") {
-        const element = resolve(scope, type.element);
-
-        if (isError(element)) {
-            return element;
-        }
-
-        return {
+        return given(resolve(scope, type.element), element => ({
             kind: "array-type",
-            element: element as TypeExpression,
-        }
+            element,
+        }));
     } else {
         // TODO: Recurse on ProcType, FuncType, IndexerType, TupleType
-        return type;
-    }
-}
-
-function flattenUnions(type: TypeExpression): TypeExpression {
-    if (type.kind === "union-type") {
-        const members: TypeExpression[] = [];
-        for (const member of type.members) {
-            if (member.kind === "union-type") {
-                members.push(...member.members.map(flattenUnions));
-            } else {
-                members.push(member);
-            }
-        }
-
-        return {
-            kind: "union-type",
-            members,
-        }
-    } else {
         return type;
     }
 }
@@ -710,9 +367,9 @@ export function errorMessage(error: BagelTypeError): string {
     }
 }
 
-export function isError(x: unknown): x is BagelTypeError {
-    return x != null && typeof x === "object" && ((x as any).kind === "bagel-assignable-to-error" || (x as any).kind === "bagel-misc-type-error");
-}
+// export function isError(x: unknown): x is BagelTypeError {
+//     return x != null && typeof x === "object" && ((x as any).kind === "bagel-assignable-to-error" || (x as any).kind === "bagel-misc-type-error");
+// }
 
 export function assignmentError(ast: AST, destination: TypeExpression, value: TypeExpression): BagelAssignableToError {
     return { kind: "bagel-assignable-to-error", ast, destination, value, stack: undefined };
@@ -724,50 +381,4 @@ export function cannotFindName(ast: LocalIdentifier): BagelCannotFindNameError {
 
 export function miscError(ast: AST|undefined, message: string): BagelMiscTypeError {
     return { kind: "bagel-misc-type-error", ast, message }
-}
-
-const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
-    "+": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } },
-        { left: { kind: "string-type" }, right: { kind: "string-type" }, output: { kind: "string-type" } },
-        { left: { kind: "number-type" }, right: { kind: "string-type" }, output: { kind: "string-type" } },
-        { left: { kind: "string-type" }, right: { kind: "number-type" }, output: { kind: "string-type" } },
-    ],
-    "-": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
-    ],
-    "*": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
-    ],
-    "/": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "number-type" } }
-    ],
-    "<": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
-    ],
-    ">": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
-    ],
-    "<=": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
-    ],
-    ">=": [
-        { left: { kind: "number-type" }, right: { kind: "number-type" }, output: { kind: "boolean-type" } }
-    ],
-    "&&": [
-        { left: { kind: "boolean-type" }, right: { kind: "boolean-type" }, output: { kind: "boolean-type" } }
-    ],
-    "||": [
-        { left: { kind: "boolean-type" }, right: { kind: "boolean-type" }, output: { kind: "boolean-type" } }
-    ],
-    "==": [
-        { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "boolean-type" } }
-    ],
-    "??": [
-        { left: { kind: "unknown-type" }, right: { kind: "unknown-type" }, output: { kind: "unknown-type" } }
-    ],
-    // "??": {
-    //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
-    //     output: { kind: "boolean-type" }
-    // },
 }
