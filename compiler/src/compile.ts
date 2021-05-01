@@ -17,9 +17,10 @@ function compileOne(ast: AST): string {
         case "let-declaration": return `${compileOne(ast.name)} = ${compileOne(ast.value)}`;
         case "assignment": return `${compileOne(ast.target)} = ${compileOne(ast.value)}`;
         case "proc-call": return `${compileOne(ast.proc)}${ast.args.map(arg => `(${compileOne(arg)})`).join("")}`;
-        case "if-else-statement": return `if(${compileOne(ast.ifCondition)}) { ${ast.ifResult.map(compileOne).join(" ")} }` + (ast.elseResult != null ? ` else { ${ast.elseResult.map(compileOne).join(" ")} }` : ``);
-        case "for-loop": return `for (const ${compileOne(ast.itemIdentifier)} of ${compileOne(ast.iterator)}) { ${ast.body.map(compileOne).join(" ")} }`;
-        case "while-loop": return `while (${compileOne(ast.condition)}) { ${ast.body.map(compileOne).join(" ")} }`;
+        case "if-else-statement": return `if(${compileOne(ast.ifCondition)}) ${compileOne(ast.ifResult)}` 
+            + (ast.elseResult != null ? ` else ${compileOne(ast.elseResult)}` : ``);
+        case "for-loop": return `for (const ${compileOne(ast.itemIdentifier)} of ${compileOne(ast.iterator)}) ${compileOne(ast.body)}`;
+        case "while-loop": return `while (${compileOne(ast.condition)}) ${compileOne(ast.body)}`;
         case "func": return compileFunc(ast);
         case "funcall": return `${compileOne(ast.func)}${ast.args.map(arg => `(${compileOne(arg)})`).join("")}`;
         case "pipe": return compilePipe(ast.expressions, ast.expressions.length - 1);
@@ -42,6 +43,7 @@ function compileOne(ast: AST): string {
         case "javascript-escape": return ast.js;
         case "reaction": return `disposers.push(crowdx.reaction(() => ${compileOne(ast.data)}, (data) => ${compileOne(ast.effect)}(data)))`;
         case "indexer": return `${compileOne(ast.base)}[${compileOne(ast.indexer)}]`;
+        case "block": return `{ ${ast.statements.map(compileOne).join(" ")} }`;
     }
 
     throw Error("Couldn't compile '" + (ast as any).kind + "'");
@@ -57,7 +59,7 @@ function compileProc(proc: Proc): string {
     return `function ${proc.name == null ? '' : proc.name.name}(${proc.argNames[0] != null ? compileOne(proc.argNames[0]) : ''}) {${proc.argNames.length > 1 ? ` return (${proc.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(arg)}) => `).join("")}{\n` : ''}
     const disposers = [];
 
-    ${proc.body.map(compileOne).join("; ")}
+    ${proc.body.statements.map(compileOne).join("; ")}
 
     // disposers.forEach(crowdx.dispose);
 ${proc.argNames.length > 1 ? `});` : ''}}`;

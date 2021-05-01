@@ -5,6 +5,7 @@ export type AST =
     | Expression
     | Statement
     | PlainIdentifier
+    | Block
 
 export type Module = {
     kind: "module",
@@ -59,6 +60,11 @@ export type PlainIdentifier = {
     name: string,
 }
 
+export type Block = {
+    kind: "block",
+    statements: Statement[],
+}
+
 export type Statement = 
     | Reaction
     | IfElseStatement
@@ -97,21 +103,21 @@ export type ProcCall = {
 export type IfElseStatement = {
     kind: "if-else-statement",
     ifCondition: Expression,
-    ifResult: Statement[],
-    elseResult?: Statement[],
+    ifResult: Block,
+    elseResult?: Block,
 }
 
 export type ForLoop = {
     kind: "for-loop",
     itemIdentifier: PlainIdentifier,
     iterator: Expression,
-    body: Statement[],
+    body: Block,
 }
 
 export type WhileLoop = {
     kind: "while-loop",
     condition: Expression,
-    body: Statement[],
+    body: Block,
 }
 
 export type TypeExpression =
@@ -247,7 +253,7 @@ export type Proc = {
     name?: PlainIdentifier,
     type: ProcType,
     argNames: PlainIdentifier[],
-    body: Statement[],
+    body: Block,
 }
 
 export type Func = {

@@ -1,4 +1,4 @@
-import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration, PrimitiveType, FuncType, Module } from "./ast";
+import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration, PrimitiveType, FuncType, Module, Block } from "./ast";
 import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction, err, expec, BagelSyntaxError, isError, errorMessage } from "./parsing-utils";
 
 export function parse(code: string): Module {
@@ -330,11 +330,7 @@ const proc: ParseFunction<Proc> = (code, index) =>
     given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, "{"), index =>
-    given(consumeWhitespace(code, index), index =>
-    given(parseSeries(code, index, statement), ({ parsed: body, newIndex: index }) => 
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "}"), err(code, index, '"}"'), index =>({
+    expec(parseBlock(code, index), err(code, index, 'Procedure body'), ({ parsed: body, newIndex: index }) => ({
         parsed: {
             kind: "proc",
             name,
@@ -346,7 +342,7 @@ const proc: ParseFunction<Proc> = (code, index) =>
             body,
         },
         newIndex: index,
-    })))))))))))
+    })))))))
 
 const statement: ParseFunction<Statement> = (code, index) =>
     reaction(code, index)
@@ -441,22 +437,16 @@ const ifElseStatement: ParseFunction<IfElseStatement> = (code, index) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ")"), err(code, index, '")"'), index =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
-    given(consumeWhitespace(code, index), index =>
-    given(parseSeries(code, index, statement), ({ parsed: ifResult, newIndex: index }) => 
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "}"), err(code, index, '"}"'), index =>
+    expec(parseBlock(code, index), err(code, index, 'If block'), ({ parsed: ifResult, newIndex: index }) => 
     given(consumeWhitespace(code, index), index => {
         const elseResultResult = 
             given(consume(code, index, "else"), index => 
             given(consumeWhitespace(code, index), index =>
-            expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
-            given(parseSeries(code, index, statement), ({ parsed, newIndex: index }) =>
-            expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({ parsed, newIndex: index }))))));
+            expec(parseBlock(code, index), err(code, index, 'Else block'), result => result)));
 
         if (isError(elseResultResult)) {
             return elseResultResult
-        } else if (elseResultResult == null || elseResultResult.parsed.length === 0) {
+        } else if (elseResultResult == null) {
             return {
                 parsed: {
                     kind: "if-else-statement",
@@ -476,7 +466,7 @@ const ifElseStatement: ParseFunction<IfElseStatement> = (code, index) =>
                 newIndex: elseResultResult.newIndex,
             }
         }
-    }))))))))))))))
+    }))))))))))
 
 const forLoop: ParseFunction<ForLoop> = (code, index) =>
     given(consume(code, index, "for"), index =>
@@ -491,10 +481,7 @@ const forLoop: ParseFunction<ForLoop> = (code, index) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ")"), err(code, index, '")"'), index =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
-    given(parseSeries(code, index, statement), ({ parsed: body, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
+    expec(parseBlock(code, index), err(code, index, 'Loop body'), ({ parsed: body, newIndex: index }) => ({
         parsed: {
             kind: "for-loop",
             itemIdentifier,
@@ -502,7 +489,7 @@ const forLoop: ParseFunction<ForLoop> = (code, index) =>
             body,
         },
         newIndex: index,
-    })))))))))))))))))
+    }))))))))))))))
 
 const whileLoop: ParseFunction<WhileLoop> = (code, index) =>
     given(consume(code, index, "while"), index =>
@@ -513,17 +500,26 @@ const whileLoop: ParseFunction<WhileLoop> = (code, index) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ")"), err(code, index, '")"'), index =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
-    given(parseSeries(code, index, statement), ({ parsed: body, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
+    expec(parseBlock(code, index), err(code, index, 'Loop body'), ({ parsed: body, newIndex: index }) => ({
         parsed: {
             kind: "while-loop",
             condition,
             body,
         },
         newIndex: index,
-    })))))))))))))
+    }))))))))))
+
+const parseBlock: ParseFunction<Block> = (code, index) =>
+    given(consume(code, index, "{"), index =>
+    given(parseSeries(code, index, statement), ({ parsed: statements, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
+        parsed: {
+            kind: "block",
+            statements,
+        },
+        newIndex: index,
+    })))))
 
 
 const expressionPrecedenceTiers: () => ParseFunction<Expression>[][] = () => [
