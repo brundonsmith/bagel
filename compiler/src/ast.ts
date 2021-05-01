@@ -1,4 +1,10 @@
 
+export type SourceInfo = {
+    code: string,
+    startIndex: number,
+    endIndex: number,
+}
+
 export type AST =
     | Module
     | Declaration
@@ -7,7 +13,7 @@ export type AST =
     | PlainIdentifier
     | Block
 
-export type Module = {
+export type Module = SourceInfo & {
     kind: "module",
     declarations: Declaration[],
 }
@@ -19,7 +25,7 @@ export type Declaration =
     | FuncDeclaration
     | ConstDeclaration
 
-export type ImportDeclaration = {
+export type ImportDeclaration = SourceInfo & {
     kind: "import-declaration",
     imports: Array<{
         name: PlainIdentifier,
@@ -28,26 +34,26 @@ export type ImportDeclaration = {
     path: StringLiteral,
 }
 
-export type TypeDeclaration = {
+export type TypeDeclaration = SourceInfo & {
     kind: "type-declaration",
     name: PlainIdentifier,
     type: TypeExpression,
     exported: boolean,
 }
 
-export type ProcDeclaration = {
+export type ProcDeclaration = SourceInfo & {
     kind: "proc-declaration",
     proc: Proc,
     exported: boolean,
 }
 
-export type FuncDeclaration = {
+export type FuncDeclaration = SourceInfo & {
     kind: "func-declaration",
     func: Func,
     exported: boolean,
 }
 
-export type ConstDeclaration = {
+export type ConstDeclaration = SourceInfo & {
     kind: "const-declaration",
     name: PlainIdentifier,
     type: TypeExpression,
@@ -55,12 +61,12 @@ export type ConstDeclaration = {
     exported: boolean,
 }
 
-export type PlainIdentifier = {
+export type PlainIdentifier = SourceInfo & {
     kind: "plain-identifier",
     name: string,
 }
 
-export type Block = {
+export type Block = SourceInfo & {
     kind: "block",
     statements: Statement[],
 }
@@ -75,46 +81,46 @@ export type Statement =
     | Assignment
     | ProcCall
 
-export type Reaction = {
+export type Reaction = SourceInfo & {
     kind: "reaction",
     data: Expression,
     effect: Expression,
 }
 
-export type LetDeclaration = {
+export type LetDeclaration = SourceInfo & {
     kind: "let-declaration",
     name: LocalIdentifier,
     type?: TypeExpression,
     value: Expression,
 }
 
-export type Assignment = {
+export type Assignment = SourceInfo & {
     kind: "assignment",
     target: LocalIdentifier | PropertyAccessor,
     value: Expression,
 }
 
-export type ProcCall = {
+export type ProcCall = SourceInfo & {
     kind: "proc-call",
     proc: Expression,
     args: Expression[],
 }
 
-export type IfElseStatement = {
+export type IfElseStatement = SourceInfo & {
     kind: "if-else-statement",
     ifCondition: Expression,
     ifResult: Block,
     elseResult?: Block,
 }
 
-export type ForLoop = {
+export type ForLoop = SourceInfo & {
     kind: "for-loop",
     itemIdentifier: PlainIdentifier,
     iterator: Expression,
     body: Block,
 }
 
-export type WhileLoop = {
+export type WhileLoop = SourceInfo & {
     kind: "while-loop",
     condition: Expression,
     body: Block,
@@ -314,7 +320,7 @@ export type Expression =
     | BooleanLiteral
     | NilLiteral
 
-export type Proc = {
+export type Proc = SourceInfo & {
     kind: "proc",
     name?: PlainIdentifier,
     type: ProcType,
@@ -322,7 +328,7 @@ export type Proc = {
     body: Block,
 }
 
-export type Func = {
+export type Func = SourceInfo & {
     kind: "func",
     name?: PlainIdentifier,
     type: FuncType,
@@ -330,12 +336,12 @@ export type Func = {
     body: Expression,
 }
 
-export type Pipe = {
+export type Pipe = SourceInfo & {
     kind: "pipe",
     expressions: Expression[],
 }
 
-export type BinaryOperator = {
+export type BinaryOperator = SourceInfo & {
     kind: "binary-operator",
     left: Expression,
     right: Expression,
@@ -345,77 +351,77 @@ export type BinaryOperator = {
 export const BINARY_OPS = [ "+", "-", "*", "/", "<=", ">=", "<", ">", "==", "&&", "||", "??" ] as const;
 export type BinaryOp = typeof BINARY_OPS[number];
 
-export type Funcall = {
+export type Funcall = SourceInfo & {
     kind: "funcall",
     func: Expression,
     args: Expression[],
 }
 
-export type Indexer = {
+export type Indexer = SourceInfo & {
     kind: "indexer",
     base: Expression,
     indexer: Expression,
 }
 
-export type IfElseExpression = {
+export type IfElseExpression = SourceInfo & {
     kind: "if-else-expression",
     ifCondition: Expression,
     ifResult: Expression,
     elseResult?: Expression,
 }
 
-export type Range = {
+export type Range = SourceInfo & {
     kind: "range",
     start: number,
     end: number,
 }
 
-export type ParenthesizedExpression = {
+export type ParenthesizedExpression = SourceInfo & {
     kind: "parenthesized-expression",
     inner: Expression,
 }
 
-export type PropertyAccessor = {
+export type PropertyAccessor = SourceInfo & {
     kind: "property-accessor",
     base: Expression,
     properties: PlainIdentifier[],
 }
 
-export type LocalIdentifier = {
+export type LocalIdentifier = SourceInfo & {
     kind: "local-identifier",
     name: string,
 }
 
-export type ObjectLiteral = {
+export type ObjectLiteral = SourceInfo & {
     kind: "object-literal",
     entries: [PlainIdentifier, Expression][],
 }
 
-export type ArrayLiteral = {
+export type ArrayLiteral = SourceInfo & {
     kind: "array-literal",
     entries: Expression[],
 }
 
-export type StringLiteral = {
+export type StringLiteral = SourceInfo & {
     kind: "string-literal",
     segments: (string|Expression)[],
 }
 
-export type NumberLiteral = {
+export type NumberLiteral = SourceInfo & {
     kind: "number-literal",
     value: number,
 }
 
-export type BooleanLiteral = {
+export type BooleanLiteral = SourceInfo & {
     kind: "boolean-literal",
     value: boolean,
 }
 
-export type NilLiteral = {
+export type NilLiteral = SourceInfo & {
     kind: "nil-literal",
 }
 
-export type JavascriptEscape = {
+export type JavascriptEscape = SourceInfo & {
     kind: "javascript-escape",
     js: string,
 }

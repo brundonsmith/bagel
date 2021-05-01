@@ -172,10 +172,15 @@ export type BagelSyntaxError = {
 }
 
 export function errorMessage(error: BagelSyntaxError): string {
+    const { line, column } = lineAndColumn(error.code, error.index);
+    return `${line}:${column} ${error.expected} expected\n${error.stack}`;
+}
+
+export function lineAndColumn(code: string, index: number): { line: number, column: number } {
     let line = 1;
     let column = 0;
-    for (let i = 0; i <= error.index; i++) {
-        if (error.code[i] === "\n") {
+    for (let i = 0; i <= index; i++) {
+        if (code[i] === "\n") {
             line++;
             column = 0;
         } else {
@@ -183,7 +188,7 @@ export function errorMessage(error: BagelSyntaxError): string {
         }
     }
 
-    return `${line}:${column} ${error.expected} expected\n${error.stack}`;
+    return { line, column };
 }
 
 export function isError(x: unknown): x is BagelSyntaxError {

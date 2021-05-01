@@ -26,7 +26,7 @@ export type DeepReadonly<T extends BasicData> = T
     // T extends BasicData[] ? Readonly<DeepReadonly<T[number]>[]> :
     // T
 
-export function deepEquals(a: DeepReadonly<BasicData>, b: DeepReadonly<BasicData>): boolean {
+export function deepEquals(a: DeepReadonly<BasicData>, b: DeepReadonly<BasicData>, ignorePropNames: string[] = []): boolean {
     if (a === b) {
         return true;
     } else if(a == null && b == null) {
@@ -37,7 +37,7 @@ export function deepEquals(a: DeepReadonly<BasicData>, b: DeepReadonly<BasicData
                 return false;
             } else {
                 for (let i = 0; i < a.length; i++) {
-                    if (!deepEquals(a[i], b[i])) {
+                    if (!deepEquals(a[i], b[i], ignorePropNames)) {
                         return false;
                     }
                 }
@@ -47,7 +47,7 @@ export function deepEquals(a: DeepReadonly<BasicData>, b: DeepReadonly<BasicData
             const keysSet = Array.from(new Set([...Object.keys(a as {}), ...Object.keys(b as {})]));
             
             for (const key of keysSet) {
-                if (!deepEquals(a[key], b[key])) {
+                if (!ignorePropNames.includes(key) && !deepEquals(a[key], b[key], ignorePropNames)) {
                     return false;
                 }
             }

@@ -772,10 +772,10 @@ test(function funcTypeType() {
 
 
 
-function testParse<T extends AST>(code: string, expected: T, parseFn: (code: string, index: number) => T): string|undefined {
+function testParse<T extends Omit<AST, "code"|"startIndex"|"endIndex">>(code: string, expected: T, parseFn: (code: string, index: number) => T): string|undefined {
     const parsed = parseFn(code, 0);
 
-    if (!deepEquals(parsed, expected)) {
+    if (!deepEquals(parsed, expected, ["code", "startIndex", "endIndex"])) {
         return `\nParsing: "${code}"\n\nExpected:\n${JSON.stringify(expected, null, 4)}\n\nReceived:\n${JSON.stringify(parsed, null, 4)}`;
     }
 }

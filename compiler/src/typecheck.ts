@@ -1,5 +1,6 @@
 import { AST, LocalIdentifier, Module, PlainIdentifier, Proc, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, REACTION_DATA_TYPE, REACTION_EFFECT_TYPE } from "./ast";
 import { ModulesStore, Scope } from "./modules-store";
+import { lineAndColumn } from "./parsing-utils";
 import { deepEquals, DeepReadonly, given, walkParseTree } from "./utils";
 
 export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: (error: BagelTypeError) => void) {
@@ -360,10 +361,15 @@ export type BagelMiscTypeError = {
 }
 
 export function errorMessage(error: BagelTypeError): string {
+    const lineAndColumnMsg = given(given(error.ast, ast => lineAndColumn(ast.code, ast.startIndex)), ({ line, column }) => `${line}:${column} `) ?? ``;
+    
     switch (error.kind) {
-        case "bagel-assignable-to-error": return `Type '${serialize(error.value)}' is not assignable to type '${serialize(error.destination)}'`;
-        case "bagel-cannot-find-name-error": return `Cannot find name '${error.ast.name}'`;
-        case "bagel-misc-type-error": return error.message;
+        case "bagel-assignable-to-error":
+            return lineAndColumnMsg + `Type '${serialize(error.value)}' is not assignable to type '${serialize(error.destination)}'`;
+        case "bagel-cannot-find-name-error":
+            return lineAndColumnMsg + `Cannot find name '${error.ast.name}'`;
+        case "bagel-misc-type-error":
+            return lineAndColumnMsg + error.message;
     }
 }
 
