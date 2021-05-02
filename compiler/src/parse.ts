@@ -924,7 +924,7 @@ const stringLiteral: ParseFunction<StringLiteral> = (code, startIndex) => {
         index++;
         let currentSegmentStart = index;
 
-        while (code[index] !== "'") {
+        while (index < code.length && code[index] !== "'") {
             if (code[index] === "$" && code[index+1] === "{") {
                 if (index - currentSegmentStart > 0) {
                     segments.push(code.substring(currentSegmentStart, index));
@@ -953,17 +953,21 @@ const stringLiteral: ParseFunction<StringLiteral> = (code, startIndex) => {
             }
         }
 
-        segments.push(code.substring(currentSegmentStart, index));
+        if (index > code.length) {
+            return err(code, index, '"\'"');
+        } else {
+            segments.push(code.substring(currentSegmentStart, index));
 
-        return {
-            parsed: {
-                kind: "string-literal",
-                code,
-                startIndex,
-                endIndex: index,
-                segments,
-            },
-            newIndex: index + 1,
+            return {
+                parsed: {
+                    kind: "string-literal",
+                    code,
+                    startIndex,
+                    endIndex: index,
+                    segments,
+                },
+                newIndex: index + 1,
+            }
         }
     }
 }

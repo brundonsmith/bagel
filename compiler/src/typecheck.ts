@@ -183,7 +183,12 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 return scope;
             };
             case "assignment": {
-                // TODO: Check we're not assigning to a const
+                if (ast.target.kind === "local-identifier" && scope.values[ast.target.name].mutability !== "all") {
+                    reportError(miscError(ast.target, `Cannot assign to '${ast.target.name}' because it is not mutable`));
+                }
+                //  else if(ast.target.kind === "property-accessor" && scope.values[ast.target.]) {
+                //    TODO: Have to figure out whether the mutability of any arbitrary base expression
+                // }
 
                 const targetType = modulesStore.getTypeOf(ast.target);
                 const valueType = modulesStore.getTypeOf(ast.value);

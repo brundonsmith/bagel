@@ -116,14 +116,16 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
             return lastPropType;
         };
         case "local-identifier": {
-            const localTypeOrExpression = scope.values[ast.name];
+            const descriptor = scope.values[ast.name];
 
-            if (localTypeOrExpression == null) {
+            if (descriptor == null) {
                 return UNKNOWN_TYPE;
-            } else if (isExpression(localTypeOrExpression as any)) {
-                return determineType(modulesStore, localTypeOrExpression as Expression, scope);
+            } else if (descriptor.declaredType.kind !== "unknown-type") {
+                return descriptor.declaredType;
+            } else if (descriptor.initialValue != null) {
+                return determineType(modulesStore, descriptor.initialValue, scope);
             } else {
-                return localTypeOrExpression as TypeExpression;
+                return UNKNOWN_TYPE;
             }
         };
         case "object-literal": {
@@ -221,6 +223,14 @@ function flattenUnions(type: TypeExpression): TypeExpression {
             kind: "union-type",
             members,
         }
+    } else {
+        return type;
+    }
+}
+
+function unknownFallback(type: TypeExpression, fallback: Expression): TypeExpression|Expression {
+    if (type.kind === "unknown-type") {
+        return fallback;
     } else {
         return type;
     }

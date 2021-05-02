@@ -1,19 +1,17 @@
 import { promises as fs, watchFile } from "fs";
 import path from "path";
 
+import { build } from "esbuild";
+
 import { parse } from "./parse";
 import { ModulesStore } from "./modules-store";
 import { scopescan } from "./scopescan";
 import { typescan } from "./typescan";
 import { typecheck, errorMessage, BagelTypeError } from "./typecheck";
-import { compile, LOCALS_OBJ } from "./compile";
+import { compile } from "./compile";
 
 // @ts-ignore
 // window.parse = parse;
-
-const entry = path.resolve(__dirname, process.argv[2]);
-const output = process.argv[3] || path.resolve(path.dirname(entry), path.basename(entry).split(".")[0] + ".js");
-const watch = true;
 
 function canonicalModuleName(importerModule: string, relativePath: string) {
     const moduleDir = path.dirname(importerModule);
@@ -25,6 +23,11 @@ function printError(error: BagelTypeError) {
 }
 
 (async function() {
+    const entry = path.resolve(__dirname, process.argv[2]);
+    const outDir = process.argv[3] || path.dirname(entry);
+    const bundle = false;
+    const watch = true;
+    
     const modulesStore = new ModulesStore();
 
     const allModules = new Set<string>([entry]);
@@ -74,6 +77,30 @@ function printError(error: BagelTypeError) {
     }
     const endTypecheck = Date.now();
 
+    // compile to JS
+    await Promise.all(Array.from(modulesStore.modules.entries()).map(([ module, ast ]) => {
+        // TODO: use specified outDir
+        const jsPath = bagelFileToJsFile(module);
+        const compiled = compile(modulesStore, ast);
+        const compiledWithLib = `
+            import { observable as ___observable } from "./crowdx";
+            import { range } from "./lib";` + compiled + (module === entry ? 'main();' : '');
+        return fs.writeFile(jsPath, compiledWithLib);
+    }))
+
+    if (bundle) {
+        await build({
+            entryPoints: [ entry ],
+            outfile: bagelFileToJsFile(entry, true)
+        })
+    }
+    
+
+    console.log();
+    console.log(`Spent ${timeSpentParsing}ms parsing`)
+    console.log(`Typechecked in ${endTypecheck - startTypecheck}ms`)
+
+    
 
     if (watch) {
         for (const module of modulesStore.modules.keys()) {
@@ -82,11 +109,12 @@ function printError(error: BagelTypeError) {
                 const fileContents = await fs.readFile(module);
                 const parsed = parse(fileContents.toString());
                 modulesStore.modules.set(module, parsed);
-                // TODO: Garbage-collect old AST
 
                 scopescan(modulesStore, parsed);
                 typescan(modulesStore, parsed);
 
+                // console.log(JSON.stringify(parsed, null, 2))
+                // console.log(modulesStore.)
                 // console.log(modulesStore.getScopeFor(parsed).types)
                 // console.log(modulesStore.getScopeFor(parsed).values)
 
@@ -99,20 +127,30 @@ function printError(error: BagelTypeError) {
                 if (!hadError) {
                     console.log("No errors")
                 }
+                
+                const jsPath = bagelFileToJsFile(module);
+                const compiled = compile(modulesStore, parsed);
+                const compiledWithLib = `
+                    import { observable as ___observable } from "./crowdx";
+                    import { range } from "./lib";` + compiled;
+                await fs.writeFile(jsPath, compiledWithLib);
+
+                
+                if (bundle) {
+                    await build({
+                        entryPoints: [ entry ],
+                        outfile: bagelFileToJsFile(entry, true)
+                    })
+                }
             })
         }
     }
 
-
-    // compile to JS
-    // const compiled = compile(parsed)
-    // fs.writeFile(output, compiled);
-    
-
-    console.log();
-    console.log(`Spent ${timeSpentParsing}ms parsing`)
-    console.log(`Typechecked in ${endTypecheck - startTypecheck}ms`)
 })()
+
+function bagelFileToJsFile(module: string, bundle?: boolean): string {
+    return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + (bundle ? ".bundle" : "") + ".js")
+}
 
 
 // fs.readFile(entry).then(async code => {

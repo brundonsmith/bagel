@@ -5,7 +5,15 @@ import { DeepReadonly } from "./utils";
 export type Scope = {
     readonly parentScope?: Scope,
     readonly types: {[key: string]: TypeExpression},
-    readonly values: {[key: string]: TypeExpression|Expression},
+    readonly values: {[key: string]: DeclarationDescriptor},
+}
+
+export type Mutability = "all"|"properties-only"|"none";
+
+export type DeclarationDescriptor = {
+    mutability: Mutability,
+    declaredType: TypeExpression,
+    initialValue?: Expression,
 }
 
 export type ReadonlyScope = {
@@ -15,10 +23,10 @@ export type ReadonlyScope = {
 
 export class ModulesStore {
     readonly modules = new Map<string, Module>();
-    readonly scopeFor = new Map<ScopeOwner, Scope>();
-    readonly astTypes = new Map<AST, TypeExpression>();
+    readonly scopeFor = new WeakMap<AST, Scope>();
+    readonly astTypes = new WeakMap<AST, TypeExpression>();
 
-    getScopeFor(ast: ScopeOwner): DeepReadonly<Scope> {
+    getScopeFor(ast: AST): DeepReadonly<Scope> {
         const scope = this.scopeFor.get(ast);
 
         if (scope == null) {

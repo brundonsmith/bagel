@@ -1,82 +1,86 @@
-import { AST, Declaration, Expression, Func, LocalIdentifier, Module, Proc } from "./ast";
+import { AST, Expression, Func, Module, Proc } from "./ast";
+import { ModulesStore } from "./modules-store";
 
-export function compile(module: Module): string {
-    return module.declarations.map(compileOne).join("\n\n");
+export function compile(modulesStore: ModulesStore, module: Module): string {
+    return module.declarations.map(decl => compileOne(modulesStore, decl)).join("\n\n");
 }
 
-function compileOne(ast: AST): string {
+function compileOne(modulesStore: ModulesStore, ast: AST): string {
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
-            compileOne(name) + (alias ? ` as ${compileOne(alias)}` : ``)
-        ).join(", ")} } from ${compileOne(ast.path)};`;
+            compileOne(modulesStore, name) + (alias ? ` as ${compileOne(modulesStore, alias)}` : ``)
+        ).join(", ")} } from ${compileOne(modulesStore, ast.path)};`;
         case "type-declaration": return ``;
-        case "proc-declaration": return (ast.exported ? `export ` : ``) + compileProc(ast.proc);
-        case "func-declaration": return (ast.exported ? `export ` : ``) + compileFunc(ast.func);
-        case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(ast.name)} = ${compileOne(ast.value)};`;
-        case "proc": return compileProc(ast);
-        case "let-declaration": return `${compileOne(ast.name)} = ${compileOne(ast.value)}`;
-        case "assignment": return `${compileOne(ast.target)} = ${compileOne(ast.value)}`;
-        case "proc-call": return `${compileOne(ast.proc)}${ast.args.map(arg => `(${compileOne(arg)})`).join("")}`;
-        case "if-else-statement": return `if(${compileOne(ast.ifCondition)}) ${compileOne(ast.ifResult)}` 
-            + (ast.elseResult != null ? ` else ${compileOne(ast.elseResult)}` : ``);
-        case "for-loop": return `for (const ${compileOne(ast.itemIdentifier)} of ${compileOne(ast.iterator)}) ${compileOne(ast.body)}`;
-        case "while-loop": return `while (${compileOne(ast.condition)}) ${compileOne(ast.body)}`;
-        case "func": return compileFunc(ast);
-        case "funcall": return `${compileOne(ast.func)}${ast.args.map(arg => `(${compileOne(arg)})`).join("")}`;
-        case "pipe": return compilePipe(ast.expressions, ast.expressions.length - 1);
-        case "binary-operator": return `${compileOne(ast.left)} ${ast.operator} ${compileOne(ast.right)}`;
-        case "if-else-expression": return `(${compileOne(ast.ifCondition)}) ? (${compileOne(ast.ifResult)}) : (${ast.elseResult == null ? NIL : compileOne(ast.elseResult)})`;
+        case "proc-declaration": return (ast.exported ? `export ` : ``) + compileProc(modulesStore, ast.proc);
+        case "func-declaration": return (ast.exported ? `export ` : ``) + compileFunc(modulesStore, ast.func);
+        case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)};`;
+        case "proc": return compileProc(modulesStore, ast);
+        case "let-declaration": return `${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)}`;
+        case "assignment": return `${compileOne(modulesStore, ast.target)} = ${compileOne(modulesStore, ast.value)}`;
+        case "proc-call": return `${compileOne(modulesStore, ast.proc)}${ast.args.map(arg => `(${compileOne(modulesStore, arg)})`).join("")}`;
+        case "if-else-statement": return `if(${compileOne(modulesStore, ast.ifCondition)}) ${compileOne(modulesStore, ast.ifResult)}` 
+            + (ast.elseResult != null ? ` else ${compileOne(modulesStore, ast.elseResult)}` : ``);
+        case "for-loop": return `for (const ${compileOne(modulesStore, ast.itemIdentifier)} of ${compileOne(modulesStore, ast.iterator)}) ${compileOne(modulesStore, ast.body)}`;
+        case "while-loop": return `while (${compileOne(modulesStore, ast.condition)}) ${compileOne(modulesStore, ast.body)}`;
+        case "func": return compileFunc(modulesStore, ast);
+        case "funcall": return `${compileOne(modulesStore, ast.func)}${ast.args.map(arg => `(${compileOne(modulesStore, arg)})`).join("")}`;
+        case "pipe": return compilePipe(modulesStore, ast.expressions, ast.expressions.length - 1);
+        case "binary-operator": return `${compileOne(modulesStore, ast.left)} ${ast.operator} ${compileOne(modulesStore, ast.right)}`;
+        case "if-else-expression": return `(${compileOne(modulesStore, ast.ifCondition)}) ? (${compileOne(modulesStore, ast.ifResult)}) : (${ast.elseResult == null ? NIL : compileOne(modulesStore, ast.elseResult)})`;
         case "range": return `range(${ast.start})(${ast.end})`;
-        case "parenthesized-expression": return `(${compileOne(ast.inner)})`;
-        case "property-accessor": return `${compileOne(ast.base)}.${ast.properties.map(compileOne).join(".")}`;
-        case "local-identifier": return `${ast.name}`;
+        case "parenthesized-expression": return `(${compileOne(modulesStore, ast.inner)})`;
+        case "property-accessor": return `${compileOne(modulesStore, ast.base)}.${ast.properties.map(p => compileOne(modulesStore, p)).join(".")}`;
+        case "local-identifier": return modulesStore.getScopeFor(ast).values[ast.name].mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
         case "plain-identifier": return ast.name;
-        case "object-literal":  return `{ ${ast.entries.map(([ key, value ]) => `${compileOne(key)}: ${compileOne(value)}`).join(", ")} }`;
-        case "array-literal":   return `[${ast.entries.map(compileOne).join(", ")}]`;
+        case "object-literal":  return `{ ${ast.entries.map(([ key, value ]) => `${compileOne(modulesStore, key)}: ${compileOne(modulesStore, value)}`).join(", ")} }`;
+        case "array-literal":   return `[${ast.entries.map(e => compileOne(modulesStore, e)).join(", ")}]`;
         case "string-literal":  return `\`${ast.segments.map(segment =>
                                             typeof segment === "string"
                                                 ? segment
-                                                : '${' + compileOne(segment) + '}').join("")}\``;
+                                                : '${' + compileOne(modulesStore, segment) + '}').join("")}\``;
         case "number-literal":  return JSON.stringify(ast.value);
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
-        case "reaction": return `disposers.push(crowdx.reaction(() => ${compileOne(ast.data)}, (data) => ${compileOne(ast.effect)}(data)))`;
-        case "indexer": return `${compileOne(ast.base)}[${compileOne(ast.indexer)}]`;
-        case "block": return `{ ${ast.statements.map(compileOne).join(" ")} }`;
+        case "reaction": return `disposers.push(crowdx.reaction(() => ${compileOne(modulesStore, ast.data)}, (data) => ${compileOne(modulesStore, ast.effect)}(data)))`;
+        case "indexer": return `${compileOne(modulesStore, ast.base)}[${compileOne(modulesStore, ast.indexer)}]`;
+        case "block": return `{ ${ast.statements.map(s => compileOne(modulesStore, s)).join(" ")} }`;
     }
 
     throw Error("Couldn't compile '" + (ast as any).kind + "'");
 }
 
 const NIL = `undefined`;
+const LOCALS_OBJ = "___locals";
 
-export const LOCALS_OBJ = "__locals";
+function compileProc(modulesStore: ModulesStore, proc: Proc): string {
+    const mutableLocals = Object.entries(modulesStore.getScopeFor(proc.body).values)
+        .filter(e => e[1].mutability === "all");
 
-//.map(name => `${name}:{value:${name}}`)
-// let ${LOCALS_OBJ} = __locals.crowdx.observable(Object.create(${LOCALS_OBJ}, {${proc.argNames.map(compileOne).map(arg => `${arg}: {value: ${arg}}`).join(", ")}}));
-function compileProc(proc: Proc): string {
-    return `function ${proc.name == null ? '' : proc.name.name}(${proc.argNames[0] != null ? compileOne(proc.argNames[0]) : ''}) {${proc.argNames.length > 1 ? ` return (${proc.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(arg)}) => `).join("")}{\n` : ''}
-    const disposers = [];
+    return `function ${proc.name == null ? '' : proc.name.name}(${proc.argNames[0] != null ? compileOne(modulesStore, proc.argNames[0]) : ''}) {${proc.argNames.length > 1 ? ` return (${proc.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}) => `).join("")}{\n` : ''}
+    ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
+    `const ${LOCALS_OBJ} = ___observable({${
+        mutableLocals
+            .map(e => `${e[0]}: undefined`)
+            .join(",")
+    }});` : ``}
 
-    ${proc.body.statements.map(compileOne).join("; ")}
+    ${proc.body.statements.map(s => compileOne(modulesStore, s)).join(";\n")}
 
-    // disposers.forEach(crowdx.dispose);
 ${proc.argNames.length > 1 ? `});` : ''}}`;
 }
 // TODO: dispose of reactions somehow... at some point...
 
-// TODO: Don't pass __parent_locals to top-level declared functions/procs
-function compileFunc(func: Func): string {
-    return `function ${func.name == null ? '' : func.name.name}(${func.argNames[0] != null ? compileOne(func.argNames[0]) : ''}) { return (${func.argNames.map((arg, index, arr) => index === 0 ? '' : `(${compileOne(arg)}) => `).join("")}
-    ${compileOne(func.body)}
+function compileFunc(modulesStore: ModulesStore, func: Func): string {
+    return `function ${func.name == null ? '' : func.name.name}(${func.argNames[0] != null ? compileOne(modulesStore, func.argNames[0]) : ''}) { return (${func.argNames.map((arg, index, arr) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}) => `).join("")}
+    ${compileOne(modulesStore, func.body)}
 );}`;
 }
 
-function compilePipe(expressions: readonly Expression[], end: number): string {
+function compilePipe(modulesStore: ModulesStore, expressions: readonly Expression[], end: number): string {
     if (end === 0) {
-        return compileOne(expressions[end]);
+        return compileOne(modulesStore, expressions[end]);
     } else {
-        return `${compileOne(expressions[end])}(${compilePipe(expressions, end - 1)})`;
+        return `${compileOne(modulesStore, expressions[end])}(${compilePipe(modulesStore, expressions, end - 1)})`;
     }
 }
