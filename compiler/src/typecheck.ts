@@ -126,7 +126,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 return scope;
             };
             case "local-identifier": {
-                if (!scope.values.hasOwnProperty(ast.name)) {
+                if (scope.values[ast.name] == null) {
                     reportError(cannotFindName(ast));
                 }
 
@@ -198,6 +198,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 const procType = modulesStore.getTypeOf(ast.proc);
 
                 if (procType.kind !== "proc-type") {
+                    // console.log(procType)
                     reportError(miscError(ast.proc, `Expression must be a procedure to be called`));
                 } else {
                     const argValueTypes = ast.args.map(arg => modulesStore.getTypeOf(arg));
