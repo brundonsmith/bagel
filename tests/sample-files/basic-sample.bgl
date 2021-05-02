@@ -1,0 +1,14 @@
+
+func foo(x: number): number => 1234 + x
+
+
+const f: T = 123
+type T = number
+
+type Stuff = {
+    foo: number
+}
+
+const BAR: Stuff = {
+    foo: 12
+}

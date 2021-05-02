@@ -1,11 +1,11 @@
-import { promises as fs } from "fs";
+import { promises as fs, watchFile } from "fs";
 import path from "path";
 
 import { parse } from "./parse";
 import { ModulesStore } from "./modules-store";
 import { scopescan } from "./scopescan";
 import { typescan } from "./typescan";
-import { typecheck, errorMessage } from "./typecheck";
+import { typecheck, errorMessage, BagelTypeError } from "./typecheck";
 import { compile, LOCALS_OBJ } from "./compile";
 
 // @ts-ignore
@@ -13,10 +13,15 @@ import { compile, LOCALS_OBJ } from "./compile";
 
 const entry = path.resolve(__dirname, process.argv[2]);
 const output = process.argv[3] || path.resolve(path.dirname(entry), path.basename(entry).split(".")[0] + ".js");
+const watch = true;
 
 function canonicalModuleName(importerModule: string, relativePath: string) {
     const moduleDir = path.dirname(importerModule);
     return path.resolve(moduleDir, relativePath)
+}
+
+function printError(error: BagelTypeError) {
+    console.error(errorMessage(error));
 }
 
 (async function() {
@@ -38,7 +43,7 @@ function canonicalModuleName(importerModule: string, relativePath: string) {
         
             const startParse = Date.now();
             const parsed = parse(fileContents.toString());
-            timeSpentParsing += startParse - Date.now();
+            timeSpentParsing += Date.now() - startParse;
 
             for (const declaration of parsed.declarations) {
                 if (declaration.kind === "import-declaration") {
@@ -65,9 +70,38 @@ function canonicalModuleName(importerModule: string, relativePath: string) {
 
     // typecheck all parsed modules
     for (const [_, ast] of modulesStore.modules) {
-        typecheck(modulesStore, ast, error => console.error(errorMessage(error)));
+        typecheck(modulesStore, ast, printError);
     }
     const endTypecheck = Date.now();
+
+
+    if (watch) {
+        for (const module of modulesStore.modules.keys()) {
+            watchFile(module, async (curr, prev) => {
+                console.log("Typechecking...")
+                const fileContents = await fs.readFile(module);
+                const parsed = parse(fileContents.toString());
+                modulesStore.modules.set(module, parsed);
+                // TODO: Garbage-collect old AST
+
+                scopescan(modulesStore, parsed);
+                typescan(modulesStore, parsed);
+
+                // console.log(modulesStore.getScopeFor(parsed).types)
+                // console.log(modulesStore.getScopeFor(parsed).values)
+
+                let hadError = false;
+                typecheck(modulesStore, parsed, err => {
+                    hadError = true;
+                    printError(err)
+                });
+
+                if (!hadError) {
+                    console.log("No errors")
+                }
+            })
+        }
+    }
 
 
     // compile to JS
@@ -79,6 +113,7 @@ function canonicalModuleName(importerModule: string, relativePath: string) {
     console.log(`Spent ${timeSpentParsing}ms parsing`)
     console.log(`Typechecked in ${endTypecheck - startTypecheck}ms`)
 })()
+
 
 // fs.readFile(entry).then(async code => {
 //     const parsed = parse(code.toString());
