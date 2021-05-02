@@ -9,6 +9,16 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
             case "block": {
                 return modulesStore.getScopeFor(ast);
             };
+            case "const-declaration": {
+                const constType = ast.type;
+                const valueType = modulesStore.getTypeOf(ast.value);
+
+                if (!subsumes(scope, constType, valueType)) {
+                    reportError(assignmentError(ast.value, constType, valueType));
+                }
+
+                return scope;
+            };
             case "func": {
                 const funcScope = modulesStore.getScopeFor(ast);
                 const bodyType = modulesStore.getTypeOf(ast.body);
@@ -258,7 +268,7 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
         }
     } else if (resolvedValue.kind === "union-type") {
         return false;
-    } else if(deepEquals(resolvedDestination, resolvedValue)) {
+    } else if(deepEquals(resolvedDestination, resolvedValue, ["code", "startIndex", "endIndex"])) {
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
             // NOTE: Value and destination are flipped on purpose for args!
@@ -273,7 +283,7 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
         return subsumes(scope, resolvedDestination.element, resolvedValue.element)
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
         return resolvedDestination.entries.every(([key, destinationValue]) => 
-            given(resolvedValue.entries.find(e => deepEquals(e[0], key))?.[1], value => subsumes(scope, destinationValue, value)));
+            given(resolvedValue.entries.find(e => deepEquals(e[0], key, ["code", "startIndex", "endIndex"]))?.[1], value => subsumes(scope, destinationValue, value)));
     } else if (resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") {
         return subsumes(scope, resolvedDestination.itemType, resolvedValue.itemType);
     }
