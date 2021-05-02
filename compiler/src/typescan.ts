@@ -118,7 +118,9 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
         case "local-identifier": {
             const localTypeOrExpression = scope.values[ast.name];
 
-            if (isExpression(localTypeOrExpression as any)) {
+            if (localTypeOrExpression == null) {
+                return UNKNOWN_TYPE;
+            } else if (isExpression(localTypeOrExpression as any)) {
                 return determineType(modulesStore, localTypeOrExpression as Expression, scope);
             } else {
                 return localTypeOrExpression as TypeExpression;
