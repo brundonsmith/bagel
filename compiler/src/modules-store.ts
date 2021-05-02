@@ -1,4 +1,5 @@
 import { AST, Block, Expression, Func, Module, Proc, TypeExpression } from "./ast";
+import { ScopeOwner } from "./scopescan";
 import { DeepReadonly } from "./utils";
 
 export type Scope = {
@@ -14,10 +15,10 @@ export type ReadonlyScope = {
 
 export class ModulesStore {
     readonly modules = new Map<string, Module>();
-    readonly scopeFor = new Map<Module|Func|Proc|Block, Scope>();
+    readonly scopeFor = new Map<ScopeOwner, Scope>();
     readonly astTypes = new Map<AST, TypeExpression>();
 
-    getScopeFor(ast: Module|Func|Proc|Block): DeepReadonly<Scope> {
+    getScopeFor(ast: ScopeOwner): DeepReadonly<Scope> {
         const scope = this.scopeFor.get(ast);
 
         if (scope == null) {

@@ -1,4 +1,4 @@
-import { AST, Block, Expression, Func, Module, Proc, TypeExpression, UNKNOWN_TYPE } from "./ast";
+import { AST, Block, Expression, ForLoop, Func, Module, NUMBER_TYPE, Proc, TypeExpression, UNKNOWN_TYPE } from "./ast";
 import { ModulesStore, Scope } from "./modules-store";
 import { walkParseTree } from "./utils";
 
@@ -8,16 +8,21 @@ export function scopescan(modulesStore: ModulesStore, ast: AST) {
             case "module":
             case "func":
             case "proc":
-            case "block": {
+            case "block":
+            case "for-loop": {
                 const scope = scopeFrom(ast, payload);
                 modulesStore.scopeFor.set(ast, scope);
                 return scope;
             }
         }
+
+        return payload;
     });
 }
 
-export function scopeFrom(ast: Module|Func|Proc|Block, parentScope?: Scope): Scope {
+export type ScopeOwner = Module|Func|Proc|Block|ForLoop;
+
+export function scopeFrom(ast: ScopeOwner, parentScope?: Scope): Scope {
     const scope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {} };
 
     switch (ast.kind) {
@@ -53,6 +58,9 @@ export function scopeFrom(ast: Module|Func|Proc|Block, parentScope?: Scope): Sco
                 }
             }
             break;
+        case "for-loop":
+            scope.values[ast.itemIdentifier.name] = NUMBER_TYPE; // TODO: ast.iterator;
+            break;
     }
 
     return scope;
@@ -60,8 +68,8 @@ export function scopeFrom(ast: Module|Func|Proc|Block, parentScope?: Scope): Sco
 
 export function extendScope(scope: Scope): Scope {
     return {
-        types: Object.create(scope.types, {}),
-        values: Object.create(scope.values, {}),
+        types: Object.create(scope.types),
+        values: Object.create(scope.values),
     }
 }
 
