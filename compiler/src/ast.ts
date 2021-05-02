@@ -144,6 +144,7 @@ export type TypeExpression =
     | IteratorType
     | PromiseType
     | UnknownType
+    | JavascriptEscapeType
 
 export type UnionType = {
     kind: "union-type",
@@ -234,6 +235,10 @@ export type UnknownType = {
     kind: "unknown-type",
 }
 
+export type JavascriptEscapeType = {
+    kind: "javascript-escape-type",
+}
+
 export const STRING_TYPE: StringType = {
     kind: "string-type"
 }
@@ -248,6 +253,9 @@ export const NIL_TYPE: NilType = {
 }
 export const UNKNOWN_TYPE: UnknownType = {
     kind: "unknown-type"
+}
+export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
+    kind: "javascript-escape-type"
 }
 export const ITERATOR_OF_NUMBERS_TYPE: IteratorType = {
     kind: "iterator-type",

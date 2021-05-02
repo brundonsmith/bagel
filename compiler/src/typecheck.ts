@@ -287,6 +287,8 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
             given(resolvedValue.entries.find(e => deepEquals(e[0], key, ["code", "startIndex", "endIndex"]))?.[1], value => subsumes(scope, destinationValue, value)));
     } else if (resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") {
         return subsumes(scope, resolvedDestination.itemType, resolvedValue.itemType);
+    } else if (resolvedValue.kind === "javascript-escape-type") {
+        return true;
     }
 
     return false;
@@ -344,6 +346,7 @@ function serialize(typeExpression: TypeExpression): string {
         case "iterator-type": return `Iterator<${typeExpression.itemType}>`;
         case "promise-type": return `Promise<${typeExpression.resultType}>`;
         case "unknown-type": return "unknown";
+        case "javascript-escape-type": return "#js#"
     }
 }
 

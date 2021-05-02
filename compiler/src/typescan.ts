@@ -1,4 +1,4 @@
-import { BinaryOp, BOOLEAN_TYPE, Expression, isExpression, ITERATOR_OF_NUMBERS_TYPE, Module, NIL_TYPE, NUMBER_TYPE, PlainIdentifier, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "./ast";
+import { BinaryOp, BOOLEAN_TYPE, Expression, isExpression, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Module, NIL_TYPE, NUMBER_TYPE, PlainIdentifier, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "./ast";
 import { ModulesStore, Scope } from "./modules-store";
 import { subsumes } from "./typecheck";
 import { deepEquals, DeepReadonly, walkParseTree } from "./utils";
@@ -156,7 +156,7 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
         case "number-literal": return NUMBER_TYPE;
         case "boolean-literal": return BOOLEAN_TYPE;
         case "nil-literal": return NIL_TYPE;
-        case "javascript-escape": return UNKNOWN_TYPE;
+        case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
     }
 }
 
