@@ -144,6 +144,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.effect, fn);
         } break;
         case "let-declaration": {
+            walkParseTree(nextPayload, ast.name, fn);
             walkParseTree(nextPayload, ast.value, fn);
         } break;
         case "assignment": {
