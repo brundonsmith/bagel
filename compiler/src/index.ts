@@ -1,7 +1,7 @@
 import { promises as fs, watchFile } from "fs";
 import path from "path";
 
-import { build } from "esbuild";
+import { build, BuildOptions } from "esbuild";
 
 import { parse } from "./parse";
 import { ModulesStore } from "./modules-store";
@@ -23,9 +23,9 @@ function printError(error: BagelTypeError) {
 }
 
 (async function() {
-    const entry = path.resolve(__dirname, process.argv[2]);
+    const entry = path.resolve(process.cwd(), process.argv[2]);
     const outDir = process.argv[3] || path.dirname(entry);
-    const bundle = false;
+    const bundle = true;
     const watch = true;
     
     const modulesStore = new ModulesStore();
@@ -84,14 +84,16 @@ function printError(error: BagelTypeError) {
         const compiled = compile(modulesStore, ast);
         const compiledWithLib = `
             import { observable as ___observable } from "./crowdx";
-            import { range } from "./lib";` + compiled + (module === entry ? 'main();' : '');
+            import { range } from "./lib";
+        ` + compiled + (module === entry ? '\nmain();' : '');
         return fs.writeFile(jsPath, compiledWithLib);
     }))
 
     if (bundle) {
         await build({
-            entryPoints: [ entry ],
-            outfile: bagelFileToJsFile(entry, true)
+            entryPoints: [ bagelFileToJsFile(entry) ],
+            outfile: bagelFileToJsFile(entry, true),
+            bundle: true,
         })
     }
     
@@ -132,14 +134,16 @@ function printError(error: BagelTypeError) {
                 const compiled = compile(modulesStore, parsed);
                 const compiledWithLib = `
                     import { observable as ___observable } from "./crowdx";
-                    import { range } from "./lib";` + compiled;
+                    import { range } from "./lib";
+                ` + compiled;
                 await fs.writeFile(jsPath, compiledWithLib);
 
                 
                 if (bundle) {
                     await build({
-                        entryPoints: [ entry ],
-                        outfile: bagelFileToJsFile(entry, true)
+                        entryPoints: [ bagelFileToJsFile(entry) ],
+                        outfile: bagelFileToJsFile(entry, true),
+                        bundle: true,
                     })
                 }
             })

@@ -10,7 +10,7 @@
   "description": "",
   "name": "bagel-compiler",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --outfile=../build/compiler.js",
-    "watch": "esbuild src/index.ts --bundle --platform=node --outfile=../build/compiler.js --watch"
+    "build": "esbuild src/index.ts --bundle --platform=node --outfile=../build/compiler.js --external:esbuild",
+    "watch": "esbuild src/index.ts --bundle --platform=node --outfile=../build/compiler.js --external:esbuild --watch"
   }
 }

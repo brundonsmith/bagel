@@ -10,8 +10,8 @@
     "description": "Bagel programming language",
     "name": "bagel",
     "scripts": {
-        "build": "cd compiler && npm run build && cd ../ && cd lib && npm run build",
-        "build-and-run": "cd compiler && npm run build && cd ../ && cd lib && npm run build && cd ../ && node build/compiler.js",
+        "build": "cd compiler && npm run build && cd ../",
+        "build-and-run": "cd compiler && npm run build && cd ../ && node build/compiler.js",
         "test": "cd tests && npm run build-and-run"
     },
     "dependencies": {
