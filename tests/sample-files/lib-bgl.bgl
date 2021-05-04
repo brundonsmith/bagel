@@ -1,0 +1,9 @@
+
+export proc logp(x: string|number|boolean|nil) {
+    js# console.log(x) #js
+}
+
+export func logf(x: string|number|boolean|nil): string => 
+    js# (() => { console.log(x); return x })() #js
+
+export func add(a: number, b: number): number => a + b

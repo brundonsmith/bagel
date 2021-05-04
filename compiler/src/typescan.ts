@@ -10,7 +10,7 @@ export function typescan(modulesStore: ModulesStore, ast: Module): void {
             modulesStore.astTypes.set(ast, type);
         }
 
-        return modulesStore.scopeFor.get(ast as any) ?? scope;
+        return modulesStore.scopeFor.get(ast) ?? scope;
     });
 }
 

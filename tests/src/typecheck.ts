@@ -1,6 +1,7 @@
 import { NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../../compiler/src/ast";
 import { ModulesStore } from "../../compiler/src/modules-store";
 import { parse } from "../../compiler/src/parse";
+import { given } from "../../compiler/src/parsing-utils";
 import { scopescan } from "../../compiler/src/scopescan";
 import { typecheck, BagelTypeError, errorMessage } from "../../compiler/src/typecheck";
 import { typescan } from "../../compiler/src/typescan";
@@ -22,19 +23,19 @@ test(function typeDeclarations() {
             kind: "array-type",
             element: STRING_TYPE,
         }])
-        ?? testTypecheck(`type Stuff = { foo: Bar, foo2: Blah }`, [{
+        ?? given(`type Stuff = { foo: Bar, foo2: Blah }`, code => testTypecheck(code, [{
             kind: "object-type",
             entries: [
                 [
-                    { kind: "plain-identifier", name: "foo" },
-                    { kind: "named-type", name: { kind: "plain-identifier", name: "Bar" } },
+                    { kind: "plain-identifier", name: "foo", code, startIndex: 15, endIndex: 18 },
+                    { kind: "named-type", name: { kind: "plain-identifier", name: "Bar", code, startIndex: 20, endIndex: 23 } },
                 ],
                 [
-                    { kind: "plain-identifier", name: "foo2" },
-                    { kind: "named-type", name: { kind: "plain-identifier", name: "Blah" } },
+                    { kind: "plain-identifier", name: "foo2", code, startIndex: 25, endIndex: 28 },
+                    { kind: "named-type", name: { kind: "plain-identifier", name: "Blah", code, startIndex: 30, endIndex: 34 } },
                 ]
             ],
-        }])
+        }]))
 })
 
 test(function constDeclarationsInference() {

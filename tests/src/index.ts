@@ -1,4 +1,4 @@
 
 import "./utils";
 import "./parse";
-import "./typecheck";
+// import "./typecheck";

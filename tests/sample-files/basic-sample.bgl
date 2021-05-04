@@ -1,5 +1,7 @@
 
-func foo(x: number): number => 1234 + x
+from './lib-bgl' import { logp, add }
+
+func foo(x: number): number => add(1234, x)
 
 
 const f: T = 123
@@ -11,4 +13,16 @@ type Stuff = {
 
 const BAR: Stuff = {
     foo: 12
+}
+
+proc main() {
+    let a: string = '12';
+
+    for (num of 0..10) {
+        logp(foo(12, num));
+    }
+
+    if (3 > 4) {
+        logp(123);
+    }
 }

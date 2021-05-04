@@ -1,11 +1,18 @@
 
-func mergeSort(arr) =>
-    merge(
-        mergeSort(arr |> slice(0, floor(arr.length / 2))),
-        mergeSort(arr |> slice(floor(arr.length / 2), nil))
-    )
 
-func merge(arr1, arr2) =>
+func foo() => '1234'
+
+export func mergeSort(arr: number[]): number[] =>
+    if (arr.length <= 1) {
+        arr
+    } else {
+        merge(
+            mergeSort(arr |> slice(0, floor(arr.length / 2)) |> arrayFrom),
+            mergeSort(arr |> slice(floor(arr.length / 2), nil) |> arrayFrom)
+        )
+    }
+
+func merge(arr1: number[], arr2: number[]): number[] =>
     if (arr1.length == 0) {
         arr2
     } else {
@@ -13,9 +20,20 @@ func merge(arr1, arr2) =>
             arr1
         } else {
             if (arr1[0] <= arr2[0]) {
-                concat([ arr1[0] ], merge(arr1 |> slice(1, nil), arr2))
+                concat([ arr1[0] ], merge(arr1 |> slice(1, nil) |> arrayFrom, arr2)) |> arrayFrom
             } else {
-                concat([ arr2[0] ], merge(arr1, arr2 |> slice(1, nil)))
+                concat([ arr2[0] ], merge(arr1, arr2 |> slice(1, nil) |> arrayFrom)) |> arrayFrom
             }
         }
     }
+
+const sorted = mergeSort([4, 2, 7, 5, 1])
+
+proc doStuff(a, b) {
+    console.log(a + b);
+}
+
+proc main() {
+    console.log(sorted);
+}
+

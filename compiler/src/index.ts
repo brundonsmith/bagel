@@ -5,18 +5,10 @@ import { build, BuildOptions } from "esbuild";
 
 import { parse } from "./parse";
 import { ModulesStore } from "./modules-store";
-import { scopescan } from "./scopescan";
+import { canonicalModuleName, scopescan } from "./scopescan";
 import { typescan } from "./typescan";
 import { typecheck, errorMessage, BagelTypeError } from "./typecheck";
 import { compile } from "./compile";
-
-// @ts-ignore
-// window.parse = parse;
-
-function canonicalModuleName(importerModule: string, relativePath: string) {
-    const moduleDir = path.dirname(importerModule);
-    return path.resolve(moduleDir, relativePath)
-}
 
 function printError(error: BagelTypeError) {
     console.error(errorMessage(error));
@@ -41,6 +33,7 @@ function printError(error: BagelTypeError) {
         doneModules.add(module);
     
         if (!modulesStore.modules.has(module)) {
+            // console.log("parsing", module)
         
             const fileContents = await fs.readFile(module);
         
@@ -50,7 +43,7 @@ function printError(error: BagelTypeError) {
 
             for (const declaration of parsed.declarations) {
                 if (declaration.kind === "import-declaration") {
-                    const importedModule = canonicalModuleName(module, declaration.path.segments.join(""));
+                    const importedModule = canonicalModuleName(module, declaration.path);
                     allModules.add(importedModule);
                 }
             }
@@ -62,8 +55,8 @@ function printError(error: BagelTypeError) {
 
     const startTypecheck = Date.now();
     // scopescan all parsed modules
-    for (const [_, ast] of modulesStore.modules) {
-        scopescan(modulesStore, ast);
+    for (const [module, ast] of modulesStore.modules) {
+        scopescan(modulesStore, ast, module);
     }
 
     // typescan all parsed modules
@@ -112,7 +105,7 @@ function printError(error: BagelTypeError) {
                 const parsed = parse(fileContents.toString());
                 modulesStore.modules.set(module, parsed);
 
-                scopescan(modulesStore, parsed);
+                scopescan(modulesStore, parsed, module);
                 typescan(modulesStore, parsed);
 
                 // console.log(JSON.stringify(parsed, null, 2))

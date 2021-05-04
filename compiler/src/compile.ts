@@ -9,7 +9,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(modulesStore, name) + (alias ? ` as ${compileOne(modulesStore, alias)}` : ``)
-        ).join(", ")} } from ${compileOne(modulesStore, ast.path)};`;
+        ).join(", ")} } from "${ast.path.segments.join("")}";`;
         case "type-declaration": return ``;
         case "proc-declaration": return (ast.exported ? `export ` : ``) + compileProc(modulesStore, ast.proc);
         case "func-declaration": return (ast.exported ? `export ` : ``) + compileFunc(modulesStore, ast.func);
