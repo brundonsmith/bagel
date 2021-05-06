@@ -1,7 +1,7 @@
 import { AST, LocalIdentifier, Module, PlainIdentifier, Proc, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, REACTION_DATA_TYPE, REACTION_EFFECT_TYPE } from "./ast";
 import { ModulesStore, Scope } from "./modules-store";
 import { lineAndColumn } from "./parsing-utils";
-import { deepEquals, DeepReadonly, given, walkParseTree } from "./utils";
+import { deepEquals, DeepReadonly, given, walkParseTree, sOrNone, wasOrWere } from "./utils";
 
 export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: (error: BagelTypeError) => void) {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
@@ -61,9 +61,10 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
 
                 if (funcType.kind !== "func-type") {
                     reportError(miscError(ast, "Expression must be a function to be called"));
+                } else if (funcType.argTypes.length < ast.args.length) {
+                    reportError(miscError(ast, `Function only takes ${funcType.argTypes.length} argument${sOrNone(funcType.argTypes.length)}, but ${ast.args.length} ${wasOrWere(ast.args.length)} supplied`));
                 } else {
                     // TODO: infer what types arguments are allowed to be based on function body
-
                     const argValueTypes = ast.args.map(arg => modulesStore.getTypeOf(arg));
 
                     for (let index = 0; index < argValueTypes.length; index++) {
@@ -205,6 +206,8 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 if (procType.kind !== "proc-type") {
                     // console.log(procType)
                     reportError(miscError(ast.proc, `Expression must be a procedure to be called`));
+                } else if (procType.argTypes.length < ast.args.length) {
+                    reportError(miscError(ast, `Function only takes ${procType.argTypes.length} argument${sOrNone(procType.argTypes.length)}, but ${ast.args.length} ${wasOrWere(ast.args.length)} supplied`));
                 } else {
                     const argValueTypes = ast.args.map(arg => modulesStore.getTypeOf(arg));
     

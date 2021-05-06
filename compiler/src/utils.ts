@@ -185,3 +185,10 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             break;
     }
 }
+
+export function sOrNone(num: number): string {
+    return num > 1 ? 's' : '';
+}
+export function wasOrWere(num: number): string {
+    return num > 1 ? 'were' : 'was';
+}
