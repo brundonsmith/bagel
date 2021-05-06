@@ -17,13 +17,13 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "proc": return compileProc(modulesStore, ast);
         case "let-declaration": return `${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)}`;
         case "assignment": return `${compileOne(modulesStore, ast.target)} = ${compileOne(modulesStore, ast.value)}`;
-        case "proc-call": return `${compileOne(modulesStore, ast.proc)}${ast.args.map(arg => `(${compileOne(modulesStore, arg)})`).join("")}`;
+        case "proc-call": return `${compileOne(modulesStore, ast.proc)}${ast.args.map(arg => `(${compileOne(modulesStore, arg)})`).join("") || "()"};`;
         case "if-else-statement": return `if(${compileOne(modulesStore, ast.ifCondition)}) ${compileOne(modulesStore, ast.ifResult)}` 
             + (ast.elseResult != null ? ` else ${compileOne(modulesStore, ast.elseResult)}` : ``);
         case "for-loop": return `for (const ${compileOne(modulesStore, ast.itemIdentifier)} of ${compileOne(modulesStore, ast.iterator)}) ${compileOne(modulesStore, ast.body)}`;
         case "while-loop": return `while (${compileOne(modulesStore, ast.condition)}) ${compileOne(modulesStore, ast.body)}`;
         case "func": return compileFunc(modulesStore, ast);
-        case "funcall": return `${compileOne(modulesStore, ast.func)}${ast.args.map(arg => `(${compileOne(modulesStore, arg)})`).join("")}`;
+        case "funcall": return `${compileOne(modulesStore, ast.func)}${ast.args.map(arg => `(${compileOne(modulesStore, arg)})`).join("") || "()"}`;
         case "pipe": return compilePipe(modulesStore, ast.expressions, ast.expressions.length - 1);
         case "binary-operator": return `${compileOne(modulesStore, ast.left)} ${ast.operator} ${compileOne(modulesStore, ast.right)}`;
         case "if-else-expression": return `(${compileOne(modulesStore, ast.ifCondition)}) ? (${compileOne(modulesStore, ast.ifResult)}) : (${ast.elseResult == null ? NIL : compileOne(modulesStore, ast.elseResult)})`;
