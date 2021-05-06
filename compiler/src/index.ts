@@ -83,11 +83,15 @@ function printError(error: BagelTypeError) {
     }))
 
     if (bundle) {
-        await build({
-            entryPoints: [ bagelFileToJsFile(entry) ],
-            outfile: bagelFileToJsFile(entry, true),
-            bundle: true,
-        })
+        try {
+            await build({
+                entryPoints: [ bagelFileToJsFile(entry) ],
+                outfile: bagelFileToJsFile(entry, true),
+                bundle: true,
+            })
+        } catch(err) {
+            console.error(err.message);
+        }
     }
     
 
@@ -133,11 +137,15 @@ function printError(error: BagelTypeError) {
 
                 
                 if (bundle) {
-                    await build({
-                        entryPoints: [ bagelFileToJsFile(entry) ],
-                        outfile: bagelFileToJsFile(entry, true),
-                        bundle: true,
-                    })
+                    try {
+                        await build({
+                            entryPoints: [ bagelFileToJsFile(entry) ],
+                            outfile: bagelFileToJsFile(entry, true),
+                            bundle: true,
+                        })
+                    } catch(err) {
+                        console.error(err.message);
+                    }
                 }
             })
         }
