@@ -203,8 +203,11 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
             case "proc-call": {
                 const procType = modulesStore.getTypeOf(ast.proc);
 
+                // TODO: Proc call has to finish applying arguments to be valid; 
+                // partial-application of a proc would actually be an 
+                // expression (oh boy)
+
                 if (procType.kind !== "proc-type") {
-                    // console.log(procType)
                     reportError(miscError(ast.proc, `Expression must be a procedure to be called`));
                 } else if (procType.argTypes.length < ast.args.length) {
                     reportError(miscError(ast, `Function only takes ${procType.argTypes.length} argument${sOrNone(procType.argTypes.length)}, but ${ast.args.length} ${wasOrWere(ast.args.length)} supplied`));
@@ -260,9 +263,9 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
 
     if (resolvedDestination == null || resolvedValue == null) {
         return false;
-    }
-
-    if (resolvedDestination.kind === "unknown-type") {
+    } else if (resolvedValue.kind === "javascript-escape-type") {
+        return true;
+    } else if (resolvedDestination.kind === "unknown-type") {
         return true;
     } else if(resolvedValue.kind === "unknown-type") {
         return false;
@@ -295,8 +298,6 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
             given(resolvedValue.entries.find(e => deepEquals(e[0], key, ["code", "startIndex", "endIndex"]))?.[1], value => subsumes(scope, destinationValue, value)));
     } else if (resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") {
         return subsumes(scope, resolvedDestination.itemType, resolvedValue.itemType);
-    } else if (resolvedValue.kind === "javascript-escape-type") {
-        return true;
     }
 
     return false;
@@ -351,10 +352,10 @@ function serialize(typeExpression: TypeExpression): string {
         case "nil-type": return `nil`;
         case "literal-type": return String(typeExpression.value);
         case "nominal-type": return typeExpression.name;
-        case "iterator-type": return `Iterator<${typeExpression.itemType}>`;
-        case "promise-type": return `Promise<${typeExpression.resultType}>`;
+        case "iterator-type": return `Iterator<${serialize(typeExpression.itemType)}>`;
+        case "promise-type": return `Promise<${serialize(typeExpression.resultType)}>`;
         case "unknown-type": return "unknown";
-        case "javascript-escape-type": return "#js#"
+        case "javascript-escape-type": return "<js escape>"
     }
 }
 

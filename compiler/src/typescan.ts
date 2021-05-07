@@ -1,4 +1,4 @@
-import { BinaryOp, BOOLEAN_TYPE, Expression, isExpression, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Module, NIL_TYPE, NUMBER_TYPE, PlainIdentifier, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "./ast";
+import { BinaryOp, BOOLEAN_TYPE, Expression, isExpression, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Module, NIL_TYPE, NUMBER_TYPE, PlainIdentifier, STRING_TYPE, TypeExpression, UNKNOWN_TYPE, FuncType } from "./ast";
 import { ModulesStore, Scope } from "./modules-store";
 import { subsumes } from "./typecheck";
 import { deepEquals, DeepReadonly, walkParseTree } from "./utils";
@@ -28,7 +28,7 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
             }
         };
         case "pipe": {
-            return determineType(modulesStore, ast.expressions[ast.expressions.length - 1], scope);
+            return (determineType(modulesStore, ast.expressions[ast.expressions.length - 1], scope) as FuncType).returnType;
         };
         case "binary-operator": {
             const leftType = determineType(modulesStore, ast.left, scope);

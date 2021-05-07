@@ -2,7 +2,9 @@ import { AST, Expression, Func, Module, Proc } from "./ast";
 import { ModulesStore } from "./modules-store";
 
 export function compile(modulesStore: ModulesStore, module: Module): string {
-    return module.declarations.map(decl => compileOne(modulesStore, decl)).join("\n\n");
+    return module.declarations
+        .filter(declaration => declaration.kind !== "type-declaration")
+        .map(decl => compileOne(modulesStore, decl)).join("\n\n");
 }
 
 function compileOne(modulesStore: ModulesStore, ast: AST): string {
@@ -27,7 +29,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "pipe": return compilePipe(modulesStore, ast.expressions, ast.expressions.length - 1);
         case "binary-operator": return `${compileOne(modulesStore, ast.left)} ${ast.operator} ${compileOne(modulesStore, ast.right)}`;
         case "if-else-expression": return `(${compileOne(modulesStore, ast.ifCondition)}) ? (${compileOne(modulesStore, ast.ifResult)}) : (${ast.elseResult == null ? NIL : compileOne(modulesStore, ast.elseResult)})`;
-        case "range": return `range(${ast.start})(${ast.end})`;
+        case "range": return `___range(${ast.start})(${ast.end})`;
         case "parenthesized-expression": return `(${compileOne(modulesStore, ast.inner)})`;
         case "property-accessor": return `${compileOne(modulesStore, ast.base)}.${ast.properties.map(p => compileOne(modulesStore, p)).join(".")}`;
         case "local-identifier": return modulesStore.getScopeFor(ast).values[ast.name].mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;

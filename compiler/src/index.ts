@@ -75,10 +75,7 @@ function printError(error: BagelTypeError) {
         // TODO: use specified outDir
         const jsPath = bagelFileToJsFile(module);
         const compiled = compile(modulesStore, ast);
-        const compiledWithLib = `
-            import { observable as ___observable } from "./crowdx";
-            import { range } from "./lib";
-        ` + compiled + (module === entry ? '\nmain();' : '');
+        const compiledWithLib = LIB_IMPORTS + compiled + (module === entry ? '\nmain();' : '');
         return fs.writeFile(jsPath, compiledWithLib);
     }))
 
@@ -129,10 +126,7 @@ function printError(error: BagelTypeError) {
                 
                 const jsPath = bagelFileToJsFile(module);
                 const compiled = compile(modulesStore, parsed);
-                const compiledWithLib = `
-                    import { observable as ___observable } from "./crowdx";
-                    import { range } from "./lib";
-                ` + compiled;
+                const compiledWithLib = LIB_IMPORTS + compiled;
                 await fs.writeFile(jsPath, compiledWithLib);
 
                 
@@ -152,6 +146,12 @@ function printError(error: BagelTypeError) {
     }
 
 })()
+
+const LIB_IMPORTS = `
+import { observable as ___observable } from "./crowdx";
+import { range as ___range } from "./lib";
+
+`
 
 function bagelFileToJsFile(module: string, bundle?: boolean): string {
     return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + (bundle ? ".bundle" : "") + ".js")
