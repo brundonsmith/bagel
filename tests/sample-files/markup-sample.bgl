@@ -1,0 +1,14 @@
+
+from './lib-bgl' import { logp }
+
+func greet(name: string): string => 'Hello, ${name}!'
+
+const foo: string =
+    <div>
+        <h1>{greet('Brandon')}</h1>
+    </div>
+
+
+proc main() {
+    logp(foo);
+}

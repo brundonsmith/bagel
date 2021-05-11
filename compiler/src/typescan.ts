@@ -128,6 +128,13 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
                 return UNKNOWN_TYPE;
             }
         };
+        case "element-tag": {
+            return {
+                kind: "element-type",
+                tagName: ast.tagName,
+                attributes: ast.attributes
+            };
+        };
         case "object-literal": {
             const entries = ast.entries.map(([key, value]) => 
                 [key, determineType(modulesStore, value, scope)] as [PlainIdentifier, TypeExpression]);

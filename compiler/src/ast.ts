@@ -131,6 +131,7 @@ export type TypeExpression =
     | NamedType
     | ProcType
     | FuncType
+    | ElementType
     | ObjectType
     | IndexerType
     | ArrayType
@@ -165,6 +166,12 @@ export type FuncType = {
     kind: "func-type",
     argTypes: TypeExpression[],
     returnType: TypeExpression,
+}
+
+export type ElementType = {
+    kind: "element-type",
+    tagName: PlainIdentifier,
+    attributes: [PlainIdentifier, Expression][],
 }
 
 export type ObjectType = {
@@ -295,6 +302,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "parenthesized-expression": undefined,
     "property-accessor": undefined,
     "local-identifier": undefined,
+    "element-tag": undefined,
     "object-literal": undefined,
     "array-literal": undefined,
     "string-literal": undefined,
@@ -321,6 +329,7 @@ export type Expression =
     | ParenthesizedExpression
     | PropertyAccessor
     | LocalIdentifier
+    | ElementTag
     | ObjectLiteral
     | ArrayLiteral
     | StringLiteral
@@ -398,6 +407,13 @@ export type PropertyAccessor = SourceInfo & {
 export type LocalIdentifier = SourceInfo & {
     kind: "local-identifier",
     name: string,
+}
+
+export type ElementTag = SourceInfo & {
+    kind: "element-tag",
+    tagName: PlainIdentifier,
+    attributes: [PlainIdentifier, Expression][],
+    children: Expression[],
 }
 
 export type ObjectLiteral = SourceInfo & {

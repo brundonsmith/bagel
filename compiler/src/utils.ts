@@ -102,6 +102,15 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
                 walkParseTree(nextPayload, arg, fn);
             }
         } break;
+        case "element-tag": {
+            for (const [name, value] of ast.attributes) {
+                walkParseTree(nextPayload, name, fn);
+                walkParseTree(nextPayload, value, fn);
+            }
+            for (const child of ast.children) {
+                walkParseTree(nextPayload, child, fn);
+            }
+        } break;
         case "indexer": {
             walkParseTree(nextPayload, ast.base, fn);
             walkParseTree(nextPayload, ast.indexer, fn);

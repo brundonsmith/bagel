@@ -355,7 +355,8 @@ function serialize(typeExpression: TypeExpression): string {
         case "iterator-type": return `Iterator<${serialize(typeExpression.itemType)}>`;
         case "promise-type": return `Promise<${serialize(typeExpression.resultType)}>`;
         case "unknown-type": return "unknown";
-        case "javascript-escape-type": return "<js escape>"
+        case "element-type": return `<${typeExpression.tagName}>`;
+        case "javascript-escape-type": return "<js escape>";
     }
 }
 

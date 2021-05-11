@@ -1,4 +1,4 @@
-import { AST, Expression, Func, Module, Proc } from "./ast";
+import { AST, Expression, Func, Module, Proc, PlainIdentifier } from "./ast";
 import { ModulesStore } from "./modules-store";
 
 export function compile(modulesStore: ModulesStore, module: Module): string {
@@ -29,12 +29,12 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "pipe": return compilePipe(modulesStore, ast.expressions, ast.expressions.length - 1);
         case "binary-operator": return `${compileOne(modulesStore, ast.left)} ${ast.operator} ${compileOne(modulesStore, ast.right)}`;
         case "if-else-expression": return `(${compileOne(modulesStore, ast.ifCondition)}) ? (${compileOne(modulesStore, ast.ifResult)}) : (${ast.elseResult == null ? NIL : compileOne(modulesStore, ast.elseResult)})`;
-        case "range": return `___range(${ast.start})(${ast.end})`;
+        case "range": return `${HIDDEN_IDENTIFIER_PREFIX}range(${ast.start})(${ast.end})`;
         case "parenthesized-expression": return `(${compileOne(modulesStore, ast.inner)})`;
         case "property-accessor": return `${compileOne(modulesStore, ast.base)}.${ast.properties.map(p => compileOne(modulesStore, p)).join(".")}`;
         case "local-identifier": return modulesStore.getScopeFor(ast).values[ast.name].mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
         case "plain-identifier": return ast.name;
-        case "object-literal":  return `{ ${ast.entries.map(([ key, value ]) => `${compileOne(modulesStore, key)}: ${compileOne(modulesStore, value)}`).join(", ")} }`;
+        case "object-literal":  return `{${objectEntries(modulesStore, ast.entries)}}`;
         case "array-literal":   return `[${ast.entries.map(e => compileOne(modulesStore, e)).join(", ")}]`;
         case "string-literal":  return `\`${ast.segments.map(segment =>
                                             typeof segment === "string"
@@ -47,13 +47,25 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "reaction": return `disposers.push(crowdx.reaction(() => ${compileOne(modulesStore, ast.data)}, (data) => ${compileOne(modulesStore, ast.effect)}(data)))`;
         case "indexer": return `${compileOne(modulesStore, ast.base)}[${compileOne(modulesStore, ast.indexer)}]`;
         case "block": return `{ ${ast.statements.map(s => compileOne(modulesStore, s)).join(" ")} }`;
+        case "element-tag": return `${HIDDEN_IDENTIFIER_PREFIX}elementTag('${ast.tagName.name}',{${
+            objectEntries(modulesStore, (ast.attributes as [PlainIdentifier, Expression|Expression[]][])
+                .concat([ [{kind: "plain-identifier", name: "children"}, ast.children] as [PlainIdentifier, Expression[]] ]))}})`;
     }
 
     throw Error("Couldn't compile '" + (ast as any).kind + "'");
 }
 
+function objectEntries(modulesStore: ModulesStore, entries: [PlainIdentifier, Expression|Expression[]][]): string {
+    return entries
+        .map(([ key, value ]) => `${compileOne(modulesStore, key)}: ${Array.isArray(value) ? value.map(c => compileOne(modulesStore, c)) : compileOne(modulesStore, value)}`)
+        .join(", ")
+}
+
+// TODO: Forbid this in user-defined identifers
+export const HIDDEN_IDENTIFIER_PREFIX = `___`;
+
 const NIL = `undefined`;
-const LOCALS_OBJ = "___locals";
+const LOCALS_OBJ = HIDDEN_IDENTIFIER_PREFIX + "locals";
 
 function compileProc(modulesStore: ModulesStore, proc: Proc): string {
     const mutableLocals = Object.entries(modulesStore.getScopeFor(proc.body).values)
@@ -61,7 +73,7 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
 
     return `function ${proc.name == null ? '' : proc.name.name}(${proc.argNames[0] != null ? compileOne(modulesStore, proc.argNames[0]) : ''}) {${proc.argNames.length > 1 ? ` return (${proc.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}) => `).join("")}{\n` : ''}
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
-    `const ${LOCALS_OBJ} = ___observable({${
+    `const ${LOCALS_OBJ} = ${HIDDEN_IDENTIFIER_PREFIX}observable({${
         mutableLocals
             .map(e => `${e[0]}: undefined`)
             .join(",")

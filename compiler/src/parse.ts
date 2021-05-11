@@ -1,5 +1,5 @@
-import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration, PrimitiveType, FuncType, Module, Block, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, UNKNOWN_TYPE } from "./ast";
-import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction, err, expec, BagelSyntaxError, isError, errorMessage } from "./parsing-utils";
+import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration, PrimitiveType, FuncType, Module, Block, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, UNKNOWN_TYPE, IteratorType, ElementTag } from "./ast";
+import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction, err, expec, BagelSyntaxError, isError } from "./parsing-utils";
 
 export function parse(code: string): Module {
     let index = 0;
@@ -878,7 +878,49 @@ const plainIdentifier: ParseFunction<PlainIdentifier> = (code, startIndex) =>
         newIndex: index,
     }))
 
-const objectLiteral: ParseFunction<ObjectLiteral> = (code, startIndex) =>
+// TODO: Support /> closing
+export const elementTag: ParseFunction<ElementTag> = (code, startIndex) =>
+    given(consume(code, startIndex, "<"), index =>
+    given(plainIdentifier(code, index), ({ parsed: tagName, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(parseSeries(code, index, _tagAttribute), ({ parsed: attributes, newIndex: index }) =>
+    expec(consume(code, index, ">"), err(code, index, '">"'), index => 
+    given(parseSeries(code, index, (code, index) => elementTag(code, index) ?? _elementEmbeddedExpression(code, index)), ({ parsed: children, newIndex: index }) =>
+    expec(consume(code, index, "</"), err(code, index, 'Closing tag'), index => 
+    expec(plainIdentifier(code, index), err(code, index, "Closing tag name"), ({ parsed: closingTagName, newIndex: index }) =>
+    // TODO: Check that closing tag matches opening tag
+    expec(consume(code, index, ">"), err(code, index, '">"'), index => ({
+        parsed: {
+            kind: "element-tag",
+            code,
+            startIndex,
+            endIndex: index,
+            tagName,
+            attributes,
+            children,
+        },
+        newIndex: index,
+    }))))))))))
+
+const _tagAttribute: ParseFunction<[PlainIdentifier, Expression]> = (code, index) =>
+    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
+    given(consume(code, index, "="), index =>
+    expec(_elementEmbeddedExpression(code, index), err(code, index, "Expression"), ({ parsed: expression, newIndex: index }) => ({
+        parsed: [ name, expression ],
+        newIndex: index,
+    }))))
+
+const _elementEmbeddedExpression: ParseFunction<Expression> = (code, index) =>
+    given(consume(code, index, "{"), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(expression(code, index), err(code, index, "Expression"), ({ parsed: expression, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
+        parsed: expression,
+        newIndex: index,
+    }))))))
+
+export const objectLiteral: ParseFunction<ObjectLiteral> = (code, startIndex) =>
     given(consume(code, startIndex, "{"), index =>
     given(parseSeries(code, index, _objectEntry, ","), ({ parsed: entries, newIndex: index }) =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
