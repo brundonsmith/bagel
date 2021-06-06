@@ -1,0 +1,7 @@
+ast tasks
+x blocks
+- chaining if/else
+- combine declaration types?
+- better story around func declaration types
+- unify let and top-level declarations in some way?
+- argNames/types split is weird
