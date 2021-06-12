@@ -1,5 +1,10 @@
-import { ArrayLiteral, ArrayType, Assignment, AST, BinaryOp, BinaryOperator, BooleanLiteral, ConstDeclaration, Declaration, Expression, ForLoop, Func, Funcall, FuncDeclaration, LocalIdentifier, IfElseExpression, IfElseStatement, IndexerType, JavascriptEscape, KEYWORDS, LetDeclaration, LiteralType, NilLiteral, NominalType, NumberLiteral, ObjectLiteral, ObjectType, ParenthesizedExpression, Pipe, Proc, ProcCall, ProcDeclaration, PropertyAccessor, Range, Reaction, Statement, StringLiteral, TupleType, TypeDeclaration, TypeExpression, UnionType, UnknownType, WhileLoop, PlainIdentifier, NamedType, Indexer, ImportDeclaration, PrimitiveType, FuncType, Module, Block, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, UNKNOWN_TYPE, IteratorType, ElementTag } from "./ast";
-import { given, consume, consumeWhitespace, consumeWhile, isNumeric, parseBinaryOp, ParseResult, parseSeries, isSymbolic, parseOptional, ParseFunction, err, expec, BagelSyntaxError, isError, errorMessage } from "./parsing-utils";
+import { Module } from "../model/ast";
+import { Block, PlainIdentifier } from "../model/common";
+import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../model/declarations";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Funcall, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral } from "../model/expressions";
+import { Assignment, ForLoop, IfElseStatement, LetDeclaration, ProcCall, Reaction, Statement, WhileLoop } from "../model/statements";
+import { ArrayType, BOOLEAN_TYPE, FuncType, IndexerType, LiteralType, NamedType, NIL_TYPE, NUMBER_TYPE, ObjectType, PrimitiveType, STRING_TYPE, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../model/type-expressions";
+import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, err, errorMessage, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common";
 
 export function parse(code: string): Module {
     let index = 0;
@@ -866,18 +871,6 @@ const localIdentifier: ParseFunction<LocalIdentifier> = (code, startIndex) =>
         newIndex: index,
     }))
 
-const plainIdentifier: ParseFunction<PlainIdentifier> = (code, startIndex) => 
-    given(identifierSegment(code, startIndex), ({ segment: name, newIndex: index }) => ({
-        parsed: {
-            kind: "plain-identifier",
-            code,
-            startIndex,
-            endIndex: index,
-            name,
-        },
-        newIndex: index,
-    }))
-
 // TODO: Support /> closing
 export const elementTag: ParseFunction<ElementTag> = (code, startIndex) =>
     given(consume(code, startIndex, "<"), index =>
@@ -1102,26 +1095,6 @@ const javascriptEscape: ParseFunction<JavascriptEscape> = (code, startIndex) =>
             newIndex: index,
         }));
 })
-
-function identifierSegment(code: string, index: number): { segment: string, newIndex: number} | undefined {
-    const startIndex = index;
-
-    while (isSymbolic(code[index], index - startIndex)) {
-        index++;
-    }
-
-    const segment = code.substring(startIndex, index);
-
-    for (const keyword of KEYWORDS) {
-        if (segment === keyword) {
-            return undefined;
-        }
-    }
-
-    if (index - startIndex > 0) {
-        return { segment, newIndex: index };
-    }
-}
 
 function consumeComments(code: string, index: number): number {
     if (code[0] === "/") {

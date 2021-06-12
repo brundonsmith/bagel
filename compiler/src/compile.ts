@@ -1,5 +1,8 @@
-import { AST, Expression, Func, Module, Proc, PlainIdentifier } from "./ast";
-import { ModulesStore } from "./modules-store";
+import { ModulesStore } from "./checking/modules-store";
+import { Module, AST } from "./model/ast";
+import { PlainIdentifier } from "./model/common";
+import { Expression, Proc, Func } from "./model/expressions";
+
 
 export function compile(modulesStore: ModulesStore, module: Module): string {
     return module.declarations

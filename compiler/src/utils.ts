@@ -1,4 +1,4 @@
-import { AST } from "./ast";
+import { AST } from "./model/ast";
 
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
     if (val != null) {

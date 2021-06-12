@@ -1,11 +1,12 @@
-import { NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../../compiler/src/ast";
-import { ModulesStore } from "../../compiler/src/modules-store";
+
+import { ModulesStore } from "../../compiler/src/checking/modules-store";
+import { scopescan } from "../../compiler/src/checking/scopescan";
+import { BagelTypeError, typecheck } from "../../compiler/src/checking/typecheck";
+import { typescan } from "../../compiler/src/checking/typescan";
+import { STRING_TYPE, NUMBER_TYPE, UNKNOWN_TYPE, TypeExpression } from "../../compiler/src/model/type-expressions";
 import { parse } from "../../compiler/src/parse";
-import { given } from "../../compiler/src/parsing-utils";
-import { scopescan } from "../../compiler/src/scopescan";
-import { typecheck, BagelTypeError, errorMessage } from "../../compiler/src/typecheck";
-import { typescan } from "../../compiler/src/typescan";
-import { deepEquals } from "../../compiler/src/utils";
+import { errorMessage } from "../../compiler/src/parse/common";
+import { deepEquals, given } from "../../compiler/src/utils";
 import { test } from "./testing-utils";
 
 console.log("typecheck.ts")

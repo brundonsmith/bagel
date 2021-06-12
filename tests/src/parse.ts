@@ -1,8 +1,9 @@
 
 import { test } from "./testing-utils";
 import { parse } from "../../compiler/src/parse";
-import { AST, FuncDeclaration, NUMBER_TYPE, STRING_TYPE, UNKNOWN_TYPE } from "../../compiler/src/ast";
 import { deepEquals } from "../../compiler/src/utils";
+import { AST } from "../../compiler/src/model/ast";
+import { UNKNOWN_TYPE, STRING_TYPE, NUMBER_TYPE } from "../../compiler/src/model/type-expressions";
 
 console.log("parse.ts")
 

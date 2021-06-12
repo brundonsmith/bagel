@@ -1,7 +1,10 @@
-import { BinaryOp, BOOLEAN_TYPE, Expression, isExpression, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Module, NIL_TYPE, NUMBER_TYPE, PlainIdentifier, STRING_TYPE, TypeExpression, UNKNOWN_TYPE, FuncType } from "./ast";
+import { Module } from "../model/ast";
+import { PlainIdentifier } from "../model/common";
+import { BinaryOp, Expression, isExpression } from "../model/expressions";
+import { BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../model/type-expressions";
+import { deepEquals, DeepReadonly, walkParseTree } from "../utils";
 import { ModulesStore, Scope } from "./modules-store";
 import { subsumes } from "./typecheck";
-import { deepEquals, DeepReadonly, walkParseTree } from "./utils";
 
 export function typescan(modulesStore: ModulesStore, ast: Module): void {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {

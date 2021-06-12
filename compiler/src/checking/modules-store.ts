@@ -1,6 +1,8 @@
-import { AST, Block, Expression, Func, Module, Proc, TypeExpression } from "./ast";
-import { ScopeOwner } from "./scopescan";
-import { DeepReadonly } from "./utils";
+import { AST, Module } from "../model/ast";
+import { Expression } from "../model/expressions";
+import { TypeExpression } from "../model/type-expressions";
+import { DeepReadonly } from "../utils";
+
 
 export type Scope = {
     readonly parentScope?: Scope,

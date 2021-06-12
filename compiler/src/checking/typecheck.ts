@@ -1,7 +1,11 @@
-import { AST, LocalIdentifier, Module, PlainIdentifier, Proc, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, REACTION_DATA_TYPE, REACTION_EFFECT_TYPE } from "./ast";
+import { AST, Module } from "../model/ast";
+import { PlainIdentifier } from "../model/common";
+import { LocalIdentifier, Proc } from "../model/expressions";
+import { REACTION_DATA_TYPE, REACTION_EFFECT_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../model/type-expressions";
+import { lineAndColumn } from "../parse/common";
+import { deepEquals, DeepReadonly, given, sOrNone, walkParseTree, wasOrWere } from "../utils";
 import { ModulesStore, Scope } from "./modules-store";
-import { lineAndColumn } from "./parsing-utils";
-import { deepEquals, DeepReadonly, given, walkParseTree, sOrNone, wasOrWere } from "./utils";
+
 
 export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: (error: BagelTypeError) => void) {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {

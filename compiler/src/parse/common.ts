@@ -1,4 +1,5 @@
-import { AST, BinaryOp, BINARY_OPS, KEYWORDS } from "./ast";
+import { KEYWORDS, PlainIdentifier } from "../model/common";
+import { BinaryOp, BINARY_OPS, Expression } from "../model/expressions";
 
 export function consume(code: string, index: number, segment: string): number|undefined {
     for (let i = 0; i < segment.length; i++) {
@@ -211,3 +212,75 @@ export function err(code: string, index: number, expected: string): BagelSyntaxE
 }
 
 export type ParseFunction<T> = (code: string, index: number) => ParseResult<T> | BagelSyntaxError | undefined;
+
+
+export class ParseMemo {
+    private memo = new Map<string, Map<ParseFunction<Expression>, Map<number, ParseResult<Expression>>>>();
+
+    memoize(fn: ParseFunction<Expression>, code: string, index: number, result: ParseResult<Expression>|BagelSyntaxError|undefined) {
+        if (result != null && !isError(result)) {
+            if (!this.memo.has(code)) {
+                this.memo.set(code, new Map());
+            }
+            if (!this.memo.get(code)?.has(fn)) {
+                this.memo.get(code)?.set(fn, new Map());
+            }
+            
+            this.memo.get(code)?.get(fn)?.set(index, result);
+        }
+    }
+
+    get(fn: ParseFunction<Expression>, code: string, index: number) {
+        return this.memo.get(code)?.get(fn)?.get(index);
+    }
+
+    delete(code: string) {
+        this.memo.delete(code);
+    }
+
+    cachedOrParse<T extends Expression>(fn: ParseFunction<T>): ParseFunction<T> {
+        return (code: string, index: number): ParseResult<T>|BagelSyntaxError|undefined => {
+            const cached = this.get(fn, code, index);
+
+            if (cached != null) {
+                return cached as ParseResult<T>;
+            } else {
+                const result = fn(code, index);
+                this.memoize(fn, code, index, result);
+                return result;
+            }
+        }
+    }
+}
+
+export const plainIdentifier: ParseFunction<PlainIdentifier> = (code, startIndex) => 
+    given(identifierSegment(code, startIndex), ({ segment: name, newIndex: index }) => ({
+        parsed: {
+            kind: "plain-identifier",
+            code,
+            startIndex,
+            endIndex: index,
+            name,
+        },
+        newIndex: index,
+    }))
+
+export function identifierSegment(code: string, index: number): { segment: string, newIndex: number} | undefined {
+    const startIndex = index;
+
+    while (isSymbolic(code[index], index - startIndex)) {
+        index++;
+    }
+
+    const segment = code.substring(startIndex, index);
+
+    for (const keyword of KEYWORDS) {
+        if (segment === keyword) {
+            return undefined;
+        }
+    }
+
+    if (index - startIndex > 0) {
+        return { segment, newIndex: index };
+    }
+}

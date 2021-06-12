@@ -1,14 +1,14 @@
+import { build } from "esbuild";
 import { promises as fs, watchFile } from "fs";
 import path from "path";
-
-import { build, BuildOptions } from "esbuild";
-
-import { parse } from "./parse";
-import { ModulesStore } from "./modules-store";
-import { canonicalModuleName, scopescan } from "./scopescan";
-import { typescan } from "./typescan";
-import { typecheck, errorMessage, BagelTypeError } from "./typecheck";
+import { ModulesStore } from "./checking/modules-store";
+import { canonicalModuleName, scopescan } from "./checking/scopescan";
+import { BagelTypeError, errorMessage, typecheck } from "./checking/typecheck";
+import { typescan } from "./checking/typescan";
 import { compile } from "./compile";
+import { parse } from "./parse";
+
+
 
 function printError(error: BagelTypeError) {
     console.error(errorMessage(error));
