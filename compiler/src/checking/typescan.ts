@@ -9,7 +9,7 @@ import { subsumes } from "./typecheck";
 export function typescan(modulesStore: ModulesStore, ast: Module): void {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         if (modulesStore.astTypes.get(ast) == null && isExpression(ast)) {
-            const type = determineType(modulesStore, ast, scope);
+            const type = distillUnion(scope, flattenUnions(determineType(modulesStore, ast, scope)));
             modulesStore.astTypes.set(ast, type);
         }
 
@@ -169,6 +169,8 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
         case "boolean-literal": return BOOLEAN_TYPE;
         case "nil-literal": return NIL_TYPE;
         case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
+
+        throw Error();
     }
 }
 
@@ -232,6 +234,29 @@ function flattenUnions(type: TypeExpression): TypeExpression {
         return {
             kind: "union-type",
             members,
+        }
+    } else {
+        return type;
+    }
+}
+
+function distillUnion(scope: Scope, type: TypeExpression): TypeExpression {
+    if (type.kind === "union-type") {
+        const membersToDrop = new Set<TypeExpression>();
+
+        for (const member of type.members) {
+            for (const other of type.members) {
+                if (member !== other) {
+                    if (subsumes(scope, other, member) && !membersToDrop.has(other)) {
+                        membersToDrop.add(member);
+                    }
+                }
+            }
+        }
+
+        return {
+            kind: "union-type",
+            members: type.members.filter(mem => !membersToDrop.has(mem)),
         }
     } else {
         return type;
