@@ -29,6 +29,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 const bodyType = modulesStore.getTypeOf(ast.body);
 
                 if (ast.type.returnType.kind !== "unknown-type" && !subsumes(funcScope, ast.type.returnType, bodyType)) {
+                    console.log(JSON.stringify({ returnType: ast.type.returnType, bodyType }, null, 2))
                     reportError(assignmentError(ast.body, ast.type.returnType, bodyType));
                 }
                 
@@ -41,7 +42,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                     const typeOfPipe = modulesStore.getTypeOf(expr);
 
                     if (typeOfPipe?.kind !== "func-type") {
-                        reportError(miscError(ast, `Each transformation in pipeline expression must be a function`));
+                        reportError(miscError(expr, `Each transformation in pipeline expression must be a function: found '${expr.kind}'`));
                     } else if (!subsumes(scope, typeOfPipe.argTypes[0], inputType)) {
                         reportError(assignmentError(ast, typeOfPipe.argTypes[0], inputType));
                     } else {

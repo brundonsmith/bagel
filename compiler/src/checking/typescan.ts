@@ -4,12 +4,12 @@ import { BinaryOp, Expression, isExpression } from "../model/expressions";
 import { BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../model/type-expressions";
 import { deepEquals, DeepReadonly, walkParseTree } from "../utils";
 import { ModulesStore, Scope } from "./modules-store";
-import { subsumes } from "./typecheck";
+import { BagelTypeError, miscError, subsumes } from "./typecheck";
 
-export function typescan(modulesStore: ModulesStore, ast: Module): void {
+export function typescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         if (modulesStore.astTypes.get(ast) == null && isExpression(ast)) {
-            const type = distillUnion(scope, flattenUnions(determineType(modulesStore, ast, scope)));
+            const type = handleSingletonUnion(distillUnion(scope, flattenUnions(determineType(reportError, modulesStore, ast, scope))));
             modulesStore.astTypes.set(ast, type);
         }
 
@@ -17,7 +17,7 @@ export function typescan(modulesStore: ModulesStore, ast: Module): void {
     });
 }
 
-function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepReadonly<Scope>): TypeExpression {
+function determineType(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Expression, scope: DeepReadonly<Scope>): TypeExpression {
     switch(ast.kind) {
         case "proc": {
             return ast.type;
@@ -28,16 +28,24 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
 
                 // if no return-type is declared, try inferring the type from the inner expression
                 returnType: ast.type.returnType.kind === "unknown-type" 
-                    ? determineType(modulesStore, ast.body, modulesStore.getScopeFor(ast)) 
+                    ? determineType(reportError, modulesStore, ast.body, modulesStore.getScopeFor(ast)) 
                     : ast.type.returnType,
             }
         };
         case "pipe": {
-            return (determineType(modulesStore, ast.expressions[ast.expressions.length - 1], scope) as FuncType).returnType;
+            const lastPipeExpression = ast.expressions[ast.expressions.length - 1];
+            const lastStageType = determineType(reportError, modulesStore, lastPipeExpression, scope);
+
+            if (lastStageType.kind === "func-type") {
+                return lastStageType.returnType;
+            } else {
+                // reportError(miscError(lastPipeExpression, `Expected function in pipe expression, got '${lastStageType.kind}'`))
+                return UNKNOWN_TYPE;
+            }
         };
         case "binary-operator": {
-            const leftType = determineType(modulesStore, ast.left, scope);
-            const rightType = determineType(modulesStore, ast.right, scope);
+            const leftType = determineType(reportError, modulesStore, ast.left, scope);
+            const rightType = determineType(reportError, modulesStore, ast.right, scope);
 
             for (const types of BINARY_OPERATOR_TYPES[ast.operator]) {
                 const { left, right, output } = types;
@@ -50,7 +58,7 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
             return UNKNOWN_TYPE;
         };
         case "funcall": {
-            const funcType = determineType(modulesStore, ast.func, scope);
+            const funcType = determineType(reportError, modulesStore, ast.func, scope);
 
             if (funcType.kind === "func-type") {
                 return funcType.returnType;
@@ -59,8 +67,8 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
             }
         };
         case "indexer": {
-            const baseType = determineType(modulesStore, ast.base, scope);
-            const indexerType = determineType(modulesStore, ast.indexer, scope);
+            const baseType = determineType(reportError, modulesStore, ast.base, scope);
+            const indexerType = determineType(reportError, modulesStore, ast.indexer, scope);
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
                 const key = indexerType.value.segments[0];
@@ -83,7 +91,7 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
             return UNKNOWN_TYPE;
         };
         case "if-else-expression": {
-            const ifType = determineType(modulesStore, ast.ifResult, scope);
+            const ifType = determineType(reportError, modulesStore, ast.ifResult, scope);
 
             if (ast.elseResult == null) {
                 return {
@@ -91,7 +99,7 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
                     members: [ ifType, NIL_TYPE ],
                 };
             } else {
-                const elseType = determineType(modulesStore, ast.elseResult, scope);
+                const elseType = determineType(reportError, modulesStore, ast.elseResult, scope);
 
                 return {
                     kind: "union-type",
@@ -100,9 +108,9 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
             }
         };
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
-        case "parenthesized-expression": return determineType(modulesStore, ast.inner, scope);
+        case "parenthesized-expression": return determineType(reportError, modulesStore, ast.inner, scope);
         case "property-accessor": {
-            const baseType = determineType(modulesStore, ast.base, scope);
+            const baseType = determineType(reportError, modulesStore, ast.base, scope);
 
             let lastPropType = baseType;
             for (const prop of ast.properties) {
@@ -128,7 +136,7 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
             } else if (descriptor.declaredType.kind !== "unknown-type") {
                 return descriptor.declaredType;
             } else if (descriptor.initialValue != null) {
-                return determineType(modulesStore, descriptor.initialValue, scope);
+                return determineType(reportError, modulesStore, descriptor.initialValue, scope);
             } else {
                 return UNKNOWN_TYPE;
             }
@@ -142,7 +150,7 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
         };
         case "object-literal": {
             const entries = ast.entries.map(([key, value]) => 
-                [key, determineType(modulesStore, value, scope)] as [PlainIdentifier, TypeExpression]);
+                [key, determineType(reportError, modulesStore, value, scope)] as [PlainIdentifier, TypeExpression]);
 
             return {
                 kind: "object-type",
@@ -150,7 +158,7 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
             };
         };
         case "array-literal": {
-            const entries = ast.entries.map(entry => determineType(modulesStore, entry, scope));
+            const entries = ast.entries.map(entry => determineType(reportError, modulesStore, entry, scope));
 
             // NOTE: This could be slightly better where different element types overlap each other
             const uniqueEntryTypes = entries.filter((el, index, arr) => 
@@ -225,6 +233,7 @@ const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right:
 function flattenUnions(type: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         const members: TypeExpression[] = [];
+
         for (const member of type.members) {
             if (member.kind === "union-type") {
                 members.push(...member.members.map(flattenUnions));
@@ -244,13 +253,16 @@ function flattenUnions(type: TypeExpression): TypeExpression {
 
 function distillUnion(scope: Scope, type: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
-        const membersToDrop = new Set<TypeExpression>();
+        const indicesToDrop = new Set<number>();
 
-        for (const member of type.members) {
-            for (const other of type.members) {
-                if (member !== other) {
-                    if (subsumes(scope, other, member) && !membersToDrop.has(other)) {
-                        membersToDrop.add(member);
+        for (let i = 0; i < type.members.length; i++) {
+            for (let j = 0; j < type.members.length; j++) {
+                if (i !== j) {
+                    const a = type.members[i];
+                    const b = type.members[j];
+
+                    if (subsumes(scope, type.members[j], type.members[i]) && !indicesToDrop.has(j)) {
+                        indicesToDrop.add(i);
                     }
                 }
             }
@@ -258,8 +270,16 @@ function distillUnion(scope: Scope, type: TypeExpression): TypeExpression {
 
         return {
             kind: "union-type",
-            members: type.members.filter(mem => !membersToDrop.has(mem)),
+            members: type.members.filter((_, index) => !indicesToDrop.has(index)),
         }
+    } else {
+        return type;
+    }
+}
+
+function handleSingletonUnion(type: TypeExpression): TypeExpression {
+    if (type.kind === "union-type" && type.members.length === 1) {
+        return type.members[0];
     } else {
         return type;
     }

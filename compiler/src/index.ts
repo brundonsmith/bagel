@@ -83,7 +83,7 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     // typescan all parsed modules
     for (const [module, ast] of modulesStore.modules) {
         try {
-            typescan(modulesStore, ast);
+            typescan(err => printError(path.basename(module), err), modulesStore, ast);
         } catch {
             console.error("Failed to typecheck module " + module + "\n")
         }
@@ -94,7 +94,7 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
         try {
             typecheck(modulesStore, ast, err => printError(path.basename(module), err));
         } catch (e) {
-            console.error(`Encountered exception typechecking module "${module}":\n${e}\n`);
+            console.error(`Encountered exception typechecking module "${module}":\n${e.stack}\n`);
         }
     }
     const endTypecheck = Date.now();
@@ -129,10 +129,12 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
                 try {
                     const fileContents = await fs.readFile(module);
                     const parsed = parse(fileContents.toString());
+                    // console.log(JSON.stringify(parsed, null, 2))
                     modulesStore.modules.set(module, parsed);
 
                     scopescan(err => printError(path.basename(module), err), modulesStore, parsed, module);
-                    typescan(modulesStore, parsed);
+                    typescan(err => printError(path.basename(module), err), modulesStore, parsed);
+                    console.log(modulesStore.getScopeFor(parsed).values['arrayFrom'])
 
                     // console.log(JSON.stringify(parsed, null, 2))
                     // console.log(modulesStore.)
@@ -146,7 +148,7 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
                             printError(path.basename(module), err)
                         });
                     } catch (e) {
-                        console.error(`Encountered exception typechecking module "${module}":\n${e}`);
+                        console.error(`Encountered exception typechecking module "${module}":\n${e.stack}`);
                         hadError = true;
                     }
 
@@ -163,8 +165,8 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
                     // if (bundle) {
                     //     await bundleOutput(entry)
                     // }
-                } catch {
-                    console.error("Failed to read module " + module)
+                } catch (e) {
+                    console.error("Failed to read module " + module + `\n${e.stack}`)
                 }
             })
         }
