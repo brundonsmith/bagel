@@ -35,7 +35,6 @@ export type Pipe = SourceInfo & {
   
 export type Func = SourceInfo & {
     kind: "func",
-    name?: PlainIdentifier,
     type: FuncType,
     argNames: PlainIdentifier[],
     body: Expression,
@@ -43,7 +42,6 @@ export type Func = SourceInfo & {
 
 export type Proc = SourceInfo & {
     kind: "proc",
-    name?: PlainIdentifier,
     type: ProcType,
     argNames: PlainIdentifier[],
     body: Block,

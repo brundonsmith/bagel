@@ -41,6 +41,7 @@ export type FuncType = {
     kind: "func-type",
     argTypes: TypeExpression[],
     returnType: TypeExpression,
+    typeParams: PlainIdentifier[],
 }
 
 export type ElementType = {
@@ -157,6 +158,7 @@ export const REACTION_DATA_TYPE: TypeExpression = {
     returnType: {
         kind: "unknown-type"
     },
+    typeParams: [],
 }
 export const REACTION_EFFECT_TYPE: TypeExpression = {
     kind: "proc-type",

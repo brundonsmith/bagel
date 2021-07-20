@@ -25,6 +25,8 @@ function determineType(modulesStore: ModulesStore, ast: Expression, scope: DeepR
         case "func": {
             return {
                 ...ast.type,
+
+                // if no return-type is declared, try inferring the type from the inner expression
                 returnType: ast.type.returnType.kind === "unknown-type" 
                     ? determineType(modulesStore, ast.body, modulesStore.getScopeFor(ast)) 
                     : ast.type.returnType,

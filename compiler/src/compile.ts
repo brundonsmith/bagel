@@ -17,8 +17,8 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
             compileOne(modulesStore, name) + (alias ? ` as ${compileOne(modulesStore, alias)}` : ``)
         ).join(", ")} } from "${ast.path.segments.join("")}.bagel";`;
         case "type-declaration": return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileTypeExpression(ast.type)}`;
-        case "proc-declaration": return (ast.exported ? `export ` : ``) + compileProc(modulesStore, ast.proc);
-        case "func-declaration": return (ast.exported ? `export ` : ``) + compileFunc(modulesStore, ast.func);
+        case "proc-declaration": return (ast.exported ? `export ` : ``) + compileProc(modulesStore, ast.proc, ast.name.name);
+        case "func-declaration": return (ast.exported ? `export ` : ``) + compileFunc(modulesStore, ast.func, ast.name.name);
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)};`;
         case "proc": return compileProc(modulesStore, ast);
         case "let-declaration": return `${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)}`;
@@ -71,11 +71,11 @@ export const HIDDEN_IDENTIFIER_PREFIX = `___`;
 const NIL = `undefined`;
 const LOCALS_OBJ = HIDDEN_IDENTIFIER_PREFIX + "locals";
 
-function compileProc(modulesStore: ModulesStore, proc: Proc): string {
+function compileProc(modulesStore: ModulesStore, proc: Proc, name?: string): string {
     const mutableLocals = Object.entries(modulesStore.getScopeFor(proc.body).values)
         .filter(e => e[1].mutability === "all");
 
-    return `function ${proc.name == null ? '' : proc.name.name}(${proc.argNames[0] != null ? compileOne(modulesStore, proc.argNames[0]) : ''}) {${proc.argNames.length > 1 ? ` return (${proc.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}) => `).join("")}{\n` : ''}
+    return `function ${name ?? ''}(${proc.argNames[0] != null ? compileOne(modulesStore, proc.argNames[0]) : ''}) {${proc.argNames.length > 1 ? ` return (${proc.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}) => `).join("")}{\n` : ''}
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
     `const ${LOCALS_OBJ} = ${HIDDEN_IDENTIFIER_PREFIX}observable({${
         mutableLocals
@@ -89,8 +89,8 @@ ${proc.argNames.length > 1 ? `});` : ''}}`;
 }
 // TODO: dispose of reactions somehow... at some point...
 
-function compileFunc(modulesStore: ModulesStore, func: Func): string {
-    return `function ${func.name == null ? '' : func.name.name}(${func.argNames[0] != null ? `${compileOne(modulesStore, func.argNames[0])}: ${compileTypeExpression(func.type.argTypes[0])}` : ''}) { return (${func.argNames.map((arg, index, arr) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}: ${compileTypeExpression(func.type.argTypes[index])})${index === arr.length - 1 ? ": " + compileTypeExpression(func.type.returnType) : ""} => `).join("")}
+function compileFunc(modulesStore: ModulesStore, func: Func, name?: string): string {
+    return `function ${name ?? ''}(${func.argNames[0] != null ? `${compileOne(modulesStore, func.argNames[0])}: ${compileTypeExpression(func.type.argTypes[0])}` : ''}) { return (${func.argNames.map((arg, index, arr) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}: ${compileTypeExpression(func.type.argTypes[index])})${index === arr.length - 1 ? ": " + compileTypeExpression(func.type.returnType) : ""} => `).join("")}
     ${compileOne(modulesStore, func.body)}
 );}`;
 }
@@ -121,4 +121,6 @@ function compileTypeExpression(expr: TypeExpression): string {
         case "boolean-type": return `boolean`;
         case "nil-type": return `null|undefined`;
     }
+
+    throw Error(`Compilation logic for type expression of kind '${expr.kind}' is unspecified`)
 }

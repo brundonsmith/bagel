@@ -42,7 +42,7 @@ export class ModulesStore {
         const type = this.astTypes.get(ast);
 
         if (type == null) {
-            throw Error("No type found for AST node:" + JSON.stringify(ast, null, 2));
+            throw Error(`No type found for AST node of kind '${ast.kind}'`);
         }
 
         return type;

@@ -228,7 +228,9 @@ const funcType: ParseFunction<FuncType> = (code, index) =>
         parsed: {
             kind: "func-type",
             argTypes,
-            returnType
+            returnType,
+            typeParams: [],
+
         },
         newIndex: index
     }))))))))))
@@ -277,9 +279,12 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (code, startIndex) => {
     
     return given(consume(code, indexAfterExport ?? startIndex, "proc"), index =>
         given(consumeWhitespace(code, index), index =>
+        given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index =>
         expec(proc(code, index), err(code, index, 'Procedure'), ({ parsed: proc, newIndex: index }) => ({
             parsed: {
                 kind: "proc-declaration",
+                name,
                 code,
                 startIndex,
                 endIndex: index,
@@ -287,7 +292,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (code, startIndex) => {
                 exported,
             },
             newIndex: index,
-        }))))
+        }))))))
 }
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = (code, startIndex) => {
@@ -302,9 +307,12 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (code, startIndex) => {
     
     return given(consume(code, indexAfterExport ?? startIndex, "func"), index =>
         given(consumeWhitespace(code, index), index =>
+        given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index =>
         expec(func(code, index), err(code, index, 'Function'), ({ parsed: func, newIndex: index }) => ({
             parsed: {
                 kind: "func-declaration",
+                name,
                 code,
                 startIndex,
                 endIndex: index,
@@ -312,7 +320,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (code, startIndex) => {
                 exported,
             },
             newIndex: index,
-        }))))
+        }))))))
 }
 
 const constDeclaration: ParseFunction<ConstDeclaration> = (code, startIndex) => {
@@ -351,8 +359,7 @@ const constDeclaration: ParseFunction<ConstDeclaration> = (code, startIndex) => 
 }
 
 const proc: ParseFunction<Proc> = (code, startIndex) =>
-    given(parseOptional(code, startIndex, plainIdentifier), ({ parsed: name, newIndex }) =>
-    given(consume(code, newIndex ?? startIndex, "("), index =>
+    given(consume(code, startIndex, "("), index =>
     given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
@@ -362,7 +369,6 @@ const proc: ParseFunction<Proc> = (code, startIndex) =>
             code,
             startIndex,
             endIndex: index,
-            name,
             type: {
                 kind: "proc-type",
                 argTypes: args.map(arg => arg.type ?? UNKNOWN_TYPE),
@@ -371,7 +377,7 @@ const proc: ParseFunction<Proc> = (code, startIndex) =>
             body,
         },
         newIndex: index,
-    })))))))
+    }))))))
 
 const statement: ParseFunction<Statement> = (code, startIndex) =>
     reaction(code, startIndex)
@@ -633,8 +639,7 @@ const expression: ParseFunction<Expression> =
     memo.cachedOrParse((code, index) => parseStartingFromTier(0)(code, index))
 
 const func: ParseFunction<Func> = (code, startIndex) =>
-    given(parseOptional(code, startIndex, plainIdentifier), ({ parsed: name, newIndex }) =>
-    given(consume(code, newIndex ?? startIndex, "("), index =>
+    given(consume(code, startIndex, "("), index =>
     given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
@@ -650,17 +655,17 @@ const func: ParseFunction<Func> = (code, startIndex) =>
             code,
             startIndex,
             endIndex: index,
-            name,
             type: {
                 kind: "func-type",
                 argTypes: args.map(arg => arg.type ?? UNKNOWN_TYPE),
                 returnType: returnType ?? UNKNOWN_TYPE,
+                typeParams: [],
             },
             argNames: args.map(arg => arg.name),
             body,
         },
         newIndex: index,
-    })))))))))))
+    }))))))))))
 
 const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: PlainIdentifier, type?: TypeExpression }> | BagelSyntaxError | undefined => 
     given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
