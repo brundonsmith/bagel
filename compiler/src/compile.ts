@@ -77,11 +77,7 @@ function compileProc(modulesStore: ModulesStore, proc: Proc, name?: string): str
 
     return `function ${name ?? ''}(${proc.argNames[0] != null ? compileOne(modulesStore, proc.argNames[0]) : ''}) {${proc.argNames.length > 1 ? ` return (${proc.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}) => `).join("")}{\n` : ''}
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
-    `const ${LOCALS_OBJ} = ${HIDDEN_IDENTIFIER_PREFIX}observable({${
-        mutableLocals
-            .map(e => `${e[0]}: undefined`)
-            .join(",")
-    }});` : ``}
+    `const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileTypeExpression(e[1].declaredType)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});` : ``}
 
     ${proc.body.statements.map(s => compileOne(modulesStore, s)).join(";\n")}
 
