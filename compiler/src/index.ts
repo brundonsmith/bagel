@@ -77,7 +77,7 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     const startTypecheck = Date.now();
     // scopescan all parsed modules
     for (const [module, ast] of modulesStore.modules) {
-        scopescan(modulesStore, ast, module);
+        scopescan(err => printError(path.basename(module), err), modulesStore, ast, module);
     }
 
     // typescan all parsed modules
@@ -131,7 +131,7 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
                     const parsed = parse(fileContents.toString());
                     modulesStore.modules.set(module, parsed);
 
-                    scopescan(modulesStore, parsed, module);
+                    scopescan(err => printError(path.basename(module), err), modulesStore, parsed, module);
                     typescan(modulesStore, parsed);
 
                     // console.log(JSON.stringify(parsed, null, 2))

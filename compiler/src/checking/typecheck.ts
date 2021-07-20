@@ -1,5 +1,6 @@
 import { AST, Module } from "../model/ast";
 import { PlainIdentifier } from "../model/common";
+import { ImportDeclaration, ImportItem } from "../model/declarations";
 import { LocalIdentifier, Proc } from "../model/expressions";
 import { REACTION_DATA_TYPE, REACTION_EFFECT_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../model/type-expressions";
 import { lineAndColumn } from "../parse/common";
@@ -368,6 +369,8 @@ export type BagelTypeError =
     | BagelAssignableToError
     | BagelCannotFindNameError
     | BagelMiscTypeError
+    | BagelCannotFindModuleError
+    | BagelCannotFindExportError
 
 export type BagelAssignableToError = {
     kind: "bagel-assignable-to-error",
@@ -388,6 +391,17 @@ export type BagelMiscTypeError = {
     message: string,
 }
 
+export type BagelCannotFindModuleError = {
+    kind: "bagel-cannot-find-module-error",
+    ast: ImportDeclaration
+}
+
+export type BagelCannotFindExportError = {
+    kind: "bagel-cannot-find-export-error",
+    ast: ImportItem,
+    importDeclaration: ImportDeclaration
+}
+
 export function errorMessage(error: BagelTypeError): string {
     const lineAndColumnMsg = given(given(error.ast, ast => lineAndColumn(ast.code, ast.startIndex)), ({ line, column }) => `${line}:${column} `) ?? ``;
     
@@ -398,6 +412,10 @@ export function errorMessage(error: BagelTypeError): string {
             return lineAndColumnMsg + `Cannot find name '${error.ast.name}'`;
         case "bagel-misc-type-error":
             return lineAndColumnMsg + error.message;
+        case "bagel-cannot-find-module-error":
+            return lineAndColumnMsg + `Failed to resolve module '${error.ast.path.segments[0]}'`
+        case "bagel-cannot-find-export-error":
+            return lineAndColumnMsg + `Module '${error.importDeclaration.path.segments[0]}' has no export named ${error.ast.name.name}`
     }
 }
 
@@ -415,4 +433,12 @@ export function cannotFindName(ast: LocalIdentifier): BagelCannotFindNameError {
 
 export function miscError(ast: AST|undefined, message: string): BagelMiscTypeError {
     return { kind: "bagel-misc-type-error", ast, message }
+}
+
+export function cannotFindModule(ast: ImportDeclaration): BagelCannotFindModuleError {
+    return { kind: "bagel-cannot-find-module-error", ast }
+}
+
+export function cannotFindExport(ast: ImportItem, importDeclaration: ImportDeclaration): BagelCannotFindExportError {
+    return { kind: "bagel-cannot-find-export-error", ast, importDeclaration }
 }

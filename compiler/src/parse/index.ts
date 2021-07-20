@@ -60,7 +60,13 @@ const importDeclaration: ParseFunction<ImportDeclaration> = (code, startIndex) =
             code,
             startIndex,
             endIndex: index,
-            imports: imports.map(name => ({ name })),
+            imports: imports.map(i => ({
+                kind: "import-item",
+                name: i,
+                code: i.code,
+                startIndex: i.startIndex,
+                endIndex: i.endIndex,
+            })),
             path,
         },
         newIndex: index

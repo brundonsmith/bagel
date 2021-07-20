@@ -7,9 +7,10 @@ import { ForLoop } from "../model/statements";
 import { TypeExpression, UNKNOWN_TYPE, NUMBER_TYPE } from "../model/type-expressions";
 import { walkParseTree } from "../utils";
 import { ModulesStore, Scope } from "./modules-store";
+import { BagelTypeError, cannotFindExport, cannotFindModule } from "./typecheck";
 
 
-export function scopescan(modulesStore: ModulesStore, ast: Module, module: string) {
+export function scopescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module, module: string) {
 
     walkParseTree<Scope|undefined>(undefined, ast, (payload, ast) => {
         
@@ -21,7 +22,7 @@ export function scopescan(modulesStore: ModulesStore, ast: Module, module: strin
             case "proc":
             case "block":
             case "for-loop": {
-                const scope = scopeFrom(modulesStore, ast, module, payload);
+                const scope = scopeFrom(reportError, modulesStore, ast, module, payload);
                 modulesStore.scopeFor.set(ast, scope);
                 return scope;
             }
@@ -35,7 +36,7 @@ export function scopescan(modulesStore: ModulesStore, ast: Module, module: strin
 
 export type ScopeOwner = Module|Func|Proc|Block|ForLoop;
 
-export function scopeFrom(modulesStore: ModulesStore, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
+export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
     const scope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {} };
 
     // TODO: Err on duplicate identifiers
@@ -66,17 +67,42 @@ export function scopeFrom(modulesStore: ModulesStore, ast: ScopeOwner, module: s
                     };
                 } else if (declaration.kind === "import-declaration") {
                     const otherModule = modulesStore.modules.get(canonicalModuleName(module, declaration.path));
-                    for (const i of declaration.imports) {
-                        const foreignDecl = otherModule?.declarations.find(decl => 
-                            declExported(decl) && declName(decl) === i.name.name) as Declaration;
-                        // TODO: Proper error messaging when import doesn't exist
-                        const name = declName(foreignDecl) as string;
+                    
+                    if (otherModule == null) {
+                        reportError(cannotFindModule(declaration));
 
+                    for (const i of declaration.imports) {
+                            const name = i.alias?.name ?? i.name.name;
+
+                            scope.values[name] = {
+                                mutability: "none",
+                                declaredType: UNKNOWN_TYPE,
+                            };
+                        }
+                    } else {
+                        for (const i of declaration.imports) {
+                            const foreignDecl = otherModule.declarations.find(foreignDeclCandidate => 
+                                declExported(foreignDeclCandidate) && declName(foreignDeclCandidate) === i.name.name);
+
+                            const name = i.alias?.name ?? i.name.name;
+
+                            if (foreignDecl == null) {
+                                reportError(cannotFindExport(i, declaration));
+
+                                scope.values[name] = {
+                                    mutability: "none",
+                                    declaredType: UNKNOWN_TYPE,
+                                };
+                            } else {
                         scope.values[name] = {
                             mutability: "none",
                             declaredType: declType(foreignDecl) as TypeExpression,
                             initialValue: declValue(foreignDecl),
                         };
+                            }
+
+
+                        }
                     }
                 }
             }

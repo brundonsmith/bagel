@@ -11,11 +11,14 @@ export type Declaration =
 
 export type ImportDeclaration = SourceInfo & {
     kind: "import-declaration",
-    imports: Array<{
-        name: PlainIdentifier,
-        alias?: PlainIdentifier,
-    }>,
+    imports: Array<ImportItem>,
     path: StringLiteral,
+}
+
+export type ImportItem = SourceInfo & {
+    kind: "import-item",
+    name: PlainIdentifier,
+    alias?: PlainIdentifier,
 }
 
 export type TypeDeclaration = SourceInfo & {
