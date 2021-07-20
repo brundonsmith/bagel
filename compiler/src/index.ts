@@ -10,19 +10,36 @@ import { parse } from "./parse";
 
 
 
-function printError(error: BagelTypeError) {
-    console.error(errorMessage(error));
+function printError(module: string, error: BagelTypeError) {
+    console.error(module + "|" + errorMessage(error));
+}
+
+async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
+    
+    for (const file of await fs.readdir(dirPath)) {
+        const filePath = path.resolve(dirPath, file);
+
+        if ((await fs.stat(filePath)).isDirectory()) {
+            await getAllFiles(filePath, arrayOfFiles);
+        } else {
+            arrayOfFiles.push(filePath);
+        }
+    }
+  
+    return arrayOfFiles;
 }
 
 (async function() {
-    const entry = path.resolve(process.cwd(), process.argv[2]);
-    const outDir = process.argv[3] || path.dirname(entry);
+    const dir = path.resolve(process.cwd(), process.argv[2]);
+    const allFilesInDir = await getAllFiles(dir);
+    const outDir = process.argv[3] || path.dirname(dir);
     const bundle = true;
     const watch = true;
+    const emit = true;
     
     const modulesStore = new ModulesStore();
-
-    const allModules = new Set<string>([entry]);
+    
+    const allModules = new Set<string>(allFilesInDir.filter(f => f.includes(".bgl")));
     const doneModules = new Set<string>();
 
     let timeSpentParsing = 0;
@@ -33,22 +50,26 @@ function printError(error: BagelTypeError) {
         doneModules.add(module);
     
         if (!modulesStore.modules.has(module)) {
-            // console.log("parsing", module)
+            // console.log("parsing", path.basename(module))
         
-            const fileContents = await fs.readFile(module);
-        
-            const startParse = Date.now();
-            const parsed = parse(fileContents.toString());
-            timeSpentParsing += Date.now() - startParse;
+            try {
+                const fileContents = await fs.readFile(module);
+            
+                const startParse = Date.now();
+                const parsed = parse(fileContents.toString());
+                timeSpentParsing += Date.now() - startParse;
 
-            for (const declaration of parsed.declarations) {
-                if (declaration.kind === "import-declaration") {
-                    const importedModule = canonicalModuleName(module, declaration.path);
-                    allModules.add(importedModule);
+                for (const declaration of parsed.declarations) {
+                    if (declaration.kind === "import-declaration") {
+                        const importedModule = canonicalModuleName(module, declaration.path);
+                        allModules.add(importedModule);
+                    }
                 }
-            }
 
-            modulesStore.modules.set(module, parsed);
+                modulesStore.modules.set(module, parsed);
+            } catch {
+                console.error("Failed to read module " + module + "\n")
+            }
         }
     }
 
@@ -60,86 +81,90 @@ function printError(error: BagelTypeError) {
     }
 
     // typescan all parsed modules
-    for (const [_, ast] of modulesStore.modules) {
-        typescan(modulesStore, ast);
+    for (const [module, ast] of modulesStore.modules) {
+        try {
+            typescan(modulesStore, ast);
+        } catch {
+            console.error("Failed to typecheck module " + module + "\n")
+        }
     }
 
     // typecheck all parsed modules
-    for (const [_, ast] of modulesStore.modules) {
-        typecheck(modulesStore, ast, printError);
+    for (const [module, ast] of modulesStore.modules) {
+        try {
+            typecheck(modulesStore, ast, err => printError(path.basename(module), err));
+        } catch (e) {
+            console.error(`Encountered exception typechecking module "${module}":\n${e}\n`);
+        }
     }
     const endTypecheck = Date.now();
 
-    // compile to JS
-    await Promise.all(Array.from(modulesStore.modules.entries()).map(([ module, ast ]) => {
-        // TODO: use specified outDir
-        const jsPath = bagelFileToJsFile(module);
-        const compiled = compile(modulesStore, ast);
-        const compiledWithLib = LIB_IMPORTS + compiled + (module === entry ? '\nmain();' : '');
-        return fs.writeFile(jsPath, compiledWithLib);
-    }))
-
-    if (bundle) {
-        try {
-            await build({
-                entryPoints: [ bagelFileToJsFile(entry) ],
-                outfile: bagelFileToJsFile(entry, true),
-                bundle: true,
-            })
-        } catch(err) {
-            console.error(err.message);
-        }
+    // compile to TS
+    if (emit) {
+        await Promise.all(Array.from(modulesStore.modules.entries()).map(([ module, ast ]) => {
+            // TODO: use specified outDir
+            const jsPath = bagelFileToTsFile(module);
+            const compiled = compile(modulesStore, ast);
+            const compiledWithLib = LIB_IMPORTS + compiled;// + (module === entry ? '\nmain();' : '');
+            return fs.writeFile(jsPath, compiledWithLib);
+        }))
     }
+
+    // TODO
+    // if (bundle) {
+    //     await bundleOutput(entry)
+    // }
     
 
     console.log();
     console.log(`Spent ${timeSpentParsing}ms parsing`)
     console.log(`Typechecked in ${endTypecheck - startTypecheck}ms`)
-
     
 
     if (watch) {
         for (const module of modulesStore.modules.keys()) {
             watchFile(module, async (curr, prev) => {
-                console.log("Typechecking...")
-                const fileContents = await fs.readFile(module);
-                const parsed = parse(fileContents.toString());
-                modulesStore.modules.set(module, parsed);
+                console.log(`Typechecking ${module}...`)
 
-                scopescan(modulesStore, parsed, module);
-                typescan(modulesStore, parsed);
+                try {
+                    const fileContents = await fs.readFile(module);
+                    const parsed = parse(fileContents.toString());
+                    modulesStore.modules.set(module, parsed);
 
-                // console.log(JSON.stringify(parsed, null, 2))
-                // console.log(modulesStore.)
-                // console.log(modulesStore.getScopeFor(parsed).types)
-                // console.log(modulesStore.getScopeFor(parsed).values)
+                    scopescan(modulesStore, parsed, module);
+                    typescan(modulesStore, parsed);
 
-                let hadError = false;
-                typecheck(modulesStore, parsed, err => {
-                    hadError = true;
-                    printError(err)
-                });
+                    // console.log(JSON.stringify(parsed, null, 2))
+                    // console.log(modulesStore.)
+                    // console.log(modulesStore.getScopeFor(parsed).types)
+                    // console.log(modulesStore.getScopeFor(parsed).values)
 
-                if (!hadError) {
-                    console.log("No errors")
-                }
-                
-                const jsPath = bagelFileToJsFile(module);
-                const compiled = compile(modulesStore, parsed);
-                const compiledWithLib = LIB_IMPORTS + compiled;
-                await fs.writeFile(jsPath, compiledWithLib);
-
-                
-                if (bundle) {
+                    let hadError = false;
                     try {
-                        await build({
-                            entryPoints: [ bagelFileToJsFile(entry) ],
-                            outfile: bagelFileToJsFile(entry, true),
-                            bundle: true,
-                        })
-                    } catch(err) {
-                        console.error(err.message);
+                        typecheck(modulesStore, parsed, err => {
+                            hadError = true;
+                            printError(path.basename(module), err)
+                        });
+                    } catch (e) {
+                        console.error(`Encountered exception typechecking module "${module}":\n${e}`);
+                        hadError = true;
                     }
+
+                    if (!hadError) {
+                        console.log("No errors")
+                    }
+                    
+                    const jsPath = bagelFileToTsFile(module);
+                    const compiled = compile(modulesStore, parsed);
+                    const compiledWithLib = LIB_IMPORTS + compiled;
+                    await fs.writeFile(jsPath, compiledWithLib);
+
+                    // TODO
+                    // if (bundle) {
+                    //     await bundleOutput(entry)
+                    // }
+                } catch {
+                    console.error("Failed to read module " + module)
                 }
             })
         }
@@ -149,38 +174,22 @@ function printError(error: BagelTypeError) {
 
 const LIB_IMPORTS = `
 import { observable as ___observable } from "./crowdx";
-import { range as ___range } from "./lib";
+import { range as ___range, slice, map, filter, entries, count, join, concat, log, floor, arrayFrom, fromEntries } from "./lib";
 
 `
 
-function bagelFileToJsFile(module: string, bundle?: boolean): string {
-    return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + (bundle ? ".bundle" : "") + ".js")
+async function bundleOutput(entry: string) {
+    try {
+        await build({
+            entryPoints: [ bagelFileToTsFile(entry) ],
+            outfile: bagelFileToTsFile(entry, true),
+            bundle: true,
+        })
+    } catch(err) {
+        console.error(err.message);
+    }
 }
 
-
-// fs.readFile(entry).then(async code => {
-//     const parsed = parse(code.toString());
-    
-//     // console.log(JSON.stringify(parsed, null, 4))
-//     const compiled = compile(parsed)
-//     // console.log(compiled)
-    
-    
-
-//     // Add this stuff when bundling:
-//     // Object.entries(window["bagel-lib"]).forEach(([key, value]) => window[key] = value)
-//     // main();
-//     //
-//     // const bagelLibBundle = (await fs.readFile(path.resolve(__dirname, "lib.js"))).toString();
-
-//     const startTypecheck = Date.now();
-//     const types = typecheckModule(parsed);
-//     const endTypecheck = Date.now();
-//     console.log(types);
-//     fs.writeFile(output, compiled);
-//     // console.log(eval(compiled))
-    
-//     console.log();
-//     console.log(`Parsed in ${endParse - startParse}ms`)
-//     console.log(`Typechecked in ${endTypecheck - startTypecheck}ms`)
-// });
+function bagelFileToTsFile(module: string, bundle?: boolean): string {
+    return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + (bundle ? ".bundle" : "") + ".bagel.ts")
+}

@@ -2,4 +2,5 @@ dist
 .vscode
 node_modules
 build
-tests/sample-files/*.js
+tests/sample-files/*.bagel.js
+tests/sample-files/*.bagel.ts
