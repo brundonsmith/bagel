@@ -94,14 +94,12 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                                     declaredType: UNKNOWN_TYPE,
                                 };
                             } else {
-                        scope.values[name] = {
-                            mutability: "none",
-                            declaredType: declType(foreignDecl) as TypeExpression,
-                            initialValue: declValue(foreignDecl),
-                        };
+                                scope.values[name] = {
+                                    mutability: "none",
+                                    declaredType: declType(foreignDecl) as TypeExpression,
+                                    initialValue: declValue(foreignDecl),
+                                };
                             }
-
-
                         }
                     }
                 }
