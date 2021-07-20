@@ -105,7 +105,7 @@ function compilePipe(modulesStore: ModulesStore, expressions: readonly Expressio
 
 function compileTypeExpression(expr: TypeExpression): string {
     switch (expr.kind) {
-        case "union-type": return expr.members.join(" | ");
+        case "union-type": return expr.members.map(compileTypeExpression).join(" | ");
         case "named-type": return expr.name.name;
         case "proc-type": return `(${expr.argTypes.map(compileTypeExpression).join(", ")}) => void`;
         case "func-type": return `(${expr.argTypes.map(compileTypeExpression).join(", ")}) => ${compileTypeExpression(expr.returnType)}`;
@@ -119,7 +119,7 @@ function compileTypeExpression(expr: TypeExpression): string {
         case "string-type": return `string`;
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;
-        case "nil-type": return `null|undefined`;
+        case "nil-type": return `null | undefined`;
     }
 
     throw Error(`Compilation logic for type expression of kind '${expr.kind}' is unspecified`)
