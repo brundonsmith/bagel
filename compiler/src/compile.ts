@@ -2,6 +2,7 @@ import { ModulesStore } from "./checking/modules-store";
 import { Module, AST } from "./model/ast";
 import { PlainIdentifier } from "./model/common";
 import { Expression, Proc, Func } from "./model/expressions";
+import { TypeExpression } from "./model/type-expressions";
 
 
 export function compile(modulesStore: ModulesStore, module: Module): string {
@@ -14,8 +15,8 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(modulesStore, name) + (alias ? ` as ${compileOne(modulesStore, alias)}` : ``)
-        ).join(", ")} } from "${ast.path.segments.join("")}";`;
-        case "type-declaration": return ``;
+        ).join(", ")} } from "${ast.path.segments.join("")}.bagel";`;
+        case "type-declaration": return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileTypeExpression(ast.type)}`;
         case "proc-declaration": return (ast.exported ? `export ` : ``) + compileProc(modulesStore, ast.proc);
         case "func-declaration": return (ast.exported ? `export ` : ``) + compileFunc(modulesStore, ast.func);
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)};`;
@@ -35,7 +36,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "range": return `${HIDDEN_IDENTIFIER_PREFIX}range(${ast.start})(${ast.end})`;
         case "parenthesized-expression": return `(${compileOne(modulesStore, ast.inner)})`;
         case "property-accessor": return `${compileOne(modulesStore, ast.base)}.${ast.properties.map(p => compileOne(modulesStore, p)).join(".")}`;
-        case "local-identifier": return modulesStore.getScopeFor(ast).values[ast.name].mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
+        case "local-identifier": return modulesStore.getScopeFor(ast).values[ast.name]?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
         case "plain-identifier": return ast.name;
         case "object-literal":  return `{${objectEntries(modulesStore, ast.entries)}}`;
         case "array-literal":   return `[${ast.entries.map(e => compileOne(modulesStore, e)).join(", ")}]`;
@@ -89,7 +90,7 @@ ${proc.argNames.length > 1 ? `});` : ''}}`;
 // TODO: dispose of reactions somehow... at some point...
 
 function compileFunc(modulesStore: ModulesStore, func: Func): string {
-    return `function ${func.name == null ? '' : func.name.name}(${func.argNames[0] != null ? compileOne(modulesStore, func.argNames[0]) : ''}) { return (${func.argNames.map((arg, index, arr) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}) => `).join("")}
+    return `function ${func.name == null ? '' : func.name.name}(${func.argNames[0] != null ? `${compileOne(modulesStore, func.argNames[0])}: ${compileTypeExpression(func.type.argTypes[0])}` : ''}) { return (${func.argNames.map((arg, index, arr) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}: ${compileTypeExpression(func.type.argTypes[index])})${index === arr.length - 1 ? ": " + compileTypeExpression(func.type.returnType) : ""} => `).join("")}
     ${compileOne(modulesStore, func.body)}
 );}`;
 }
@@ -99,5 +100,25 @@ function compilePipe(modulesStore: ModulesStore, expressions: readonly Expressio
         return compileOne(modulesStore, expressions[end]);
     } else {
         return `${compileOne(modulesStore, expressions[end])}(${compilePipe(modulesStore, expressions, end - 1)})`;
+    }
+}
+
+function compileTypeExpression(expr: TypeExpression): string {
+    switch (expr.kind) {
+        case "union-type": return expr.members.join(" | ");
+        case "named-type": return expr.name.name;
+        case "proc-type": return `(${expr.argTypes.map(compileTypeExpression).join(", ")}) => void`;
+        case "func-type": return `(${expr.argTypes.map(compileTypeExpression).join(", ")}) => ${compileTypeExpression(expr.returnType)}`;
+        case "element-type": throw Error();
+        case "object-type": return `{${expr.entries
+            .map(([ key, value ]) => `${key.name}: ${compileTypeExpression(value)}`)
+            .join(", ")}}`;
+        case "indexer-type": return `{[key: ${compileTypeExpression(expr.keyType)}]: ${compileTypeExpression(expr.valueType)}}`;
+        case "array-type": return `${compileTypeExpression(expr.element)}[]`;
+        case "tuple-type": return `[${expr.members.map(compileTypeExpression).join(", ")}]`;
+        case "string-type": return `string`;
+        case "number-type": return `number`;
+        case "boolean-type": return `boolean`;
+        case "nil-type": return `null|undefined`;
     }
 }
