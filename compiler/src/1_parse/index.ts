@@ -559,12 +559,13 @@ const reaction: ParseFunction<Reaction> = (code, startIndex) =>
     expec(consume(code, index, "triggers"), err(code, index, '"triggers" clause'), index =>
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(expression(code, index), err(code, index, "Side-effect procedure"), ({ parsed: effect, newIndex: index }) => 
-    given(parseOptional(code, index, (code, index) =>
         given(consumeWhitespaceRequired(code, index), index =>
+    expec(
         given(consume(code, index, "until"), index =>
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
-        expec(expression(code, index), err(code, index, "Disposal condition"), res => res))))), ({ parsed: until, newIndex }) => 
-    given(consumeWhitespace(code, newIndex ?? index), index =>
+        expec(expression(code, index), err(code, index, "Disposal condition"), res => res)))
+        ?? consume(code, index, "forever"), err(code, index, 'Reaction lifetime (either "until <func>" or "forever")'), lifetimeResult => 
+    given(consumeWhitespace(code, typeof lifetimeResult === 'number' ? lifetimeResult : lifetimeResult.newIndex), index =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
         parsed: {
             kind: "reaction",
@@ -573,10 +574,10 @@ const reaction: ParseFunction<Reaction> = (code, startIndex) =>
             endIndex: index,
             data,
             effect,
-            until
+            until: typeof lifetimeResult === 'number' ? undefined : lifetimeResult.parsed
         },
         newIndex: index,
-    })))))))))))
+    }))))))))))))
 
 const computation: ParseFunction<Computation> = (code, startIndex) =>
     given(consume(code, startIndex, "computation"), index =>
