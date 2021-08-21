@@ -170,7 +170,7 @@ import { observable as ___observable, reaction as ___reaction, computed as ___co
     range as ___range, slice, map, filter, entries, count, join, concat, log, floor, arrayFrom, fromEntries } from "../../lib/src";
 
 ___configure({
-    enforceActions: false,
+    enforceActions: "never",
     computedRequiresReaction: false,
     reactionRequiresObservable: false,
     observableRequiresReaction: false,
