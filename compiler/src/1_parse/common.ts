@@ -28,6 +28,14 @@ export function consumeWhitespace(code: string, index: number): number {
     return consumeWhile(code, index, ch => ch.match(/[\s]/) != null);
 }
 
+export function consumeWhitespaceRequired(code: string, index: number): number|undefined {
+    const newIndex = consumeWhile(code, index, ch => ch.match(/[\s]/) != null);
+    
+    if (newIndex > index) {
+        return newIndex;
+    }
+}
+
 export function consumeWhile(code: string, index: number, fn: (ch: string, index: number) => boolean): number {
     let newIndex = index;
     while (code[newIndex] != null && fn(code[newIndex], newIndex)) {

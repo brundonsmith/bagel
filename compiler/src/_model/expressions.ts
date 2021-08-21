@@ -22,6 +22,7 @@ export type Expression =
     | StringLiteral
     | NumberLiteral
     | ElementTag
+    | ClassConstruction
 
 export type JavascriptEscape = SourceInfo & {
     kind: "javascript-escape",
@@ -134,6 +135,12 @@ export type ElementTag = SourceInfo & {
     children: Expression[],
 }
 
+export type ClassConstruction = SourceInfo & {
+    kind: "class-construction",
+    clazz: LocalIdentifier,
+    
+}
+
 const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "proc": undefined,
     "func": undefined,
@@ -154,6 +161,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "boolean-literal": undefined,
     "nil-literal": undefined,
     "javascript-escape": undefined,
+    "class-construction": undefined,
 };
 
 export function isExpression(ast: AST): ast is Expression {

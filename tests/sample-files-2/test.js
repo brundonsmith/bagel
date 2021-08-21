@@ -4138,7 +4138,7 @@
 
   // tests/sample-files-2/basic-sample.bgl.ts
   configure({
-    enforceActions: false,
+    enforceActions: "never",
     computedRequiresReaction: false,
     reactionRequiresObservable: false,
     observableRequiresReaction: false

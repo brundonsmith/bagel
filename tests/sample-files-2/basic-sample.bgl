@@ -15,6 +15,16 @@ const BAR: Stuff = {
     foo: 12
 }
 
+class MyClass {
+    private someState: number = 12
+
+    func foo() => 12
+
+    public proc bar(newState: number) {
+        this.someState = newState;
+    }
+}
+
 proc main() {
     let a: string = '';
     

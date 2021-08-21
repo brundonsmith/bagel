@@ -2,12 +2,14 @@ import { AST, Module } from "../_model/ast";
 import { Expression } from "../_model/expressions";
 import { TypeExpression } from "../_model/type-expressions";
 import { DeepReadonly } from "../utils";
+import { ClassDeclaration } from "../_model/declarations";
 
 
 export type Scope = {
     readonly parentScope?: Scope,
     readonly types: {[key: string]: TypeExpression},
     readonly values: {[key: string]: DeclarationDescriptor},
+    readonly classes: {[key: string]: ClassDeclaration},
 }
 
 export type Mutability = "all"|"properties-only"|"none";

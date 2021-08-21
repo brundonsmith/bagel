@@ -1,10 +1,11 @@
+import { log } from "../utils";
 import { Module } from "../_model/ast";
 import { Block, PlainIdentifier } from "../_model/common";
-import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Funcall, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral } from "../_model/expressions";
+import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Funcall, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral } from "../_model/expressions";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, ProcCall, Reaction, Statement, WhileLoop } from "../_model/statements";
 import { ArrayType, BOOLEAN_TYPE, FuncType, IndexerType, LiteralType, NamedType, NIL_TYPE, NUMBER_TYPE, ObjectType, PrimitiveType, STRING_TYPE, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions";
-import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, err, errorMessage, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common";
+import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, errorMessage, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common";
 
 export function parse(code: string, fileName?: string): Module {
     let index = 0;
@@ -43,12 +44,13 @@ const declaration: ParseFunction<Declaration> = (code, index) =>
     ?? procDeclaration(code, index)
     ?? funcDeclaration(code, index)
     ?? constDeclaration(code, index)
+    ?? classDeclaration(code, index)
 
 const importDeclaration: ParseFunction<ImportDeclaration> = (code, startIndex) =>
     given(consume(code, startIndex, "from"), index =>
-    given(consumeWhitespace(code, index), index =>
+    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(stringLiteral(code, index), err(code, index, 'Import path'), ({ parsed: path, newIndex: index }) => 
-    given(consumeWhitespace(code, index), index =>
+    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(consume(code, index, "import"), err(code, index, '"import"'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
@@ -74,7 +76,7 @@ const importDeclaration: ParseFunction<ImportDeclaration> = (code, startIndex) =
 
 const typeDeclaration: ParseFunction<TypeDeclaration> = (code, startIndex) => {
     const indexAfterExport = given(consume(code, startIndex, "export"), index =>
-        consumeWhitespace(code, index));
+        consumeWhitespaceRequired(code, index));
 
     if (isError(indexAfterExport)) {
         return indexAfterExport;
@@ -83,7 +85,7 @@ const typeDeclaration: ParseFunction<TypeDeclaration> = (code, startIndex) => {
     const exported = indexAfterExport != null;
     
     return given(consume(code, indexAfterExport ?? startIndex, "type"), index => 
-        given(consumeWhitespace(code, index), index =>
+        given(consumeWhitespaceRequired(code, index), index =>
         expec(plainIdentifier(code, index), err(code, index, 'Type name'), ({ parsed: name, newIndex: index }) =>
         given(consumeWhitespace(code, index), index =>
         expec(consume(code, index, "="), err(code, index, '"="'), index =>
@@ -275,7 +277,7 @@ const unknownType: ParseFunction<UnknownType> = (code, startIndex) =>
 
 const procDeclaration: ParseFunction<ProcDeclaration> = (code, startIndex) => {
     const indexAfterExport = given(consume(code, startIndex, "export"), index =>
-        consumeWhitespace(code, index));
+        consumeWhitespaceRequired(code, index));
 
     if (isError(indexAfterExport)) {
         return indexAfterExport;
@@ -284,7 +286,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (code, startIndex) => {
     const exported = indexAfterExport != null;
     
     return given(consume(code, indexAfterExport ?? startIndex, "proc"), index =>
-        given(consumeWhitespace(code, index), index =>
+        given(consumeWhitespaceRequired(code, index), index =>
         given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
         given(consumeWhitespace(code, index), index =>
         expec(proc(code, index), err(code, index, 'Procedure'), ({ parsed: proc, newIndex: index }) => ({
@@ -303,7 +305,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (code, startIndex) => {
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = (code, startIndex) => {
     const indexAfterExport = given(consume(code, startIndex, "export"), index =>
-        consumeWhitespace(code, index));
+        consumeWhitespaceRequired(code, index));
 
     if (isError(indexAfterExport)) {
         return indexAfterExport;
@@ -312,7 +314,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (code, startIndex) => {
     const exported = indexAfterExport != null;
     
     return given(consume(code, indexAfterExport ?? startIndex, "func"), index =>
-        given(consumeWhitespace(code, index), index =>
+        given(consumeWhitespaceRequired(code, index), index =>
         given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
         given(consumeWhitespace(code, index), index =>
         expec(func(code, index), err(code, index, 'Function'), ({ parsed: func, newIndex: index }) => ({
@@ -331,7 +333,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (code, startIndex) => {
 
 const constDeclaration: ParseFunction<ConstDeclaration> = (code, startIndex) => {
     const indexAfterExport = given(consume(code, startIndex, "export"), index =>
-        consumeWhitespace(code, index));
+        consumeWhitespaceRequired(code, index));
 
     if (isError(indexAfterExport)) {
         return indexAfterExport;
@@ -340,7 +342,7 @@ const constDeclaration: ParseFunction<ConstDeclaration> = (code, startIndex) => 
     const exported = indexAfterExport != null;
     
     return given(consume(code, indexAfterExport ?? startIndex, "const"), index =>
-        given(consumeWhitespace(code, index), index =>
+        given(consumeWhitespaceRequired(code, index), index =>
         given(plainIdentifier(code, index), ({ parsed: name, newIndex: index}) =>
         given(consumeWhitespace(code, index), index =>
         given(parseOptional(code, index, (code, index) =>
@@ -363,6 +365,143 @@ const constDeclaration: ParseFunction<ConstDeclaration> = (code, startIndex) => 
                 newIndex: index,
         }))))))))))
 }
+
+const classDeclaration: ParseFunction<ClassDeclaration> = (code, startIndex) => {
+    const indexAfterExport = given(consume(code, startIndex, "export"), index =>
+        consumeWhitespaceRequired(code, index));
+
+    if (isError(indexAfterExport)) {
+        return indexAfterExport;
+    }
+
+    const exported = indexAfterExport != null;
+    
+    return given(consume(code, startIndex, "class"), index =>
+        given(consumeWhitespaceRequired(code, index), index =>
+        expec(plainIdentifier(code, index), err(code, index, "Class name"), ({ parsed: name, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index =>
+        expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
+        given(parseSeries(code, index, classMember), ({ parsed: members, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index =>
+        expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
+            parsed: {
+                kind: "class-declaration",
+                code,
+                startIndex,
+                endIndex: index,
+                name,
+                typeParams: [],
+                members,
+                exported
+            },
+            newIndex: index
+        })))))))))
+}
+
+const classMember: ParseFunction<ClassMember> = (code, startIndex) =>
+    classProperty(code, startIndex)
+    ?? classFunction(code, startIndex)
+    ?? classProcedure(code, startIndex)
+
+const classProperty: ParseFunction<ClassProperty> = (code, startIndex) => {
+    const accessResult = given(_accessModifier(code, startIndex), ({ parsed, newIndex: index }) => 
+        given(consumeWhitespaceRequired(code, index), index => ({
+            parsed,
+            newIndex: index
+        })));
+
+    if (isError(accessResult)) {
+        return accessResult;
+    }
+
+    const access = accessResult?.parsed ?? 'public';
+    
+    return given(plainIdentifier(code, accessResult?.newIndex ?? startIndex), ({ parsed: name, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index =>
+        given(parseOptional(code, index, (code, index) =>
+            given(consume(code, index, ":"), index =>
+            given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: type, newIndex }) =>
+        given(consumeWhitespace(code, newIndex ?? index), index =>
+        expec(consume(code, index, "="), err(code, index, '"="'), index =>
+        given(consumeWhitespace(code, index), index =>
+        expec(expression(code, index), err(code, index, 'Expression'), ({ parsed: value, newIndex: index }) => ({
+            parsed: {
+                kind: "class-property",
+                code,
+                startIndex,
+                endIndex: index,
+                name,
+                type,
+                value,
+                access
+            },
+            newIndex: index,
+        }))))))))
+}
+
+const classFunction: ParseFunction<ClassFunction> = (code, startIndex) => {
+    const accessResult = given(_accessModifier(code, startIndex), ({ parsed, newIndex: index }) => 
+        given(consumeWhitespaceRequired(code, index), index => ({
+            parsed,
+            newIndex: index
+        })));
+
+    if (isError(accessResult)) {
+        return accessResult;
+    }
+
+    const access = accessResult?.parsed ?? 'public';
+    
+    return given(funcDeclaration(code, accessResult?.newIndex ?? startIndex), ({ parsed: { name, func }, newIndex: index }) => ({
+        parsed: {
+            kind: "class-function",
+            code,
+            startIndex,
+            endIndex: index,
+            name,
+            func,
+            access
+        },
+        newIndex: index,
+    }))
+}
+
+const classProcedure: ParseFunction<ClassProcedure> = (code, startIndex) => {
+    const accessResult = given(_accessModifier(code, startIndex), ({ parsed, newIndex: index }) => 
+        given(consumeWhitespaceRequired(code, index), index => ({
+            parsed,
+            newIndex: index
+        })));
+
+    if (isError(accessResult)) {
+        return accessResult;
+    }
+
+    const access = accessResult?.parsed ?? 'public';
+    
+    return given(procDeclaration(code, accessResult?.newIndex ?? startIndex), ({ parsed: { name, proc }, newIndex: index }) => ({
+        parsed: {
+            kind: "class-procedure",
+            code,
+            startIndex,
+            endIndex: index,
+            name,
+            proc,
+            access
+        },
+        newIndex: index,
+    }))
+}
+
+const _accessModifier: ParseFunction<'private'|'public'> = (code, startIndex) =>
+    given(consume(code, startIndex, "private"), index => ({
+        parsed: "private",
+        newIndex: index
+    }))
+    ?? given(consume(code, startIndex, "public"), index => ({
+        parsed: "public",
+        newIndex: index
+    }))
 
 const proc: ParseFunction<Proc> = (code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
@@ -398,15 +537,15 @@ const statement: ParseFunction<Statement> = (code, startIndex) =>
 
 const reaction: ParseFunction<Reaction> = (code, startIndex) =>
     given(consume(code, startIndex, "reaction"), index =>
-    given(consumeWhitespace(code, index), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
     expec(expression(code, index), err(code, index, "Data function"), ({ parsed: data, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
+    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(consume(code, index, "triggers"), err(code, index, '"triggers" clause'), index =>
-    given(consumeWhitespace(code, index), index =>
+    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(expression(code, index), err(code, index, "Side-effect procedure"), ({ parsed: effect, newIndex: index }) => 
-    given(consumeWhitespace(code, index), index =>
+    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(consume(code, index, "until"), err(code, index, '"until" clause'), index =>
-    given(consumeWhitespace(code, index), index =>
+    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(expression(code, index), err(code, index, "Disposal condition"), ({ parsed: until, newIndex: index }) => 
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
@@ -424,7 +563,7 @@ const reaction: ParseFunction<Reaction> = (code, startIndex) =>
 
 const computation: ParseFunction<Computation> = (code, startIndex) =>
     given(consume(code, startIndex, "computation"), index =>
-    given(consumeWhitespace(code, index), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
     expec(plainIdentifier(code, index), err(code, index, "Computation name"), ({ parsed: name, newIndex: index }) =>
     expec(consume(code, index, '()'), err(code, index, '"()"'), index =>
     given(consumeWhitespace(code, index), index =>
@@ -445,7 +584,7 @@ const computation: ParseFunction<Computation> = (code, startIndex) =>
 
 const letDeclaration: ParseFunction<LetDeclaration> = (code, startIndex) =>
     given(consume(code, startIndex, "let"), index =>
-    given(consumeWhitespace(code, index), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
     given(localIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseOptional(code, index, (code, index) =>
@@ -470,13 +609,13 @@ const letDeclaration: ParseFunction<LetDeclaration> = (code, startIndex) =>
         }))))))))))))
 
 const assignment: ParseFunction<Assignment> = (code, startIndex) =>
-    given(localIdentifier(code, startIndex) ?? propertyAccessor(code, startIndex), ({ parsed: target, newIndex: index }) =>
+    given(propertyAccessor(code, startIndex) ?? localIdentifier(code, startIndex), ({ parsed: target, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "="), index =>
     given(consumeWhitespace(code, index), index =>
-    given(expression(code, index), ({ parsed: value, newIndex: index }) => 
+    expec(expression(code, index), err(code, index, "Assignment value"), ({ parsed: value, newIndex: index }) => 
     given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, ";"), index => ({
+    expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
         parsed: {
             kind: "assignment",
             code,
@@ -560,9 +699,9 @@ const forLoop: ParseFunction<ForLoop> = (code, startIndex) =>
     expec(consume(code, index, "("), err(code, index, '"("'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(plainIdentifier(code, index), err(code, index, 'Item identifier for loop items'), ({ parsed: itemIdentifier, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
     expec(consume(code, index, "of"), err(code, index, '"of"'), index =>
-    given(consumeWhitespace(code, index), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
     expec(expression(code, index), err(code, index, 'Iterator expression'), ({ parsed: iterator, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ")"), err(code, index, '")"'), index =>
@@ -603,6 +742,7 @@ const whileLoop: ParseFunction<WhileLoop> = (code, startIndex) =>
 
 const parseBlock: ParseFunction<Block> = (code, startIndex) =>
     given(consume(code, startIndex, "{"), index =>
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries(code, index, statement), ({ parsed: statements, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
@@ -614,11 +754,11 @@ const parseBlock: ParseFunction<Block> = (code, startIndex) =>
             statements,
         },
         newIndex: index,
-    })))))
+    }))))))
 
 
 const expressionPrecedenceTiers: () => ParseFunction<Expression>[][] = () => [
-    [ javascriptEscape, pipe ],
+    [ javascriptEscape, pipe, classConstruction ],
     [ func, proc, range, binaryOperator ],
     [ funcall ],
     [ indexer ],
@@ -913,7 +1053,7 @@ const localIdentifier: ParseFunction<LocalIdentifier> = (code, startIndex) =>
 export const elementTag: ParseFunction<ElementTag> = (code, startIndex) =>
     given(consume(code, startIndex, "<"), index =>
     given(plainIdentifier(code, index), ({ parsed: tagName, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
     given(parseSeries(code, index, _tagAttribute), ({ parsed: attributes, newIndex: index }) =>
     expec(consume(code, index, ">"), err(code, index, '">"'), index => 
     given(parseSeries(code, index, (code, index) => elementTag(code, index) ?? _elementEmbeddedExpression(code, index)), ({ parsed: children, newIndex: index }) =>
@@ -950,6 +1090,21 @@ const _elementEmbeddedExpression: ParseFunction<Expression> = (code, index) =>
         parsed: expression,
         newIndex: index,
     }))))))
+
+export const classConstruction: ParseFunction<ClassConstruction> = (code, startIndex) =>
+    given(consume(code, startIndex, "new"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(localIdentifier(code, index), err(code, index, "Constructor"), ({ parsed: clazz, newIndex: index }) =>
+    expec(consume(code, index, "()"), err(code, index, '"()"'), index => ({
+        parsed: {
+            kind: "class-construction",
+            code,
+            startIndex,
+            endIndex: index,
+            clazz
+        },
+        newIndex: index
+    })))))
 
 export const objectLiteral: ParseFunction<ObjectLiteral> = (code, startIndex) =>
     given(consume(code, startIndex, "{"), index =>

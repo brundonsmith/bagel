@@ -8,6 +8,7 @@ export type Declaration =
     | ProcDeclaration
     | FuncDeclaration
     | ConstDeclaration
+    | ClassDeclaration
 
 export type ImportDeclaration = SourceInfo & {
     kind: "import-declaration",
@@ -49,3 +50,41 @@ export type ConstDeclaration = SourceInfo & {
     value: Expression,
     exported: boolean,
 }
+
+export type ClassDeclaration = SourceInfo & {
+    kind: "class-declaration",
+    name: PlainIdentifier,
+    typeParams: PlainIdentifier[],
+    members: ClassMember[],
+    exported: boolean,
+    // TODO: constructor
+}
+
+export type ClassMember =
+    | ClassProperty
+    | ClassFunction
+    | ClassProcedure
+
+export type ClassProperty = SourceInfo & {
+    kind: "class-property",
+    name: PlainIdentifier,
+    type?: TypeExpression,
+    value: Expression,
+    access: 'private'|'public',
+}
+
+export type ClassFunction = SourceInfo & {
+    kind: "class-function",
+    name: PlainIdentifier,
+    func: Func,
+    access: 'private'|'public',
+}
+
+export type ClassProcedure = SourceInfo & {
+    kind: "class-procedure",
+    name: PlainIdentifier,
+    proc: Proc,
+    access: 'private'|'public',
+}
+
+// TODO: ClassReaction

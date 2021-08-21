@@ -1,11 +1,12 @@
 import { Block, PlainIdentifier, SourceInfo } from "./common";
-import { Declaration } from "./declarations";
+import { ClassMember, Declaration } from "./declarations";
 import { Expression } from "./expressions";
 import { Statement } from "./statements";
 
 export type AST =
     | Module
     | Declaration
+    | ClassMember
     | Expression
     | Statement
     | PlainIdentifier

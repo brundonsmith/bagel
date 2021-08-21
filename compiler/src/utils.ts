@@ -90,18 +90,45 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             }
         } break;
         case "func-declaration": {
+            walkParseTree(nextPayload, ast.name, fn);
             walkParseTree(nextPayload, ast.func, fn);
         } break;
         case "proc-declaration": {
+            walkParseTree(nextPayload, ast.name, fn);
             walkParseTree(nextPayload, ast.proc, fn);
         } break;
         case "const-declaration": {
+            walkParseTree(nextPayload, ast.name, fn);
             walkParseTree(nextPayload, ast.value, fn);
         } break;
+        case "class-declaration": {
+            walkParseTree(nextPayload, ast.name, fn);
+            for(const member of ast.members) {
+                walkParseTree(nextPayload, member, fn);
+            }
+        } break;
+        case "class-property": {
+            walkParseTree(nextPayload, ast.name, fn);
+            walkParseTree(nextPayload, ast.value, fn);
+        } break;
+        case "class-function": {
+            walkParseTree(nextPayload, ast.name, fn);
+            walkParseTree(nextPayload, ast.func, fn);
+        } break;
+        case "class-procedure": {
+            walkParseTree(nextPayload, ast.name, fn);
+            walkParseTree(nextPayload, ast.proc, fn);
+        } break;
         case "proc": {
+            for (const argName of ast.argNames) {
+                walkParseTree(nextPayload, argName, fn);
+            }
             walkParseTree(nextPayload, ast.body, fn);
         } break;
         case "func": {
+            for (const argName of ast.argNames) {
+                walkParseTree(nextPayload, argName, fn);
+            }
             walkParseTree(nextPayload, ast.body, fn);
         } break;
         case "pipe": {
@@ -128,6 +155,9 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
                 walkParseTree(nextPayload, child, fn);
             }
         } break;
+        case "class-construction": {
+            walkParseTree(nextPayload, ast.clazz, fn);
+        } break;
         case "indexer": {
             walkParseTree(nextPayload, ast.base, fn);
             walkParseTree(nextPayload, ast.indexer, fn);
@@ -144,6 +174,9 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         } break;
         case "property-accessor": {
             walkParseTree(nextPayload, ast.base, fn);
+            for (const property of ast.properties) {
+                walkParseTree(nextPayload, property, fn);
+            }
         } break;
         case "object-literal": {
             for (const [key, value] of ast.entries) {
@@ -195,6 +228,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             }
         } break;
         case "for-loop": {
+            walkParseTree(nextPayload, ast.itemIdentifier, fn);
             walkParseTree(nextPayload, ast.iterator, fn);
             walkParseTree(nextPayload, ast.body, fn);
         } break;
@@ -202,9 +236,17 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.condition, fn);
             walkParseTree(nextPayload, ast.body, fn);
         } break;
+        case "import-declaration": {
+            walkParseTree(nextPayload, ast.path, fn);
+            for (const i of ast.imports) {
+                walkParseTree(nextPayload, i.name, fn);
+                if (i.alias) {
+                    walkParseTree(nextPayload, i.alias, fn);
+                }
+            }
+        } break;
 
         // atomic
-        case "import-declaration":
         case "type-declaration":
         case "plain-identifier":
         case "range":
@@ -213,6 +255,9 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "boolean-literal":
         case "nil-literal":
             break;
+
+        default:
+            throw Error("Need to add walk clause for AST node type " + ast.kind)
     }
 }
 

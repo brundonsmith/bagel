@@ -37,7 +37,7 @@ export function scopescan(reportError: (error: BagelTypeError) => void, modulesS
 export type ScopeOwner = Module|Func|Proc|Block|ForLoop;
 
 export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
-    const scope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {} };
+    const scope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {}, classes: {} };
 
     // TODO: Err on duplicate identifiers
     
@@ -65,6 +65,8 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                         declaredType: declaration.type,
                         initialValue: declaration.value
                     };
+                } else if (declaration.kind === "class-declaration") {
+                    scope.classes[declaration.name.name] = declaration;
                 } else if (declaration.kind === "import-declaration") {
                     const otherModule = modulesStore.modules.get(canonicalModuleName(module, declaration.path));
                     
@@ -177,6 +179,7 @@ export function extendScope(scope: Scope): Scope {
     return {
         types: Object.create(scope.types),
         values: Object.create(scope.values),
+        classes: scope.classes, // classes can't be created in lower scopes, so we don't need to worry about hierarchy
     }
 }
 
