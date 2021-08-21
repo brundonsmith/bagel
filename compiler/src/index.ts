@@ -64,12 +64,12 @@ const printError = (module: string) => (error: BagelTypeError) => {
                 }
 
                 modulesStore.modules.set(module, parsed);
-            } catch {
+            } catch (e) {
                 console.error("Failed to read module " + module + "\n")
+                console.error(e)
             }
         }
     }
-
 
     const startTypecheck = Date.now();
     // scopescan all parsed modules
@@ -153,7 +153,8 @@ const printError = (module: string) => (error: BagelTypeError) => {
                     //     await bundleOutput(entry)
                     // }
                 } catch (e) {
-                    console.error("Failed to read module " + module + `\n${e.stack}`)
+                    console.error("Failed to read module " + module + "\n")
+                    console.error(e)
                 }
             })
         }
