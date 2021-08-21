@@ -11,6 +11,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "mobx": "^6.3.2"
+    "mobx": "^6.3.2",
+    "preact": "^10.5.14"
   }
 }

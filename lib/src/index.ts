@@ -16,10 +16,27 @@ function reaction<T>(expression: () => T, effect: (arg: T) => void, opts?: IReac
 export function reactionUntil<T>(expression: () => T, effect: (arg: T) => void, until?: () => boolean, opts?: IReactionOptions | undefined): void {
     const r = reaction(expression, effect, opts);
     if (until) {
-    when(until, r);
+        when(until, r);
     }
 }
 
+
+// Preact
+export {
+    h,
+} from "preact"
+import {
+    render as prender,
+} from "preact"
+
+export function render(a: Parameters<typeof prender>[0]) {
+    return function (b: Parameters<typeof prender>[1]): ReturnType<typeof prender> {
+        return prender(a, b)
+    }
+}
+
+
+// Custom
 export function range(start: number) {
     return function*(end: number) {
         for (let i = start; i < end; i++) {
