@@ -1,4 +1,5 @@
 import { ModulesStore } from "../3_checking/modules-store";
+import { given } from "../utils";
 import { Module, AST } from "../_model/ast";
 import { PlainIdentifier } from "../_model/common";
 import { Expression, Proc, Func } from "../_model/expressions";
@@ -57,7 +58,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "reaction": return `${HIDDEN_IDENTIFIER_PREFIX}reactionUntil(
 ${compileOne(modulesStore, ast.data)},
 ${compileOne(modulesStore, ast.effect)},
-${compileOne(modulesStore, ast.until)});`;
+${given(ast.until, until => compileOne(modulesStore, until))});`;
         case "computation": return `const ${ast.name.name} = ${HIDDEN_IDENTIFIER_PREFIX}computed(() => ${compileOne(modulesStore, ast.expression)});`;
         case "indexer": return `${compileOne(modulesStore, ast.base)}[${compileOne(modulesStore, ast.indexer)}]`;
         case "block": return `{ ${ast.statements.map(s => compileOne(modulesStore, s)).join(" ")} }`;

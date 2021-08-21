@@ -56,7 +56,7 @@ export type Reaction = SourceInfo & {
     kind: "reaction",
     data: Expression,
     effect: Expression,
-    until: Expression,
+    until: Expression|undefined,
 }
 
 export type Computation = SourceInfo & {

@@ -172,11 +172,13 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                     reportError(assignmentError(ast.effect, requiredEffectType, effectType));
                 }
 
-                const untilType = modulesStore.getTypeOf(ast.until);
-                if (untilType.kind !== "func-type") {
-                    reportError(miscError(ast.data, `Expected function in until clause`));
-                } else if (!subsumes(scope, REACTION_UNTIL_TYPE, untilType)) {
-                    reportError(assignmentError(ast.data, REACTION_UNTIL_TYPE, untilType));
+                if (ast.until) {
+                    const untilType = modulesStore.getTypeOf(ast.until);
+                    if (untilType.kind !== "func-type") {
+                        reportError(miscError(ast.data, `Expected function in until clause`));
+                    } else if (!subsumes(scope, REACTION_UNTIL_TYPE, untilType)) {
+                        reportError(assignmentError(ast.data, REACTION_UNTIL_TYPE, untilType));
+                    }
                 }
 
                 // TODO: This may become generalized later by generics/inverted inference

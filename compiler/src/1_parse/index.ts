@@ -543,11 +543,12 @@ const reaction: ParseFunction<Reaction> = (code, startIndex) =>
     expec(consume(code, index, "triggers"), err(code, index, '"triggers" clause'), index =>
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(expression(code, index), err(code, index, "Side-effect procedure"), ({ parsed: effect, newIndex: index }) => 
+    given(parseOptional(code, index, (code, index) =>
+        given(consumeWhitespaceRequired(code, index), index =>
+        given(consume(code, index, "until"), index =>
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
-    expec(consume(code, index, "until"), err(code, index, '"until" clause'), index =>
-    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
-    expec(expression(code, index), err(code, index, "Disposal condition"), ({ parsed: until, newIndex: index }) => 
-    given(consumeWhitespace(code, index), index =>
+        expec(expression(code, index), err(code, index, "Disposal condition"), res => res))))), ({ parsed: until, newIndex }) => 
+    given(consumeWhitespace(code, newIndex ?? index), index =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
         parsed: {
             kind: "reaction",
@@ -559,7 +560,7 @@ const reaction: ParseFunction<Reaction> = (code, startIndex) =>
             until
         },
         newIndex: index,
-    }))))))))))))))
+    })))))))))))
 
 const computation: ParseFunction<Computation> = (code, startIndex) =>
     given(consume(code, startIndex, "computation"), index =>

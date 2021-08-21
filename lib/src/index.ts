@@ -1,15 +1,23 @@
-import { IReactionPublic, IReactionOptions, IReactionDisposer, reaction, when } from "mobx";
+import { IReactionPublic, IReactionOptions, IReactionDisposer, reaction as mreaction, when, autorun } from "mobx";
 
+
+// MobX
 export {
     observable,
     computed,
-    reaction,
     configure
 } from "mobx"
 
-export function reactionUntil<T>(expression: (r: IReactionPublic) => T, effect: (arg: T, prev: T, r: IReactionPublic) => void, until: () => boolean, opts?: IReactionOptions | undefined): void {
+function reaction<T>(expression: () => T, effect: (arg: T) => void, opts?: IReactionOptions | undefined): IReactionDisposer {
+    effect(expression()) // eagerly evaluate
+    return mreaction(expression, effect, opts)
+}
+
+export function reactionUntil<T>(expression: () => T, effect: (arg: T) => void, until?: () => boolean, opts?: IReactionOptions | undefined): void {
     const r = reaction(expression, effect, opts);
+    if (until) {
     when(until, r);
+    }
 }
 
 export function range(start: number) {

@@ -201,7 +201,9 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "reaction": {
             walkParseTree(nextPayload, ast.data, fn);
             walkParseTree(nextPayload, ast.effect, fn);
+            if (ast.until) {
             walkParseTree(nextPayload, ast.until, fn);
+            }
         } break;
         case "computation": {
             walkParseTree(nextPayload, ast.expression, fn);
