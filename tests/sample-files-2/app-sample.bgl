@@ -1,0 +1,26 @@
+
+func Counter(increment: (){}, decrement: (){}, count: number) =>
+    <div>
+        <h1>
+            {'Counter is ${count}'}
+        </h1>
+        <button onClick={increment}>{'+'}</button>
+        <button onClick={decrement}>{'-'}</button>
+    </div>
+
+proc main() {
+    let count = 0;
+
+    let increment = () {
+       count = count + 1;
+    };
+    let decrement = () {
+       count = count - 1;
+    };
+
+    reaction () => count
+    triggers (count) {
+        render(Counter(increment, decrement, count), document.body);
+    }
+    forever;
+}
