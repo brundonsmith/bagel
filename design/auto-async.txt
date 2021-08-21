@@ -1,0 +1,7 @@
+- Function types have a hidden "async" property
+- Any function that calls an async function is automatically "colored" as async
+- Base fetch function designed to heavily favor non-mutating requests
+- All async dependencies in a function call (recursive?) are gathered and run 
+in parallel
+- Behaves as if everything were async and awaited, but doesn't actually do that 
+for performance reasons

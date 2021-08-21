@@ -1,0 +1,11 @@
+
+export func fibonacci(n: number): number =>
+    if (n <= 1) {
+        n
+    } else {
+        fibonacci(n - 1) + fibonacci(n - 2)
+    }
+
+const first10 = 0..10 |> map(fibonacci) |> arrayFrom
+
+

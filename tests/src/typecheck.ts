@@ -1,11 +1,10 @@
 
-import { ModulesStore } from "../../compiler/src/checking/modules-store";
-import { scopescan } from "../../compiler/src/checking/scopescan";
-import { BagelTypeError, typecheck } from "../../compiler/src/checking/typecheck";
-import { typescan } from "../../compiler/src/checking/typescan";
-import { STRING_TYPE, NUMBER_TYPE, UNKNOWN_TYPE, TypeExpression } from "../../compiler/src/model/type-expressions";
-import { parse } from "../../compiler/src/parse";
-import { errorMessage } from "../../compiler/src/parse/common";
+import { ModulesStore } from "../../compiler/src/3_checking/modules-store";
+import { scopescan } from "../../compiler/src/3_checking/scopescan";
+import { BagelTypeError, errorMessage, typecheck } from "../../compiler/src/3_checking/typecheck";
+import { typescan } from "../../compiler/src/3_checking/typescan";
+import { STRING_TYPE, NUMBER_TYPE, UNKNOWN_TYPE, TypeExpression } from "../../compiler/src/_model/type-expressions";
+import { parse } from "../../compiler/src/1_parse";
 import { deepEquals, given } from "../../compiler/src/utils";
 import { test } from "./testing-utils";
 

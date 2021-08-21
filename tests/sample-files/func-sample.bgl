@@ -1,5 +1,4 @@
 
-
 func foo() => '1234'
 
 export func mergeSort(arr: number[]): number[] =>

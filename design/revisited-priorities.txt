@@ -1,0 +1,2 @@
+- Restricting pure contexts from side-effects
+- Observable-everything (doing what MobX can't quite do)

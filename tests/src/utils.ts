@@ -1,6 +1,6 @@
 import { test } from "./testing-utils";
 import { deepEquals } from "../../compiler/src/utils";
-import { UNKNOWN_TYPE } from "../../compiler/src/model/type-expressions";
+import { UNKNOWN_TYPE } from "../../compiler/src/_model/type-expressions";
 
 console.log("utils.ts")
 

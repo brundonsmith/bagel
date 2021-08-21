@@ -11,6 +11,7 @@ export type Statement =
     | Assignment
     | ProcCall
     | Reaction
+    | Computation
 
 export type LetDeclaration = SourceInfo & {
     kind: "let-declaration",
@@ -55,4 +56,11 @@ export type Reaction = SourceInfo & {
     kind: "reaction",
     data: Expression,
     effect: Expression,
+    until: Expression,
+}
+
+export type Computation = SourceInfo & {
+    kind: "computation",
+    name: PlainIdentifier,
+    expression: Expression,
 }

@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+      "allowSyntheticDefaultImports": true,
+      "noImplicitAny": true,
+      "downlevelIteration": true,
+      "strict": true,
+      "module": "ES2020",
+      "target": "ES2021",
+      "lib": [],
+      "allowJs": true,
+      "moduleResolution": "node"
+    },
+    "include": ["*/src/**/*"]
+  }
+  

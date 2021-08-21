@@ -1,6 +1,6 @@
-import { AST, Module } from "../model/ast";
-import { Expression } from "../model/expressions";
-import { TypeExpression } from "../model/type-expressions";
+import { AST, Module } from "../_model/ast";
+import { Expression } from "../_model/expressions";
+import { TypeExpression } from "../_model/type-expressions";
 import { DeepReadonly } from "../utils";
 
 

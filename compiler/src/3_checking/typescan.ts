@@ -1,7 +1,7 @@
-import { Module } from "../model/ast";
-import { PlainIdentifier } from "../model/common";
-import { BinaryOp, Expression, isExpression } from "../model/expressions";
-import { BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../model/type-expressions";
+import { Module } from "../_model/ast";
+import { PlainIdentifier } from "../_model/common";
+import { BinaryOp, Expression, Func, isExpression, LocalIdentifier } from "../_model/expressions";
+import { BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions";
 import { deepEquals, DeepReadonly, walkParseTree } from "../utils";
 import { ModulesStore, Scope } from "./modules-store";
 import { BagelTypeError, miscError, subsumes } from "./typecheck";
@@ -9,15 +9,43 @@ import { BagelTypeError, miscError, subsumes } from "./typecheck";
 export function typescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         if (modulesStore.astTypes.get(ast) == null && isExpression(ast)) {
-            const type = handleSingletonUnion(distillUnion(scope, flattenUnions(determineType(reportError, modulesStore, ast, scope))));
-            modulesStore.astTypes.set(ast, type);
+            determineTypeAndCache(reportError, modulesStore, ast, scope)
+        } else if (ast.kind === "reaction") {
+            // TODO: Might be best to ransform the reaction ast under the hood 
+            // to a proc call taking a function and proc, to leverage the same
+            // type inference mechanism for arguments that will be used 
+            // elsewhere 
+            const dataType = determineTypeAndCache(reportError, modulesStore, ast.data, scope)
+            const effectType = determineTypeAndCache(reportError, modulesStore, ast.effect, scope)
+
+            if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.argTypes[0].kind === "unknown-type") {
+                effectType.argTypes[0] = dataType.returnType;
+            }
+        } else if (ast.kind === "computation") {
+            determineTypeAndCache(reportError, modulesStore, ast.expression, scope)
         }
 
         return modulesStore.scopeFor.get(ast) ?? scope;
     });
 }
 
-function determineType(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Expression, scope: DeepReadonly<Scope>): TypeExpression {
+function determineTypeAndCache(
+    reportError: (error: BagelTypeError) => void, 
+    modulesStore: ModulesStore, 
+    ast: Expression, 
+    scope: DeepReadonly<Scope>
+): TypeExpression {
+    const type = handleSingletonUnion(distillUnion(scope, flattenUnions(determineType(reportError, modulesStore, ast, scope))));
+    modulesStore.astTypes.set(ast, type);
+    return type;
+}
+
+function determineType(
+    reportError: (error: BagelTypeError) => void, 
+    modulesStore: ModulesStore, 
+    ast: Expression, 
+    scope: DeepReadonly<Scope>
+): TypeExpression {
     switch(ast.kind) {
         case "proc": {
             return ast.type;
@@ -28,13 +56,13 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
 
                 // if no return-type is declared, try inferring the type from the inner expression
                 returnType: ast.type.returnType.kind === "unknown-type" 
-                    ? determineType(reportError, modulesStore, ast.body, modulesStore.getScopeFor(ast)) 
+                    ? determineTypeAndCache(reportError, modulesStore, ast.body, modulesStore.getScopeFor(ast)) 
                     : ast.type.returnType,
             }
         };
         case "pipe": {
             const lastPipeExpression = ast.expressions[ast.expressions.length - 1];
-            const lastStageType = determineType(reportError, modulesStore, lastPipeExpression, scope);
+            const lastStageType = determineTypeAndCache(reportError, modulesStore, lastPipeExpression, scope);
 
             if (lastStageType.kind === "func-type") {
                 return lastStageType.returnType;
@@ -44,8 +72,8 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
             }
         };
         case "binary-operator": {
-            const leftType = determineType(reportError, modulesStore, ast.left, scope);
-            const rightType = determineType(reportError, modulesStore, ast.right, scope);
+            const leftType = determineTypeAndCache(reportError, modulesStore, ast.left, scope);
+            const rightType = determineTypeAndCache(reportError, modulesStore, ast.right, scope);
 
             for (const types of BINARY_OPERATOR_TYPES[ast.operator]) {
                 const { left, right, output } = types;
@@ -58,7 +86,7 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
             return UNKNOWN_TYPE;
         };
         case "funcall": {
-            const funcType = determineType(reportError, modulesStore, ast.func, scope);
+            const funcType = determineTypeAndCache(reportError, modulesStore, ast.func, scope);
 
             if (funcType.kind === "func-type") {
                 return funcType.returnType;
@@ -67,8 +95,8 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
             }
         };
         case "indexer": {
-            const baseType = determineType(reportError, modulesStore, ast.base, scope);
-            const indexerType = determineType(reportError, modulesStore, ast.indexer, scope);
+            const baseType = determineTypeAndCache(reportError, modulesStore, ast.base, scope);
+            const indexerType = determineTypeAndCache(reportError, modulesStore, ast.indexer, scope);
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
                 const key = indexerType.value.segments[0];
@@ -91,7 +119,7 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
             return UNKNOWN_TYPE;
         };
         case "if-else-expression": {
-            const ifType = determineType(reportError, modulesStore, ast.ifResult, scope);
+            const ifType = determineTypeAndCache(reportError, modulesStore, ast.ifResult, scope);
 
             if (ast.elseResult == null) {
                 return {
@@ -99,7 +127,7 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
                     members: [ ifType, NIL_TYPE ],
                 };
             } else {
-                const elseType = determineType(reportError, modulesStore, ast.elseResult, scope);
+                const elseType = determineTypeAndCache(reportError, modulesStore, ast.elseResult, scope);
 
                 return {
                     kind: "union-type",
@@ -108,9 +136,9 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
             }
         };
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
-        case "parenthesized-expression": return determineType(reportError, modulesStore, ast.inner, scope);
+        case "parenthesized-expression": return determineTypeAndCache(reportError, modulesStore, ast.inner, scope);
         case "property-accessor": {
-            const baseType = determineType(reportError, modulesStore, ast.base, scope);
+            const baseType = determineTypeAndCache(reportError, modulesStore, ast.base, scope);
 
             let lastPropType = baseType;
             for (const prop of ast.properties) {
@@ -136,7 +164,7 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
             } else if (descriptor.declaredType.kind !== "unknown-type") {
                 return descriptor.declaredType;
             } else if (descriptor.initialValue != null) {
-                return determineType(reportError, modulesStore, descriptor.initialValue, scope);
+                return determineTypeAndCache(reportError, modulesStore, descriptor.initialValue, scope);
             } else {
                 return UNKNOWN_TYPE;
             }
@@ -150,7 +178,7 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
         };
         case "object-literal": {
             const entries = ast.entries.map(([key, value]) => 
-                [key, determineType(reportError, modulesStore, value, scope)] as [PlainIdentifier, TypeExpression]);
+                [key, determineTypeAndCache(reportError, modulesStore, value, scope)] as [PlainIdentifier, TypeExpression]);
 
             return {
                 kind: "object-type",
@@ -158,7 +186,7 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
             };
         };
         case "array-literal": {
-            const entries = ast.entries.map(entry => determineType(reportError, modulesStore, entry, scope));
+            const entries = ast.entries.map(entry => determineTypeAndCache(reportError, modulesStore, entry, scope));
 
             // NOTE: This could be slightly better where different element types overlap each other
             const uniqueEntryTypes = entries.filter((el, index, arr) => 
@@ -173,7 +201,7 @@ function determineType(reportError: (error: BagelTypeError) => void, modulesStor
                         members: uniqueEntryTypes,
                     },
             };
-        }
+        };
         case "string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
         case "boolean-literal": return BOOLEAN_TYPE;

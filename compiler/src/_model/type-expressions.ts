@@ -155,9 +155,7 @@ export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
 export const REACTION_DATA_TYPE: TypeExpression = {
     kind: "func-type",
     argTypes: [],
-    returnType: {
-        kind: "unknown-type"
-    },
+    returnType: UNKNOWN_TYPE,
     typeParams: [],
 }
 export const REACTION_EFFECT_TYPE: TypeExpression = {
@@ -165,4 +163,10 @@ export const REACTION_EFFECT_TYPE: TypeExpression = {
     argTypes: [
         UNKNOWN_TYPE
     ],
+}
+export const REACTION_UNTIL_TYPE: TypeExpression = {
+    kind: "func-type",
+    argTypes: [],
+    returnType: BOOLEAN_TYPE,
+    typeParams: [],
 }

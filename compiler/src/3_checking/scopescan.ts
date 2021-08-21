@@ -1,10 +1,10 @@
 import path from "path";
-import { Module } from "../model/ast";
-import { Block } from "../model/common";
-import { Declaration } from "../model/declarations";
-import { Func, Proc, Expression, StringLiteral } from "../model/expressions";
-import { ForLoop } from "../model/statements";
-import { TypeExpression, UNKNOWN_TYPE, NUMBER_TYPE } from "../model/type-expressions";
+import { Module } from "../_model/ast";
+import { Block } from "../_model/common";
+import { Declaration } from "../_model/declarations";
+import { Func, Proc, Expression, StringLiteral } from "../_model/expressions";
+import { ForLoop } from "../_model/statements";
+import { TypeExpression, UNKNOWN_TYPE, NUMBER_TYPE } from "../_model/type-expressions";
 import { walkParseTree } from "../utils";
 import { ModulesStore, Scope } from "./modules-store";
 import { BagelTypeError, cannotFindExport, cannotFindModule } from "./typecheck";

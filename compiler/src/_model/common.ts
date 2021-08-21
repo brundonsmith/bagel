@@ -19,4 +19,4 @@ export type Block = SourceInfo & {
 export const KEYWORDS = [ "func", "proc", "if", "else", 
 "type", "typeof", "class", "let", "const", "for", "while", 
 "of", "nil", "public", "visible", "private", "reaction", 
-"triggers", "true", "false", "import", "export", "from", "as" ] as const;
+"triggers", "until", "true", "false", "import", "export", "from", "as" ] as const;

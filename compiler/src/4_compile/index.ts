@@ -1,21 +1,23 @@
-import { ModulesStore } from "./checking/modules-store";
-import { Module, AST } from "./model/ast";
-import { PlainIdentifier } from "./model/common";
-import { Expression, Proc, Func } from "./model/expressions";
-import { TypeExpression } from "./model/type-expressions";
+import { ModulesStore } from "../3_checking/modules-store";
+import { Module, AST } from "../_model/ast";
+import { PlainIdentifier } from "../_model/common";
+import { Expression, Proc, Func } from "../_model/expressions";
+import { TypeExpression } from "../_model/type-expressions";
 
 
 export function compile(modulesStore: ModulesStore, module: Module): string {
+    const hasMain = module.declarations.some(decl => decl.kind === "proc-declaration" && decl.name.name === "main")
     return module.declarations
         .filter(declaration => declaration.kind !== "type-declaration")
-        .map(decl => compileOne(modulesStore, decl)).join("\n\n");
+        .map(decl => compileOne(modulesStore, decl))
+        .join("\n\n") + (hasMain ? "main();\n" : "");
 }
 
 function compileOne(modulesStore: ModulesStore, ast: AST): string {
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(modulesStore, name) + (alias ? ` as ${compileOne(modulesStore, alias)}` : ``)
-        ).join(", ")} } from "${ast.path.segments.join("")}.bagel";`;
+        ).join(", ")} } from "${ast.path.segments.join("")}.bgl.ts";`;
         case "type-declaration": return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileTypeExpression(ast.type)}`;
         case "proc-declaration": return (ast.exported ? `export ` : ``) + compileProc(modulesStore, ast.proc, ast.name.name);
         case "func-declaration": return (ast.exported ? `export ` : ``) + compileFunc(modulesStore, ast.func, ast.name.name);
@@ -23,7 +25,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "proc": return compileProc(modulesStore, ast);
         case "let-declaration": return `${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)}`;
         case "assignment": return `${compileOne(modulesStore, ast.target)} = ${compileOne(modulesStore, ast.value)}`;
-        case "proc-call": return `${compileOne(modulesStore, ast.proc)}${ast.args.map(arg => `(${compileOne(modulesStore, arg)})`).join("") || "()"};`;
+        case "proc-call": return `${compileOne(modulesStore, ast.proc)}${ast.args.map(arg => `(${compileOne(modulesStore, arg)})`).join("") || "()"}`;
         case "if-else-statement": return `if(${compileOne(modulesStore, ast.ifCondition)}) ${compileOne(modulesStore, ast.ifResult)}` 
             + (ast.elseResult != null ? ` else ${compileOne(modulesStore, ast.elseResult)}` : ``);
         case "for-loop": return `for (const ${compileOne(modulesStore, ast.itemIdentifier)} of ${compileOne(modulesStore, ast.iterator)}) ${compileOne(modulesStore, ast.body)}`;
@@ -48,7 +50,11 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
-        case "reaction": return `disposers.push(crowdx.reaction(() => ${compileOne(modulesStore, ast.data)}, (data) => ${compileOne(modulesStore, ast.effect)}(data)))`;
+        case "reaction": return `${HIDDEN_IDENTIFIER_PREFIX}reactionUntil(
+${compileOne(modulesStore, ast.data)},
+${compileOne(modulesStore, ast.effect)},
+${compileOne(modulesStore, ast.until)});`;
+        case "computation": return `const ${ast.name.name} = ${HIDDEN_IDENTIFIER_PREFIX}computed(() => ${compileOne(modulesStore, ast.expression)});`;
         case "indexer": return `${compileOne(modulesStore, ast.base)}[${compileOne(modulesStore, ast.indexer)}]`;
         case "block": return `{ ${ast.statements.map(s => compileOne(modulesStore, s)).join(" ")} }`;
         case "element-tag": return `${HIDDEN_IDENTIFIER_PREFIX}elementTag('${ast.tagName.name}',{${
@@ -70,17 +76,20 @@ export const HIDDEN_IDENTIFIER_PREFIX = `___`;
 
 const NIL = `undefined`;
 const LOCALS_OBJ = HIDDEN_IDENTIFIER_PREFIX + "locals";
+const SENTINEL_OBJ = HIDDEN_IDENTIFIER_PREFIX + "sentinel";
 
 function compileProc(modulesStore: ModulesStore, proc: Proc, name?: string): string {
     const mutableLocals = Object.entries(modulesStore.getScopeFor(proc.body).values)
         .filter(e => e[1].mutability === "all");
 
+    // TODO: arg types for procs
     return `function ${name ?? ''}(${proc.argNames[0] != null ? compileOne(modulesStore, proc.argNames[0]) : ''}) {${proc.argNames.length > 1 ? ` return (${proc.argNames.map((arg, index) => index === 0 ? '' : `(${compileOne(modulesStore, arg)}) => `).join("")}{\n` : ''}
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
-    `const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileTypeExpression(e[1].declaredType)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});` : ``}
+    `const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileTypeExpression(e[1].declaredType)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});
+     const ${SENTINEL_OBJ} = {};` : ``}
 
-    ${proc.body.statements.map(s => compileOne(modulesStore, s)).join(";\n")}
-
+    ${proc.body.statements.map(s => compileOne(modulesStore, s)).join(";\n")};
+    
 ${proc.argNames.length > 1 ? `});` : ''}}`;
 }
 // TODO: dispose of reactions somehow... at some point...
@@ -116,6 +125,7 @@ function compileTypeExpression(expr: TypeExpression): string {
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;
         case "nil-type": return `null | undefined`;
+        case "unknown-type": return `unknown`;
     }
 
     throw Error(`Compilation logic for type expression of kind '${expr.kind}' is unspecified`)

@@ -3,11 +3,6 @@ export proc logp(x: string|number|boolean|nil) {
     js# console.log(x) #js
 }
 
-export js! func logf(x: string|number|boolean|nil): string => {
-    console.log(x);
-    return x;
-}
-
 export func logf(x: string|number|boolean|nil): string => 
     js# (() => { console.log(x); return x })() #js
 

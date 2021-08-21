@@ -4,9 +4,9 @@
     "noImplicitAny": true,
     "downlevelIteration": true,
     "strict": true,
-    "module": "es6",
-    "target": "es5",
-    "lib": ["es2019"],
+    "module": "ES2020",
+    "target": "ES2021",
+    "lib": [],
     "allowJs": true,
     "moduleResolution": "node"
   },

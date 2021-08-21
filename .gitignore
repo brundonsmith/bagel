@@ -2,5 +2,6 @@ dist
 .vscode
 node_modules
 build
-*.bagel.js
-*.bagel.ts
+*.bgl.js
+*.bgl.ts
+lib/lib.js

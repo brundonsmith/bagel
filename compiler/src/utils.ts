@@ -1,4 +1,4 @@
-import { AST } from "./model/ast";
+import { AST } from "./_model/ast";
 
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
     if (val != null) {
@@ -151,6 +151,10 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "reaction": {
             walkParseTree(nextPayload, ast.data, fn);
             walkParseTree(nextPayload, ast.effect, fn);
+            walkParseTree(nextPayload, ast.until, fn);
+        } break;
+        case "computation": {
+            walkParseTree(nextPayload, ast.expression, fn);
         } break;
         case "let-declaration": {
             walkParseTree(nextPayload, ast.name, fn);

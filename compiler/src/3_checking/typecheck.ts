@@ -1,9 +1,9 @@
-import { AST, Module } from "../model/ast";
-import { PlainIdentifier } from "../model/common";
-import { ImportDeclaration, ImportItem } from "../model/declarations";
-import { LocalIdentifier, Proc } from "../model/expressions";
-import { REACTION_DATA_TYPE, REACTION_EFFECT_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../model/type-expressions";
-import { lineAndColumn } from "../parse/common";
+import { AST, Module } from "../_model/ast";
+import { PlainIdentifier } from "../_model/common";
+import { ImportDeclaration, ImportItem } from "../_model/declarations";
+import { LocalIdentifier, Proc } from "../_model/expressions";
+import { FuncType, ProcType, REACTION_DATA_TYPE, REACTION_EFFECT_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions";
+import { lineAndColumn } from "../1_parse/common";
 import { deepEquals, DeepReadonly, given, sOrNone, walkParseTree, wasOrWere } from "../utils";
 import { ModulesStore, Scope } from "./modules-store";
 
@@ -29,7 +29,6 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 const bodyType = modulesStore.getTypeOf(ast.body);
 
                 if (ast.type.returnType.kind !== "unknown-type" && !subsumes(funcScope, ast.type.returnType, bodyType)) {
-                    console.log(JSON.stringify({ returnType: ast.type.returnType, bodyType }, null, 2))
                     reportError(assignmentError(ast.body, ast.type.returnType, bodyType));
                 }
                 
@@ -162,11 +161,22 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                     reportError(assignmentError(ast.data, REACTION_DATA_TYPE, dataType));
                 }
 
-                const effectType = modulesStore.getTypeOf(ast.data);
+                const effectType = modulesStore.getTypeOf(ast.effect);
+                const requiredEffectType: ProcType = {
+                    kind: 'proc-type',
+                    argTypes: [ (dataType as FuncType).returnType ]
+                };
                 if (effectType.kind !== "proc-type") {
-                    reportError(miscError(ast.data, `Expected procedure in effect clause`));
-                } else if (!subsumes(scope, REACTION_EFFECT_TYPE, effectType)) {
-                    reportError(assignmentError(ast.data, REACTION_EFFECT_TYPE, effectType));
+                    reportError(miscError(ast.effect, `Expected procedure in effect clause`));
+                } else if (!subsumes(scope, requiredEffectType, effectType)) {
+                    reportError(assignmentError(ast.effect, requiredEffectType, effectType));
+                }
+
+                const untilType = modulesStore.getTypeOf(ast.until);
+                if (untilType.kind !== "func-type") {
+                    reportError(miscError(ast.data, `Expected function in until clause`));
+                } else if (!subsumes(scope, REACTION_UNTIL_TYPE, untilType)) {
+                    reportError(assignmentError(ast.data, REACTION_UNTIL_TYPE, untilType));
                 }
 
                 // TODO: This may become generalized later by generics/inverted inference
@@ -177,6 +187,8 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 return scope;
             };
             case "let-declaration": {
+                // console.log(JSON.stringify(scope, null, 2))
+                // console.log(JSON.stringify(ast, null, 2))
                 const valueType = modulesStore.getTypeOf(ast.value);
 
                 if (ast.type != null) {

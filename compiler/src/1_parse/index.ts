@@ -1,12 +1,12 @@
-import { Module } from "../model/ast";
-import { Block, PlainIdentifier } from "../model/common";
-import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../model/declarations";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Funcall, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral } from "../model/expressions";
-import { Assignment, ForLoop, IfElseStatement, LetDeclaration, ProcCall, Reaction, Statement, WhileLoop } from "../model/statements";
-import { ArrayType, BOOLEAN_TYPE, FuncType, IndexerType, LiteralType, NamedType, NIL_TYPE, NUMBER_TYPE, ObjectType, PrimitiveType, STRING_TYPE, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../model/type-expressions";
+import { Module } from "../_model/ast";
+import { Block, PlainIdentifier } from "../_model/common";
+import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Funcall, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral } from "../_model/expressions";
+import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, ProcCall, Reaction, Statement, WhileLoop } from "../_model/statements";
+import { ArrayType, BOOLEAN_TYPE, FuncType, IndexerType, LiteralType, NamedType, NIL_TYPE, NUMBER_TYPE, ObjectType, PrimitiveType, STRING_TYPE, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions";
 import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, err, errorMessage, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common";
 
-export function parse(code: string): Module {
+export function parse(code: string, fileName?: string): Module {
     let index = 0;
 
     const declarations: Declaration[] = [];
@@ -23,7 +23,7 @@ export function parse(code: string): Module {
     
     if (isError(result)) {
         // throw result;
-        console.log("Syntax error:", errorMessage(result));
+        console.log((fileName ? fileName : "<unknown>") + "|" + errorMessage(result));
     }
 
     memo.delete(code);
@@ -387,6 +387,7 @@ const proc: ParseFunction<Proc> = (code, startIndex) =>
 
 const statement: ParseFunction<Statement> = (code, startIndex) =>
     reaction(code, startIndex)
+    ?? computation(code, startIndex)
     ?? javascriptEscape(code, startIndex)
     ?? letDeclaration(code, startIndex)
     ?? ifElseStatement(code, startIndex)
@@ -404,6 +405,10 @@ const reaction: ParseFunction<Reaction> = (code, startIndex) =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(code, index), err(code, index, "Side-effect procedure"), ({ parsed: effect, newIndex: index }) => 
     given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "until"), err(code, index, '"until" clause'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(expression(code, index), err(code, index, "Disposal condition"), ({ parsed: until, newIndex: index }) => 
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
         parsed: {
             kind: "reaction",
@@ -412,8 +417,30 @@ const reaction: ParseFunction<Reaction> = (code, startIndex) =>
             endIndex: index,
             data,
             effect,
+            until
         },
         newIndex: index,
+    }))))))))))))))
+
+const computation: ParseFunction<Computation> = (code, startIndex) =>
+    given(consume(code, startIndex, "computation"), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(plainIdentifier(code, index), err(code, index, "Computation name"), ({ parsed: name, newIndex: index }) =>
+    expec(consume(code, index, '()'), err(code, index, '"()"'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, '=>'), err(code, index, '"=>"'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(expression(code, index), err(code, index, "Computation expression"), ({ parsed: expression, newIndex: index }) => 
+    expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
+        parsed: {
+            kind: "computation",
+            code,
+            startIndex,
+            endIndex: index,
+            name,
+            expression
+        },
+        newIndex: index
     }))))))))))
 
 const letDeclaration: ParseFunction<LetDeclaration> = (code, startIndex) =>

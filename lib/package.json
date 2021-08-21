@@ -4,13 +4,13 @@
   "description": "Runtime library for bagel language",
   "main": "dist.js",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --outfile=../build/lib.js",
-    "watch": "esbuild src/index.ts --bundle --platform=node --outfile=../build/lib.js --watch"
+    "build": "esbuild src/index.ts --bundle --platform=node --outfile=./lib.ts",
+    "watch": "esbuild src/index.ts --bundle --platform=node --outfile=./lib.ts --watch"
   },
   "author": "Brandon Smith",
   "license": "MIT",
   "private": true,
-  "devDependencies": {
-    "mobx": "^6.2.0"
+  "dependencies": {
+    "mobx": "^6.3.2"
   }
 }
