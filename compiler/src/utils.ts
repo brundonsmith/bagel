@@ -254,9 +254,11 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "number-literal":
         case "boolean-literal":
         case "nil-literal":
+        case "javascript-escape":
             break;
 
         default:
+            // @ts-expect-error
             throw Error("Need to add walk clause for AST node type " + ast.kind)
     }
 }
