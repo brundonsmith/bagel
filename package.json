@@ -12,7 +12,7 @@
     "scripts": {
         "build": "cd compiler && npm run build && cd ../",
         "build-and-watch": "cd compiler && npm run build && cd ../ && node build/compiler.js tests/sample-files-2 --watch",
-        "build-and-bundle": "cd compiler && npm run build && cd ../ && node build/compiler.js tests/sample-files-2 && esbuild tests/sample-files-2/basic-sample.bgl.ts --outfile=\"tests/sample-files-2/test.js\" --bundle && node tests/sample-files-2/test.js",
+        "build-and-bundle": "cd compiler && npm run build && cd ../ && node build/compiler.js tests/sample-files-2 && esbuild tests/sample-files-2/app-sample.bgl.ts --outfile=\"tests/sample-files-2/test.js\" --bundle",
         "test": "cd tests && npm run build-and-run"
     },
     "dependencies": {
