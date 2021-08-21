@@ -58,6 +58,23 @@ export function deepEquals(a: DeepReadonly<BasicData>, b: DeepReadonly<BasicData
     return false;
 }
 
+export function withoutSourceInfo(ast: AST) {
+    const clone = JSON.parse(JSON.stringify(ast))
+
+    walkParseTree(undefined, clone, (_, ast) => {
+        // @ts-ignore
+        delete ast.code
+        // @ts-ignore
+        delete ast.startIndex
+        // @ts-ignore
+        delete ast.endIndex
+
+        return undefined
+    })
+
+    return clone
+}
+
 export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST) => T) {
     const nextPayload = fn(payload, ast);
     
