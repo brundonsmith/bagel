@@ -62,9 +62,8 @@ ${given(ast.until, until => compileOne(modulesStore, until))});`;
         case "computation": return `const ${ast.name.name} = ${HIDDEN_IDENTIFIER_PREFIX}computed(() => ${compileOne(modulesStore, ast.expression)});`;
         case "indexer": return `${compileOne(modulesStore, ast.base)}[${compileOne(modulesStore, ast.indexer)}]`;
         case "block": return `{ ${ast.statements.map(s => compileOne(modulesStore, s)).join(" ")} }`;
-        case "element-tag": return `${HIDDEN_IDENTIFIER_PREFIX}elementTag('${ast.tagName.name}',{${
-            objectEntries(modulesStore, (ast.attributes as [PlainIdentifier, Expression|Expression[]][])
-                .concat([ [{kind: "plain-identifier", name: "children"}, ast.children] as [PlainIdentifier, Expression[]] ]))}})`;
+        case "element-tag": return `${HIDDEN_IDENTIFIER_PREFIX}h('${ast.tagName.name}',{${
+            objectEntries(modulesStore, (ast.attributes as [PlainIdentifier, Expression|Expression[]][]))}}, ${ast.children.map(c => compileOne(modulesStore, c)).join(', ')})`;
         case "class-construction": return `new ${ast.clazz.name}()`;
     }
 

@@ -759,7 +759,7 @@ const parseBlock: ParseFunction<Block> = (code, startIndex) =>
 
 
 const expressionPrecedenceTiers: () => ParseFunction<Expression>[][] = () => [
-    [ javascriptEscape, pipe, classConstruction ],
+    [ javascriptEscape, pipe, classConstruction, elementTag ],
     [ func, proc, range, binaryOperator ],
     [ funcall ],
     [ indexer ],
@@ -1054,7 +1054,7 @@ const localIdentifier: ParseFunction<LocalIdentifier> = (code, startIndex) =>
 export const elementTag: ParseFunction<ElementTag> = (code, startIndex) =>
     given(consume(code, startIndex, "<"), index =>
     given(plainIdentifier(code, index), ({ parsed: tagName, newIndex: index }) =>
-    given(consumeWhitespaceRequired(code, index), index =>
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries(code, index, _tagAttribute), ({ parsed: attributes, newIndex: index }) =>
     expec(consume(code, index, ">"), err(code, index, '">"'), index => 
     given(parseSeries(code, index, (code, index) => elementTag(code, index) ?? _elementEmbeddedExpression(code, index)), ({ parsed: children, newIndex: index }) =>

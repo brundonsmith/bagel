@@ -167,7 +167,8 @@ function bagelFileToTsFile(module: string, bundle?: boolean): string {
 }
 
 const LIB_IMPORTS = `
-import { observable as ___observable, reaction as ___reaction, computed as ___computed, reactionUntil as ___reactionUntil, configure as ___configure,
+import { observable as ___observable, computed as ___computed, reactionUntil as ___reactionUntil, configure as ___configure,
+    h as ___h, render,
     range as ___range, slice, map, filter, entries, count, join, concat, log, floor, arrayFrom, fromEntries } from "../../lib/src";
 
 ___configure({
