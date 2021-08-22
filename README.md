@@ -34,3 +34,12 @@ pipeline operator)
 - There is no global state; global values are all immutable. A main() procedure 
 is called when the app starts, and any mutable state has to be initialized 
 there and passed down to sub-procedures.
+
+<h2>Trying it out</h2>
+
+This is in an extremely rough state right now, but if you're determined to 
+delve into the deep, you can run `npm run build-and-watch` to watch and convert
+every `.bgl` file in `tests/sample-files-2` into a corresponding `.bgl.ts`
+file. You can also run `npm run build-and-bundle` to build `app-sample.bgl` 
+into `app-sample.bgl.ts` and then bundle it with `lib/` into `test.js`. Open
+`test.html` in a web browser to run the code.
