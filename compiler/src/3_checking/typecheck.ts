@@ -418,19 +418,17 @@ export type BagelCannotFindExportError = {
 }
 
 export function errorMessage(error: BagelTypeError): string {
-    const lineAndColumnMsg = given(given(error.ast, ast => lineAndColumn(ast.code, ast.startIndex)), ({ line, column }) => `${line}:${column} `) ?? ``;
-    
     switch (error.kind) {
         case "bagel-assignable-to-error":
-            return lineAndColumnMsg + `Type '${serialize(error.value)}' is not assignable to type '${serialize(error.destination)}'`;
+            return `Type '${serialize(error.value)}' is not assignable to type '${serialize(error.destination)}'`;
         case "bagel-cannot-find-name-error":
-            return lineAndColumnMsg + `Cannot find name '${error.ast.name}'`;
+            return `Cannot find name '${error.ast.name}'`;
         case "bagel-misc-type-error":
-            return lineAndColumnMsg + error.message;
+            return error.message;
         case "bagel-cannot-find-module-error":
-            return lineAndColumnMsg + `Failed to resolve module '${error.ast.path.segments[0]}'`
+            return `Failed to resolve module '${error.ast.path.segments[0]}'`
         case "bagel-cannot-find-export-error":
-            return lineAndColumnMsg + `Module '${error.importDeclaration.path.segments[0]}' has no export named ${error.ast.name.name}`
+            return `Module '${error.importDeclaration.path.segments[0]}' has no export named ${error.ast.name.name}`
     }
 }
 

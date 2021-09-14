@@ -200,6 +200,26 @@ export function lineAndColumn(code: string, index: number): { line: number, colu
     return { line, column };
 }
 
+export function getLineContents(code: string, line: number) {
+    let currentLine = 1;
+    let startIndex;
+    for (startIndex = 0; startIndex < code.length && currentLine < line; startIndex++) {
+        if (code[startIndex] === "\n") {
+            currentLine++;
+        }
+    }
+
+    if (currentLine === line) {
+        for (let endIndex = startIndex; endIndex < code.length; endIndex++) {
+            if (code[endIndex] === "\n") {
+                return { startIndex: startIndex, content: code.substring(startIndex, endIndex) }
+            }
+        }
+    }
+
+    return undefined
+}
+
 export function isError(x: unknown): x is BagelSyntaxError {
     return x != null && typeof x === "object" && (x as any).kind === "bagel-syntax-error";
 }

@@ -8,6 +8,8 @@ import { typescan } from "./3_checking/typescan";
 import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile";
 import { parse } from "./1_parse";
 import { reshape } from "./2_reshape";
+import logger from "node-color-log"
+import { getLineContents, given, lineAndColumn } from "./1_parse/common";
 
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
@@ -24,8 +26,43 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     return arrayOfFiles;
 }
 
-const printError = (module: string) => (error: BagelTypeError) => {
-    console.error(module + "|" + errorMessage(error));
+const printError = (modulePath: string) => (error: BagelTypeError) => {
+    logger
+        .color('cyan').log(modulePath).joint()
+
+    const { line, column } = given(error.ast, ast => lineAndColumn(ast.code, ast.startIndex)) as { line: number; column: number; } | undefined ?? {}
+    if (line != null && column != null) {
+        logger
+            .color('white').log(':').joint()
+            .color('yellow').log(line).joint()
+            .color('white').log(':').joint()
+            .color('yellow').log(column).joint()
+    }
+    logger
+        .color('white').log(' - ').joint()
+        .color('red').log('error').joint()
+        .color('white').log(' ' + errorMessage(error))
+
+    if (error.ast) {
+        logger.color('black').bgColor('white').log(line).joint().bgColor('black')
+
+        const lineContent = getLineContents(error.ast.code, line as number);
+
+        if (lineContent) {
+            const padding = '  '
+
+            const digitsInLineNum = String(line).length
+            const underlineSpacing = padding + new Array(digitsInLineNum + error.ast.startIndex - lineContent.startIndex).fill(' ').join('')
+            const underline = new Array(error.ast.endIndex - error.ast.startIndex).fill('~').join('')
+            
+            logger
+                .color('white').log(padding + lineContent.content)
+            logger
+                .color('red').log(underlineSpacing + underline)
+        }
+    }
+
+    logger.log()
 }
 
 (async function() {
