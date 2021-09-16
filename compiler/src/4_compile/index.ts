@@ -11,7 +11,7 @@ export function compile(modulesStore: ModulesStore, module: Module): string {
     return module.declarations
         .filter(declaration => declaration.kind !== "type-declaration")
         .map(decl => compileOne(modulesStore, decl))
-        .join("\n\n") + (hasMain ? "main();\n" : "");
+        .join("\n\n") + (hasMain ? "setTimeout(main, 0);\n" : "");
 }
 
 function compileOne(modulesStore: ModulesStore, ast: AST): string {
