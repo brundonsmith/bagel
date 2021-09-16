@@ -1,0 +1,4 @@
+
+func foo<T>(val: T) => val
+
+const bar = foo(12)

@@ -1,0 +1,61 @@
+
+func itemsDone(appState) => 
+    appState.todos |> filter((todo) => todo.done) |> count
+
+proc main() {
+    let appState = {
+        todos: [],
+        newTodo: { text: '', done: false },
+    };
+
+    let handleNewTextChange = (e) {
+        appState.newTodo.text = e.target.value;
+    };
+    let handleNewDoneChange = (e) {
+        appState.newTodo.done = e.target.checked;
+    };
+
+    let handleAddButtonClick = () {
+        appState.todos.push(appState.newTodo);
+        appState.newTodo = { text: '', done: false };
+    };
+
+    let handleItemTextChange = (itemIndex: number) => (e) {
+        ((appState.todos)[itemIndex]).text = e.target.value;
+    };
+    let handleItemDoneChange = (itemIndex: number) => (e) {
+        ((appState.todos)[itemIndex]).text = e.target.value;
+    };
+    let handleItemDeleteButtonClick = (itemIndex: number) => () {
+        appState.todos.splice(itemIndex, 1);
+    };
+
+    reaction () => 
+        <div>
+            <div>
+                {itemsDone(appState)}{' items done'}
+            </div>
+
+            <ul>
+                {appState.todos 
+                    |> map((todo, index) =>
+                        <li class={'todo-item'}>
+                            <input type={'text'} value={todo.text} onChange={handleItemTextChange(index)}></input>
+                            <input type={'checkbox'} checked={todo.done} onChange={handleItemDoneChange(index)}></input>
+                            <button onClick={handleItemDeleteButtonClick(itemIndex)}>{'X'}</button>
+                        </li>)
+                    |> arrayFrom}
+            </ul>
+
+            <div>
+                <input id={'new-todo-text'} value={appState.newTodo.text} onChange={handleNewTextChange}></input>
+                <input id={'new-todo-done'} checked={appState.newTodo.done} onChange={handleNewDoneChange} type={'checkbox'}></input>
+                <button id={'add-button'} onClick={handleAddButtonClick}>{'Add'}</button>
+            </div>
+        </div>
+    triggers (vdom) {
+        console.log(appState);
+        render(vdom, document.body);
+    }
+    forever;
+}
