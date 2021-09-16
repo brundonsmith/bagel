@@ -1,10 +1,9 @@
-import { log } from "../utils";
 import { Module } from "../_model/ast";
 import { Block, PlainIdentifier } from "../_model/common";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Funcall, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral } from "../_model/expressions";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, ProcCall, Reaction, Statement, WhileLoop } from "../_model/statements";
-import { ArrayType, BOOLEAN_TYPE, FuncType, IndexerType, LiteralType, NamedType, NIL_TYPE, NUMBER_TYPE, ObjectType, PrimitiveType, ProcType, STRING_TYPE, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions";
+import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PromiseType, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions";
 import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, errorMessage, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common";
 
 export function parse(code: string, fileName?: string): Module {
@@ -108,12 +107,15 @@ const typeExpression: ParseFunction<TypeExpression> = (code, index) =>
     arrayType(code, index)
     ?? nonArrayType(code, index)
 
-const arrayType: ParseFunction<ArrayType> = (code, index) =>
-    given(nonArrayType(code, index), ({ parsed: element, newIndex: index }) =>
+const arrayType: ParseFunction<ArrayType> = (code, startIndex) =>
+    given(nonArrayType(code, startIndex), ({ parsed: element, newIndex: index }) =>
     given(consume(code, index, "[]"), index => ({
         parsed: {
             kind: "array-type",
             element,
+            code,
+            startIndex,
+            endIndex: index
         },
         newIndex: index,
     })))
@@ -123,14 +125,17 @@ const nonArrayType: ParseFunction<TypeExpression> = (code, index) =>
     unionType(code, index)
     ?? atomicType(code, index)
 
-const unionType: ParseFunction<UnionType> = (code, index) =>
+const unionType: ParseFunction<UnionType> = (code, startIndex) =>
     // TODO: Allow leading |
-    given(parseSeries(code, index, atomicType, "|", { leadingDelimiter: "optional", trailingDelimiter: "forbidden" }), ({ parsed: members, newIndex: index }) =>
+    given(parseSeries(code, startIndex, atomicType, "|", { leadingDelimiter: "optional", trailingDelimiter: "forbidden" }), ({ parsed: members, newIndex: index }) =>
         members.length >= 2
             ? {
                 parsed: {
                     kind: "union-type",
                     members,
+                    code,
+                    startIndex,
+                    endIndex: index,
                 },
                 newIndex: index,
             }
@@ -140,6 +145,8 @@ const atomicType: ParseFunction<TypeExpression> = (code, index) =>
     primitiveType(code, index)
     ?? funcType(code, index)
     ?? procType(code, index)
+    ?? iteratorType(code, index)
+    ?? promiseType(code, index)
     ?? literalType(code, index)
     ?? namedType(code, index)
     ?? objectType(code, index)
@@ -147,17 +154,20 @@ const atomicType: ParseFunction<TypeExpression> = (code, index) =>
     ?? tupleType(code, index)
     ?? unknownType(code, index)
 
-const namedType: ParseFunction<NamedType> = (code, index) =>
-    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) => ({
+const namedType: ParseFunction<NamedType> = (code, startIndex) =>
+    given(plainIdentifier(code, startIndex), ({ parsed: name, newIndex: index }) => ({
         parsed: {
             kind: "named-type",
             name,
+            code,
+            startIndex,
+            endIndex: index,
         },
         newIndex: index,
     }))
 
-const objectType: ParseFunction<ObjectType> = (code, index) =>
-    given(consume(code, index, "{"), index =>
+const objectType: ParseFunction<ObjectType> = (code, startIndex) =>
+    given(consume(code, startIndex, "{"), index =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(code, index, _objectTypeEntry, ","), ({ parsed: entries, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -165,6 +175,9 @@ const objectType: ParseFunction<ObjectType> = (code, index) =>
         parsed: {
             kind: "object-type",
             entries,
+            code,
+            startIndex,
+            endIndex: index,
         },
         newIndex: index,
     }))))))
@@ -179,8 +192,8 @@ const _objectTypeEntry = (code: string, index: number): ParseResult<[PlainIdenti
         newIndex: index,
     }))))))
 
-const indexerType: ParseFunction<IndexerType> = (code, index) =>
-    given(consume(code, index, "{"), index =>
+const indexerType: ParseFunction<IndexerType> = (code, startIndex) =>
+    given(consume(code, startIndex, "{"), index =>
     given(consume(code, index, "["), index =>
     expec(typeExpression(code, index), err(code, index, 'Type expression for key'), ({ parsed: keyType, newIndex: index }) =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index =>
@@ -191,41 +204,82 @@ const indexerType: ParseFunction<IndexerType> = (code, index) =>
             kind: "indexer-type",
             keyType,
             valueType,
+            code,
+            startIndex,
+            endIndex: index,
         },
         newIndex: index,
     }))))))))
 
-const tupleType: ParseFunction<TupleType> = (code, index) =>
-    given(consume(code, index, "["), index =>
+const tupleType: ParseFunction<TupleType> = (code, startIndex) =>
+    given(consume(code, startIndex, "["), index =>
     given(parseSeries(code, index, typeExpression, ","), ({ parsed: members, newIndex: index }) =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index => ({
         parsed: {
             kind: "tuple-type",
             members,
+            code,
+            startIndex,
+            endIndex: index,
         },
         newIndex: index,
     }))))
 
-const primitiveType: ParseFunction<PrimitiveType> = (code, index) =>
-    given(consume(code, index, "string"), index => ({
-        parsed: STRING_TYPE,
+const primitiveType: ParseFunction<PrimitiveType> = (code, startIndex) =>
+    given(consume(code, startIndex, "string"), index => ({
+        parsed: {
+            kind: "string-type",
+            code,
+            startIndex,
+            endIndex: index,
+        },
         newIndex: index,
     }))
-    ?? given(consume(code, index, "number"), index => ({
-        parsed: NUMBER_TYPE,
+    ?? given(consume(code, startIndex, "number"), index => ({
+        parsed: {
+            kind: "number-type",
+            code,
+            startIndex,
+            endIndex: index,
+        },
         newIndex: index,
     }))
-    ?? given(consume(code, index, "boolean"), index => ({
-        parsed: BOOLEAN_TYPE,
+    ?? given(consume(code, startIndex, "boolean"), index => ({
+        parsed: {
+            kind: "boolean-type",
+            code,
+            startIndex,
+            endIndex: index,
+        },
         newIndex: index,
     }))
-    ?? given(consume(code, index, "nil"), index => ({
-        parsed: NIL_TYPE,
+    ?? given(consume(code, startIndex, "nil"), index => ({
+        parsed: {
+            kind: "nil-type",
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        newIndex: index,
+    }))
+    ?? given(consume(code, startIndex, "unknown"), index => ({
+        parsed: {
+            kind: "unknown-type",
+            code,
+            startIndex,
+            endIndex: index,
+        },
         newIndex: index,
     }))
 
-const funcType: ParseFunction<FuncType> = (code, index) =>
-    given(consume(code, index, "("), index  =>
+const funcType: ParseFunction<FuncType> = (code, startIndex) =>
+    given(parseOptional(code, startIndex, (code, index) =>
+        given(consume(code, index, "<"), index =>
+        given(consumeWhitespace(code, index), index =>
+        expec(parseSeries(code, index, plainIdentifier, ','), err(code, index, "Type parameters"), ({ parsed: typeParams, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index => 
+        given(consume(code, index, ">"), index => ({ parsed: typeParams, newIndex: index }))))))), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
+    given(consume(code, indexAfterTypeParams ?? startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(code, index, typeExpression, ","), ({ parsed: argTypes, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -238,14 +292,16 @@ const funcType: ParseFunction<FuncType> = (code, index) =>
             kind: "func-type",
             argTypes,
             returnType,
-            typeParams: [],
-
+            typeParams: typeParams ?? [],
+            code,
+            startIndex,
+            endIndex: index,
         },
         newIndex: index
-    }))))))))))
+    })))))))))))
 
-const procType: ParseFunction<ProcType> = (code, index) =>
-    given(consume(code, index, "("), index  =>
+const procType: ParseFunction<ProcType> = (code, startIndex) =>
+    given(consume(code, startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(code, index, typeExpression, ","), ({ parsed: argTypes, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -255,18 +311,57 @@ const procType: ParseFunction<ProcType> = (code, index) =>
         parsed: {
             kind: "proc-type",
             argTypes,
+            typeParams: [],
+            code,
+            startIndex,
+            endIndex: index,
         },
         newIndex: index
     }))))))))
 
-const literalType: ParseFunction<LiteralType> = (code, index) =>
-    given(stringLiteral(code, index) 
-        ?? numberLiteral(code, index) 
-        ?? booleanLiteral(code, index), 
+const iteratorType: ParseFunction<IteratorType> = (code, startIndex) =>
+    given(consume(code, startIndex, "Iterator<"), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(typeExpression(code, index), err(code, index, "Iterator item type"), ({ parsed: itemType, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, ">"), err(code, index, '">"'), index => ({
+        parsed: {
+            kind: "iterator-type",
+            itemType,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        newIndex: index,
+    }))))))
+
+const promiseType: ParseFunction<PromiseType> = (code, startIndex) =>
+    given(consume(code, startIndex, "Promise<"), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(typeExpression(code, index), err(code, index, "Promise result type"), ({ parsed: resultType, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, ">"), err(code, index, '">"'), index => ({
+        parsed: {
+            kind: "promise-type",
+            resultType,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        newIndex: index,
+    }))))))
+
+const literalType: ParseFunction<LiteralType> = (code, startIndex) =>
+    given(stringLiteral(code, startIndex) 
+        ?? numberLiteral(code, startIndex) 
+        ?? booleanLiteral(code, startIndex), 
     ({ parsed: value, newIndex: index }) => ({
         parsed: {
             kind: "literal-type",
             value,
+            code,
+            startIndex,
+            endIndex: index,
         },
         newIndex: index,
     }))
@@ -533,6 +628,10 @@ const proc: ParseFunction<Proc> = (code, startIndex) =>
             type: {
                 kind: "proc-type",
                 argTypes: args.map(arg => arg.type ?? UNKNOWN_TYPE),
+                typeParams: [],
+                code: undefined,
+                startIndex: undefined,
+                endIndex: undefined
             },
             argNames: args.map(arg => arg.name),
             body,
@@ -559,10 +658,10 @@ const reaction: ParseFunction<Reaction> = (code, startIndex) =>
     expec(consume(code, index, "triggers"), err(code, index, '"triggers" clause'), index =>
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(expression(code, index), err(code, index, "Side-effect procedure"), ({ parsed: effect, newIndex: index }) => 
-        given(consumeWhitespaceRequired(code, index), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
     expec(
         given(consume(code, index, "until"), index =>
-    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
+        expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
         expec(expression(code, index), err(code, index, "Disposal condition"), res => res)))
         ?? consume(code, index, "forever"), err(code, index, 'Reaction lifetime (either "until <func>" or "forever")'), lifetimeResult => 
     given(consumeWhitespace(code, typeof lifetimeResult === 'number' ? lifetimeResult : lifetimeResult.newIndex), index =>
@@ -830,7 +929,13 @@ const expression: ParseFunction<Expression> =
     memo.cachedOrParse((code, index) => parseStartingFromTier(0)(code, index))
 
 const func: ParseFunction<Func> = (code, startIndex) =>
-    given(consume(code, startIndex, "("), index =>
+    given(parseOptional(code, startIndex, (code, index) =>
+        given(consume(code, index, "<"), index =>
+        given(consumeWhitespace(code, index), index =>
+        expec(parseSeries(code, index, plainIdentifier, ','), err(code, index, "Type parameters"), ({ parsed: typeParams, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index => 
+        given(consume(code, index, ">"), index => ({ parsed: typeParams, newIndex: index }))))))), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
+    given(consume(code, indexAfterTypeParams ?? startIndex, "("), index =>
     given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
@@ -850,13 +955,16 @@ const func: ParseFunction<Func> = (code, startIndex) =>
                 kind: "func-type",
                 argTypes: args.map(arg => arg.type ?? UNKNOWN_TYPE),
                 returnType: returnType ?? UNKNOWN_TYPE,
-                typeParams: [],
+                typeParams: typeParams ?? [],
+                code: undefined,
+                startIndex: undefined,
+                endIndex: undefined,
             },
             argNames: args.map(arg => arg.name),
             body,
         },
         newIndex: index,
-    }))))))))))
+    })))))))))))
 
 const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: PlainIdentifier, type?: TypeExpression }> | BagelSyntaxError | undefined => 
     given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
@@ -1073,8 +1181,10 @@ export const elementTag: ParseFunction<ElementTag> = (code, startIndex) =>
     given(plainIdentifier(code, index), ({ parsed: tagName, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(code, index, _tagAttribute), ({ parsed: attributes, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ">"), err(code, index, '">"'), index => 
     given(parseSeries(code, index, (code, index) => elementTag(code, index) ?? _elementEmbeddedExpression(code, index)), ({ parsed: children, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "</"), err(code, index, 'Closing tag'), index => 
     expec(plainIdentifier(code, index), err(code, index, "Closing tag name"), ({ parsed: closingTagName, newIndex: index }) =>
     // TODO: Check that closing tag matches opening tag
@@ -1089,7 +1199,7 @@ export const elementTag: ParseFunction<ElementTag> = (code, startIndex) =>
             children,
         },
         newIndex: index,
-    }))))))))))
+    }))))))))))))
 
 const _tagAttribute: ParseFunction<[PlainIdentifier, Expression]> = (code, index) =>
     given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>

@@ -9,7 +9,8 @@ import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile";
 import { parse } from "./1_parse";
 import { reshape } from "./2_reshape";
 import logger from "node-color-log"
-import { getLineContents, given, lineAndColumn } from "./1_parse/common";
+import { given } from './utils'
+import { getLineContents, lineAndColumn } from "./1_parse/common";
 
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
@@ -30,7 +31,10 @@ const printError = (modulePath: string) => (error: BagelTypeError) => {
     logger
         .color('cyan').log(modulePath).joint()
 
-    const { line, column } = given(error.ast, ast => lineAndColumn(ast.code, ast.startIndex)) as { line: number; column: number; } | undefined ?? {}
+    const { line, column } = 
+        given(error.ast?.code, code => 
+        given(error.ast?.startIndex, startIndex => 
+            lineAndColumn(code, startIndex))) ?? {}
     if (line != null && column != null) {
         logger
             .color('white').log(':').joint()
@@ -43,17 +47,19 @@ const printError = (modulePath: string) => (error: BagelTypeError) => {
         .color('red').log('error').joint()
         .color('white').log(' ' + errorMessage(error))
 
-    if (error.ast) {
+    // print the problematic line of code, with the issue underlined
+    const { code, startIndex, endIndex } = error.ast ?? {}
+    if (code != null && startIndex != null && endIndex != null) {
         logger.color('black').bgColor('white').log(line).joint().bgColor('black')
 
-        const lineContent = getLineContents(error.ast.code, line as number);
+        const lineContent = getLineContents(code, line as number);
 
         if (lineContent) {
             const padding = '  '
 
             const digitsInLineNum = String(line).length
-            const underlineSpacing = padding + new Array(digitsInLineNum + error.ast.startIndex - lineContent.startIndex).fill(' ').join('')
-            const underline = new Array(error.ast.endIndex - error.ast.startIndex).fill('~').join('')
+            const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
+            const underline = new Array(endIndex - startIndex).fill('~').join('')
             
             logger
                 .color('white').log(padding + lineContent.content)
@@ -127,7 +133,7 @@ const printError = (modulePath: string) => (error: BagelTypeError) => {
     for (const [module, ast] of modulesStore.modules) {
         try {
             typecheck(modulesStore, ast, printError(path.basename(module)));
-        } catch (e) {
+        } catch (e: any) {
             console.error(`Encountered exception typechecking module "${module}":\n${e.stack}\n`);
         }
     }
@@ -171,7 +177,7 @@ const printError = (modulePath: string) => (error: BagelTypeError) => {
                             hadError = true;
                             printError(path.basename(module))(err)
                         });
-                    } catch (e) {
+                    } catch (e: any) {
                         console.error(`Encountered exception typechecking module "${module}":\n${e.stack}`);
                         hadError = true;
                     }

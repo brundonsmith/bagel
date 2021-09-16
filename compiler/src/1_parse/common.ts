@@ -215,6 +215,7 @@ export function getLineContents(code: string, line: number) {
                 return { startIndex: startIndex, content: code.substring(startIndex, endIndex) }
             }
         }
+        return { startIndex: startIndex, content: code.substring(startIndex, code.length) }
     }
 
     return undefined

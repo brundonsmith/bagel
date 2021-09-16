@@ -6,7 +6,6 @@ import { ClassDeclaration } from "../_model/declarations";
 
 
 export type Scope = {
-    readonly parentScope?: Scope,
     readonly types: {[key: string]: TypeExpression},
     readonly values: {[key: string]: DeclarationDescriptor},
     readonly classes: {[key: string]: ClassDeclaration},

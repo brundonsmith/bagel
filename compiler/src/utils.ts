@@ -75,7 +75,7 @@ export function withoutSourceInfo(ast: AST) {
     return clone
 }
 
-export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST) => T) {
+export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST) => T): void {
     const nextPayload = fn(payload, ast);
     
     switch(ast.kind) {
@@ -248,6 +248,63 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             }
         } break;
 
+        // types
+        case "union-type": {
+            for (const m of ast.members) {
+                walkParseTree(nextPayload, m, fn);
+            }
+        } break;
+        case "named-type": {
+            walkParseTree(nextPayload, ast.name, fn);
+        } break;
+        case "proc-type": {
+            for (const m of ast.typeParams) {
+                walkParseTree(nextPayload, m, fn);
+            }
+            for (const m of ast.argTypes) {
+                walkParseTree(nextPayload, m, fn);
+            }
+        } break;
+        case "func-type": {
+            for (const m of ast.typeParams) {
+                walkParseTree(nextPayload, m, fn);
+            }
+            for (const m of ast.argTypes) {
+                walkParseTree(nextPayload, m, fn);
+            }
+            walkParseTree(nextPayload, ast.returnType, fn);
+        } break;
+        case "object-type": {
+            for (const [k, v] of ast.entries) {
+                walkParseTree(nextPayload, k, fn);
+                walkParseTree(nextPayload, v, fn);
+            }
+        } break;
+        case "indexer-type": {
+            walkParseTree(nextPayload, ast.keyType, fn);
+            walkParseTree(nextPayload, ast.valueType, fn);
+        } break;
+        case "array-type": {
+            walkParseTree(nextPayload, ast.element, fn);
+        } break;
+        case "tuple-type": {
+            for (const m of ast.members) {
+                walkParseTree(nextPayload, m, fn);
+            }
+        } break;
+        case "literal-type": {
+            walkParseTree(nextPayload, ast.value, fn);
+        } break;
+        case "nominal-type": {
+            walkParseTree(nextPayload, ast.inner, fn);
+        } break;
+        case "iterator-type": {
+            walkParseTree(nextPayload, ast.itemType, fn);
+        } break;
+        case "promise-type": {
+            walkParseTree(nextPayload, ast.resultType, fn);
+        } break;
+
         // atomic
         case "type-declaration":
         case "plain-identifier":
@@ -257,6 +314,13 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "boolean-literal":
         case "nil-literal":
         case "javascript-escape":
+        case "element-type":
+        case "string-type":
+        case "number-type":
+        case "boolean-type":
+        case "nil-type":
+        case "unknown-type":
+        case "javascript-escape-type":
             break;
 
         default:

@@ -109,6 +109,13 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
             break;
         case "func":
         case "proc":
+            
+            // add any generic type parameters to scope
+            for (const typeParam of ast.type.typeParams) {
+                // TODO: Use `extends` to give these more meaningful types in context
+                scope.types[typeParam.name] = UNKNOWN_TYPE
+            }
+
             // add func/proc arguments to scope
             for (let i = 0; i < ast.argNames.length; i++) {
                 scope.values[ast.argNames[i].name] = {

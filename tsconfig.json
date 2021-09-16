@@ -10,5 +10,5 @@
     "allowJs": true,
     "moduleResolution": "node"
   },
-  "include": ["*/src/**/*"]
+  "include": ["compiler/src/**/*"]
 }

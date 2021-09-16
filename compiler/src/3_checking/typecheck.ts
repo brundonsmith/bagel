@@ -2,7 +2,7 @@ import { AST, Module } from "../_model/ast";
 import { PlainIdentifier } from "../_model/common";
 import { ImportDeclaration, ImportItem } from "../_model/declarations";
 import { LocalIdentifier, Proc } from "../_model/expressions";
-import { FuncType, ProcType, REACTION_DATA_TYPE, REACTION_EFFECT_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions";
+import { FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions";
 import { lineAndColumn } from "../1_parse/common";
 import { deepEquals, DeepReadonly, given, sOrNone, walkParseTree, wasOrWere } from "../utils";
 import { ModulesStore, Scope } from "./modules-store";
@@ -164,7 +164,11 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 const effectType = modulesStore.getTypeOf(ast.effect);
                 const requiredEffectType: ProcType = {
                     kind: 'proc-type',
-                    argTypes: [ (dataType as FuncType).returnType ]
+                    argTypes: [ (dataType as FuncType).returnType ],
+                    typeParams: [],
+                    code: undefined,
+                    startIndex: undefined,
+                    endIndex: undefined,
                 };
                 if (effectType.kind !== "proc-type") {
                     reportError(miscError(ast.effect, `Expected procedure in effect clause`));
@@ -281,6 +285,8 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
     const resolvedDestination = resolve(scope, destination);
     const resolvedValue = resolve(scope, value);
 
+    // console.log({ resolvedDestination, resolvedValue })
+
     if (resolvedDestination == null || resolvedValue == null) {
         return false;
     } else if (resolvedValue.kind === "javascript-escape-type") {
@@ -335,6 +341,9 @@ function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpression>)
             return {
                 kind: "union-type",
                 members: memberTypes as DeepReadonly<TypeExpression>[],
+                code: undefined,
+                startIndex: undefined,
+                endIndex: undefined,
             };
         }
     } else if(type.kind === "object-type") {
@@ -344,11 +353,17 @@ function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpression>)
         return {
             kind: "object-type",
             entries,
+            code: undefined,
+            startIndex: undefined,
+            endIndex: undefined,
         }
     } else if(type.kind === "array-type") {
         return given(resolve(scope, type.element), element => ({
             kind: "array-type",
             element,
+            code: undefined,
+            startIndex: undefined,
+            endIndex: undefined,
         }));
     } else {
         // TODO: Recurse on ProcType, FuncType, IndexerType, TupleType
@@ -375,7 +390,8 @@ function serialize(typeExpression: TypeExpression): string {
         case "iterator-type": return `Iterator<${serialize(typeExpression.itemType)}>`;
         case "promise-type": return `Promise<${serialize(typeExpression.resultType)}>`;
         case "unknown-type": return "unknown";
-        case "element-type": return `<${typeExpression.tagName}>`;
+        case "element-type": return `<element tag>`
+        // case "element-type": return `<${typeExpression.tagName}>`;
         case "javascript-escape-type": return "<js escape>";
     }
 }

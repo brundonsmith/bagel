@@ -1,7 +1,8 @@
-import { Block, PlainIdentifier, SourceInfo } from "./common";
 import { ClassMember, Declaration } from "./declarations";
 import { Expression } from "./expressions";
 import { Statement } from "./statements";
+import { TypeExpression } from "./type-expressions";
+import { Block, PlainIdentifier, SourceInfo } from "./common";
 
 export type AST =
     | Module
@@ -9,6 +10,7 @@ export type AST =
     | ClassMember
     | Expression
     | Statement
+    | TypeExpression
     | PlainIdentifier
     | Block
 

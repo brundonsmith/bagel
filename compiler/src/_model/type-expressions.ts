@@ -1,5 +1,5 @@
-import { PlainIdentifier } from "./common"
-import { BooleanLiteral, Expression, NumberLiteral, StringLiteral } from "./expressions"
+import { PlainIdentifier, SourceInfo } from "./common"
+import { BooleanLiteral, NumberLiteral, StringLiteral } from "./expressions"
 
 export type TypeExpression =
     | UnionType
@@ -22,51 +22,52 @@ export type TypeExpression =
     | UnknownType
     | JavascriptEscapeType
 
-export type UnionType = {
+export type UnionType = SourceInfo & {
     kind: "union-type",
     members: TypeExpression[],
 }
 
-export type NamedType = {
+export type NamedType = SourceInfo & {
     kind: "named-type",
     name: PlainIdentifier,
 }
 
-export type ProcType = {
+export type ProcType = SourceInfo & {
     kind: "proc-type",
+    typeParams: PlainIdentifier[],
     argTypes: TypeExpression[],
 }
 
-export type FuncType = {
+export type FuncType = SourceInfo & {
     kind: "func-type",
+    typeParams: PlainIdentifier[],
     argTypes: TypeExpression[],
     returnType: TypeExpression,
-    typeParams: PlainIdentifier[],
 }
 
-export type ElementType = {
+export type ElementType = SourceInfo & {
     kind: "element-type",
-    tagName: PlainIdentifier,
-    attributes: [PlainIdentifier, Expression][],
+    // tagName: PlainIdentifier,
+    // attributes: [PlainIdentifier, Expression][],
 }
 
-export type ObjectType = {
+export type ObjectType = SourceInfo & {
     kind: "object-type",
     entries: [PlainIdentifier, TypeExpression][],
 }
 
-export type IndexerType = {
+export type IndexerType = SourceInfo & {
     kind: "indexer-type",
     keyType: TypeExpression,
     valueType: TypeExpression,
 }
 
-export type ArrayType = {
+export type ArrayType = SourceInfo & {
     kind: "array-type",
     element: TypeExpression,
 }
 
-export type TupleType = {
+export type TupleType = SourceInfo & {
     kind: "tuple-type",
     members: TypeExpression[],
 }
@@ -76,73 +77,95 @@ export type PrimitiveType =
     | NumberType
     | BooleanType
     | NilType
+    | UnknownType
 
-export type StringType = {
+export type StringType = SourceInfo & {
     kind: "string-type",
 }
 
-export type NumberType = {
+export type NumberType = SourceInfo & {
     kind: "number-type",
 }
 
-export type BooleanType = {
+export type BooleanType = SourceInfo & {
     kind: "boolean-type",
 }
 
-export type NilType = {
+export type NilType = SourceInfo & {
     kind: "nil-type",
 }
 
-export type LiteralType = {
+export type LiteralType = SourceInfo & {
     kind: "literal-type",
     value: StringLiteral | NumberLiteral | BooleanLiteral,
 }
 
-export type NominalType = {
+export type NominalType = SourceInfo & {
     kind: "nominal-type",
     name: string,
     inner: TypeExpression,
 }
 
-export type IteratorType = {
+export type IteratorType = SourceInfo & {
     kind: "iterator-type",
     itemType: TypeExpression,
 }
 
-export type PromiseType = {
+export type PromiseType = SourceInfo & {
     kind: "promise-type",
     resultType: TypeExpression,
 }
 
-export type UnknownType = {
+export type UnknownType = SourceInfo & {
     kind: "unknown-type",
 }
 
-export type JavascriptEscapeType = {
+export type JavascriptEscapeType = SourceInfo & {
     kind: "javascript-escape-type",
 }
 
 export const STRING_TYPE: StringType = {
-    kind: "string-type"
+    kind: "string-type",
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }
 export const NUMBER_TYPE: NumberType = {
-    kind: "number-type"
+    kind: "number-type",
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }
 export const BOOLEAN_TYPE: BooleanType = {
-    kind: "boolean-type"
+    kind: "boolean-type",
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }
 export const NIL_TYPE: NilType = {
-    kind: "nil-type"
+    kind: "nil-type",
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }
 export const UNKNOWN_TYPE: UnknownType = {
-    kind: "unknown-type"
+    kind: "unknown-type",
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }
 export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
-    kind: "javascript-escape-type"
+    kind: "javascript-escape-type",
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }
 export const ITERATOR_OF_NUMBERS_TYPE: IteratorType = {
     kind: "iterator-type",
     itemType: NUMBER_TYPE,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }
 export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
     kind: "union-type",
@@ -150,23 +173,36 @@ export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
         STRING_TYPE,
         NUMBER_TYPE,
         BOOLEAN_TYPE,
-    ]
+    ],
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }
 export const REACTION_DATA_TYPE: TypeExpression = {
     kind: "func-type",
     argTypes: [],
     returnType: UNKNOWN_TYPE,
     typeParams: [],
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }
 export const REACTION_EFFECT_TYPE: TypeExpression = {
     kind: "proc-type",
     argTypes: [
         UNKNOWN_TYPE
     ],
+    typeParams: [],
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }
 export const REACTION_UNTIL_TYPE: TypeExpression = {
     kind: "func-type",
     argTypes: [],
     returnType: BOOLEAN_TYPE,
     typeParams: [],
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
 }

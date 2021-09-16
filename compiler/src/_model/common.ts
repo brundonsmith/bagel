@@ -1,9 +1,9 @@
 import { Statement } from "./statements";
 
 export type SourceInfo = {
-    code: string,
-    startIndex: number,
-    endIndex: number,
+    code: string|undefined,
+    startIndex: number|undefined,
+    endIndex: number|undefined,
 }
 
 export type PlainIdentifier = SourceInfo & {

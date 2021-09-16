@@ -16,6 +16,7 @@
         "test": "cd tests && npm run build-and-run"
     },
     "dependencies": {
-        "esbuild": "^0.11.17"
+        "esbuild": "^0.11.17",
+        "node-color-log": "^5.3.1"
     }
 }

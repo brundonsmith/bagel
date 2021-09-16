@@ -118,7 +118,7 @@ function compileTypeExpression(expr: TypeExpression): string {
         case "named-type": return expr.name.name;
         case "proc-type": return `(${expr.argTypes.map(compileTypeExpression).join(", ")}) => void`;
         case "func-type": return `(${expr.argTypes.map(compileTypeExpression).join(", ")}) => ${compileTypeExpression(expr.returnType)}`;
-        case "element-type": throw Error();
+        case "element-type": return `unknown`;
         case "object-type": return `{${expr.entries
             .map(([ key, value ]) => `${key.name}: ${compileTypeExpression(value)}`)
             .join(", ")}}`;

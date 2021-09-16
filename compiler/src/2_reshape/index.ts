@@ -39,7 +39,10 @@ export function reshape(ast: Module): Module {
                                     kind: "func-type",
                                     argTypes: [],
                                     returnType: UNKNOWN_TYPE,
-                                    typeParams: []
+                                    typeParams: [],
+                                    code: undefined,
+                                    startIndex: undefined,
+                                    endIndex: undefined,
                                 }
                             }
                         }
