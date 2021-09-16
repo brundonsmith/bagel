@@ -38,7 +38,7 @@ export function render(a: Parameters<typeof prender>[0]) {
 
 // Custom
 export function range(start: number) {
-    return function*(end: number) {
+    return function*(end: number): Iterator<number> {
         for (let i = start; i < end; i++) {
             yield i;
         }
@@ -47,7 +47,7 @@ export function range(start: number) {
 
 export function slice<T>(start: number|undefined) {
     return function(end: number|undefined) {
-        return function*(iter: Iterable<T>) {
+        return function*(iter: Iterable<T>): Iterator<T> {
             let index = 0;
             for (const el of iter) {
                 if ((start == null || index >= start) && (end == null || index < end)) {
@@ -60,7 +60,7 @@ export function slice<T>(start: number|undefined) {
 }
 
 export function map<T, R>(fn: (el: T) => R) {
-    return function*(iter: Iterable<T>) {
+    return function*(iter: Iterable<T>): Iterator<R> {
         for (const el of iter) {
             yield fn(el);
         }
@@ -68,7 +68,7 @@ export function map<T, R>(fn: (el: T) => R) {
 }
 
 export function filter<T>(fn: (el: T) => boolean) {
-    return function*(iter: Iterable<T>) {
+    return function*(iter: Iterable<T>): Iterator<T> {
         for (const el of iter) {
             if (fn(el)) {
                 yield el;
@@ -77,13 +77,13 @@ export function filter<T>(fn: (el: T) => boolean) {
     }
 }
 
-export function* entries<V>(obj: {[key: string]: V}): Generator<[string, V], void, unknown> {
+export function* entries<V>(obj: {[key: string]: V}): Iterator<[string, V]> {
     for (const key in obj) {
         yield [key, obj[key]];
     }
 }
 
-export function count<T>(iter: Iterable<T>) {
+export function count<T>(iter: Iterable<T>): number {
     let count = 0;
 
     for (const key in iter) {
@@ -91,6 +91,35 @@ export function count<T>(iter: Iterable<T>) {
     }
 
     return count;
+}
+
+export function concat<T>(iter1: Iterable<T>) {
+    return function*(iter2: Iterable<T>): Iterator<T> {    
+        for (const el of iter1) {
+            yield el;
+        }
+    
+        for (const el of iter2) {
+            yield el;
+        }
+    }
+}
+
+export function zip<T>(iter1: Iterable<T>) {
+    return function*(iter2: Iterable<T>): Iterator<[T|undefined, T|undefined]> {
+        const a = iter1[Symbol.iterator]();
+        const b = iter2[Symbol.iterator]();
+
+        let nextA = a.next();
+        let nextB = b.next();
+        
+        while (!nextA.done || !nextB.done) {
+            yield [nextA.value, nextB.value];
+
+            nextA = a.next();
+            nextB = b.next();
+        }
+    }
 }
 
 export function join<T extends string>(delimiter: string) {
@@ -109,22 +138,6 @@ export function join<T extends string>(delimiter: string) {
         }
 
         return str;
-    }
-}
-
-export function concat<T>(iter1: Iterable<T>) {
-    return function(iter2: Iterable<T>) {
-        const result: T[] = [];
-    
-        for (const el of iter1) {
-            result.push(el);
-        }
-    
-        for (const el of iter2) {
-            result.push(el);
-        }
-    
-        return result;
     }
 }
 
