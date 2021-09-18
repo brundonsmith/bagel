@@ -1,5 +1,5 @@
 
-from 'lib-bgl' import { map, arrayFrom, logp }
+from './lib-bgl' import { map, arrayFrom, logp }
 
 export func fibonacci(n: number): number =>
     if (n <= 1) {

@@ -1,7 +1,7 @@
 import { AST, Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
 import { ImportDeclaration, ImportItem } from "../_model/declarations.ts";
-import { LocalIdentifier, Proc } from "../_model/expressions.ts";
+import { Expression, LocalIdentifier, Proc } from "../_model/expressions.ts";
 import { FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions.ts";
 import { deepEquals, DeepReadonly, given, sOrNone, walkParseTree, wasOrWere } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
@@ -40,9 +40,11 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                     const typeOfPipe = modulesStore.getTypeOf(expr);
 
                     if (typeOfPipe?.kind !== "func-type") {
-                        reportError(miscError(expr, `Each transformation in pipeline expression must be a function: found '${expr.kind}'`));
-                    } else if (!subsumes(scope, typeOfPipe.argTypes[0], inputType)) {
-                        reportError(assignmentError(ast, typeOfPipe.argTypes[0], inputType));
+                        reportError(miscError(expr, `Each transformation in pipeline expression must be a function: found '${typeOfPipe.kind}'`));
+                    } else if (typeOfPipe.argType == null) {
+                        reportError(miscError(expr, `Pipeline function expected to take an argument, but takes no arguments`));
+                    } else if (!subsumes(scope, typeOfPipe.argType, inputType)) {
+                        reportError(assignmentError(ast, typeOfPipe.argType, inputType));
                     } else {
                         inputType = typeOfPipe.returnType;
                     }
@@ -55,7 +57,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                     const leftType = modulesStore.getTypeOf(ast.left);
                     const rightType = modulesStore.getTypeOf(ast.right);
 
-                    reportError(miscError(ast, `Operator '${ast.operator}' cannot be applied to types '${serialize(leftType)}' and '${serialize(rightType)}'`));
+                    reportError(miscError(ast, `Operator '${ast.operator}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
                 }
 
                 return scope;
@@ -65,17 +67,17 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
 
                 if (funcType.kind !== "func-type") {
                     reportError(miscError(ast, "Expression must be a function to be called"));
-                } else if (funcType.argTypes.length < ast.args.length) {
-                    reportError(miscError(ast, `Function only takes ${funcType.argTypes.length} argument${sOrNone(funcType.argTypes.length)}, but ${ast.args.length} ${wasOrWere(ast.args.length)} supplied`));
+                } else if (funcType.argType == null && ast.arg != null) {
+                    reportError(miscError(ast, `Too many arguments passed to function`));
+                } else if (funcType.argType != null && ast.arg == null) {
+                    reportError(miscError(ast, `Function expected argument of type ${displayForm(funcType.argType)}`));
                 } else {
+                    const arg = ast.arg as Expression
                     // TODO: infer what types arguments are allowed to be based on function body
-                    const argValueTypes = ast.args.map(arg => modulesStore.getTypeOf(arg));
+                    const argValueType = modulesStore.getTypeOf(arg as Expression)
 
-                    for (let index = 0; index < argValueTypes.length; index++) {
-                        const argValueType = argValueTypes[index];
-                        if (!subsumes(scope, funcType.argTypes[index], argValueType)) {
-                            reportError(assignmentError(ast.args[index], funcType.argTypes[index], argValueType));
-                        }
+                    if (funcType.argType != null && !subsumes(scope, funcType.argType, argValueType)) {
+                        reportError(assignmentError(arg, funcType.argType, argValueType));
                     }
                 }
 
@@ -89,14 +91,14 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                     const key = indexerType.value.segments[0];
                     const valueType = baseType.entries.find(entry => entry[0].name === key)?.[1];
                     if (valueType == null) {
-                        reportError(miscError(ast.indexer, `Property '${key}' doesn't exist on type '${serialize(baseType)}'`));
+                        reportError(miscError(ast.indexer, `Property '${key}' doesn't exist on type '${displayForm(baseType)}'`));
                     }
                 } else if (baseType.kind === "indexer-type") {
                     if (!subsumes(scope, baseType.keyType, indexerType)) {
                         reportError(assignmentError(ast.indexer, baseType.keyType, indexerType));
                     }
                 } else {
-                    reportError(miscError(ast.indexer, `Expression of type '${indexerType}' can't be used to index type '${serialize(baseType)}'`));
+                    reportError(miscError(ast.indexer, `Expression of type '${indexerType}' can't be used to index type '${displayForm(baseType)}'`));
                 }
 
                 return scope;
@@ -121,7 +123,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
 
                     const valueType = lastPropType.entries.find(entry => entry[0].name === prop.name)?.[1];
                     if (valueType == null) {
-                        reportError(miscError(prop, `Property '${prop.name}' doesn't exist on type '${serialize(baseType)}'`));
+                        reportError(miscError(prop, `Property '${prop.name}' doesn't exist on type '${displayForm(baseType)}'`));
                         return scope;
                     }
 
@@ -163,7 +165,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 const effectType = modulesStore.getTypeOf(ast.effect);
                 const requiredEffectType: ProcType = {
                     kind: 'proc-type',
-                    argTypes: [ (dataType as FuncType).returnType ],
+                    argType: (dataType as FuncType).returnType,
                     typeParams: [],
                     code: undefined,
                     startIndex: undefined,
@@ -185,8 +187,10 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 // TODO: This may become generalized later by generics/inverted inference
-                if (dataType.kind === "func-type" && effectType.kind === "proc-type" && !subsumes(scope, effectType.argTypes[0], dataType.returnType)) {
-                    reportError(assignmentError((ast.effect as Proc).argNames[0], effectType.argTypes[0], dataType.returnType));
+                if (effectType.kind !== "proc-type" || effectType.argType == null || (ast.effect as Proc).argName == null) {
+                    reportError(miscError(ast.data, `Expected procedure taking one argument`));
+                } else if (dataType.kind === "func-type" && effectType.kind === "proc-type" && !subsumes(scope, effectType.argType as TypeExpression, dataType.returnType)) {
+                    reportError(assignmentError((ast.effect as Proc).argName as PlainIdentifier, effectType.argType, dataType.returnType));
                 }
 
                 return scope;
@@ -232,16 +236,16 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
 
                 if (procType.kind !== "proc-type") {
                     reportError(miscError(ast.proc, `Expression must be a procedure to be called`));
-                } else if (procType.argTypes.length < ast.args.length) {
-                    reportError(miscError(ast, `Function only takes ${procType.argTypes.length} argument${sOrNone(procType.argTypes.length)}, but ${ast.args.length} ${wasOrWere(ast.args.length)} supplied`));
+                } else if (procType.argType == null && ast.arg != null) {
+                    reportError(miscError(ast, `Too many arguments passed to procedure`));
+                } else if (procType.argType != null && ast.arg == null) {
+                    reportError(miscError(ast, `Procedure expected argument of type ${displayForm(procType.argType)}`));
                 } else {
-                    const argValueTypes = ast.args.map(arg => modulesStore.getTypeOf(arg));
+                    const arg = ast.arg as Expression
+                    const argValueType =  modulesStore.getTypeOf(arg);
     
-                    for (let index = 0; index < argValueTypes.length; index++) {
-                        const argValueType = argValueTypes[index];
-                        if (!subsumes(scope, procType.argTypes[index], argValueType)) {
-                            reportError(assignmentError(ast.args[index], procType.argTypes[index], argValueType));
-                        }
+                    if (procType.argType != null && !subsumes(scope, procType.argType, argValueType)) {
+                        reportError(assignmentError(arg, procType.argType, argValueType));
                     }
                 }
 
@@ -309,12 +313,14 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
             // NOTE: Value and destination are flipped on purpose for args!
-            && resolvedValue.argTypes.every((valueArg, index) => subsumes(scope, valueArg, resolvedDestination.argTypes[index]))
+            && (resolvedValue.argType == null && resolvedDestination.argType == null
+                || (resolvedValue.argType != null && resolvedDestination.argType != null && subsumes(scope, resolvedValue.argType, resolvedDestination.argType)))
             && subsumes(scope, resolvedDestination.returnType, resolvedValue.returnType)) {
         return true;
     } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" 
             // NOTE: Value and destination are flipped on purpose for args!
-            && resolvedValue.argTypes.every((valueArg, index) => subsumes(scope, valueArg, resolvedDestination.argTypes[index]))) {
+            && (resolvedValue.argType == null && resolvedDestination.argType == null
+                || (resolvedValue.argType != null && resolvedDestination.argType != null && subsumes(scope, resolvedValue.argType, resolvedDestination.argType)))) {
         return true;
     } else if (resolvedDestination.kind === "array-type" && resolvedValue.kind === "array-type") {
         return subsumes(scope, resolvedDestination.element, resolvedValue.element)
@@ -370,24 +376,25 @@ function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpression>)
     }
 }
 
-function serialize(typeExpression: TypeExpression): string {
+function displayForm(typeExpression: TypeExpression): string {
     switch (typeExpression.kind) {
-        case "union-type": return typeExpression.members.map(serialize).join(" | ");
+        case "union-type": return typeExpression.members.map(displayForm).join(" | ");
         case "named-type": return typeExpression.name.name;
-        case "proc-type": return `(${typeExpression.argTypes.map(serialize).join(", ")}) { }`;
-        case "func-type": return `(${typeExpression.argTypes.map(serialize).join(", ")}) => ${serialize(typeExpression.returnType)}`;
-        case "object-type": return `{ ${typeExpression.entries.map(([ key, value ]) => `${key.name}: ${serialize(value)}`)} }`;
-        case "indexer-type": return `{ [${serialize(typeExpression.keyType)}]: ${serialize(typeExpression.valueType)} }`;
-        case "array-type": return `${serialize(typeExpression.element)}[]`;
-        case "tuple-type": return `[${typeExpression.members.map(serialize).join(", ")}]`;
+        // TODO: proc-type and func-type should display to users as (arg0, arg1, arg2) instead of (arg0) => (arg1) => (arg2)
+        case "proc-type": return `(${typeExpression.argType ? displayForm(typeExpression.argType) : ''}) {}`;
+        case "func-type": return `(${typeExpression.argType ? displayForm(typeExpression.argType) : ''}) => ${displayForm(typeExpression.returnType)}`;
+        case "object-type": return `{ ${typeExpression.entries.map(([ key, value ]) => `${key.name}: ${displayForm(value)}`)} }`;
+        case "indexer-type": return `{ [${displayForm(typeExpression.keyType)}]: ${displayForm(typeExpression.valueType)} }`;
+        case "array-type": return `${displayForm(typeExpression.element)}[]`;
+        case "tuple-type": return `[${typeExpression.members.map(displayForm).join(", ")}]`;
         case "string-type": return `string`;
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;
         case "nil-type": return `nil`;
         case "literal-type": return String(typeExpression.value);
         case "nominal-type": return typeExpression.name;
-        case "iterator-type": return `Iterator<${serialize(typeExpression.itemType)}>`;
-        case "promise-type": return `Promise<${serialize(typeExpression.resultType)}>`;
+        case "iterator-type": return `Iterator<${displayForm(typeExpression.itemType)}>`;
+        case "promise-type": return `Promise<${displayForm(typeExpression.resultType)}>`;
         case "unknown-type": return "unknown";
         case "element-type": return `<element tag>`
         // case "element-type": return `<${typeExpression.tagName}>`;
@@ -435,7 +442,7 @@ export type BagelCannotFindExportError = {
 export function errorMessage(error: BagelTypeError): string {
     switch (error.kind) {
         case "bagel-assignable-to-error":
-            return `Type '${serialize(error.value)}' is not assignable to type '${serialize(error.destination)}'`;
+            return `Type '${displayForm(error.value)}' is not assignable to type '${displayForm(error.destination)}'`;
         case "bagel-cannot-find-name-error":
             return `Cannot find name '${error.ast.name}'`;
         case "bagel-misc-type-error":

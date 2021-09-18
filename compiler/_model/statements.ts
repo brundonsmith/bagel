@@ -1,5 +1,5 @@
 import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
-import { Expression, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions.ts";
+import { Expression, Funcall, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions.ts";
 import { TypeExpression } from "./type-expressions.ts";
 
 export type Statement = 
@@ -12,6 +12,7 @@ export type Statement =
     | ProcCall
     | Reaction
     | Computation
+    | Funcall // HACK: We can't know at parse time whether a proc-call is a full proc-call or just a funcall
 
 export type LetDeclaration = SourceInfo & {
     kind: "let-declaration",
@@ -49,7 +50,7 @@ export type Assignment = SourceInfo & {
 export type ProcCall = SourceInfo & {
     kind: "proc-call",
     proc: Expression,
-    args: Expression[],
+    arg: Expression|undefined,
 }
 
 export type Reaction = SourceInfo & {

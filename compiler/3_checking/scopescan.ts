@@ -117,12 +117,12 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                 scope.types[typeParam.name] = UNKNOWN_TYPE
             }
 
-            // add func/proc arguments to scope
-            for (let i = 0; i < ast.argNames.length; i++) {
-                scope.values[ast.argNames[i].name] = {
+            // add func/proc argument to scope
+            if (ast.argName) {
+                scope.values[ast.argName.name] = {
                     mutability: ast.kind === "func" ? "none" : "properties-only",
-                    declaredType: ast.type.argTypes[i],
-                };
+                    declaredType: ast.type.argType ?? UNKNOWN_TYPE,
+                }
             }
             break;
         case "block":

@@ -37,14 +37,14 @@ export type Pipe = SourceInfo & {
 export type Func = SourceInfo & {
     kind: "func",
     type: FuncType,
-    argNames: PlainIdentifier[],
+    argName: PlainIdentifier|undefined,
     body: Expression,
 }
 
 export type Proc = SourceInfo & {
     kind: "proc",
     type: ProcType,
-    argNames: PlainIdentifier[],
+    argName: PlainIdentifier|undefined,
     body: Block,
 }
 
@@ -67,7 +67,7 @@ export type BinaryOp = typeof BINARY_OPS[number];
 export type Funcall = SourceInfo & {
     kind: "funcall",
     func: Expression,
-    args: Expression[],
+    arg: Expression|undefined,
 }
 
 export type Indexer = SourceInfo & {

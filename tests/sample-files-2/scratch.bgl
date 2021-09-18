@@ -1,1 +1,9 @@
 func foo(a: number, b: number): number => a + b
+
+proc bar(a: number) {
+    let foo = 12;
+
+    for (a of 0..10) {
+        foo = a;
+    }
+}

@@ -35,13 +35,13 @@ export type NamedType = SourceInfo & {
 export type ProcType = SourceInfo & {
     kind: "proc-type",
     typeParams: PlainIdentifier[],
-    argTypes: TypeExpression[],
+    argType: TypeExpression|undefined,
 }
 
 export type FuncType = SourceInfo & {
     kind: "func-type",
     typeParams: PlainIdentifier[],
-    argTypes: TypeExpression[],
+    argType: TypeExpression|undefined,
     returnType: TypeExpression,
 }
 
@@ -180,7 +180,7 @@ export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
 }
 export const REACTION_DATA_TYPE: TypeExpression = {
     kind: "func-type",
-    argTypes: [],
+    argType: undefined,
     returnType: UNKNOWN_TYPE,
     typeParams: [],
     code: undefined,
@@ -189,17 +189,15 @@ export const REACTION_DATA_TYPE: TypeExpression = {
 }
 export const REACTION_EFFECT_TYPE: TypeExpression = {
     kind: "proc-type",
-    argTypes: [
-        UNKNOWN_TYPE
-    ],
     typeParams: [],
+    argType: UNKNOWN_TYPE,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
 }
 export const REACTION_UNTIL_TYPE: TypeExpression = {
     kind: "func-type",
-    argTypes: [],
+    argType: undefined,
     returnType: BOOLEAN_TYPE,
     typeParams: [],
     code: undefined,

@@ -8,7 +8,7 @@ import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { given } from "./utils.ts";
-import { getLineContents, lineAndColumn } from "./1_parse/common.ts";
+import { BagelSyntaxError, errorMessage as syntaxErrorMessage, getLineContents, lineAndColumn } from "./1_parse/common.ts";
 
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
@@ -25,12 +25,16 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     return arrayOfFiles;
 }
 
-const printError = (modulePath: string) => (error: BagelTypeError) => {
+const printError = (modulePath: string) => (error: BagelTypeError|BagelSyntaxError) => {
+    const code = error.kind === 'bagel-syntax-error' ? error.code : error.ast?.code
+    const startIndex = error.kind === 'bagel-syntax-error' ? error.index : error.ast?.startIndex
+    const endIndex = error.kind === 'bagel-syntax-error' ? undefined : error.ast?.endIndex
+
     let infoLine = Colors.cyan(modulePath)
     
     const { line, column } = 
-        given(error.ast?.code, code => 
-        given(error.ast?.startIndex, startIndex => 
+        given(code, code => 
+        given(startIndex, startIndex => 
             lineAndColumn(code, startIndex))) ?? {}
     if (line != null && column != null) {
         infoLine += Colors.white(":") 
@@ -41,29 +45,27 @@ const printError = (modulePath: string) => (error: BagelTypeError) => {
     
     infoLine += Colors.white(" - ")
         + Colors.red("error")
-        + Colors.white(" " + errorMessage(error))
+        + Colors.white(" " + (error.kind === "bagel-syntax-error" ? syntaxErrorMessage(error) : errorMessage(error)))
 
     console.log(infoLine)
 
     // print the problematic line of code, with the issue underlined
-    const { code, startIndex, endIndex } = error.ast ?? {}
-    if (code != null && startIndex != null && endIndex != null && line != null) {
-        let codeAndUnderline = Colors.bgWhite(Colors.black(String(line)))
-
+    if (code != null && startIndex != null && line != null) {
         const lineContent = getLineContents(code, line);
 
         if (lineContent) {
             const padding = '  '
 
-            const digitsInLineNum = String(line).length
-            const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
-            const underline = new Array(endIndex - startIndex).fill('~').join('')
-            
-            codeAndUnderline += padding + lineContent.content + '\n'
-                + Colors.red(underlineSpacing + underline)
-        }
+            console.log(Colors.bgWhite(Colors.black(String(line))) + padding + lineContent.content)
 
-        console.log(codeAndUnderline)
+            if (endIndex != null) {
+                const digitsInLineNum = String(line).length
+                const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
+                const underline = new Array(endIndex - startIndex).fill('~').join('')
+                
+                console.log(Colors.red(underlineSpacing + underline))
+            }
+        }
     }
 
     console.log()
@@ -75,11 +77,11 @@ function bagelFileToTsFile(module: string, bundle?: boolean): string {
 
 const IMPORTED_ITEMS = ['observable', 'computed', 'reactionUntil', 'configure', 
 'h', 'render', 'range', 'slice', 'map', 'filter', 'entries', 'count', 'join', 
-'concat', 'log', 'floor', 'arrayFrom', 'fromEntries'
+'concat', 'log', 'floor', 'arrayFrom', 'fromEntries', 'Iter'
 ].map(s => `${s} as ${HIDDEN_IDENTIFIER_PREFIX}${s}`).join(', ')
 
 const LIB_IMPORTS = `
-import { ${IMPORTED_ITEMS} } from "../../lib/src.ts";
+import { ${IMPORTED_ITEMS} } from "../../lib/src/index.ts";
 
 ___configure({
     enforceActions: "never",
@@ -116,7 +118,7 @@ ___configure({
                 const fileContents = await Deno.readTextFile(module);
             
                 const startParse = Date.now();
-                const parsed = reshape(parse(fileContents, path.basename(module)));
+                const parsed = reshape(parse(fileContents, printError(path.basename(module))));
                 timeSpentParsing += Date.now() - startParse;
 
                 for (const declaration of parsed.declarations) {
@@ -180,43 +182,51 @@ ___configure({
 
     if (watch) {
         for (const module of modulesStore.modules.keys()) {
+            let lastFileContents: string|undefined
             (async () => {
                 const watcher = Deno.watchFs(module)
                 for await (const _ of watcher) {
-                    console.log(`Typechecking ${module}...`)
     
                     try {
-                        const fileContents = await Deno.readFile(module);
-                        const parsed = reshape(parse(fileContents.toString(), path.basename(module)));
-                        modulesStore.modules.set(module, parsed);
-    
-                        scopescan(printError(path.basename(module)), modulesStore, parsed, module);
-                        typescan(printError(path.basename(module)), modulesStore, parsed);
-    
-                        let hadError = false;
-                        try {
-                            typecheck(modulesStore, parsed, err => {
+                        const fileContents = await Deno.readTextFile(module);
+
+                        if (fileContents && (lastFileContents == null || lastFileContents !== fileContents)) {
+                            lastFileContents = fileContents
+
+                            console.log(`Typechecking ${module}...`)
+                            const parsed = reshape(parse(fileContents, printError(path.basename(module))));
+                            modulesStore.modules.set(module, parsed);
+        
+                            scopescan(printError(path.basename(module)), modulesStore, parsed, module);
+                            typescan(printError(path.basename(module)), modulesStore, parsed);
+        
+                            let hadError = false;
+                            try {
+                                typecheck(modulesStore, parsed, err => {
+                                    hadError = true;
+                                    printError(path.basename(module))(err)
+                                });
+                            } catch (e: any) {
+                                console.error(`Encountered exception typechecking module "${module}":\n${e.stack}`);
                                 hadError = true;
-                                printError(path.basename(module))(err)
-                            });
-                        } catch (e: any) {
-                            console.error(`Encountered exception typechecking module "${module}":\n${e.stack}`);
-                            hadError = true;
+                            }
+        
+                            if (!hadError) {
+                                console.log("No errors")
+                            }
+                            
+                            if (emit) {
+                                const jsPath = bagelFileToTsFile(module);
+                                const compiled = compile(modulesStore, parsed);
+                                const compiledWithLib = LIB_IMPORTS + compiled;
+                                await Deno.writeFile(jsPath, new TextEncoder().encode(compiledWithLib));
+                            }
+        
+                            // TODO
+                            // if (bundle) {
+                            //     await bundleOutput(entry)
+                            // }
                         }
-    
-                        if (!hadError) {
-                            console.log("No errors")
-                        }
-                        
-                        const jsPath = bagelFileToTsFile(module);
-                        const compiled = compile(modulesStore, parsed);
-                        const compiledWithLib = LIB_IMPORTS + compiled;
-                        await Deno.writeFile(jsPath, new TextEncoder().encode(compiledWithLib));
-    
-                        // TODO
-                        // if (bundle) {
-                        //     await bundleOutput(entry)
-                        // }
                     } catch (e) {
                         console.error("Failed to read module " + module + "\n")
                         console.error(e)

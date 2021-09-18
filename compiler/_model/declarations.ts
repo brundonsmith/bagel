@@ -32,7 +32,7 @@ export type TypeDeclaration = SourceInfo & {
 export type ProcDeclaration = SourceInfo & {
     kind: "proc-declaration",
     name: PlainIdentifier,
-    proc: Proc,
+    proc: Func|Proc,
     exported: boolean,
 }
 
@@ -83,7 +83,7 @@ export type ClassFunction = SourceInfo & {
 export type ClassProcedure = SourceInfo & {
     kind: "class-procedure",
     name: PlainIdentifier,
-    proc: Proc,
+    proc: Func|Proc,
     access: 'private'|'public',
 }
 

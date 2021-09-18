@@ -4,9 +4,10 @@ import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProp
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Funcall, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, ProcCall, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PromiseType, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, errorMessage, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
+import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
+import { funcTypesFromArgs,procTypeFromArgs,procFromArgs,procCallFromArgs,funcsFromArgs,funcallFromArgs } from "./curryization.ts";
 
-export function parse(code: string, fileName?: string): Module {
+export function parse(code: string, reportError: (error: BagelSyntaxError) => void): Module {
     let index = 0;
 
     const declarations: Declaration[] = [];
@@ -23,7 +24,7 @@ export function parse(code: string, fileName?: string): Module {
     
     if (isError(result)) {
         // throw result;
-        console.log((fileName ? fileName : "<unknown>") + "|" + errorMessage(result));
+        reportError(result);
     }
 
     memo.delete(code);
@@ -288,19 +289,20 @@ const funcType: ParseFunction<FuncType> = (code, startIndex) =>
     given(consume(code, index, "=>"), index =>
     given(consumeWhitespace(code, index), index =>
     expec(typeExpression(code, index), err(code, index, 'Return type'), ({ parsed: returnType, newIndex: index }) => ({
-        parsed: {
-            kind: "func-type",
+        parsed: funcTypesFromArgs(
+            typeParams ?? [],
             argTypes,
             returnType,
-            typeParams: typeParams ?? [],
-            code,
-            startIndex,
-            endIndex: index,
-        },
+            {
+                code,
+                startIndex,
+                endIndex: index
+            }
+        ),
         newIndex: index
     })))))))))))
 
-const procType: ParseFunction<ProcType> = (code, startIndex) =>
+const procType: ParseFunction<FuncType|ProcType> = (code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(code, index, typeExpression, ","), ({ parsed: argTypes, newIndex: index }) =>
@@ -308,14 +310,15 @@ const procType: ParseFunction<ProcType> = (code, startIndex) =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "{}"), index => ({
-        parsed: {
-            kind: "proc-type",
+        parsed: procTypeFromArgs(
+            [], // TODO
             argTypes,
-            typeParams: [],
-            code,
-            startIndex,
-            endIndex: index,
-        },
+            {
+                code,
+                startIndex,
+                endIndex: index
+            }
+        ),
         newIndex: index
     }))))))))
 
@@ -614,28 +617,22 @@ const _accessModifier: ParseFunction<'private'|'public'> = (code, startIndex) =>
         newIndex: index
     }))
 
-const proc: ParseFunction<Proc> = (code, startIndex) =>
+const proc: ParseFunction<Func|Proc> = (code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
     given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
     given(parseBlock(code, index), ({ parsed: body, newIndex: index }) => ({
-        parsed: {
-            kind: "proc",
-            code,
-            startIndex,
-            endIndex: index,
-            type: {
-                kind: "proc-type",
-                argTypes: args.map(arg => arg.type ?? UNKNOWN_TYPE),
-                typeParams: [],
-                code: undefined,
-                startIndex: undefined,
-                endIndex: undefined
-            },
-            argNames: args.map(arg => arg.name),
+        parsed: procFromArgs(
+            [], // TODO
+            args,
             body,
-        },
+            {
+                code,
+                startIndex,
+                endIndex: index
+            }
+        ),
         newIndex: index,
     }))))))
 
@@ -744,20 +741,20 @@ const assignment: ParseFunction<Assignment> = (code, startIndex) =>
         newIndex: index,
     }))))))))
 
-const procCall: ParseFunction<ProcCall> = (code, startIndex) =>
+const procCall: ParseFunction<Funcall|ProcCall> = (code, startIndex) =>
     given(parseBeneath(code, startIndex, funcall), ({ parsed: proc, newIndex: index }) =>
     given(parseSeries(code, index, _argExpressions), ({ parsed: argLists, newIndex: index }) => 
         argLists.length > 0 ?
             expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
-                // @ts-ignore
-                parsed: argLists.reduce((proc: Expression, args: Expression[]) => ({
-                    kind: "proc-call",
-                    code,
-                    startIndex,
-                    endIndex: index,
+                parsed: procCallFromArgs(
                     proc,
-                    args,
-                }), proc) as ProcCall,
+                    argLists,
+                    {
+                        code,
+                        startIndex,
+                        endIndex: index
+                    }
+                ),
                 newIndex: index,
             }))
         : undefined))
@@ -946,23 +943,17 @@ const func: ParseFunction<Func> = (code, startIndex) =>
     given(consume(code, index, "=>"), index =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(code, index), err(code, index, 'Function body'), ({ parsed: body, newIndex: index }) => ({
-        parsed: {
-            kind: "func",
-            code,
-            startIndex,
-            endIndex: index,
-            type: {
-                kind: "func-type",
-                argTypes: args.map(arg => arg.type ?? UNKNOWN_TYPE),
-                returnType: returnType ?? UNKNOWN_TYPE,
-                typeParams: typeParams ?? [],
-                code: undefined,
-                startIndex: undefined,
-                endIndex: undefined,
-            },
-            argNames: args.map(arg => arg.name),
+        parsed: funcsFromArgs(
+            typeParams ?? [],
+            args,
+            returnType ?? UNKNOWN_TYPE,
             body,
-        },
+            {
+                code,
+                startIndex,
+                endIndex: index
+            }
+        ),
         newIndex: index,
     })))))))))))
 
@@ -1015,20 +1006,18 @@ const binaryOperator: ParseFunction<BinaryOperator> = (code, startIndex) =>
 const funcall: ParseFunction<Funcall> = (code, startIndex) =>
     given(parseBeneath(code, startIndex, funcall), ({ parsed: func, newIndex: index }) =>
     given(parseSeries(code, index, _argExpressions), ({ parsed: argLists, newIndex: index }) => 
-        argLists.length > 0 ? 
+    argLists.length > 0 ? {
+        parsed: funcallFromArgs(
+            func,
+            argLists,
             {
-                // @ts-ignore
-                parsed: argLists.reduce((func: Expression, args: Expression[]) => ({
-                    kind: "funcall",
-                    code,
-                    startIndex,
-                    endIndex: index,
-                    func,
-                    args,
-                }), func) as Funcall,
-                newIndex: index,
+                code,
+                startIndex,
+                endIndex: index
             }
-        : undefined))
+        ),
+        newIndex: index
+    } : undefined))
 
 const _argExpressions: ParseFunction<Expression[]> = (code, index) =>
     given(consume(code, index, "("), index => 

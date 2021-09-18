@@ -1,7 +1,7 @@
 import { Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
-import { BinaryOp, Expression, Func, isExpression, Proc } from "../_model/expressions.ts";
-import { BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
+import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, DeepReadonly, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
 import { BagelTypeError, subsumes } from "./typecheck.ts";
@@ -9,7 +9,7 @@ import { BagelTypeError, subsumes } from "./typecheck.ts";
 export function typescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         if (modulesStore.astTypes.get(ast) == null && isExpression(ast)) {
-            determineTypeAndCache(reportError, modulesStore, ast, scope)
+            determineTypeAndStore(reportError, modulesStore, ast, scope)
         }
   
         if (ast.kind === "reaction") {
@@ -17,16 +17,16 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
             // to a proc call taking a function and proc, to leverage the same
             // type inference mechanism for arguments that will be used 
             // elsewhere 
-            const dataType = determineTypeAndCache(reportError, modulesStore, ast.data, scope)
-            const effectType = determineTypeAndCache(reportError, modulesStore, ast.effect, scope)
+            const dataType = determineTypeAndStore(reportError, modulesStore, ast.data, scope)
+            const effectType = determineTypeAndStore(reportError, modulesStore, ast.effect, scope)
 
-            if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.argTypes[0].kind === "unknown-type") {
-                effectType.argTypes[0] = dataType.returnType;
+            if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.argType?.kind === "unknown-type") {
+                effectType.argType = dataType.returnType;
             }
         } else if (ast.kind === "computation") {
-            determineTypeAndCache(reportError, modulesStore, ast.expression, scope)
+            determineTypeAndStore(reportError, modulesStore, ast.expression, scope)
         } else if (ast.kind === "for-loop") {
-            const iteratorType = determineTypeAndCache(reportError, modulesStore, ast.iterator, scope)
+            const iteratorType = determineTypeAndStore(reportError, modulesStore, ast.iterator, scope)
 
             if (iteratorType.kind === "iterator-type") {
                 modulesStore.astTypes.set(ast.itemIdentifier, iteratorType.itemType)
@@ -34,51 +34,41 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
         } else if (ast.kind === "funcall") {
             
 
-            const funcType = determineTypeAndCache(reportError, modulesStore, ast.func, scope);
+            const funcType = determineTypeAndStore(reportError, modulesStore, ast.func, scope);
             // console.log({ funcType })
 
             if (funcType.kind === "func-type") {
-                for (let i = 0; i < funcType.argTypes.length; i++) {
+                // infer callback argument types based on context
+                if ((funcType.argType?.kind === "func-type" && ast.arg?.kind === "func") 
+                    || (funcType.argType?.kind === "proc-type" && ast.arg?.kind === "proc")) {
+                    const argType = funcType.argType;
+                    const argExpr = ast.arg;
 
-                    // infer callback argument types based on context
-                    if ((funcType.argTypes[i].kind === "func-type" && ast.args[i].kind === "func") 
-                        || (funcType.argTypes[i].kind === "proc-type" && ast.args[i].kind === "proc")) {
-                        const argType = funcType.argTypes[i] as FuncType|ProcType;
-                        const argExpr = ast.args[i] as Func|Proc;
+                    // console.log({ argType, argExpr })
 
-                        // console.log({ argType, argExpr })
+                    const argArgType = argExpr.type.argType
+                    // console.log({ argArgType })
 
-                        for (let j = 0; j < argExpr.type.argTypes.length; j++) {
-                            const argArgType = argExpr.type.argTypes[j]
-                            // console.log({ argArgType })
-
-                            if (argArgType.kind === "unknown-type") {
-                                // console.log(argExpr.argNames[j])
-                                // console.log(argType.argTypes[j])
-                                modulesStore.astTypes.set(argExpr.argNames[j], argType.argTypes[j]);
-                            }
-                        }
+                    if (argArgType?.kind === "unknown-type" && argType.argType != null) {
+                        // console.log(argExpr.argNames[j])
+                        // console.log(argType.argTypes[j])
+                        modulesStore.astTypes.set(argExpr.argName as PlainIdentifier, argType.argType);
                     }
                 }
             }
         } else if (ast.kind === "proc-call") {
-            const procType = determineTypeAndCache(reportError, modulesStore, ast.proc, scope);
+            const procType = determineTypeAndStore(reportError, modulesStore, ast.proc, scope);
 
             if (procType.kind === "proc-type") {
-                for (let i = 0; i < procType.argTypes.length; i++) {
+                if ((procType.argType?.kind === "func-type" && ast.arg?.kind === "func") 
+                    || (procType.argType?.kind === "proc-type" && ast.arg?.kind === "proc")) {
+                    const argType = procType.argType;
+                    const argExpr = ast.arg;
 
-                    if ((procType.argTypes[i].kind === "func-type" && ast.args[i].kind === "func") 
-                        || (procType.argTypes[i].kind === "proc-type" && ast.args[i].kind === "proc")) {
-                        const argType = procType.argTypes[i] as FuncType|ProcType;
-                        const argExpr = ast.args[i] as Func|Proc;
+                    const argArgType = argExpr.type.argType
 
-                        for (let j = 0; j < argExpr.type.argTypes.length; j++) {
-                            const argArgType = argExpr.type.argTypes[j]
-
-                            if (argArgType.kind === "unknown-type") {
-                                modulesStore.astTypes.set(argExpr.argNames[j], argType.argTypes[j]);
-                            }
-                        }
+                    if (argArgType?.kind === "unknown-type" && argType.argType != null) {
+                        modulesStore.astTypes.set(argExpr.argName as PlainIdentifier, argType.argType);
                     }
                 }
             }
@@ -88,7 +78,7 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
     });
 }
 
-function determineTypeAndCache(
+function determineTypeAndStore(
     reportError: (error: BagelTypeError) => void, 
     modulesStore: ModulesStore, 
     ast: Expression, 
@@ -115,13 +105,13 @@ function determineType(
 
                 // if no return-type is declared, try inferring the type from the inner expression
                 returnType: ast.type.returnType.kind === "unknown-type" 
-                    ? determineTypeAndCache(reportError, modulesStore, ast.body, modulesStore.getScopeFor(ast)) 
+                    ? determineTypeAndStore(reportError, modulesStore, ast.body, modulesStore.getScopeFor(ast)) 
                     : ast.type.returnType,
             }
         }
         case "pipe": {
             const lastPipeExpression = ast.expressions[ast.expressions.length - 1];
-            const lastStageType = determineTypeAndCache(reportError, modulesStore, lastPipeExpression, scope);
+            const lastStageType = determineTypeAndStore(reportError, modulesStore, lastPipeExpression, scope);
 
             if (lastStageType.kind === "func-type") {
                 return lastStageType.returnType;
@@ -131,8 +121,8 @@ function determineType(
             }
         }
         case "binary-operator": {
-            const leftType = determineTypeAndCache(reportError, modulesStore, ast.left, scope);
-            const rightType = determineTypeAndCache(reportError, modulesStore, ast.right, scope);
+            const leftType = determineTypeAndStore(reportError, modulesStore, ast.left, scope);
+            const rightType = determineTypeAndStore(reportError, modulesStore, ast.right, scope);
 
             for (const types of BINARY_OPERATOR_TYPES[ast.operator]) {
                 const { left, right, output } = types;
@@ -145,7 +135,7 @@ function determineType(
             return UNKNOWN_TYPE;
         }
         case "funcall": {
-            const funcType = determineTypeAndCache(reportError, modulesStore, ast.func, scope);
+            const funcType = determineTypeAndStore(reportError, modulesStore, ast.func, scope);
 
             if (funcType.kind === "func-type") {
                 return funcType.returnType;
@@ -154,8 +144,8 @@ function determineType(
             }
         }
         case "indexer": {
-            const baseType = determineTypeAndCache(reportError, modulesStore, ast.base, scope);
-            const indexerType = determineTypeAndCache(reportError, modulesStore, ast.indexer, scope);
+            const baseType = determineTypeAndStore(reportError, modulesStore, ast.base, scope);
+            const indexerType = determineTypeAndStore(reportError, modulesStore, ast.indexer, scope);
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
                 const key = indexerType.value.segments[0];
@@ -181,7 +171,7 @@ function determineType(
             return UNKNOWN_TYPE;
         }
         case "if-else-expression": {
-            const ifType = determineTypeAndCache(reportError, modulesStore, ast.ifResult, scope);
+            const ifType = determineTypeAndStore(reportError, modulesStore, ast.ifResult, scope);
 
             if (ast.elseResult == null) {
                 return {
@@ -192,7 +182,7 @@ function determineType(
                     endIndex: undefined,
                 };
             } else {
-                const elseType = determineTypeAndCache(reportError, modulesStore, ast.elseResult, scope);
+                const elseType = determineTypeAndStore(reportError, modulesStore, ast.elseResult, scope);
 
                 return {
                     kind: "union-type",
@@ -204,9 +194,9 @@ function determineType(
             }
         }
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
-        case "parenthesized-expression": return determineTypeAndCache(reportError, modulesStore, ast.inner, scope);
+        case "parenthesized-expression": return determineTypeAndStore(reportError, modulesStore, ast.inner, scope);
         case "property-accessor": {
-            const baseType = determineTypeAndCache(reportError, modulesStore, ast.base, scope);
+            const baseType = determineTypeAndStore(reportError, modulesStore, ast.base, scope);
 
             let lastPropType = baseType;
             for (const prop of ast.properties) {
@@ -232,7 +222,7 @@ function determineType(
             } else if (descriptor.declaredType.kind !== "unknown-type") {
                 return descriptor.declaredType;
             } else if (descriptor.initialValue != null) {
-                return determineTypeAndCache(reportError, modulesStore, descriptor.initialValue, scope);
+                return determineTypeAndStore(reportError, modulesStore, descriptor.initialValue, scope);
             } else {
                 return UNKNOWN_TYPE;
             }
@@ -249,7 +239,7 @@ function determineType(
         }
         case "object-literal": {
             const entries = ast.entries.map(([key, value]) => 
-                [key, determineTypeAndCache(reportError, modulesStore, value, scope)] as [PlainIdentifier, TypeExpression]);
+                [key, determineTypeAndStore(reportError, modulesStore, value, scope)] as [PlainIdentifier, TypeExpression]);
 
             return {
                 kind: "object-type",
@@ -260,7 +250,7 @@ function determineType(
             };
         }
         case "array-literal": {
-            const entries = ast.entries.map(entry => determineTypeAndCache(reportError, modulesStore, entry, scope));
+            const entries = ast.entries.map(entry => determineTypeAndStore(reportError, modulesStore, entry, scope));
 
             // NOTE: This could be slightly better where different element types overlap each other
             const uniqueEntryTypes = entries.filter((el, index, arr) => 

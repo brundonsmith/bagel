@@ -119,15 +119,10 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.name, fn);
             walkParseTree(nextPayload, ast.proc, fn);
         } break;
-        case "proc": {
-            for (const argName of ast.argNames) {
-                walkParseTree(nextPayload, argName, fn);
-            }
-            walkParseTree(nextPayload, ast.body, fn);
-        } break;
+        case "proc":
         case "func": {
-            for (const argName of ast.argNames) {
-                walkParseTree(nextPayload, argName, fn);
+            if (ast.argName) {
+                walkParseTree(nextPayload, ast.argName, fn);
             }
             walkParseTree(nextPayload, ast.body, fn);
         } break;
@@ -142,8 +137,8 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         } break;
         case "funcall": {
             walkParseTree(nextPayload, ast.func, fn);
-            for (const arg of ast.args) {
-                walkParseTree(nextPayload, arg, fn);
+            if (ast.arg) {
+                walkParseTree(nextPayload, ast.arg, fn);
             }
         } break;
         case "element-tag": {
@@ -197,7 +192,6 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             }
         } break;
 
-        // not expressions, but should have their contents checked
         case "reaction": {
             walkParseTree(nextPayload, ast.data, fn);
             walkParseTree(nextPayload, ast.effect, fn);
@@ -218,8 +212,8 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         } break;
         case "proc-call": {
             walkParseTree(nextPayload, ast.proc, fn);
-            for (const arg of ast.args) {
-                walkParseTree(nextPayload, arg, fn);
+            if (ast.arg) {
+                walkParseTree(nextPayload, ast.arg, fn);
             }
         } break;
         case "if-else-statement": {
@@ -261,16 +255,16 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             for (const m of ast.typeParams) {
                 walkParseTree(nextPayload, m, fn);
             }
-            for (const m of ast.argTypes) {
-                walkParseTree(nextPayload, m, fn);
+            if (ast.argType) {
+                walkParseTree(nextPayload, ast.argType, fn);
             }
         } break;
         case "func-type": {
             for (const m of ast.typeParams) {
                 walkParseTree(nextPayload, m, fn);
             }
-            for (const m of ast.argTypes) {
-                walkParseTree(nextPayload, m, fn);
+            if (ast.argType) {
+                walkParseTree(nextPayload, ast.argType, fn);
             }
             walkParseTree(nextPayload, ast.returnType, fn);
         } break;
