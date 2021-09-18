@@ -1,10 +1,15 @@
 
-export proc logp(x: string|number|boolean|nil) {
+export proc logp(x: unknown) {
     js# console.log(x) #js
 }
 
-export func logf(x: string|number|boolean|nil): string => 
+export func logf(x: unknown): string => 
     js# (() => { console.log(x); return x })() #js
 
 export func add(a: number, b: number): number => a + b
 
+export func arrayFrom(iter: Iterator<unknown>): unknown[] =>
+    js# ___arrayFrom(iter) #js
+
+export func map(fn: (number) => number, iter: Iterator<number>): Iterator<number> =>
+    js# ___map(fn)(iter) #js

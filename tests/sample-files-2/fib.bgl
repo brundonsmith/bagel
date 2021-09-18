@@ -1,4 +1,6 @@
 
+from 'lib-bgl' import { map, arrayFrom, logp }
+
 export func fibonacci(n: number): number =>
     if (n <= 1) {
         n
@@ -9,3 +11,6 @@ export func fibonacci(n: number): number =>
 const first10 = 0..10 |> map(fibonacci) |> arrayFrom
 
 
+proc main() {
+    logp(first10);
+}
