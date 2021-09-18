@@ -20,7 +20,7 @@ proc main() {
 
     reaction () => count
     triggers (count) {
-        render(Counter(increment, decrement, count), document.body);
+        ___render(Counter(increment, decrement, count), document.body);
     }
     forever;
 }

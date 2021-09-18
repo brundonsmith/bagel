@@ -209,10 +209,13 @@ function bagelFileToTsFile(module: string, bundle?: boolean): string {
     return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + (bundle ? ".bundle" : "") + ".bgl.ts")
 }
 
+const IMPORTED_ITEMS = ['observable', 'computed', 'reactionUntil', 'configure', 
+'h', 'render', 'range', 'slice', 'map', 'filter', 'entries', 'count', 'join', 
+'concat', 'log', 'floor', 'arrayFrom', 'fromEntries'
+].map(s => `${s} as ${HIDDEN_IDENTIFIER_PREFIX}${s}`).join(', ')
+
 const LIB_IMPORTS = `
-import { observable as ___observable, computed as ___computed, reactionUntil as ___reactionUntil, configure as ___configure,
-    h as ___h, render,
-    range as ___range, slice, map, filter, entries, count, join, concat, log, floor, arrayFrom, fromEntries } from "../../lib/src";
+import { ${IMPORTED_ITEMS} } from "../../lib/src";
 
 ___configure({
     enforceActions: "never",
