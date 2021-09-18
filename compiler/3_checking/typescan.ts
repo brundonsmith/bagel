@@ -1,10 +1,10 @@
 import { Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
-import { BinaryOp, Expression, Func, isExpression, LocalIdentifier, Proc } from "../_model/expressions.ts";
+import { BinaryOp, Expression, Func, isExpression, Proc } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, DeepReadonly, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
-import { BagelTypeError, miscError, subsumes } from "./typecheck.ts";
+import { BagelTypeError, subsumes } from "./typecheck.ts";
 
 export function typescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
@@ -108,7 +108,7 @@ function determineType(
     switch(ast.kind) {
         case "proc": {
             return ast.type;
-        };
+        }
         case "func": {
             return {
                 ...ast.type,
@@ -118,7 +118,7 @@ function determineType(
                     ? determineTypeAndCache(reportError, modulesStore, ast.body, modulesStore.getScopeFor(ast)) 
                     : ast.type.returnType,
             }
-        };
+        }
         case "pipe": {
             const lastPipeExpression = ast.expressions[ast.expressions.length - 1];
             const lastStageType = determineTypeAndCache(reportError, modulesStore, lastPipeExpression, scope);
@@ -129,7 +129,7 @@ function determineType(
                 // reportError(miscError(lastPipeExpression, `Expected function in pipe expression, got '${lastStageType.kind}'`))
                 return UNKNOWN_TYPE;
             }
-        };
+        }
         case "binary-operator": {
             const leftType = determineTypeAndCache(reportError, modulesStore, ast.left, scope);
             const rightType = determineTypeAndCache(reportError, modulesStore, ast.right, scope);
@@ -143,7 +143,7 @@ function determineType(
             }
 
             return UNKNOWN_TYPE;
-        };
+        }
         case "funcall": {
             const funcType = determineTypeAndCache(reportError, modulesStore, ast.func, scope);
 
@@ -152,7 +152,7 @@ function determineType(
             } else {
                 return UNKNOWN_TYPE;
             }
-        };
+        }
         case "indexer": {
             const baseType = determineTypeAndCache(reportError, modulesStore, ast.base, scope);
             const indexerType = determineTypeAndCache(reportError, modulesStore, ast.indexer, scope);
@@ -179,7 +179,7 @@ function determineType(
             }
 
             return UNKNOWN_TYPE;
-        };
+        }
         case "if-else-expression": {
             const ifType = determineTypeAndCache(reportError, modulesStore, ast.ifResult, scope);
 
@@ -202,7 +202,7 @@ function determineType(
                     endIndex: undefined,
                 };
             }
-        };
+        }
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
         case "parenthesized-expression": return determineTypeAndCache(reportError, modulesStore, ast.inner, scope);
         case "property-accessor": {
@@ -223,7 +223,7 @@ function determineType(
             }
             
             return lastPropType;
-        };
+        }
         case "local-identifier": {
             const descriptor = scope.values[ast.name];
 
@@ -236,7 +236,7 @@ function determineType(
             } else {
                 return UNKNOWN_TYPE;
             }
-        };
+        }
         case "element-tag": {
             return {
                 kind: "element-type",
@@ -246,7 +246,7 @@ function determineType(
                 startIndex: undefined,
                 endIndex: undefined,
             };
-        };
+        }
         case "object-literal": {
             const entries = ast.entries.map(([key, value]) => 
                 [key, determineTypeAndCache(reportError, modulesStore, value, scope)] as [PlainIdentifier, TypeExpression]);
@@ -258,7 +258,7 @@ function determineType(
                 startIndex: undefined,
                 endIndex: undefined,
             };
-        };
+        }
         case "array-literal": {
             const entries = ast.entries.map(entry => determineTypeAndCache(reportError, modulesStore, entry, scope));
 
@@ -281,7 +281,7 @@ function determineType(
                 startIndex: undefined,
                 endIndex: undefined,
             };
-        };
+        }
         case "string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
         case "boolean-literal": return BOOLEAN_TYPE;
@@ -372,7 +372,7 @@ function distillUnion(scope: Scope, type: TypeExpression): TypeExpression {
                     const a = type.members[i];
                     const b = type.members[j];
 
-                    if (subsumes(scope, type.members[j], type.members[i]) && !indicesToDrop.has(j)) {
+                    if (subsumes(scope, b, a) && !indicesToDrop.has(j)) {
                         indicesToDrop.add(i);
                     }
                 }

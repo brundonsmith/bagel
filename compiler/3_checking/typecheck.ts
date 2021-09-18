@@ -3,7 +3,6 @@ import { PlainIdentifier } from "../_model/common.ts";
 import { ImportDeclaration, ImportItem } from "../_model/declarations.ts";
 import { LocalIdentifier, Proc } from "../_model/expressions.ts";
 import { FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions.ts";
-import { lineAndColumn } from "../1_parse/common.ts";
 import { deepEquals, DeepReadonly, given, sOrNone, walkParseTree, wasOrWere } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
 
@@ -13,7 +12,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
         switch(ast.kind) {
             case "block": {
                 return modulesStore.getScopeFor(ast);
-            };
+            }
             case "const-declaration": {
                 const constType = ast.type;
                 const valueType = modulesStore.getTypeOf(ast.value);
@@ -23,7 +22,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "func": {
                 const funcScope = modulesStore.getScopeFor(ast);
                 const bodyType = modulesStore.getTypeOf(ast.body);
@@ -33,7 +32,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
                 
                 return funcScope;
-            };
+            }
             case "pipe": {
                 let inputType = modulesStore.getTypeOf(ast.expressions[0]);
 
@@ -50,7 +49,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "binary-operator": {
                 if (modulesStore.getTypeOf(ast).kind === "unknown-type") {
                     const leftType = modulesStore.getTypeOf(ast.left);
@@ -60,7 +59,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "funcall": {
                 const funcType = modulesStore.getTypeOf(ast.func);
 
@@ -81,7 +80,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "indexer": {
                 const baseType = modulesStore.getTypeOf(ast.base);
                 const indexerType = modulesStore.getTypeOf(ast.indexer);
@@ -101,7 +100,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "if-else-expression": {
                 const ifConditionType = modulesStore.getTypeOf(ast.ifCondition);
                 if (ifConditionType?.kind !== "boolean-type") {
@@ -109,7 +108,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "property-accessor": {
                 const baseType = modulesStore.getTypeOf(ast.base);
 
@@ -130,14 +129,14 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
                 
                 return scope;
-            };
+            }
             case "local-identifier": {
                 if (scope.values[ast.name] == null) {
                     reportError(cannotFindName(ast));
                 }
 
                 return scope;
-            };
+            }
             case "string-literal": {
                 for (const segment of ast.segments) {
                     if (typeof segment !== "string") {
@@ -150,7 +149,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
 
             // not expressions, but should have their contents checked
             case "reaction": {
@@ -191,7 +190,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "let-declaration": {
                 // console.log(JSON.stringify(scope, null, 2))
                 // console.log(JSON.stringify(ast, null, 2))
@@ -206,7 +205,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
                 
                 return scope;
-            };
+            }
             case "assignment": {
                 if (ast.target.kind === "local-identifier" && scope.values[ast.target.name].mutability !== "all") {
                     reportError(miscError(ast.target, `Cannot assign to '${ast.target.name}' because it is not mutable`));
@@ -223,7 +222,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "proc-call": {
                 const procType = modulesStore.getTypeOf(ast.proc);
 
@@ -247,7 +246,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "if-else-statement": {
                 const conditionType = modulesStore.getTypeOf(ast.ifCondition);
 
@@ -256,7 +255,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "for-loop": {
                 // TODO: Disallow shadowing? Not sure
 
@@ -266,7 +265,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 return scope;
-            };
+            }
             case "while-loop": {
                 const conditionType = modulesStore.getTypeOf(ast.condition);
                 if (conditionType.kind !== "boolean-type") {
@@ -274,7 +273,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
                 
                 return scope;
-            };
+            }
             default:
                 return scope;
         }        

@@ -165,5 +165,5 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
 };
 
 export function isExpression(ast: AST): ast is Expression {
-    return ALL_EXPRESSION_TYPES.hasOwnProperty(ast.kind);
+    return Object.prototype.hasOwnProperty.call(ALL_EXPRESSION_TYPES, ast.kind);
 }
