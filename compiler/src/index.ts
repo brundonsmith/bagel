@@ -72,16 +72,16 @@ const printError = (modulePath: string) => (error: BagelTypeError) => {
 }
 
 (async function() {
-    const dir = path.resolve(process.cwd(), process.argv[2]);
-    const allFilesInDir = await getAllFiles(dir);
-    const outDir = process.argv[3] || path.dirname(dir);
+    const fileOrDir = path.resolve(process.cwd(), process.argv[2]);
+    const allFiles = (await fs.stat(fileOrDir)).isDirectory() ? await getAllFiles(fileOrDir) : [ fileOrDir ];
+    const outDir = process.argv[3] || path.dirname(fileOrDir);
     const bundle = true;
     const watch = process.argv.includes("--watch");
     const emit = !process.argv.includes("--noEmit");
     
     const modulesStore = new ModulesStore();
     
-    const allModules = new Set<string>(allFilesInDir.filter(f => f.match(/\.bgl$/i)));
+    const allModules = new Set<string>(allFiles.filter(f => f.match(/\.bgl$/i)));
     const doneModules = new Set<string>();
 
     let timeSpentParsing = 0;
