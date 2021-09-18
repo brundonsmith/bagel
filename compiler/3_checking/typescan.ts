@@ -1,10 +1,10 @@
-import { Module } from "../_model/ast";
-import { PlainIdentifier } from "../_model/common";
-import { BinaryOp, Expression, Func, isExpression, LocalIdentifier, Proc } from "../_model/expressions";
-import { BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions";
-import { deepEquals, DeepReadonly, walkParseTree } from "../utils";
-import { ModulesStore, Scope } from "./modules-store";
-import { BagelTypeError, miscError, subsumes } from "./typecheck";
+import { Module } from "../_model/ast.ts";
+import { PlainIdentifier } from "../_model/common.ts";
+import { BinaryOp, Expression, Func, isExpression, LocalIdentifier, Proc } from "../_model/expressions.ts";
+import { BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { deepEquals, DeepReadonly, walkParseTree } from "../utils.ts";
+import { ModulesStore, Scope } from "./modules-store.ts";
+import { BagelTypeError, miscError, subsumes } from "./typecheck.ts";
 
 export function typescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {

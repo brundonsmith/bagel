@@ -1,6 +1,6 @@
-import { Module } from "../_model/ast";
-import { UNKNOWN_TYPE } from "../_model/type-expressions";
-import { walkParseTree } from "../utils";
+import { Module } from "../_model/ast.ts";
+import { UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { walkParseTree } from "../utils.ts";
 
 /**
  * Reshape the parse tree in various ways, including simplification of later 

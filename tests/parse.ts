@@ -1,9 +1,9 @@
 
-import { test } from "./testing-utils";
-import { parse } from "../../compiler/src/1_parse";
-import { deepEquals } from "../../compiler/src/utils";
-import { AST } from "../../compiler/src/_model/ast";
-import { UNKNOWN_TYPE, STRING_TYPE, NUMBER_TYPE } from "../../compiler/src/_model/type-expressions";
+import { test } from "./testing-utils.ts";
+import { parse } from "../compiler/1_parse/index.ts";
+import { deepEquals } from "../compiler/utils.ts";
+import { AST } from "../compiler/_model/ast.ts";
+import { UNKNOWN_TYPE, STRING_TYPE, NUMBER_TYPE } from "../compiler/_model/type-expressions.ts";
 
 console.log("parse.ts")
 

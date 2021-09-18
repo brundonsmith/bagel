@@ -1,4 +1,4 @@
-import { Statement } from "./statements";
+import { Statement } from "./statements.ts";
 
 export type SourceInfo = {
     code: string|undefined,

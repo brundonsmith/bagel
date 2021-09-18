@@ -1,13 +1,14 @@
-import path from "path";
-import { Module } from "../_model/ast";
-import { Block } from "../_model/common";
-import { Declaration } from "../_model/declarations";
-import { Func, Proc, Expression, StringLiteral } from "../_model/expressions";
-import { ForLoop } from "../_model/statements";
-import { TypeExpression, UNKNOWN_TYPE, NUMBER_TYPE } from "../_model/type-expressions";
-import { walkParseTree } from "../utils";
-import { ModulesStore, Scope } from "./modules-store";
-import { BagelTypeError, cannotFindExport, cannotFindModule } from "./typecheck";
+import { path } from "../deps.ts";
+
+import { Module } from "../_model/ast.ts";
+import { Block } from "../_model/common.ts";
+import { Declaration } from "../_model/declarations.ts";
+import { Func, Proc, Expression, StringLiteral } from "../_model/expressions.ts";
+import { ForLoop } from "../_model/statements.ts";
+import { TypeExpression, UNKNOWN_TYPE, NUMBER_TYPE } from "../_model/type-expressions.ts";
+import { walkParseTree } from "../utils.ts";
+import { ModulesStore, Scope } from "./modules-store.ts";
+import { BagelTypeError, cannotFindExport, cannotFindModule } from "./typecheck.ts";
 
 
 export function scopescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module, module: string) {

@@ -1,6 +1,6 @@
-import { AST } from "./ast"
-import { Block, PlainIdentifier, SourceInfo } from "./common"
-import { FuncType, ProcType } from "./type-expressions"
+import { AST } from "./ast.ts";
+import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
+import { FuncType, ProcType } from "./type-expressions.ts";
 
 export type Expression = 
     | JavascriptEscape

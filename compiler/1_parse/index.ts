@@ -1,10 +1,10 @@
-import { Module } from "../_model/ast";
-import { Block, PlainIdentifier } from "../_model/common";
-import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Funcall, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral } from "../_model/expressions";
-import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, ProcCall, Reaction, Statement, WhileLoop } from "../_model/statements";
-import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PromiseType, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions";
-import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, errorMessage, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common";
+import { Module } from "../_model/ast.ts";
+import { Block, PlainIdentifier } from "../_model/common.ts";
+import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Funcall, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral } from "../_model/expressions.ts";
+import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, ProcCall, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
+import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PromiseType, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, errorMessage, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 export function parse(code: string, fileName?: string): Module {
     let index = 0;

@@ -1,6 +1,6 @@
 
 export function test(fn: () => string|void) {
-    if (!process.argv[2] || process.argv[2] === fn.name) {
+    if (!Deno.args[0] || Deno.args[0] === fn.name) {
         try {
             const result = fn();
     

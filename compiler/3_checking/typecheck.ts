@@ -1,11 +1,11 @@
-import { AST, Module } from "../_model/ast";
-import { PlainIdentifier } from "../_model/common";
-import { ImportDeclaration, ImportItem } from "../_model/declarations";
-import { LocalIdentifier, Proc } from "../_model/expressions";
-import { FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions";
-import { lineAndColumn } from "../1_parse/common";
-import { deepEquals, DeepReadonly, given, sOrNone, walkParseTree, wasOrWere } from "../utils";
-import { ModulesStore, Scope } from "./modules-store";
+import { AST, Module } from "../_model/ast.ts";
+import { PlainIdentifier } from "../_model/common.ts";
+import { ImportDeclaration, ImportItem } from "../_model/declarations.ts";
+import { LocalIdentifier, Proc } from "../_model/expressions.ts";
+import { FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions.ts";
+import { lineAndColumn } from "../1_parse/common.ts";
+import { deepEquals, DeepReadonly, given, sOrNone, walkParseTree, wasOrWere } from "../utils.ts";
+import { ModulesStore, Scope } from "./modules-store.ts";
 
 
 export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: (error: BagelTypeError) => void) {

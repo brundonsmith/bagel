@@ -1,6 +1,6 @@
-import { PlainIdentifier, SourceInfo } from "./common"
-import { Expression, Func, Proc, StringLiteral } from "./expressions"
-import { TypeExpression } from "./type-expressions"
+import { PlainIdentifier, SourceInfo } from "./common.ts";
+import { Expression, Func, Proc, StringLiteral } from "./expressions.ts";
+import { TypeExpression } from "./type-expressions.ts";
 
 export type Declaration =
     | ImportDeclaration

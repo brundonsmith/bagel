@@ -1,7 +1,4 @@
-dist
 .vscode
 node_modules
-build
 *.bgl.js
 *.bgl.ts
-lib/lib.js

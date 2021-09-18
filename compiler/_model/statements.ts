@@ -1,6 +1,6 @@
-import { Block, PlainIdentifier, SourceInfo } from "./common"
-import { Expression, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions"
-import { TypeExpression } from "./type-expressions"
+import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
+import { Expression, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions.ts";
+import { TypeExpression } from "./type-expressions.ts";
 
 export type Statement = 
     | JavascriptEscape

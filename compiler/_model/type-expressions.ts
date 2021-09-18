@@ -1,5 +1,5 @@
-import { PlainIdentifier, SourceInfo } from "./common"
-import { BooleanLiteral, NumberLiteral, StringLiteral } from "./expressions"
+import { PlainIdentifier, SourceInfo } from "./common.ts";
+import { BooleanLiteral, NumberLiteral, StringLiteral } from "./expressions.ts";
 
 export type TypeExpression =
     | UnionType

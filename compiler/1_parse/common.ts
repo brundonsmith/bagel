@@ -1,5 +1,5 @@
-import { KEYWORDS, PlainIdentifier } from "../_model/common";
-import { BinaryOp, BINARY_OPS, Expression } from "../_model/expressions";
+import { KEYWORDS, PlainIdentifier } from "../_model/common.ts";
+import { BinaryOp, BINARY_OPS, Expression } from "../_model/expressions.ts";
 
 export function consume(code: string, index: number, segment: string): number|undefined {
     for (let i = 0; i < segment.length; i++) {

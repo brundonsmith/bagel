@@ -1,9 +1,9 @@
-import { ModulesStore } from "../3_checking/modules-store";
-import { given } from "../utils";
-import { Module, AST } from "../_model/ast";
-import { PlainIdentifier } from "../_model/common";
-import { Expression, Proc, Func } from "../_model/expressions";
-import { TypeExpression } from "../_model/type-expressions";
+import { ModulesStore } from "../3_checking/modules-store.ts";
+import { given } from "../utils.ts";
+import { Module, AST } from "../_model/ast.ts";
+import { PlainIdentifier } from "../_model/common.ts";
+import { Expression, Proc, Func } from "../_model/expressions.ts";
+import { TypeExpression } from "../_model/type-expressions.ts";
 
 
 export function compile(modulesStore: ModulesStore, module: Module): string {
@@ -18,7 +18,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(modulesStore, name) + (alias ? ` as ${compileOne(modulesStore, alias)}` : ``)
-        ).join(", ")} } from "${ast.path.segments.join("")}.bgl.ts";`;
+        ).join(", ")} } from "${ast.path.segments.join("")}.bgl.ts.ts";`;
         case "type-declaration": return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileTypeExpression(ast.type)}`;
         case "proc-declaration": return (ast.exported ? `export ` : ``) + compileProc(modulesStore, ast.proc, ast.name.name);
         case "func-declaration": return (ast.exported ? `export ` : ``) + compileFunc(modulesStore, ast.func, ast.name.name);

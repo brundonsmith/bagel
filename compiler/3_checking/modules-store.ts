@@ -1,8 +1,8 @@
-import { AST, Module } from "../_model/ast";
-import { Expression } from "../_model/expressions";
-import { TypeExpression } from "../_model/type-expressions";
-import { DeepReadonly } from "../utils";
-import { ClassDeclaration } from "../_model/declarations";
+import { AST, Module } from "../_model/ast.ts";
+import { Expression } from "../_model/expressions.ts";
+import { TypeExpression } from "../_model/type-expressions.ts";
+import { DeepReadonly } from "../utils.ts";
+import { ClassDeclaration } from "../_model/declarations.ts";
 
 
 export type Scope = {
