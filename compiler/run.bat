@@ -1,1 +1,1 @@
-deno run --allow-read --allow-write index.ts %*
+deno run --allow-read --allow-write %~dp0/index.ts %*
