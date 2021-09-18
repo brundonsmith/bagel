@@ -11,5 +11,5 @@ export func add(a: number, b: number): number => a + b
 export func arrayFrom(iter: Iterator<unknown>): unknown[] =>
     js# ___arrayFrom(iter) #js
 
-export func map(fn: (number) => number, iter: Iterator<number>): Iterator<number> =>
+export func map(fn: (n: number) => number, iter: Iterator<number>): Iterator<number> =>
     js# ___map(fn)(iter) #js

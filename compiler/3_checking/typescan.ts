@@ -20,8 +20,8 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
             const dataType = determineTypeAndStore(reportError, modulesStore, ast.data, scope)
             const effectType = determineTypeAndStore(reportError, modulesStore, ast.effect, scope)
 
-            if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.argType?.kind === "unknown-type") {
-                effectType.argType = dataType.returnType;
+            if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.arg?.type.kind === "unknown-type") {
+                effectType.arg.type = dataType.returnType;
             }
         } else if (ast.kind === "computation") {
             determineTypeAndStore(reportError, modulesStore, ast.expression, scope)
@@ -39,20 +39,19 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
 
             if (funcType.kind === "func-type") {
                 // infer callback argument types based on context
-                if ((funcType.argType?.kind === "func-type" && ast.arg?.kind === "func") 
-                    || (funcType.argType?.kind === "proc-type" && ast.arg?.kind === "proc")) {
-                    const argType = funcType.argType;
+                if ((funcType.arg?.type.kind === "func-type" && ast.arg?.kind === "func") 
+                    || (funcType.arg?.type.kind === "proc-type" && ast.arg?.kind === "proc")) {
+                    const argType = funcType.arg.type;
                     const argExpr = ast.arg;
 
                     // console.log({ argType, argExpr })
 
-                    const argArgType = argExpr.type.argType
                     // console.log({ argArgType })
 
-                    if (argArgType?.kind === "unknown-type" && argType.argType != null) {
+                    if (argExpr.type.arg != null && argExpr.type.arg.type.kind === "unknown-type" && argType.arg != null) {
                         // console.log(argExpr.argNames[j])
                         // console.log(argType.argTypes[j])
-                        modulesStore.astTypes.set(argExpr.argName as PlainIdentifier, argType.argType);
+                        modulesStore.astTypes.set(argExpr.type.arg.name, argType.arg.type);
                     }
                 }
             }
@@ -60,15 +59,13 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
             const procType = determineTypeAndStore(reportError, modulesStore, ast.proc, scope);
 
             if (procType.kind === "proc-type") {
-                if ((procType.argType?.kind === "func-type" && ast.arg?.kind === "func") 
-                    || (procType.argType?.kind === "proc-type" && ast.arg?.kind === "proc")) {
-                    const argType = procType.argType;
+                if ((procType.arg?.type.kind === "func-type" && ast.arg?.kind === "func") 
+                    || (procType.arg?.type.kind === "proc-type" && ast.arg?.kind === "proc")) {
+                    const argType = procType.arg.type;
                     const argExpr = ast.arg;
 
-                    const argArgType = argExpr.type.argType
-
-                    if (argArgType?.kind === "unknown-type" && argType.argType != null) {
-                        modulesStore.astTypes.set(argExpr.argName as PlainIdentifier, argType.argType);
+                    if (argExpr.type.arg != null && argExpr.type.arg.type.kind === "unknown-type" && argType.arg != null) {
+                        modulesStore.astTypes.set(argExpr.type.arg.name, argType.arg.type);
                     }
                 }
             }

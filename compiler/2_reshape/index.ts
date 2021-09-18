@@ -30,14 +30,13 @@ export function reshape(ast: Module): Module {
                             endIndex,
                             value: {
                                 kind: "func",
-                                argName: undefined,
                                 code: expression.code,
                                 startIndex: expression.startIndex,
                                 endIndex: expression.endIndex,
                                 body: expression,
                                 type: {
                                     kind: "func-type",
-                                    argType: undefined,
+                                    arg: undefined,
                                     returnType: UNKNOWN_TYPE,
                                     typeParams: [],
                                     code: undefined,

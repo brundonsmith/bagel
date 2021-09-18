@@ -1,39 +1,39 @@
-import { IReactionPublic, IReactionOptions, IReactionDisposer, reaction as mreaction, when, autorun } from "mobx";
+// import { IReactionPublic, IReactionOptions, IReactionDisposer, reaction as mreaction, when, autorun } from "mobx";
 
 
 // MobX
-export {
-    observable,
-    computed,
-    configure
-} from "mobx"
+// export {
+//     observable,
+//     computed,
+//     configure
+// } from "mobx"
 
-function reaction<T>(expression: () => T, effect: (arg: T) => void, opts?: IReactionOptions | undefined): IReactionDisposer {
-    effect(expression()) // eagerly evaluate
-    return mreaction(expression, effect, opts)
-}
+// function reaction<T>(expression: () => T, effect: (arg: T) => void, opts?: IReactionOptions | undefined): IReactionDisposer {
+//     effect(expression()) // eagerly evaluate
+//     return mreaction(expression, effect, opts)
+// }
 
-export function reactionUntil<T>(expression: () => T, effect: (arg: T) => void, until?: () => boolean, opts?: IReactionOptions | undefined): void {
-    const r = reaction(expression, effect, opts);
-    if (until) {
-        when(until, r);
-    }
-}
+// export function reactionUntil<T>(expression: () => T, effect: (arg: T) => void, until?: () => boolean, opts?: IReactionOptions | undefined): void {
+//     const r = reaction(expression, effect, opts);
+//     if (until) {
+//         when(until, r);
+//     }
+// }
 
 
 // Preact
-export {
-    h,
-} from "preact"
-import {
-    render as prender,
-} from "preact"
+// export {
+//     h,
+// } from "preact"
+// import {
+//     render as prender,
+// } from "preact"
 
-export function render(a: Parameters<typeof prender>[0]) {
-    return function (b: Parameters<typeof prender>[1]): ReturnType<typeof prender> {
-        return prender(a, b)
-    }
-}
+// export function render(a: Parameters<typeof prender>[0]) {
+//     return function (b: Parameters<typeof prender>[1]): ReturnType<typeof prender> {
+//         return prender(a, b)
+//     }
+// }
 
 
 // Custom

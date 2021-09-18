@@ -87,7 +87,7 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
     const mutableLocals = Object.entries(modulesStore.getScopeFor(proc.body).values)
         .filter(e => e[1].mutability === "all");
 
-    return `(${proc.argName != null ? `${proc.argName.name}${proc.type.argType != null ? ': ' + compileTypeExpression(proc.type.argType) : ''}` : ''}) => {
+    return `(${proc.type.arg != null ? `${proc.type.arg.name.name}: ${compileTypeExpression(proc.type.arg.type)}` : ''}) => {
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
     `const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileTypeExpression(e[1].declaredType)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});
      const ${SENTINEL_OBJ} = {};` : ``}
@@ -98,7 +98,7 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
 // TODO: dispose of reactions somehow... at some point...
 
 const compileFunc = (modulesStore: ModulesStore, func: Func): string =>
-    `(${func.argName != null ? `${func.argName.name}${func.type.argType != null ? ': ' + compileTypeExpression(func.type.argType) : ''}` : ''})${func.type.returnType.kind !== 'unknown-type' ? `: ${compileTypeExpression(func.type.returnType)}` : ''} => ${compileOne(modulesStore, func.body)}`;
+    `(${func.type.arg != null ? `${func.type.arg.name.name}: ${compileTypeExpression(func.type.arg.type)}` : ''})${func.type.returnType.kind !== 'unknown-type' ? `: ${compileTypeExpression(func.type.returnType)}` : ''} => ${compileOne(modulesStore, func.body)}`;
 
 function compilePipe(modulesStore: ModulesStore, expressions: readonly Expression[], end: number): string {
     if (end === 0) {
@@ -112,8 +112,8 @@ function compileTypeExpression(expr: TypeExpression): string {
     switch (expr.kind) {
         case "union-type": return expr.members.map(compileTypeExpression).join(" | ");
         case "named-type": return expr.name.name;
-        case "proc-type": return `(_: ${expr.argType ? compileTypeExpression(expr.argType) : ''}) => void`;
-        case "func-type": return `(_: ${expr.argType ? compileTypeExpression(expr.argType) : ''}) => ${compileTypeExpression(expr.returnType)}`;
+        case "proc-type": return `(${expr.arg ? `${expr.arg.name.name}: ${compileTypeExpression(expr.arg.type)}` : ''}) => void`;
+        case "func-type": return `(${expr.arg ? `${expr.arg.name.name}: ${compileTypeExpression(expr.arg.type)}` : ''}) => ${compileTypeExpression(expr.returnType)}`;
         case "element-type": return `unknown`;
         case "object-type": return `{${expr.entries
             .map(([ key, value ]) => `${key.name}: ${compileTypeExpression(value)}`)

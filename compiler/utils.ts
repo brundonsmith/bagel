@@ -121,9 +121,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         } break;
         case "proc":
         case "func": {
-            if (ast.argName) {
-                walkParseTree(nextPayload, ast.argName, fn);
-            }
+            walkParseTree(nextPayload, ast.type, fn);
             walkParseTree(nextPayload, ast.body, fn);
         } break;
         case "pipe": {
@@ -255,16 +253,18 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             for (const m of ast.typeParams) {
                 walkParseTree(nextPayload, m, fn);
             }
-            if (ast.argType) {
-                walkParseTree(nextPayload, ast.argType, fn);
+            if (ast.arg) {
+                walkParseTree(nextPayload, ast.arg.name, fn);
+                walkParseTree(nextPayload, ast.arg.type, fn);
             }
         } break;
         case "func-type": {
             for (const m of ast.typeParams) {
                 walkParseTree(nextPayload, m, fn);
             }
-            if (ast.argType) {
-                walkParseTree(nextPayload, ast.argType, fn);
+            if (ast.arg) {
+                walkParseTree(nextPayload, ast.arg.name, fn);
+                walkParseTree(nextPayload, ast.arg.type, fn);
             }
             walkParseTree(nextPayload, ast.returnType, fn);
         } break;

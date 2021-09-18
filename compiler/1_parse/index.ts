@@ -282,7 +282,7 @@ const funcType: ParseFunction<FuncType> = (code, startIndex) =>
         given(consume(code, index, ">"), index => ({ parsed: typeParams, newIndex: index }))))))), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
     given(consume(code, indexAfterTypeParams ?? startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
-    given(parseSeries(code, index, typeExpression, ","), ({ parsed: argTypes, newIndex: index }) =>
+    given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
@@ -291,7 +291,7 @@ const funcType: ParseFunction<FuncType> = (code, startIndex) =>
     expec(typeExpression(code, index), err(code, index, 'Return type'), ({ parsed: returnType, newIndex: index }) => ({
         parsed: funcTypesFromArgs(
             typeParams ?? [],
-            argTypes,
+            args,
             returnType,
             {
                 code,
@@ -305,7 +305,7 @@ const funcType: ParseFunction<FuncType> = (code, startIndex) =>
 const procType: ParseFunction<FuncType|ProcType> = (code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
-    given(parseSeries(code, index, typeExpression, ","), ({ parsed: argTypes, newIndex: index }) =>
+    given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: argTypes, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
