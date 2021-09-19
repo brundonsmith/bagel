@@ -232,7 +232,7 @@ export const procTypeFromArgs = (
         }
 }
 
-export const funcallFromArgs = (func: Expression, argLists: Expression[][], sourceInfo: SourceInfo): Funcall => {
+export const funcallFromArgs = (func: Expression, argLists: Expression[][], typeArgs: TypeExpression[], sourceInfo: SourceInfo): Funcall => {
     const allArgs = argLists.flat()
 
     let first: Funcall|undefined
@@ -243,6 +243,7 @@ export const funcallFromArgs = (func: Expression, argLists: Expression[][], sour
             kind: "funcall",
             func: last,
             arg: allArgs[i],
+            typeArgs: i === 0 ? typeArgs : [],
             ...sourceInfo
         }
 
@@ -256,11 +257,12 @@ export const funcallFromArgs = (func: Expression, argLists: Expression[][], sour
             kind: "funcall",
             func,
             arg: undefined,
+            typeArgs,
             ...sourceInfo
         }
 }
 
-export const procCallFromArgs = (proc: Expression, argLists: Expression[][], sourceInfo: SourceInfo): Funcall|ProcCall => {
+export const procCallFromArgs = (proc: Expression, argLists: Expression[][], typeArgs: TypeExpression[], sourceInfo: SourceInfo): Funcall|ProcCall => {
     const allArgs = argLists.flat()
 
     let first: Funcall|ProcCall|undefined
@@ -273,12 +275,14 @@ export const procCallFromArgs = (proc: Expression, argLists: Expression[][], sou
                     kind: "funcall",
                     func: last,
                     arg: allArgs[i],
+                    typeArgs: i === 0 ? typeArgs : [],
                     ...sourceInfo
                 } as Funcall
                 : { 
                     kind: "proc-call",
                     proc: last,
                     arg: allArgs[i],
+                    typeArgs: i === 0 ? typeArgs : [],
                     ...sourceInfo
                 } as ProcCall
 
@@ -292,6 +296,7 @@ export const procCallFromArgs = (proc: Expression, argLists: Expression[][], sou
             kind: "proc-call",
             proc,
             arg: undefined,
+            typeArgs,
             ...sourceInfo
         }
 }

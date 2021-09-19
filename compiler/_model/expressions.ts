@@ -1,6 +1,6 @@
 import { AST } from "./ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
-import { FuncType, ProcType } from "./type-expressions.ts";
+import { FuncType, ProcType, TypeExpression } from "./type-expressions.ts";
 
 export type Expression = 
     | JavascriptEscape
@@ -66,6 +66,7 @@ export type Funcall = SourceInfo & {
     kind: "funcall",
     func: Expression,
     arg: Expression|undefined,
+    typeArgs: TypeExpression[],
 }
 
 export type Indexer = SourceInfo & {

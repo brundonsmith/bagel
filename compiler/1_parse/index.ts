@@ -743,12 +743,19 @@ const assignment: ParseFunction<Assignment> = (code, startIndex) =>
 
 const procCall: ParseFunction<Funcall|ProcCall> = (code, startIndex) =>
     given(parseBeneath(code, startIndex, funcall), ({ parsed: proc, newIndex: index }) =>
+    given(parseOptional(code, startIndex, (code, index) =>
+        given(consume(code, index, "<"), index =>
+        given(consumeWhitespace(code, index), index =>
+        given(parseSeries(code, index, typeExpression, ','), ({ parsed: typeArgs, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index => 
+        given(consume(code, index, ">"), index => ({ parsed: typeArgs, newIndex: index }))))))), ({ parsed: typeArgs, newIndex: indexAfterTypeArgs }) =>
     given(parseSeries(code, index, _argExpressions), ({ parsed: argLists, newIndex: index }) => 
         argLists.length > 0 ?
             expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
                 parsed: procCallFromArgs(
                     proc,
                     argLists,
+                    typeArgs ?? [],
                     {
                         code,
                         startIndex,
@@ -757,7 +764,7 @@ const procCall: ParseFunction<Funcall|ProcCall> = (code, startIndex) =>
                 ),
                 newIndex: index,
             }))
-        : undefined))
+        : undefined)))
 
     
 
@@ -1005,11 +1012,18 @@ const binaryOperator: ParseFunction<BinaryOperator> = (code, startIndex) =>
 
 const funcall: ParseFunction<Funcall> = (code, startIndex) =>
     given(parseBeneath(code, startIndex, funcall), ({ parsed: func, newIndex: index }) =>
-    given(parseSeries(code, index, _argExpressions), ({ parsed: argLists, newIndex: index }) => 
+    given(parseOptional(code, startIndex, (code, index) =>
+        given(consume(code, index, "<"), index =>
+        given(consumeWhitespace(code, index), index =>
+        given(parseSeries(code, index, typeExpression, ','), ({ parsed: typeArgs, newIndex: index }) =>
+        given(consumeWhitespace(code, index), index => 
+        given(consume(code, index, ">"), index => ({ parsed: typeArgs, newIndex: index }))))))), ({ parsed: typeArgs, newIndex: indexAfterTypeArgs }) =>
+    given(parseSeries(code, indexAfterTypeArgs ?? index, _argExpressions), ({ parsed: argLists, newIndex: index }) => 
     argLists.length > 0 ? {
         parsed: funcallFromArgs(
             func,
             argLists,
+            typeArgs ?? [],
             {
                 code,
                 startIndex,
@@ -1017,7 +1031,7 @@ const funcall: ParseFunction<Funcall> = (code, startIndex) =>
             }
         ),
         newIndex: index
-    } : undefined))
+    } : undefined)))
 
 const _argExpressions: ParseFunction<Expression[]> = (code, index) =>
     given(consume(code, index, "("), index => 

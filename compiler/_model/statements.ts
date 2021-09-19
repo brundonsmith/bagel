@@ -51,6 +51,7 @@ export type ProcCall = SourceInfo & {
     kind: "proc-call",
     proc: Expression,
     arg: Expression|undefined,
+    typeArgs: TypeExpression[],
 }
 
 export type Reaction = SourceInfo & {
