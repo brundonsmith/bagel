@@ -85,6 +85,16 @@ Deno.test({
 });
 
 Deno.test({
+  name: "methodChain",
+  fn() {
+    testCompile(
+      `const x = a.b().c()`,
+      `const x = a.b().c();`,
+    );
+  },
+});
+
+Deno.test({
   name: "ifExpression",
   fn() {
     testCompile(
