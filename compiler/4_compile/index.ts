@@ -3,7 +3,7 @@ import { given } from "../utils.ts";
 import { Module, AST } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
-import { TypeExpression } from "../_model/type-expressions.ts";
+import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
 export function compile(modulesStore: ModulesStore, module: Module): string {
@@ -22,7 +22,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "type-declaration": return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileTypeExpression(ast.type)}`;
         case "proc-declaration": return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + (ast.proc.kind === 'proc' ? compileProc(modulesStore, ast.proc) : compileFunc(modulesStore, ast.proc));
         case "func-declaration": return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileFunc(modulesStore, ast.func);
-        case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)};`;
+        case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(modulesStore, ast.name)}${ast.type ? `: ${compileTypeExpression(ast.type)}` : ''} = ${compileOne(modulesStore, ast.value)};`;
         case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(modulesStore, ast.name)} {\n${ast.members.map(m => compileOne(modulesStore, m)).join('\n')}\n}`;
         case "class-property": return `${ast.access} ${ast.name.name}${ast.type ? ': ' + compileTypeExpression(ast.type) : ''} = ${compileOne(modulesStore, ast.value)}`
         case "class-function": return `${ast.access} readonly ${ast.name.name} = ${compileFunc(modulesStore, ast.func)}`
@@ -81,16 +81,16 @@ export const HIDDEN_IDENTIFIER_PREFIX = `___`;
 
 const NIL = `undefined`;
 const LOCALS_OBJ = HIDDEN_IDENTIFIER_PREFIX + "locals";
-const SENTINEL_OBJ = HIDDEN_IDENTIFIER_PREFIX + "sentinel";
+// const SENTINEL_OBJ = HIDDEN_IDENTIFIER_PREFIX + "sentinel";
 
 function compileProc(modulesStore: ModulesStore, proc: Proc): string {
     const mutableLocals = Object.entries(modulesStore.getScopeFor(proc.body).values)
         .filter(e => e[1].mutability === "all");
 
-    return `(${proc.type.arg != null ? `${proc.type.arg.name.name}: ${compileTypeExpression(proc.type.arg.type)}` : ''}) => {
+    return `(${proc.type.arg != null ? `${proc.type.arg.name.name}: ${compileTypeExpression(proc.type.arg.type)}` : ''}): void => {
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
-    `const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileTypeExpression(e[1].declaredType)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});
-     const ${SENTINEL_OBJ} = {};` : ``}
+        `const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileTypeExpression(e[1].declaredType ?? UNKNOWN_TYPE)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});`
+    : ``}
 
     ${proc.body.statements.map(s => compileOne(modulesStore, s) + ';').join("\n")}
 }`;

@@ -17,7 +17,7 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 const constType = ast.type;
                 const valueType = modulesStore.getTypeOf(ast.value);
 
-                if (!subsumes(scope, constType, valueType)) {
+                if (constType != null && !subsumes(scope, constType, valueType)) {
                     reportError(assignmentError(ast.value, constType, valueType));
                 }
 

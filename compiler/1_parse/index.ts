@@ -472,7 +472,7 @@ const constDeclaration: ParseFunction<ConstDeclaration> = (code, startIndex) => 
                     startIndex,
                     endIndex: index,
                     name,
-                    type: type ?? UNKNOWN_TYPE,
+                    type,
                     value,
                     exported,
                 },

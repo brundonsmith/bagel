@@ -46,7 +46,7 @@ export type FuncDeclaration = SourceInfo & {
 export type ConstDeclaration = SourceInfo & {
     kind: "const-declaration",
     name: PlainIdentifier,
-    type: TypeExpression,
+    type: TypeExpression|undefined,
     value: Expression,
     exported: boolean,
 }

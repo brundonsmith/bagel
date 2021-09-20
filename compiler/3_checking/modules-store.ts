@@ -15,7 +15,7 @@ export type Mutability = "all"|"properties-only"|"none";
 
 export type DeclarationDescriptor = {
     mutability: Mutability,
-    declaredType: TypeExpression,
+    declaredType?: TypeExpression,
     initialValue?: Expression,
 }
 

@@ -143,7 +143,6 @@ Deno.test({
         }`,
       `const doStuff = (a: unknown): void => {
             const ___locals: {count?: unknown} = ___observable({});
-            const ___sentinel = {};
         
             ___locals["count"] = 0;
 
@@ -178,7 +177,6 @@ Deno.test({
         }`,
       `const doStuff = (a: unknown): void => {
             const ___locals: {count?: unknown} = ___observable({});
-            const ___sentinel = {};
         
             ___locals["count"] = 0;
 
@@ -201,7 +199,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "simpleConstDeclaration",
+  name: "constDeclarationWithType",
   fn() {
     testCompile(
       `const foo: FooType = 'stuff'`,
