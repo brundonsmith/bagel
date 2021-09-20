@@ -1,10 +1,9 @@
-import { test } from "./testing-utils";
-import { deepEquals } from "../../compiler/src/utils";
-import { UNKNOWN_TYPE } from "../../compiler/src/_model/type-expressions";
+import { deepEquals } from "../compiler/utils.ts";
+import { UNKNOWN_TYPE } from "../compiler/_model/type-expressions.ts";
 
-console.log("utils.ts")
-
-test(function deepEqualsWithUndefined() {
+Deno.test({
+  name: "deepEqualsWithUndefined",
+  fn() {
     const val1 = {
 
     };
@@ -13,11 +12,13 @@ test(function deepEqualsWithUndefined() {
     };
 
     if (!deepEquals(val1, val2)) {
-        return "Values should be considered equal but were not"
+        throw "Values should be considered equal but were not"
     }
-})
+}})
 
-test(function deepEqualsArrays() {
+Deno.test({
+  name: "deepEqualsArrays",
+  fn() {
     const val1 = [
         {
             "kind": "func-type",
@@ -62,11 +63,13 @@ test(function deepEqualsArrays() {
     ]
     
     if (deepEquals(val1, val2)) {
-        return "Values should be considered inequal but were not"
+        throw "Values should be considered inequal but were not"
     }
-})
+}})
 
-test(function deepEqualsBig() {
+Deno.test({
+  name: "deepEqualsBig",
+  fn() {
     const val = {
         kind: "func-declaration",
         func: {
@@ -162,8 +165,8 @@ test(function deepEqualsBig() {
     };
 
     if (!deepEquals(val, JSON.parse(JSON.stringify(val)))) {
-        return "Values should be considered equal but were not"
+        throw "Values should be considered equal but were not"
     }
-})
+}})
 
 console.log("")
