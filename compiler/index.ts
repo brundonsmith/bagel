@@ -76,8 +76,7 @@ function bagelFileToTsFile(module: string, bundle?: boolean): string {
 }
 
 const IMPORTED_ITEMS = ['observable', 'computed', 'reactionUntil', 'configure', 
-'h', 'render', 'range', 'slice', 'map', 'filter', 'entries', 'count', 'join', 
-'concat', 'log', 'floor', 'arrayFrom', 'fromEntries', 'Iter'
+'h', 'render', 'range', 'entries', 'log', 'floor', 'arrayFrom', 'fromEntries', 'Iter', 'RawIter'
 ].map(s => `${s} as ${HIDDEN_IDENTIFIER_PREFIX}${s}`).join(', ')
 
 const LIB_IMPORTS = `
