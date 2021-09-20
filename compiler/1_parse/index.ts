@@ -878,17 +878,6 @@ const parseBlock: ParseFunction<Block> = (code, startIndex) =>
     }))))))
 
 
-const expressionPrecedenceTiers: () => ParseFunction<Expression>[][] = () => [
-    [ javascriptEscape, pipe, classConstruction, elementTag ],
-    [ func, proc, range, binaryOperator ],
-    [ funcall ],
-    [ indexer ],
-    [ parenthesized, propertyAccessor ],
-    [ localIdentifier ],
-    [ ifElseExpression, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
-        stringLiteral, numberLiteral ],
-];
-
 class ParseMemo {
     private memo = new Map<string, Map<ParseFunction<Expression>, Map<number, ParseResult<Expression>>>>();
 
@@ -978,7 +967,7 @@ const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: 
     }))))
 
 const pipe: ParseFunction<Pipe> = (code, startIndex) => 
-    given(parseSeries(code, startIndex, parseStartingFromTier(NEXT_TIER.get(pipe)), "|>", { trailingDelimiter: "forbidden" }), ({ parsed: expressions, newIndex: index }) =>
+    given(parseSeries(code, startIndex, parseStartingFromTier(NEXT_TIER_FOR.get(pipe) as number), "|>", { trailingDelimiter: "forbidden" }), ({ parsed: expressions, newIndex: index }) =>
         expressions.length >= 2
             ? {
                 parsed: {
@@ -1432,8 +1421,18 @@ function consumeComments(code: string, index: number): number {
     return index;
 }
 
-const EXPRESSION_PRECEDENCE_TIERS = expressionPrecedenceTiers();
-const NEXT_TIER = (() => {
+const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
+    [ javascriptEscape, pipe, classConstruction, elementTag ],
+    [ func, proc, range, binaryOperator ],
+    [ funcall ],
+    [ indexer ],
+    [ parenthesized, propertyAccessor ],
+    [ localIdentifier ],
+    [ ifElseExpression, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
+        stringLiteral, numberLiteral ],
+];
+
+const NEXT_TIER_FOR: Map<ParseFunction<Expression>, number> = (() => {
     const map = new Map();
 
     for (let i = 0; i < EXPRESSION_PRECEDENCE_TIERS.length; i++) {
@@ -1460,4 +1459,4 @@ const parseStartingFromTier = (tier: number): ParseFunction<Expression> => (code
 }
 
 const parseBeneath = (code: string, index: number, fn: ParseFunction<Expression>) =>
-    parseStartingFromTier(NEXT_TIER.get(fn))(code, index)
+    parseStartingFromTier(NEXT_TIER_FOR.get(fn) as number)(code, index)
