@@ -39,12 +39,12 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 for (const expr of ast.expressions.slice(1)) {
                     const typeOfPipe = modulesStore.getTypeOf(expr);
 
-                    if (typeOfPipe?.kind !== "func-type") {
+                    if (typeOfPipe.kind !== "func-type") {
                         reportError(miscError(expr, `Each transformation in pipeline expression must be a function: found '${typeOfPipe.kind}'`));
-                    } else if (typeOfPipe.arg == null) {
-                        reportError(miscError(expr, `Pipeline function expected to take an argument, but takes no arguments`));
-                    } else if (!subsumes(scope, typeOfPipe.arg.type, inputType)) {
-                        reportError(assignmentError(ast, typeOfPipe.arg.type, inputType));
+                    } else if (typeOfPipe.args.length !== 1) {
+                        reportError(miscError(expr, `Pipeline function expected to take one argument, but takes ${typeOfPipe.args.length} arguments`));
+                    } else if (!subsumes(scope, typeOfPipe.args[0].type, inputType)) {
+                        reportError(assignmentError(ast, typeOfPipe.args[0].type, inputType));
                     } else {
                         inputType = typeOfPipe.returnType;
                     }
@@ -62,22 +62,23 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
 
                 return scope;
             }
-            case "funcall": {
-                const funcType = modulesStore.getTypeOf(ast.func);
+            case "invocation": {
+                const subjectType = modulesStore.getTypeOf(ast.subject);
 
-                if (funcType.kind !== "func-type") {
-                    reportError(miscError(ast, "Expression must be a function to be called"));
-                } else if (funcType.arg == null && ast.arg != null) {
-                    reportError(miscError(ast, `Too many arguments passed to function`));
-                } else if (funcType.arg != null && ast.arg == null) {
-                    reportError(miscError(ast, `Function expected argument of type ${displayForm(funcType.arg.type)}`));
+                if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {
+                    reportError(miscError(ast, "Expression must be a function or procedure to be called"));
+                } else if (subjectType.args.length !== ast.args.length) {
+                    reportError(miscError(ast, `Function or procedure expected ${subjectType.args.length} arguments but got ${ast.args.length}`));
                 } else {
-                    const arg = ast.arg as Expression
-                    // TODO: infer what types arguments are allowed to be based on function body
-                    const argValueType = modulesStore.getTypeOf(arg)
+                    for (let i = 0; i < ast.args.length; i++) {
+                        const arg = ast.args[i]
+                        const subjectArgType = subjectType.args[i].type
 
-                    if (funcType.arg != null && !subsumes(scope, funcType.arg.type, argValueType)) {
-                        reportError(assignmentError(arg, funcType.arg.type, argValueType));
+                        const argValueType = modulesStore.getTypeOf(arg)
+    
+                        if (!subsumes(scope, subjectArgType, argValueType)) {
+                            reportError(assignmentError(arg, subjectArgType, argValueType));
+                        }
                     }
                 }
 
@@ -165,10 +166,10 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 const effectType = modulesStore.getTypeOf(ast.effect);
                 const requiredEffectType: ProcType = {
                     kind: 'proc-type',
-                    arg: {
+                    args: [{
                         name: { kind: "plain-identifier", name: "_", code: undefined, startIndex: undefined, endIndex: undefined}, 
                         type: (dataType as FuncType).returnType
-                    },
+                    }],
                     typeParams: [],
                     code: undefined,
                     startIndex: undefined,
@@ -190,10 +191,10 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 }
 
                 // TODO: This may become generalized later by generics/inverted inference
-                if (effectType.kind !== "proc-type" || effectType.arg == null) {
+                if (effectType.kind !== "proc-type" || effectType.args.length !== 1) {
                     reportError(miscError(ast.data, `Expected procedure taking one argument`));
-                } else if (dataType.kind === "func-type" && effectType.kind === "proc-type" && !subsumes(scope, effectType.arg.type, dataType.returnType)) {
-                    reportError(assignmentError(effectType.arg.name, effectType.arg.type, dataType.returnType));
+                } else if (dataType.kind === "func-type" && effectType.kind === "proc-type" && !subsumes(scope, effectType.args[0].type, dataType.returnType)) {
+                    reportError(assignmentError(effectType.args[0].name, effectType.args[0].type, dataType.returnType));
                 }
 
                 return scope;
@@ -226,30 +227,6 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
 
                 if (!subsumes(scope, targetType, valueType)) {
                     reportError(assignmentError(ast.value, targetType, valueType));
-                }
-
-                return scope;
-            }
-            case "proc-call": {
-                const procType = modulesStore.getTypeOf(ast.proc);
-
-                // TODO: Proc call has to finish applying arguments to be valid; 
-                // partial-application of a proc would actually be an 
-                // expression (oh boy)
-
-                if (procType.kind !== "proc-type") {
-                    reportError(miscError(ast.proc, `Expression must be a procedure to be called`));
-                } else if (procType.arg == null && ast.arg != null) {
-                    reportError(miscError(ast, `Too many arguments passed to procedure`));
-                } else if (procType.arg != null && ast.arg == null) {
-                    reportError(miscError(ast, `Procedure expected argument of type ${displayForm(procType.arg.type)}`));
-                } else {
-                    const arg = ast.arg as Expression
-                    const argValueType =  modulesStore.getTypeOf(arg);
-    
-                    if (procType.arg != null && !subsumes(scope, procType.arg.type, argValueType)) {
-                        reportError(assignmentError(arg, procType.arg.type, argValueType));
-                    }
                 }
 
                 return scope;
@@ -316,14 +293,12 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
             // NOTE: Value and destination are flipped on purpose for args!
-            && (resolvedValue.arg == null && resolvedDestination.arg == null
-                || (resolvedValue.arg != null && resolvedDestination.arg != null && subsumes(scope, resolvedValue.arg.type, resolvedDestination.arg.type)))
+            && resolvedDestination.args.every((_, i) => subsumes(scope, resolvedValue.args[i].type, resolvedDestination.args[i].type))
             && subsumes(scope, resolvedDestination.returnType, resolvedValue.returnType)) {
         return true;
     } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" 
             // NOTE: Value and destination are flipped on purpose for args!
-            && (resolvedValue.arg == null && resolvedDestination.arg == null
-                || (resolvedValue.arg != null && resolvedDestination.arg != null && subsumes(scope, resolvedValue.arg.type, resolvedDestination.arg.type)))) {
+            && resolvedDestination.args.every((_, i) => subsumes(scope, resolvedValue.args[i].type, resolvedDestination.args[i].type))) {
         return true;
     } else if (resolvedDestination.kind === "array-type" && resolvedValue.kind === "array-type") {
         return subsumes(scope, resolvedDestination.element, resolvedValue.element)
@@ -384,8 +359,8 @@ function displayForm(typeExpression: TypeExpression): string {
         case "union-type": return typeExpression.members.map(displayForm).join(" | ");
         case "named-type": return typeExpression.name.name;
         // TODO: proc-type and func-type should display to users as (arg0, arg1, arg2) instead of (arg0) => (arg1) => (arg2)
-        case "proc-type": return `(${typeExpression.arg ? `${typeExpression.arg.name.name}: ${displayForm(typeExpression.arg.type)}` : ''}) {}`;
-        case "func-type": return `(${typeExpression.arg ? `${typeExpression.arg.name.name}: ${displayForm(typeExpression.arg.type)}` : ''}) => ${displayForm(typeExpression.returnType)}`;
+        case "proc-type": return `(${typeExpression.args.map(arg => `${arg.name.name}: ${displayForm(arg.type)}`).join(', ')}) {}`;
+        case "func-type": return `(${typeExpression.args.map(arg => `${arg.name.name}: ${displayForm(arg.type)}`).join(', ')}) => ${displayForm(typeExpression.returnType)}`;
         case "object-type": return `{ ${typeExpression.entries.map(([ key, value ]) => `${key.name}: ${displayForm(value)}`)} }`;
         case "indexer-type": return `{ [${displayForm(typeExpression.keyType)}]: ${displayForm(typeExpression.valueType)} }`;
         case "array-type": return `${displayForm(typeExpression.element)}[]`;

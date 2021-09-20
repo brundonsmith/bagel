@@ -20,8 +20,8 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
             const dataType = determineTypeAndStore(reportError, modulesStore, ast.data, scope)
             const effectType = determineTypeAndStore(reportError, modulesStore, ast.effect, scope)
 
-            if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.arg?.type.kind === "unknown-type") {
-                effectType.arg.type = dataType.returnType;
+            if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.args[0]?.type.kind === "unknown-type") {
+                effectType.args[0].type = dataType.returnType;
             }
         } else if (ast.kind === "computation") {
             determineTypeAndStore(reportError, modulesStore, ast.expression, scope)
@@ -31,41 +31,30 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
             if (iteratorType.kind === "iterator-type") {
                 modulesStore.astTypes.set(ast.itemIdentifier, iteratorType.itemType)
             }
-        } else if (ast.kind === "funcall") {
-            
-
-            const funcType = determineTypeAndStore(reportError, modulesStore, ast.func, scope);
+        } else if (ast.kind === "invocation") {
+            const subjectType = determineTypeAndStore(reportError, modulesStore, ast.subject, scope);
             // console.log({ funcType })
 
-            if (funcType.kind === "func-type") {
+            if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
                 // infer callback argument types based on context
-                if ((funcType.arg?.type.kind === "func-type" && ast.arg?.kind === "func") 
-                    || (funcType.arg?.type.kind === "proc-type" && ast.arg?.kind === "proc")) {
-                    const argType = funcType.arg.type;
-                    const argExpr = ast.arg;
+                for (let i = 0; i < Math.min(subjectType.args.length, ast.args.length); i++) {
+                    const subjectTypeArg = subjectType.args[i]
+                    const argExpr = ast.args[i]
 
-                    // console.log({ argType, argExpr })
+                    if ((subjectTypeArg.type.kind === "func-type" && argExpr.kind === "func") 
+                        || (subjectTypeArg.type.kind === "proc-type" && argExpr.kind === "proc")) {
 
-                    // console.log({ argArgType })
+                        // console.log({ argType, argExpr })
 
-                    if (argExpr.type.arg != null && argExpr.type.arg.type.kind === "unknown-type" && argType.arg != null) {
-                        // console.log(argExpr.argNames[j])
-                        // console.log(argType.argTypes[j])
-                        modulesStore.astTypes.set(argExpr.type.arg.name, argType.arg.type);
-                    }
-                }
-            }
-        } else if (ast.kind === "proc-call") {
-            const procType = determineTypeAndStore(reportError, modulesStore, ast.proc, scope);
+                        // console.log({ argArgType })
 
-            if (procType.kind === "proc-type") {
-                if ((procType.arg?.type.kind === "func-type" && ast.arg?.kind === "func") 
-                    || (procType.arg?.type.kind === "proc-type" && ast.arg?.kind === "proc")) {
-                    const argType = procType.arg.type;
-                    const argExpr = ast.arg;
+                        // if (argExpr.type.arg != null && argExpr.type.arg.type.kind === "unknown-type" && argType.arg != null) {
 
-                    if (argExpr.type.arg != null && argExpr.type.arg.type.kind === "unknown-type" && argType.arg != null) {
-                        modulesStore.astTypes.set(argExpr.type.arg.name, argType.arg.type);
+                        for (let j = 0; j < Math.min(subjectTypeArg.type.args.length, argExpr.type.args.length); j++) {
+                            if (argExpr.type.args[j].type.kind === "unknown-type") {
+                                modulesStore.astTypes.set(argExpr.type.args[j].name, subjectTypeArg.type.args[j].type);
+                            }
+                        }
                     }
                 }
             }
@@ -131,8 +120,8 @@ function determineType(
 
             return UNKNOWN_TYPE;
         }
-        case "funcall": {
-            const funcType = determineTypeAndStore(reportError, modulesStore, ast.func, scope);
+        case "invocation": {
+            const funcType = determineTypeAndStore(reportError, modulesStore, ast.subject, scope);
 
             if (funcType.kind === "func-type") {
                 return funcType.returnType;
@@ -216,7 +205,7 @@ function determineType(
 
             if (descriptor == null) {
                 return UNKNOWN_TYPE;
-            } else if (descriptor.declaredType.kind !== "unknown-type") {
+            } else if (descriptor.declaredType) {
                 return descriptor.declaredType;
             } else if (descriptor.initialValue != null) {
                 return determineTypeAndStore(reportError, modulesStore, descriptor.initialValue, scope);

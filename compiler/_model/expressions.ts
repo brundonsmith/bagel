@@ -9,7 +9,7 @@ export type Expression =
     | Proc
     | Range
     | BinaryOperator
-    | Funcall
+    | Invocation
     | Indexer
     | ParenthesizedExpression
     | PropertyAccessor
@@ -62,10 +62,10 @@ export type BinaryOperator = SourceInfo & {
 export const BINARY_OPS = [ "+", "-", "*", "/", "<=", ">=", "<", ">", "==", "&&", "||", "??" ] as const;
 export type BinaryOp = typeof BINARY_OPS[number];
 
-export type Funcall = SourceInfo & {
-    kind: "funcall",
-    func: Expression,
-    arg: Expression|undefined,
+export type Invocation = SourceInfo & {
+    kind: "invocation",
+    subject: Expression,
+    args: Expression[],
     typeArgs: TypeExpression[],
 }
 
@@ -145,7 +145,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "func": undefined,
     "pipe": undefined,
     "binary-operator": undefined,
-    "funcall": undefined,
+    "invocation": undefined,
     "indexer": undefined,
     "if-else-expression": undefined,
     "range": undefined,

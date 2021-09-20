@@ -1,14 +1,13 @@
-import { path, Colors } from "./deps.ts";
+import { path } from "./deps.ts";
 
 import { ModulesStore } from "./3_checking/modules-store.ts";
 import { canonicalModuleName, scopescan } from "./3_checking/scopescan.ts";
-import { BagelTypeError, errorMessage, typecheck } from "./3_checking/typecheck.ts";
+import { typecheck } from "./3_checking/typecheck.ts";
 import { typescan } from "./3_checking/typescan.ts";
 import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
-import { given } from "./utils.ts";
-import { BagelSyntaxError, errorMessage as syntaxErrorMessage, getLineContents, lineAndColumn } from "./1_parse/common.ts";
+import { printError } from "./utils.ts";
 
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
@@ -23,52 +22,6 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     }
   
     return arrayOfFiles;
-}
-
-const printError = (modulePath: string) => (error: BagelTypeError|BagelSyntaxError) => {
-    const code = error.kind === 'bagel-syntax-error' ? error.code : error.ast?.code
-    const startIndex = error.kind === 'bagel-syntax-error' ? error.index : error.ast?.startIndex
-    const endIndex = error.kind === 'bagel-syntax-error' ? undefined : error.ast?.endIndex
-
-    let infoLine = Colors.cyan(modulePath)
-    
-    const { line, column } = 
-        given(code, code => 
-        given(startIndex, startIndex => 
-            lineAndColumn(code, startIndex))) ?? {}
-    if (line != null && column != null) {
-        infoLine += Colors.white(":") 
-            + Colors.yellow(String(line)) 
-            + Colors.white(":") 
-            + Colors.yellow(String(column))
-    }
-    
-    infoLine += Colors.white(" - ")
-        + Colors.red("error")
-        + Colors.white(" " + (error.kind === "bagel-syntax-error" ? syntaxErrorMessage(error) : errorMessage(error)))
-
-    console.log(infoLine)
-
-    // print the problematic line of code, with the issue underlined
-    if (code != null && startIndex != null && line != null) {
-        const lineContent = getLineContents(code, line);
-
-        if (lineContent) {
-            const padding = '  '
-
-            console.log(Colors.bgWhite(Colors.black(String(line))) + padding + lineContent.content)
-
-            if (endIndex != null) {
-                const digitsInLineNum = String(line).length
-                const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
-                const underline = new Array(endIndex - startIndex).fill('~').join('')
-                
-                console.log(Colors.red(underlineSpacing + underline))
-            }
-        }
-    }
-
-    console.log()
 }
 
 function bagelFileToTsFile(module: string, bundle?: boolean): string {

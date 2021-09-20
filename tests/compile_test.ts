@@ -1,20 +1,19 @@
-import { errorMessage as syntaxErrorMessage } from "../compiler/1_parse/common.ts";
 import { parse } from "../compiler/1_parse/index.ts";
 import { reshape } from "../compiler/2_reshape/index.ts";
 import { ModulesStore } from "../compiler/3_checking/modules-store.ts";
 import { scopescan } from "../compiler/3_checking/scopescan.ts";
-import { errorMessage as typeErrorMessage } from "../compiler/3_checking/typecheck.ts";
 import { compile } from "../compiler/4_compile/index.ts";
+import { printError } from "../compiler/utils.ts";
 
 const module = "module";
 function testCompile(bgl: string, exp: string) {
   let error: string | undefined;
 
-  const ast = reshape(parse(bgl, (err) => error = syntaxErrorMessage(err)));
+  const ast = reshape(parse(bgl, printError('<test>')));
 
   const modulesStore = new ModulesStore();
   modulesStore.modules.set(module, ast);
-  scopescan((err) => error = typeErrorMessage(err), modulesStore, ast, module);
+  scopescan(printError('<test>'), modulesStore, ast, module);
 
   const compiled = compile(modulesStore, ast);
 
@@ -95,6 +94,18 @@ Deno.test({
 });
 
 Deno.test({
+  name: "methodChainWithSpace",
+  fn() {
+    testCompile(
+      `const x = a
+        .b()
+        .c()`,
+      `const x = a.b().c();`,
+    );
+  },
+});
+
+Deno.test({
   name: "ifExpression",
   fn() {
     testCompile(
@@ -114,7 +125,7 @@ Deno.test({
   fn() {
     testCompile(
       `func uid(arr, i) => arr[i]`,
-      `const uid = (arr: unknown) => (i: unknown) => arr[i]`,
+      `const uid = (arr: unknown, i: unknown) => arr[i]`,
     );
   },
 });
@@ -250,7 +261,7 @@ Deno.test({
                 0..10 
                 |> map((n) => n * 2) 
                 |> filter((n) => n < 10)`,
-      `const myFunc = (a: unknown) => (b: unknown) =>
+      `const myFunc = (a: unknown, b: unknown) =>
             filter((n: unknown) => n < 10)(map((n: unknown) => n * 2)(___range(0)(10)))`,
     );
   },
@@ -261,7 +272,7 @@ Deno.test({
   fn() {
     testCompile(
       `func foo(a: string, b: number): number => 0`,
-      `const foo = (a: string) => (b: number): number => 0`,
+      `const foo = (a: string, b: number): number => 0`,
     );
   },
 });
@@ -271,7 +282,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc bar(a: string[], b: { foo: number }) { }`,
-      `const bar = (a: string[]) => (b: {foo: number}): void => { }`,
+      `const bar = (a: string[], b: {foo: number}): void => { }`,
     );
   },
 });
@@ -281,7 +292,7 @@ Deno.test({
   fn() {
     testCompile(
       `export type MyFn = (a: number, b: string) => string[]`,
-      `export type MyFn = (a: number) => (b: string) => string[]`,
+      `export type MyFn = (a: number, b: string) => string[]`,
     );
   },
 });

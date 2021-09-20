@@ -36,7 +36,7 @@ export function reshape(ast: Module): Module {
                                 body: expression,
                                 type: {
                                     kind: "func-type",
-                                    arg: undefined,
+                                    args: [],
                                     returnType: UNKNOWN_TYPE,
                                     typeParams: [],
                                     code: undefined,

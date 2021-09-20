@@ -1,3 +1,6 @@
+import { BagelSyntaxError, getLineContents, lineAndColumn } from "./1_parse/common.ts";
+import { BagelTypeError,errorMessage } from "./3_checking/typecheck.ts";
+import { Colors } from "./deps.ts";
 import { AST } from "./_model/ast.ts";
 
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
@@ -133,10 +136,10 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.left, fn);
             walkParseTree(nextPayload, ast.right, fn);
         } break;
-        case "funcall": {
-            walkParseTree(nextPayload, ast.func, fn);
-            if (ast.arg) {
-                walkParseTree(nextPayload, ast.arg, fn);
+        case "invocation": {
+            walkParseTree(nextPayload, ast.subject, fn);
+            for (const arg of ast.args) {
+                walkParseTree(nextPayload, arg, fn);
             }
         } break;
         case "element-tag": {
@@ -208,12 +211,6 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.target, fn);
             walkParseTree(nextPayload, ast.value, fn);
         } break;
-        case "proc-call": {
-            walkParseTree(nextPayload, ast.proc, fn);
-            if (ast.arg) {
-                walkParseTree(nextPayload, ast.arg, fn);
-            }
-        } break;
         case "if-else-statement": {
             walkParseTree(nextPayload, ast.ifCondition, fn);
             walkParseTree(nextPayload, ast.ifResult, fn);
@@ -253,18 +250,18 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             for (const m of ast.typeParams) {
                 walkParseTree(nextPayload, m, fn);
             }
-            if (ast.arg) {
-                walkParseTree(nextPayload, ast.arg.name, fn);
-                walkParseTree(nextPayload, ast.arg.type, fn);
+            for (const arg of ast.args) {
+                walkParseTree(nextPayload, arg.name, fn);
+                walkParseTree(nextPayload, arg.type, fn);
             }
         } break;
         case "func-type": {
             for (const m of ast.typeParams) {
                 walkParseTree(nextPayload, m, fn);
             }
-            if (ast.arg) {
-                walkParseTree(nextPayload, ast.arg.name, fn);
-                walkParseTree(nextPayload, ast.arg.type, fn);
+            for (const arg of ast.args) {
+                walkParseTree(nextPayload, arg.name, fn);
+                walkParseTree(nextPayload, arg.type, fn);
             }
             walkParseTree(nextPayload, ast.returnType, fn);
         } break;
@@ -328,4 +325,50 @@ export function sOrNone(num: number): string {
 }
 export function wasOrWere(num: number): string {
     return num > 1 ? 'were' : 'was';
+}
+
+export const printError = (modulePath: string) => (error: BagelTypeError|BagelSyntaxError) => {
+    const code = error.kind === 'bagel-syntax-error' ? error.code : error.ast?.kind !== "module" ? error.ast?.code : undefined
+    const startIndex = error.kind === 'bagel-syntax-error' ? error.index : error.ast?.kind !== "module" ? error.ast?.startIndex : undefined
+    const endIndex = error.kind === 'bagel-syntax-error' ? undefined : error.ast?.kind !== "module" ? error.ast?.endIndex : undefined
+
+    let infoLine = Colors.cyan(modulePath)
+    
+    const { line, column } = 
+        given(code, code => 
+        given(startIndex, startIndex => 
+            lineAndColumn(code, startIndex))) ?? {}
+    if (line != null && column != null) {
+        infoLine += Colors.white(":") 
+            + Colors.yellow(String(line)) 
+            + Colors.white(":") 
+            + Colors.yellow(String(column))
+    }
+    
+    infoLine += Colors.white(" - ")
+        + Colors.red("error")
+        + Colors.white(" " + (error.kind === "bagel-syntax-error" ? error.message : errorMessage(error)))
+
+    console.log(infoLine)
+
+    // print the problematic line of code, with the issue underlined
+    if (code != null && startIndex != null && line != null) {
+        const lineContent = getLineContents(code, line);
+
+        if (lineContent) {
+            const padding = '  '
+
+            console.log(Colors.bgWhite(Colors.black(String(line))) + padding + lineContent.content)
+
+            if (endIndex != null) {
+                const digitsInLineNum = String(line).length
+                const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
+                const underline = new Array(endIndex - startIndex).fill('~').join('')
+                
+                console.log(Colors.red(underlineSpacing + underline))
+            }
+        }
+    }
+
+    console.log()
 }

@@ -30,13 +30,12 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "proc": return compileProc(modulesStore, ast);
         case "let-declaration": return `${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)}`;
         case "assignment": return `${compileOne(modulesStore, ast.target)} = ${compileOne(modulesStore, ast.value)}`;
-        case "proc-call": return `${compileOne(modulesStore, ast.proc)}(${ast.arg != null ? compileOne(modulesStore, ast.arg) : ''})`;
         case "if-else-statement": return `if(${compileOne(modulesStore, ast.ifCondition)}) ${compileOne(modulesStore, ast.ifResult)}` 
             + (ast.elseResult != null ? ` else ${compileOne(modulesStore, ast.elseResult)}` : ``);
         case "for-loop": return `for (const ${compileOne(modulesStore, ast.itemIdentifier)} of ${compileOne(modulesStore, ast.iterator)}) ${compileOne(modulesStore, ast.body)}`;
         case "while-loop": return `while (${compileOne(modulesStore, ast.condition)}) ${compileOne(modulesStore, ast.body)}`;
         case "func": return compileFunc(modulesStore, ast);
-        case "funcall": return `${compileOne(modulesStore, ast.func)}(${ast.arg != null ? compileOne(modulesStore, ast.arg) : ''})`;
+        case "invocation": return `${compileOne(modulesStore, ast.subject)}(${ast.args.map(arg => compileOne(modulesStore, arg)).join(', ')})`;
         case "pipe": return compilePipe(modulesStore, ast.expressions, ast.expressions.length - 1);
         case "binary-operator": return `${compileOne(modulesStore, ast.left)} ${ast.operator} ${compileOne(modulesStore, ast.right)}`;
         case "if-else-expression": return `(${compileOne(modulesStore, ast.ifCondition)}) ? (${compileOne(modulesStore, ast.ifResult)}) : (${ast.elseResult == null ? NIL : compileOne(modulesStore, ast.elseResult)})`;
@@ -87,7 +86,7 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
     const mutableLocals = Object.entries(modulesStore.getScopeFor(proc.body).values)
         .filter(e => e[1].mutability === "all");
 
-    return `(${proc.type.arg != null ? `${proc.type.arg.name.name}: ${compileTypeExpression(proc.type.arg.type)}` : ''}): void => {
+    return `(${proc.type.args.map(arg => `${arg.name.name}: ${compileTypeExpression(arg.type)}`).join(', ')}): void => {
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
         `const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileTypeExpression(e[1].declaredType ?? UNKNOWN_TYPE)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});`
     : ``}
@@ -98,7 +97,7 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
 // TODO: dispose of reactions somehow... at some point...
 
 const compileFunc = (modulesStore: ModulesStore, func: Func): string =>
-    `(${func.type.arg != null ? `${func.type.arg.name.name}: ${compileTypeExpression(func.type.arg.type)}` : ''})${func.type.returnType.kind !== 'unknown-type' ? `: ${compileTypeExpression(func.type.returnType)}` : ''} => ${compileOne(modulesStore, func.body)}`;
+    `(${func.type.args.map(arg => `${arg.name.name}: ${compileTypeExpression(arg.type)}`).join(', ')})${func.type.returnType.kind !== 'unknown-type' ? `: ${compileTypeExpression(func.type.returnType)}` : ''} => ${compileOne(modulesStore, func.body)}`;
 
 function compilePipe(modulesStore: ModulesStore, expressions: readonly Expression[], end: number): string {
     if (end === 0) {
@@ -112,8 +111,8 @@ function compileTypeExpression(expr: TypeExpression): string {
     switch (expr.kind) {
         case "union-type": return expr.members.map(compileTypeExpression).join(" | ");
         case "named-type": return expr.name.name;
-        case "proc-type": return `(${expr.arg ? `${expr.arg.name.name}: ${compileTypeExpression(expr.arg.type)}` : ''}) => void`;
-        case "func-type": return `(${expr.arg ? `${expr.arg.name.name}: ${compileTypeExpression(expr.arg.type)}` : ''}) => ${compileTypeExpression(expr.returnType)}`;
+        case "proc-type": return `(${expr.args.map(arg => `${arg.name.name}: ${compileTypeExpression(arg.type)}`).join(', ')}) => void`;
+        case "func-type": return `(${expr.args.map(arg => `${arg.name.name}: ${compileTypeExpression(arg.type)}`).join(', ')}) => ${compileTypeExpression(expr.returnType)}`;
         case "element-type": return `unknown`;
         case "object-type": return `{${expr.entries
             .map(([ key, value ]) => `${key.name}: ${compileTypeExpression(value)}`)

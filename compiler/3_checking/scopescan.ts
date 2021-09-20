@@ -118,10 +118,10 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
             }
 
             // add func/proc argument to scope
-            if (ast.type.arg) {
-                scope.values[ast.type.arg.name.name] = {
+            for (const arg of ast.type.args) {
+                scope.values[arg.name.name] = {
                     mutability: ast.kind === "func" ? "none" : "properties-only",
-                    declaredType: ast.type.arg.type,
+                    declaredType: arg.type,
                 }
             }
             break;

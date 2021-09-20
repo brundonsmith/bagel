@@ -176,12 +176,8 @@ export type BagelSyntaxError = {
     kind: "bagel-syntax-error",
     code: string,
     index: number,
-    expected: string,
+    message: string,
     stack: string|undefined,
-}
-
-export function errorMessage(error: BagelSyntaxError): string {
-    return `${error.expected} expected`;
 }
 
 export function lineAndColumn(code: string, index: number): { line: number, column: number } {
@@ -236,7 +232,7 @@ export function expec<T, R>(val: T|BagelSyntaxError|undefined, err: BagelSyntaxE
 }
 
 export function err(code: string, index: number, expected: string): BagelSyntaxError {
-    return { kind: "bagel-syntax-error", code, index, expected, stack: undefined };
+    return { kind: "bagel-syntax-error", code, index, message: `${expected} expected`, stack: undefined };
 }
 
 export type ParseFunction<T> = (code: string, index: number) => ParseResult<T> | BagelSyntaxError | undefined;
