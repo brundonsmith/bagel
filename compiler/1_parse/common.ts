@@ -83,7 +83,7 @@ export type ParseResult<T> = { parsed: T, newIndex: number };
 export function parseSeries<T>(code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string, options: Partial<SeriesOptions> = {}): ParseResult<T[]>|BagelSyntaxError {
     const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], newIndex: index };
 
-    const { leadingDelimiter, trailingDelimiter, whitespace } = { ...DEAFULT_SERIES_OPTIONS, ...options };
+    const { leadingDelimiter, trailingDelimiter, whitespace } = { ...DEFAULT_SERIES_OPTIONS, ...options };
     const parsed: T[] = [];
 
     if (delimiter != null && (leadingDelimiter === "required" || leadingDelimiter === "optional")) {
@@ -145,7 +145,7 @@ type SeriesOptions = {
     whitespace: "optional"|"forbidden",
 }
 
-const DEAFULT_SERIES_OPTIONS: SeriesOptions = {
+const DEFAULT_SERIES_OPTIONS: SeriesOptions = {
     leadingDelimiter: "forbidden",
     trailingDelimiter: "optional",
     whitespace: "optional",
