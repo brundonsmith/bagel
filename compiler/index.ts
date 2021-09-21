@@ -1,5 +1,4 @@
 import { path } from "./deps.ts";
-import * as esbuild from "https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js"
 
 import { ModulesStore } from "./3_checking/modules-store.ts";
 import { canonicalModuleName, scopescan } from "./3_checking/scopescan.ts";
@@ -47,6 +46,20 @@ ___configure({
     observableRequiresReaction: false,
 });
 `
+
+async function bundleOutput(entryFile: string) {
+   const esbuild = await import("https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js")
+
+   await esbuild.build({
+       write: true,
+       bundle: true,
+       minify: true,
+       entryPoints: [ bagelFileToTsFile(entryFile) ],
+       outfile: bagelFileToJsBundleFile(entryFile)
+   })
+
+   console.log('done')
+}
 
 {
     const entryArg = Deno.args[0]
@@ -129,13 +142,7 @@ ___configure({
         }))
 
         if (bundle && singleEntry) {
-            await esbuild.build({
-                write: true,
-                bundle: true,
-                minify: true,
-                entryPoints: [ bagelFileToTsFile(entryFileOrDir) ],
-                outfile: bagelFileToJsBundleFile(entryFileOrDir)
-            })
+            await bundleOutput(entryFileOrDir)
         }
     }
 
@@ -188,13 +195,7 @@ ___configure({
                                 await Deno.writeFile(jsPath, new TextEncoder().encode(compiledWithLib));
                                 
                                 if (bundle && singleEntry) {
-                                    await esbuild.build({
-                                        write: true,
-                                        bundle: true,
-                                        minify: true,
-                                        entryPoints: [ bagelFileToTsFile(entryFileOrDir) ],
-                                        outfile: bagelFileToJsBundleFile(entryFileOrDir)
-                                    })
+                                    await bundleOutput(entryFileOrDir)
                                 }
                             }
                         }
@@ -206,4 +207,6 @@ ___configure({
             })()
         }
     }
+
+    Deno.exit()
 }
