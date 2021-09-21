@@ -9,7 +9,6 @@ import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 export function compile(modulesStore: ModulesStore, module: Module): string {
     const hasMain = module.declarations.some(decl => decl.kind === "proc-declaration" && decl.name.name === "main")
     return module.declarations
-        .filter(declaration => declaration.kind !== "type-declaration")
         .map(decl => compileOne(modulesStore, decl))
         .join("\n\n") + (hasMain ? "\nsetTimeout(main, 0);\n" : "");
 }

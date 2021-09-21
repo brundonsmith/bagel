@@ -92,6 +92,10 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
                 walkParseTree(nextPayload, statement, fn);
             }
         } break;
+        case "type-declaration": {
+            walkParseTree(nextPayload, ast.name, fn);
+            walkParseTree(nextPayload, ast.type, fn);
+        } break;
         case "func-declaration": {
             walkParseTree(nextPayload, ast.name, fn);
             walkParseTree(nextPayload, ast.func, fn);
