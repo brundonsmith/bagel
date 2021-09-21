@@ -64,9 +64,11 @@ ${given(ast.until, until => compileOne(modulesStore, until))});`;
         case "element-tag": return `${HIDDEN_IDENTIFIER_PREFIX}h('${ast.tagName.name}',{${
             objectEntries(modulesStore, (ast.attributes as [PlainIdentifier, Expression|Expression[]][]))}}, ${ast.children.map(c => compileOne(modulesStore, c)).join(', ')})`;
         case "class-construction": return `new ${ast.clazz.name}()`;
+
+        default:
+            throw Error("Couldn't compile '" + ast.kind + "'");
     }
 
-    throw Error("Couldn't compile '" + (ast as any).kind + "'");
 }
 
 function objectEntries(modulesStore: ModulesStore, entries: [PlainIdentifier, Expression|Expression[]][]): string {
@@ -96,8 +98,18 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
 }
 // TODO: dispose of reactions somehow... at some point...
 
-const compileFunc = (modulesStore: ModulesStore, func: Func): string =>
-    `(${func.type.args.map(arg => `${arg.name.name}: ${compileTypeExpression(arg.type)}`).join(', ')})${func.type.returnType.kind !== 'unknown-type' ? `: ${compileTypeExpression(func.type.returnType)}` : ''} => ${compileOne(modulesStore, func.body)}`;
+const compileFunc = (modulesStore: ModulesStore, func: Func): string => {
+    const signature = `(${func.type.args.map(arg => `${arg.name.name}: ${compileTypeExpression(arg.type)}`).join(', ')})${func.type.returnType.kind !== 'unknown-type' ? `: ${compileTypeExpression(func.type.returnType)}` : ''} => `;
+    const body = compileOne(modulesStore, func.body);
+
+    if (func.consts.length > 0) {
+        const consts = func.consts.map(c => `    const ${c.name.name}${c.type ? ': ' + compileTypeExpression(c.type) : ""} = ${compileOne(modulesStore, c.value)};\n`).join('')
+
+        return `${signature} {\n${consts}\n    return ${body};\n}`
+    } else {
+        return signature + body
+    }
+}
 
 function compilePipe(modulesStore: ModulesStore, expressions: readonly Expression[], end: number): string {
     if (end === 0) {

@@ -37,6 +37,7 @@ export type Pipe = SourceInfo & {
 export type Func = SourceInfo & {
     kind: "func",
     type: FuncType,
+    consts: { name: PlainIdentifier, type?: TypeExpression, value: Expression }[],
     body: Expression,
 }
 

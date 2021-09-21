@@ -926,6 +926,8 @@ const func: ParseFunction<Func> = (code, startIndex) =>
     given(consumeWhitespace(code, newIndex ?? index), index =>
     given(consume(code, index, "=>"), index =>
     given(consumeWhitespace(code, index), index =>
+    given(parseSeries(code, index, _funcConst, ',', { trailingDelimiter: 'required' }), ({ parsed: consts, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(expression(code, index), err(code, index, 'Function body'), ({ parsed: body, newIndex: index }) => ({
         parsed: {
             kind: "func",
@@ -938,13 +940,14 @@ const func: ParseFunction<Func> = (code, startIndex) =>
                 startIndex,
                 endIndex: index
             },
+            consts,
             body,
             code,
             startIndex,
             endIndex: index
         },
         newIndex: index,
-    })))))))))))
+    })))))))))))))
 
 const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: PlainIdentifier, type?: TypeExpression }> | BagelSyntaxError | undefined => 
     given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
@@ -958,6 +961,27 @@ const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: 
         },
         newIndex: newIndex ?? index
     }))))
+
+const _funcConst = (code: string, index: number): ParseResult<{ name: PlainIdentifier, type?: TypeExpression, value: Expression }> | BagelSyntaxError | undefined =>
+    given(consume(code, index, 'const'), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(parseOptional(code, index, (code, index) =>
+        given(consume(code, index, ':'), index =>
+        given(consumeWhitespace(code, index), index => 
+        expec(typeExpression(code, index), err(code, index, "Type"), res => res)))), ({ parsed: type, newIndex: indexAfterType }) =>
+    given(consumeWhitespace(code, indexAfterType ?? index), index =>
+    given(consume(code, index, '='), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(expression(code, index), err(code, index, "Value"), ({ parsed: value, newIndex: index }) => ({
+        parsed: {
+            name,
+            type,
+            value
+        },
+        newIndex: index
+    }))))))))))
 
 const pipe: ParseFunction<Pipe> = (code, startIndex) => 
     given(parseSeries(code, startIndex, parseStartingFromTier(NEXT_TIER_FOR.get(pipe) as number), "|>", { trailingDelimiter: "forbidden" }), ({ parsed: expressions, newIndex: index }) =>

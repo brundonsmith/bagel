@@ -125,6 +125,17 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "proc":
         case "func": {
             walkParseTree(nextPayload, ast.type, fn);
+
+            if (ast.kind === "func") {
+                for (const c of ast.consts) {
+                    walkParseTree(nextPayload, c.name, fn);
+                    if (c.type) {
+                        walkParseTree(nextPayload, c.type, fn);
+                    }
+                    walkParseTree(nextPayload, c.value, fn);
+                }
+            }
+            
             walkParseTree(nextPayload, ast.body, fn);
         } break;
         case "pipe": {
@@ -360,8 +371,8 @@ export const printError = (modulePath: string) => (error: BagelTypeError|BagelSy
 
             console.log(Colors.bgWhite(Colors.black(String(line))) + padding + lineContent.content)
 
-                const digitsInLineNum = String(line).length
-                const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
+            const digitsInLineNum = String(line).length
+            const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
 
             if (endIndex != null) {
                 const underline = new Array(endIndex - startIndex).fill('~').join('')

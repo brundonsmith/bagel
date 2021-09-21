@@ -124,6 +124,16 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                     declaredType: arg.type,
                 }
             }
+
+            if (ast.kind === "func") {
+                for (const c of ast.consts) {
+                    scope.values[c.name.name] = {
+                        mutability: "none",
+                        declaredType: c.type,
+                        initialValue: c.value
+                    }
+                }
+            }
             break;
         case "block":
             // add let-declarations to scope

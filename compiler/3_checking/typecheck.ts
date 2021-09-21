@@ -1,7 +1,7 @@
 import { AST, Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
 import { ImportDeclaration, ImportItem } from "../_model/declarations.ts";
-import { Expression, LocalIdentifier } from "../_model/expressions.ts";
+import { LocalIdentifier } from "../_model/expressions.ts";
 import { FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions.ts";
 import { deepEquals, DeepReadonly, given, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
@@ -26,6 +26,13 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
             case "func": {
                 const funcScope = modulesStore.getScopeFor(ast);
                 const bodyType = modulesStore.getTypeOf(ast.body);
+
+                for (const c of ast.consts) {
+                    const valueType = modulesStore.getTypeOf(c.value)
+                    if (c.type && !subsumes(funcScope, c.type, valueType)) {
+                        reportError(assignmentError(c.value, c.type, valueType));
+                    }
+                }
 
                 if (ast.type.returnType.kind !== "unknown-type" && !subsumes(funcScope, ast.type.returnType, bodyType)) {
                     reportError(assignmentError(ast.body, ast.type.returnType, bodyType));

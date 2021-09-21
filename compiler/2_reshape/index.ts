@@ -33,6 +33,7 @@ export function reshape(ast: Module): Module {
                                 code: expression.code,
                                 startIndex: expression.startIndex,
                                 endIndex: expression.endIndex,
+                                consts: [],
                                 body: expression,
                                 type: {
                                     kind: "func-type",

@@ -1,9 +1,4 @@
-func foo(a: number, b: number): number => a + b
 
-proc bar(a: number) {
-    let foo = 12;
-
-    for (a of 0..10) {
-        foo = a;
-    }
-}
+export func foo(a: number, b: number): number => 
+    const c = 2 * a,
+    c + b
