@@ -2,3 +2,4 @@
 node_modules
 *.bgl.js
 *.bgl.ts
+tests/sample-files*/*.js

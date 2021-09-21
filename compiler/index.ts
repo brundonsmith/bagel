@@ -8,6 +8,7 @@ import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { printError } from "./utils.ts";
+import { esbuild } from "./deps.ts"
 
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
@@ -24,8 +25,12 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     return arrayOfFiles;
 }
 
-function bagelFileToTsFile(module: string, bundle?: boolean): string {
-    return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + (bundle ? ".bundle" : "") + ".bgl.ts")
+function bagelFileToTsFile(module: string): string {
+    return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + ".bgl.ts")
+}
+
+function bagelFileToJsBundleFile(module: string): string {
+    return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + ".bundle.js")
 }
 
 const IMPORTED_ITEMS = ['observable', 'computed', 'reactionUntil', 'configure', 
@@ -44,12 +49,13 @@ ___configure({
 `
 
 {
-    const fileOrDirArg = Deno.args[0]
-    if (!fileOrDirArg) throw Error("Bagel: No file or directory provided")
-    const fileOrDir = path.resolve(Deno.cwd(), fileOrDirArg);
-    const allFiles = (await Deno.stat(fileOrDir)).isDirectory ? await getAllFiles(fileOrDir) : [ fileOrDir ];
+    const entryArg = Deno.args[0]
+    if (!entryArg) throw Error("Bagel: No file or directory provided")
+    const entryFileOrDir = path.resolve(Deno.cwd(), entryArg);
+    const singleEntry = !(await Deno.stat(entryFileOrDir)).isDirectory
+    const allFiles = singleEntry ? [ entryFileOrDir ] : await getAllFiles(entryFileOrDir);
     // const outDir = Deno.args[1] || path.dirname(fileOrDir);
-    // const bundle = true;
+    const bundle = Deno.args.includes("--bundle");
     const watch = Deno.args.includes("--watch");
     const emit = !Deno.args.includes("--noEmit");
     
@@ -121,13 +127,18 @@ ___configure({
             const compiledWithLib = LIB_IMPORTS + compiled;
             return Deno.writeFile(jsPath, new TextEncoder().encode(compiledWithLib));
         }))
+
+        if (bundle && singleEntry) {
+            await esbuild.build({
+                write: true,
+                bundle: true,
+                minify: true,
+                entryPoints: [ bagelFileToTsFile(entryFileOrDir) ],
+                outfile: bagelFileToJsBundleFile(entryFileOrDir)
+            })
+        }
     }
 
-    // TODO
-    // if (bundle) {
-    //     await bundleOutput(entry)
-    // }
-    
     console.log();
     console.log(`Spent ${timeSpentParsing}ms parsing`)
     console.log(`Spent ${endTypecheck - startTypecheck}ms typechecking`)
@@ -175,12 +186,17 @@ ___configure({
                                 const compiled = compile(modulesStore, parsed);
                                 const compiledWithLib = LIB_IMPORTS + compiled;
                                 await Deno.writeFile(jsPath, new TextEncoder().encode(compiledWithLib));
+                                
+                                if (bundle && singleEntry) {
+                                    await esbuild.build({
+                                        write: true,
+                                        bundle: true,
+                                        minify: true,
+                                        entryPoints: [ bagelFileToTsFile(entryFileOrDir) ],
+                                        outfile: bagelFileToJsBundleFile(entryFileOrDir)
+                                    })
+                                }
                             }
-        
-                            // TODO
-                            // if (bundle) {
-                            //     await bundleOutput(entry)
-                            // }
                         }
                     } catch (e) {
                         console.error("Failed to read module " + module + "\n")

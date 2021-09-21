@@ -10,13 +10,6 @@
   "author": "Brandon Smith",
   "license": "MIT",
   "private": true,
-  "devDependencies": {
-      "@webpack-cli/generators": "^2.0.0",
-      "ts-loader": "^8.1.0",
-      "typescript": "^4.2.4",
-      "webpack": "^5.31.2",
-      "webpack-cli": "^4.6.0"
-  },
   "dependencies": {
     "mobx": "^6.3.2",
     "preact": "^10.5.14"
