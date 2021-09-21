@@ -1,4 +1,5 @@
 import { path } from "./deps.ts";
+export * as esbuild from "https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js"
 
 import { ModulesStore } from "./3_checking/modules-store.ts";
 import { canonicalModuleName, scopescan } from "./3_checking/scopescan.ts";
@@ -8,7 +9,6 @@ import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { printError } from "./utils.ts";
-import { esbuild } from "./deps.ts"
 
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
@@ -207,15 +207,3 @@ ___configure({
         }
     }
 }
-
-// async function bundleOutput(entry: string) {
-//     try {
-//         await build({
-//             entryPoints: [ bagelFileToTsFile(entry) ],
-//             outfile: bagelFileToTsFile(entry, true),
-//             bundle: true,
-//         })
-//     } catch(err) {
-//         console.error(err.message);
-//     }
-// }
