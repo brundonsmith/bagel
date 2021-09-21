@@ -1,5 +1,5 @@
 import { path } from "./deps.ts";
-export * as esbuild from "https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js"
+import * as esbuild from "https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js"
 
 import { ModulesStore } from "./3_checking/modules-store.ts";
 import { canonicalModuleName, scopescan } from "./3_checking/scopescan.ts";
