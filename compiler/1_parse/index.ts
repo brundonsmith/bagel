@@ -1180,6 +1180,7 @@ const parenthesized: ParseFunction<ParenthesizedExpression> = (code, startIndex)
 
 const propertyAccessor: ParseFunction<PropertyAccessor> = (code, startIndex) =>
     given(parseBeneath(code, startIndex, propertyAccessor), ({ parsed: base, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries(code, index, plainIdentifier, ".", { leadingDelimiter: "required", trailingDelimiter: "forbidden" }), ({ parsed: properties, newIndex: index }) => 
         properties.length > 0
             ? {
@@ -1193,7 +1194,7 @@ const propertyAccessor: ParseFunction<PropertyAccessor> = (code, startIndex) =>
                 },
                 newIndex: index
             }
-            : undefined))
+            : undefined)))
 
 const localIdentifier: ParseFunction<LocalIdentifier> = (code, startIndex) => 
     given(identifierSegment(code, startIndex), ({ segment: name, newIndex: index }) => ({

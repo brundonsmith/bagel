@@ -111,6 +111,18 @@ Deno.test({
 });
 
 Deno.test({
+  name: "propertyAccessWithSpace",
+  fn() {
+    testCompile(
+      `const x = a
+        .b
+        .c`,
+      `const x = a.b.c;`,
+    );
+  },
+});
+
+Deno.test({
   name: "methodChainWithSpace",
   fn() {
     testCompile(
