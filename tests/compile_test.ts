@@ -44,6 +44,23 @@ Deno.test({
 });
 
 Deno.test({
+  name: "func with constants",
+  fn() {
+    testCompile(
+      `func uid(n: number) => 
+        const double = 2 * n,
+        const ten = 5 * double,
+        ten`,
+      `const uid = (n: number) => {
+        const double = 2 * n;
+        const ten = 5 * double;
+        return ten;
+      }`,
+    );
+  },
+});
+
+Deno.test({
   name: "propertyAccess",
   fn() {
     testCompile(
