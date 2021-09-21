@@ -144,15 +144,18 @@ ___configure({
 
                         if (fileContents && (lastFileContents == null || lastFileContents !== fileContents)) {
                             lastFileContents = fileContents
+                            let hadError = false;
 
                             console.log(`Typechecking ${module}...`)
-                            const parsed = reshape(parse(fileContents, printError(path.basename(module))));
+                            const parsed = reshape(parse(fileContents, err => {
+                                hadError = true;
+                                printError(path.basename(module))(err)
+                            }));
                             modulesStore.modules.set(module, parsed);
         
                             scopescan(printError(path.basename(module)), modulesStore, parsed, module);
                             typescan(printError(path.basename(module)), modulesStore, parsed);
         
-                            let hadError = false;
                             try {
                                 typecheck(modulesStore, parsed, err => {
                                     hadError = true;
