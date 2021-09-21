@@ -278,6 +278,12 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
         return true;
     } else if(resolvedValue.kind === "unknown-type") {
         return false;
+    } else if(resolvedDestination.kind === "number-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "number-literal") {
+        return true;
+    } else if(resolvedDestination.kind === "string-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "string-literal") {
+        return true;
+    } else if(resolvedDestination.kind === "boolean-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "boolean-literal") {
+        return true;
     } else if(resolvedDestination.kind === "union-type") {
         if (resolvedValue.kind === "union-type") {
             return resolvedValue.members.every(valueMember => 
