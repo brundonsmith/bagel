@@ -375,7 +375,9 @@ function displayForm(typeExpression: TypeExpression): string {
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;
         case "nil-type": return `nil`;
-        case "literal-type": return String(typeExpression.value);
+        case "literal-type": return JSON.stringify(typeExpression.value.kind === "string-literal" 
+                                        ? typeExpression.value.segments.join('') 
+                                        : typeExpression.value.value);
         case "nominal-type": return typeExpression.name;
         case "iterator-type": return `Iterator<${displayForm(typeExpression.itemType)}>`;
         case "promise-type": return `Promise<${displayForm(typeExpression.resultType)}>`;
