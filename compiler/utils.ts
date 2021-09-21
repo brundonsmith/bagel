@@ -360,12 +360,14 @@ export const printError = (modulePath: string) => (error: BagelTypeError|BagelSy
 
             console.log(Colors.bgWhite(Colors.black(String(line))) + padding + lineContent.content)
 
-            if (endIndex != null) {
                 const digitsInLineNum = String(line).length
                 const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
+
+            if (endIndex != null) {
                 const underline = new Array(endIndex - startIndex).fill('~').join('')
-                
                 console.log(Colors.red(underlineSpacing + underline))
+            } else {
+                console.log(Colors.red(underlineSpacing + Colors.red("^")))
             }
         }
     }
