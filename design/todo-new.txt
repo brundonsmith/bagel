@@ -1,0 +1,12 @@
+Design tasks:
+- Dates
+- Type-checking serializable data
+- Rethink reactions (autorun? exprs vs functions for when-clause?)
+
+Implementation tasks:
+- Generics
+- Type refinement
+- Solve parsing issues around method chains
+
+Legwork tasks:
+- Build out standard libraries, including wrappers around browser APIs
