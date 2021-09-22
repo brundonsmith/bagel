@@ -90,6 +90,7 @@ async function bundleOutput(entryFile: string) {
             
                 const startParse = Date.now();
                 const parsed = reshape(parse(fileContents, printError(path.basename(module))));
+                // console.log(JSON.stringify(parsed, null, 2))
                 timeSpentParsing += Date.now() - startParse;
 
                 for (const declaration of parsed.declarations) {

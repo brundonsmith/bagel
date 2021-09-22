@@ -2,7 +2,7 @@ import { path } from "../deps.ts";
 
 import { Module } from "../_model/ast.ts";
 import { Block } from "../_model/common.ts";
-import { Declaration } from "../_model/declarations.ts";
+import { ClassDeclaration, Declaration } from "../_model/declarations.ts";
 import { Func, Proc, Expression, StringLiteral } from "../_model/expressions.ts";
 import { ForLoop } from "../_model/statements.ts";
 import { TypeExpression, UNKNOWN_TYPE, NUMBER_TYPE } from "../_model/type-expressions.ts";
@@ -22,7 +22,8 @@ export function scopescan(reportError: (error: BagelTypeError) => void, modulesS
             case "func":
             case "proc":
             case "block":
-            case "for-loop": {
+            case "for-loop":
+            case "class-declaration": {
                 const scope = scopeFrom(reportError, modulesStore, ast, module, payload);
                 modulesStore.scopeFor.set(ast, scope);
                 return scope;
@@ -35,7 +36,7 @@ export function scopescan(reportError: (error: BagelTypeError) => void, modulesS
     });
 }
 
-export type ScopeOwner = Module|Func|Proc|Block|ForLoop;
+export type ScopeOwner = Module|Func|Proc|Block|ForLoop|ClassDeclaration;
 
 export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
     const scope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {}, classes: {} };
@@ -152,6 +153,18 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
             scope.values[ast.itemIdentifier.name] = {
                 mutability: "properties-only",
                 declaredType: NUMBER_TYPE, // TODO: ast.iterator;
+            }
+            break;
+        case "class-declaration":
+            scope.values["this"] = {
+                mutability: "properties-only",
+                declaredType: {
+                    kind: "class-type",
+                    clazz: ast,
+                    code: undefined,
+                    startIndex: undefined,
+                    endIndex: undefined
+                },
             }
             break;
     }

@@ -1,4 +1,5 @@
 import { PlainIdentifier, SourceInfo } from "./common.ts";
+import { ClassDeclaration } from "./declarations.ts";
 import { BooleanLiteral, NumberLiteral, StringLiteral } from "./expressions.ts";
 
 export type TypeExpression =
@@ -15,6 +16,7 @@ export type TypeExpression =
     | NumberType
     | BooleanType
     | NilType
+    | ClassType
     | LiteralType
     | NominalType
     | IteratorType
@@ -98,6 +100,11 @@ export type NilType = SourceInfo & {
 export type LiteralType = SourceInfo & {
     kind: "literal-type",
     value: StringLiteral | NumberLiteral | BooleanLiteral,
+}
+
+export type ClassType = SourceInfo & {
+    kind: "class-type",
+    clazz: ClassDeclaration
 }
 
 export type NominalType = SourceInfo & {

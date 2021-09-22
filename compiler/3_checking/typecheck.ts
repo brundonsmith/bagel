@@ -121,27 +121,25 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
             }
             case "property-accessor": {
                 const baseType = modulesStore.getTypeOf(ast.base);
-
-                let lastPropType = baseType;
-                for (const prop of ast.properties) {
-                    if (lastPropType.kind !== "object-type") {
-                        reportError(miscError(prop, `Can only use dot operator (".") on objects with known properties`));
-                        return scope;
-                    }
-
-                    const valueType = lastPropType.entries.find(entry => entry[0].name === prop.name)?.[1];
-                    if (valueType == null) {
-                        reportError(miscError(prop, `Property '${prop.name}' doesn't exist on type '${displayForm(baseType)}'`));
-                        return scope;
-                    }
-
-                    lastPropType = valueType;
+                if (baseType.kind !== "object-type" && baseType.kind !== "class-type") {
+                    reportError(miscError(ast.base, `Can only use dot operator (".") on objects with known properties`));
+                    return scope;
                 }
+
+                for (let i = 0; i < ast.properties.length - 1; i++) {
+                    const propertyType = modulesStore.getTypeOf(ast.properties[i])
+                    if (propertyType.kind !== "object-type" && propertyType.kind !== "class-type") {
+                        reportError(miscError(ast.properties[i], `Can only use dot operator (".") on objects with known properties`));
+                        return scope;
+                    }
+                }
+                
+                // TODO: Check that property exists on each subject
                 
                 return scope;
             }
             case "local-identifier": {
-                if (scope.values[ast.name] == null) {
+                if (scope.values[ast.name] == null && scope.classes[ast.name] == null) {
                     reportError(cannotFindName(ast));
                 }
 
@@ -327,8 +325,17 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
 
 function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpression>): DeepReadonly<TypeExpression> | undefined {
     if (type.kind === "named-type") {
-        const namedType = scope.types[type.name.name];
-        return given(namedType, namedType => resolve(scope, namedType));
+        if (scope.types[type.name.name]) {
+            return resolve(scope, scope.types[type.name.name])
+        } else if (scope.classes[type.name.name]) {
+            return {
+                kind: "class-type",
+                clazz: scope.classes[type.name.name],
+                code: type.code,
+                startIndex: type.startIndex,
+                endIndex: type.endIndex
+            }
+        }
     } else if(type.kind === "union-type") {
         const memberTypes = type.members.map(member => resolve(scope, member));
         if (memberTypes.some(member => member == null)) {
@@ -392,6 +399,7 @@ function displayForm(typeExpression: TypeExpression): string {
         case "element-type": return `<element tag>`
         // case "element-type": return `<${typeExpression.tagName}>`;
         case "javascript-escape-type": return "<js escape>";
+        case "class-type": return typeExpression.clazz.name.name;
     }
 }
 

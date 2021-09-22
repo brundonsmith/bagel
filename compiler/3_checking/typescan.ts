@@ -5,6 +5,7 @@ import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYP
 import { deepEquals, DeepReadonly, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
 import { BagelTypeError, subsumes } from "./typecheck.ts";
+import { ClassMember } from "../_model/declarations.ts";
 
 export function typescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
@@ -67,7 +68,7 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
 function determineTypeAndStore(
     reportError: (error: BagelTypeError) => void, 
     modulesStore: ModulesStore, 
-    ast: Expression, 
+    ast: Expression|ClassMember, 
     scope: DeepReadonly<Scope>
 ): TypeExpression {
     const type = handleSingletonUnion(distillUnion(scope, flattenUnions(determineType(reportError, modulesStore, ast, scope))));
@@ -78,7 +79,7 @@ function determineTypeAndStore(
 function determineType(
     reportError: (error: BagelTypeError) => void, 
     modulesStore: ModulesStore, 
-    ast: Expression, 
+    ast: Expression|ClassMember, 
     scope: DeepReadonly<Scope>
 ): TypeExpression {
     switch(ast.kind) {
@@ -186,16 +187,28 @@ function determineType(
 
             let lastPropType = baseType;
             for (const prop of ast.properties) {
-                if (lastPropType.kind !== "object-type") {
+                if (lastPropType.kind === "object-type") {
+                    const valueType = lastPropType.entries.find(entry => entry[0].name === prop.name)?.[1];
+                    if (valueType == null) {
+                        return UNKNOWN_TYPE;
+                    }
+    
+                    lastPropType = valueType;
+                } else if (lastPropType.kind === "class-type") {
+                    const member = lastPropType.clazz.members.find(({ name }) => name.name === prop.name);
+                    if (member == null) {
+                        return UNKNOWN_TYPE;
+                    }
+
+                    const valueType = determineTypeAndStore(reportError, modulesStore, member, scope);
+                    if (valueType == null) {
+                        return UNKNOWN_TYPE;
+                    }
+    
+                    lastPropType = valueType;
+                } else {
                     return UNKNOWN_TYPE;
                 }
-
-                const valueType = lastPropType.entries.find(entry => entry[0].name === prop.name)?.[1];
-                if (valueType == null) {
-                    return UNKNOWN_TYPE;
-                }
-
-                lastPropType = valueType;
             }
             
             return lastPropType;
@@ -258,14 +271,22 @@ function determineType(
                 endIndex: undefined,
             };
         }
+        case "class-construction": return {
+            kind: "class-type",
+            clazz: scope.classes[ast.clazz.name],
+            code: ast.clazz.code,
+            startIndex: ast.clazz.startIndex,
+            endIndex: ast.clazz.endIndex
+        };
+        case "class-property": return ast.type ?? determineTypeAndStore(reportError, modulesStore, ast.value, scope);
+        case "class-function": return determineTypeAndStore(reportError, modulesStore, ast.func, scope);
+        case "class-procedure": return determineTypeAndStore(reportError, modulesStore, ast.proc, scope);
         case "string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
         case "boolean-literal": return BOOLEAN_TYPE;
         case "nil-literal": return NIL_TYPE;
         case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
     }
-    
-    throw Error();
 }
 
 const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {

@@ -313,6 +313,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
 
         // atomic
         case "type-declaration":
+        case "class-type":
         case "plain-identifier":
         case "range":
         case "local-identifier":
