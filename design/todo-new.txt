@@ -2,11 +2,17 @@ Design tasks:
 - Dates
 - Type-checking serializable data
 - Rethink reactions (autorun? exprs vs functions for when-clause?)
+- consts in procs
+- expressive match/switch
 
 Implementation tasks:
 - Generics
 - Type refinement
 - Solve parsing issues around method chains
+- Hoisting and/or order-checking for declarations that depend on each other
 
-Legwork tasks:
+Gruntwork tasks:
 - Build out standard libraries, including wrappers around browser APIs
+- Stripping comments when parsing (also support in language extension)
+- Various spread/destructuring syntaxes for objects, arrays, tuples, etc
+- Parse chained if/else
