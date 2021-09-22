@@ -206,7 +206,7 @@ async function bundleOutput(entryFile: string) {
                 }
             })()
         }
+    } else {
+        Deno.exit()
     }
-
-    Deno.exit()
 }
