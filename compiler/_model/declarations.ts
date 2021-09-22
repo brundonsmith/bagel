@@ -70,7 +70,7 @@ export type ClassProperty = SourceInfo & {
     name: PlainIdentifier,
     type?: TypeExpression,
     value: Expression,
-    access: 'private'|'public',
+    access: 'private'|'public'|'visible',
 }
 
 export type ClassFunction = SourceInfo & {

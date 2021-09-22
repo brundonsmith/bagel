@@ -2,6 +2,7 @@ import { ModulesStore } from "../3_checking/modules-store.ts";
 import { given } from "../utils.ts";
 import { Module, AST } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
+import { ClassProperty } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
 import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
@@ -23,9 +24,9 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "func-declaration": return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileFunc(modulesStore, ast.func);
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(modulesStore, ast.name)}${ast.type ? `: ${compileTypeExpression(ast.type)}` : ''} = ${compileOne(modulesStore, ast.value)};`;
         case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(modulesStore, ast.name)} {\n${ast.members.map(m => compileOne(modulesStore, m)).join('\n')}\n}`;
-        case "class-property": return `${ast.access} ${ast.name.name}${ast.type ? ': ' + compileTypeExpression(ast.type) : ''} = ${compileOne(modulesStore, ast.value)}`
-        case "class-function": return `${ast.access} readonly ${ast.name.name} = ${compileFunc(modulesStore, ast.func)}`
-        case "class-procedure": return `${ast.access} readonly ${ast.name.name} = ${(ast.proc.kind === 'proc' ? compileProc(modulesStore, ast.proc) : compileFunc(modulesStore, ast.proc))}`
+        case "class-property": return  compileClassProperty(modulesStore, ast)
+        case "class-function": return  `    ${ast.access} readonly ${ast.name.name} = ${compileFunc(modulesStore, ast.func)}`
+        case "class-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${(ast.proc.kind === 'proc' ? compileProc(modulesStore, ast.proc) : compileFunc(modulesStore, ast.proc))}`
         case "proc": return compileProc(modulesStore, ast);
         case "let-declaration": return `${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)}`;
         case "assignment": return `${compileOne(modulesStore, ast.target)} = ${compileOne(modulesStore, ast.value)}`;
@@ -89,10 +90,10 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
 
     return `(${proc.type.args.map(arg => `${arg.name.name}: ${compileTypeExpression(arg.type)}`).join(', ')}): void => {
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
-        `const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileTypeExpression(e[1].declaredType ?? UNKNOWN_TYPE)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});`
-    : ``}
-
-    ${proc.body.statements.map(s => compileOne(modulesStore, s) + ';').join("\n")}
+`    const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileTypeExpression(e[1].declaredType ?? UNKNOWN_TYPE)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});
+    
+`
+    : ``}${proc.body.statements.map(s => compileOne(modulesStore, s) + ';').join("\n")}
 }`;
 }
 // TODO: dispose of reactions somehow... at some point...
@@ -107,6 +108,22 @@ const compileFunc = (modulesStore: ModulesStore, func: Func): string => {
         return `${signature} {\n${consts}\n    return ${body};\n}`
     } else {
         return signature + body
+    }
+}
+
+function compileClassProperty(modulesStore: ModulesStore, ast: ClassProperty): string {
+    const typeDeclaration = ast.type ? ': ' + compileTypeExpression(ast.type) : ''
+
+    if (ast.access === "visible") {
+        return `    private _${ast.name.name}${typeDeclaration} = ${compileOne(modulesStore, ast.value)};\n` +
+               `    public get ${ast.name.name}() {\n` +
+               `        return this._${ast.name.name};\n` +
+               `    }\n` +
+               `    private set ${ast.name.name}(val${typeDeclaration}) {\n` +
+               `        this._${ast.name.name} = val;\n` +
+               `    }\n`
+    } else {
+        return `    ${ast.access} ${ast.name.name}${typeDeclaration} = ${compileOne(modulesStore, ast.value)};`
     }
 }
 

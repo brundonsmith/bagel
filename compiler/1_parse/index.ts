@@ -520,7 +520,7 @@ const classMember: ParseFunction<ClassMember> = (code, startIndex) =>
     ?? classProcedure(code, startIndex)
 
 const classProperty: ParseFunction<ClassProperty> = (code, startIndex) => {
-    const accessResult = given(_accessModifier(code, startIndex), ({ parsed, newIndex: index }) => 
+    const accessResult = given(_accessModifierWithVisible(code, startIndex), ({ parsed, newIndex: index }) => 
         given(consumeWhitespaceRequired(code, index), index => ({
             parsed,
             newIndex: index
@@ -608,6 +608,13 @@ const classProcedure: ParseFunction<ClassProcedure> = (code, startIndex) => {
         newIndex: index,
     }))
 }
+
+const _accessModifierWithVisible: ParseFunction<'private'|'public'|'visible'> = (code, startIndex) =>
+    _accessModifier(code, startIndex)
+    ?? given(consume(code, startIndex, "visible"), index => ({
+        parsed: "visible",
+        newIndex: index
+    }))
 
 const _accessModifier: ParseFunction<'private'|'public'> = (code, startIndex) =>
     given(consume(code, startIndex, "private"), index => ({
