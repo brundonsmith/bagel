@@ -46,3 +46,6 @@ delve into the deep, you can run `compiler/run <file-or-dir> --watch` to watch
 and convert `.bgl` files into corresponding `.bgl.ts`
 files. You can also run `compiler/run <file-or-dir> --bundle` to bundle 
 a `.bgl` file up with all its dependencies into a single JS file.
+
+The VSCode extension [here](https://github.com/brundonsmith/bagel-language) will
+provide syntax highlighting.
