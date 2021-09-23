@@ -1,8 +1,9 @@
 import { PlainIdentifier, SourceInfo } from "./common.ts";
-import { Expression, Func, Proc, StringLiteral } from "./expressions.ts";
+import { Expression, Func, JavascriptEscape, Proc, StringLiteral } from "./expressions.ts";
 import { TypeExpression } from "./type-expressions.ts";
 
 export type Declaration =
+    | JavascriptEscape
     | ImportDeclaration
     | TypeDeclaration
     | ProcDeclaration

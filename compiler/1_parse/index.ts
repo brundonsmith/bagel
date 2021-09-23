@@ -49,6 +49,7 @@ const declaration: ParseFunction<Declaration> = (code, index) =>
     ?? funcDeclaration(code, index)
     ?? constDeclaration(code, index)
     ?? classDeclaration(code, index)
+    ?? javascriptEscape(code, index)
 
 const importDeclaration: ParseFunction<ImportDeclaration> = (code, startIndex) =>
     given(consume(code, startIndex, "from"), index =>
