@@ -15,7 +15,7 @@ export type Statement =
 
 export type LetDeclaration = SourceInfo & {
     kind: "let-declaration",
-    name: LocalIdentifier,
+    name: PlainIdentifier,
     type?: TypeExpression,
     value: Expression,
 }

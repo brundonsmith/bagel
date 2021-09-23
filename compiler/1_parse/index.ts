@@ -713,7 +713,7 @@ const computation: ParseFunction<Computation> = (code, startIndex) =>
 const letDeclaration: ParseFunction<LetDeclaration> = (code, startIndex) =>
     given(consume(code, startIndex, "let"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
-    given(localIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
+    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseOptional(code, index, (code, index) =>
         given(consume(code, index, ":"), index =>

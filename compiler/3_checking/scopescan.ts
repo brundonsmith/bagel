@@ -8,7 +8,7 @@ import { ForLoop } from "../_model/statements.ts";
 import { TypeExpression, UNKNOWN_TYPE, NUMBER_TYPE } from "../_model/type-expressions.ts";
 import { walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
-import { BagelTypeError, cannotFindExport, cannotFindModule } from "./typecheck.ts";
+import { alreadyDeclared, BagelTypeError, cannotFindExport, cannotFindModule } from "./typecheck.ts";
 
 
 export function scopescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module, module: string) {
@@ -41,8 +41,6 @@ export type ScopeOwner = Module|Func|Proc|Block|ForLoop|ClassDeclaration;
 export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
     const scope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {}, classes: {} };
 
-    // TODO: Err on duplicate identifiers
-    
     switch (ast.kind) {
         case "module":
             // add all declarations to scope
@@ -50,24 +48,40 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                 if (declaration.kind === "type-declaration") {
                     scope.types[declaration.name.name] = declaration.type;
                 } else if (declaration.kind === "func-declaration") {
+                    if (scope.values[declaration.name.name] != null || scope.classes[declaration.name.name] != null) {
+                        reportError(alreadyDeclared(declaration.name))
+                    }
+                    
                     scope.values[declaration.name.name] = {
                         mutability: "none",
                         declaredType: declaration.func.type,
                         initialValue: declaration.func
                     };
                 } else if (declaration.kind === "proc-declaration") {
+                    if (scope.values[declaration.name.name] != null || scope.classes[declaration.name.name] != null) {
+                        reportError(alreadyDeclared(declaration.name))
+                    }
+
                     scope.values[declaration.name.name] = {
                         mutability: "none",
                         declaredType: declaration.proc.type,
                         initialValue: declaration.proc
                     };
                 } else if (declaration.kind === "const-declaration") {
+                    if (scope.values[declaration.name.name] != null || scope.classes[declaration.name.name] != null) {
+                        reportError(alreadyDeclared(declaration.name))
+                    }
+                    
                     scope.values[declaration.name.name] = {
                         mutability: "none",
                         declaredType: declaration.type,
                         initialValue: declaration.value
                     };
                 } else if (declaration.kind === "class-declaration") {
+                    if (scope.values[declaration.name.name] != null || scope.classes[declaration.name.name] != null) {
+                        reportError(alreadyDeclared(declaration.name))
+                    }
+                    
                     scope.classes[declaration.name.name] = declaration;
                 } else if (declaration.kind === "import-declaration") {
                     const otherModule = modulesStore.modules.get(canonicalModuleName(module, declaration.path));
@@ -75,7 +89,7 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                     if (otherModule == null) {
                         reportError(cannotFindModule(declaration));
 
-                    for (const i of declaration.imports) {
+                        for (const i of declaration.imports) {
                             const name = i.alias?.name ?? i.name.name;
 
                             scope.values[name] = {
@@ -88,17 +102,25 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                             const foreignDecl = otherModule.declarations.find(foreignDeclCandidate => 
                                 declExported(foreignDeclCandidate) && declName(foreignDeclCandidate) === i.name.name);
 
-                            const name = i.alias?.name ?? i.name.name;
+                            const name = i.alias ?? i.name;
 
                             if (foreignDecl == null) {
                                 reportError(cannotFindExport(i, declaration));
 
-                                scope.values[name] = {
+                                if (scope.values[name.name] != null || scope.classes[name.name] != null) {
+                                    reportError(alreadyDeclared(name))
+                                }
+
+                                scope.values[name.name] = {
                                     mutability: "none",
                                     declaredType: UNKNOWN_TYPE,
                                 };
                             } else {
-                                scope.values[name] = {
+                                if (scope.values[name.name] != null || scope.classes[name.name] != null) {
+                                    reportError(alreadyDeclared(name))
+                                }
+
+                                scope.values[name.name] = {
                                     mutability: "none",
                                     declaredType: declType(foreignDecl) as TypeExpression,
                                     initialValue: declValue(foreignDecl),
@@ -120,6 +142,10 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
 
             // add func/proc argument to scope
             for (const arg of ast.type.args) {
+                if (scope.values[arg.name.name] != null || scope.classes[arg.name.name] != null) {
+                    reportError(alreadyDeclared(arg.name))
+                }
+
                 scope.values[arg.name.name] = {
                     mutability: ast.kind === "func" ? "none" : "properties-only",
                     declaredType: arg.type,
@@ -128,6 +154,10 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
 
             if (ast.kind === "func") {
                 for (const c of ast.consts) {
+                    if (scope.values[c.name.name] != null || scope.classes[c.name.name] != null) {
+                        reportError(alreadyDeclared(c.name))
+                    }
+
                     scope.values[c.name.name] = {
                         mutability: "none",
                         declaredType: c.type,
@@ -140,6 +170,10 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
             // add let-declarations to scope
             for (const statement of ast.statements) {
                 if (statement.kind === "let-declaration") {
+                    if (scope.values[statement.name.name] != null || scope.classes[statement.name.name] != null) {
+                        reportError(alreadyDeclared(statement.name))
+                    }
+
                     scope.values[statement.name.name] = {
                         mutability: "all",
                         declaredType: statement.type ?? UNKNOWN_TYPE, 
@@ -149,6 +183,10 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
             }
             break;
         case "for-loop":
+            if (scope.values[ast.itemIdentifier.name] != null || scope.classes[ast.itemIdentifier.name] != null) {
+                reportError(alreadyDeclared(ast.itemIdentifier))
+            }
+
             // add loop element to scope
             scope.values[ast.itemIdentifier.name] = {
                 mutability: "properties-only",

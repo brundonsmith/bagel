@@ -21,10 +21,7 @@ export function reshape(ast: Module): Module {
                         // this should be a constant
                         ast.statements[i] = {
                             kind: "let-declaration",
-                            name: {
-                                ...name,
-                                kind: "local-identifier"
-                            },
+                            name,
                             code,
                             startIndex,
                             endIndex,

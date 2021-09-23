@@ -416,6 +416,7 @@ function displayForm(typeExpression: TypeExpression): string {
 export type BagelTypeError =
     | BagelAssignableToError
     | BagelCannotFindNameError
+    | BagelAlreadyDeclaredError
     | BagelMiscTypeError
     | BagelCannotFindModuleError
     | BagelCannotFindExportError
@@ -431,6 +432,11 @@ export type BagelAssignableToError = {
 export type BagelCannotFindNameError = {
     kind: "bagel-cannot-find-name-error",
     ast: LocalIdentifier,
+}
+
+export type BagelAlreadyDeclaredError = {
+    kind: "bagel-already-declared-error",
+    ast: PlainIdentifier,
 }
 
 export type BagelMiscTypeError = {
@@ -456,6 +462,8 @@ export function errorMessage(error: BagelTypeError): string {
             return `Type "${displayForm(error.value)}" is not assignable to type "${displayForm(error.destination)}"`;
         case "bagel-cannot-find-name-error":
             return `Cannot find name "${error.ast.name}"`;
+        case "bagel-already-declared-error":
+            return `Identifier "${error.ast.name}" has already been declared in this scope`;
         case "bagel-misc-type-error":
             return error.message;
         case "bagel-cannot-find-module-error":
@@ -475,6 +483,10 @@ export function assignmentError(ast: AST, destination: TypeExpression, value: Ty
 
 export function cannotFindName(ast: LocalIdentifier): BagelCannotFindNameError {
     return { kind: "bagel-cannot-find-name-error", ast };
+}
+
+export function alreadyDeclared(ast: PlainIdentifier): BagelAlreadyDeclaredError {
+    return { kind: "bagel-already-declared-error", ast };
 }
 
 export function miscError(ast: AST|undefined, message: string): BagelMiscTypeError {
