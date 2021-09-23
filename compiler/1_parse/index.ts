@@ -1359,7 +1359,7 @@ const stringLiteral: ParseFunction<StringLiteral> = (code, startIndex) => {
                     kind: "string-literal",
                     code,
                     startIndex,
-                    endIndex: index,
+                    endIndex: index + 1,
                     segments,
                 },
                 newIndex: index + 1,
