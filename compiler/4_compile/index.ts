@@ -151,7 +151,7 @@ function compileTypeExpression(expr: TypeExpression): string {
         case "array-type": return `${compileTypeExpression(expr.element)}[]`;
         case "tuple-type": return `[${expr.members.map(compileTypeExpression).join(", ")}]`;
         case "iterator-type": return `${HIDDEN_IDENTIFIER_PREFIX}Iter<${compileTypeExpression(expr.itemType)}>`;
-        case "promise-type": return `Promise<${compileTypeExpression(expr.resultType)}>`;
+        case "plan-type": return `${HIDDEN_IDENTIFIER_PREFIX}Plan<${compileTypeExpression(expr.resultType)}>`;
         // HUGE HACK but should be fine in practice...
         case "literal-type": return `${compileOne(undefined as any, expr.value)}`;
         case "string-type": return `string`;

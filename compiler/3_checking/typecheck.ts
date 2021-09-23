@@ -404,7 +404,7 @@ function displayForm(typeExpression: TypeExpression): string {
                                         : typeExpression.value.value).replaceAll('"', "'");
         case "nominal-type": return typeExpression.name;
         case "iterator-type": return `Iterator<${displayForm(typeExpression.itemType)}>`;
-        case "promise-type": return `Promise<${displayForm(typeExpression.resultType)}>`;
+        case "plan-type": return `Plan<${displayForm(typeExpression.resultType)}>`;
         case "unknown-type": return "unknown";
         case "element-type": return `<element tag>`
         // case "element-type": return `<${typeExpression.tagName}>`;

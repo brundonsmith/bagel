@@ -20,7 +20,7 @@ export type TypeExpression =
     | LiteralType
     | NominalType
     | IteratorType
-    | PromiseType
+    | PlanType
     | UnknownType
     | JavascriptEscapeType
 
@@ -118,8 +118,8 @@ export type IteratorType = SourceInfo & {
     itemType: TypeExpression,
 }
 
-export type PromiseType = SourceInfo & {
-    kind: "promise-type",
+export type PlanType = SourceInfo & {
+    kind: "plan-type",
     resultType: TypeExpression,
 }
 

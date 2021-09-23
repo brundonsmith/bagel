@@ -317,7 +317,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "iterator-type": {
             walkParseTree(nextPayload, ast.itemType, fn);
         } break;
-        case "promise-type": {
+        case "plan-type": {
             walkParseTree(nextPayload, ast.resultType, fn);
         } break;
 

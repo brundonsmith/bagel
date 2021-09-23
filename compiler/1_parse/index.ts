@@ -3,7 +3,7 @@ import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
-import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PromiseType, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 
@@ -152,7 +152,7 @@ const atomicType: ParseFunction<TypeExpression> = (code, index) =>
     ?? funcType(code, index)
     ?? procType(code, index)
     ?? iteratorType(code, index)
-    ?? promiseType(code, index)
+    ?? planType(code, index)
     ?? literalType(code, index)
     ?? namedType(code, index)
     ?? objectType(code, index)
@@ -341,14 +341,14 @@ const iteratorType: ParseFunction<IteratorType> = (code, startIndex) =>
         newIndex: index,
     }))))))
 
-const promiseType: ParseFunction<PromiseType> = (code, startIndex) =>
-    given(consume(code, startIndex, "Promise<"), index =>
+const planType: ParseFunction<PlanType> = (code, startIndex) =>
+    given(consume(code, startIndex, "Plan<"), index =>
     given(consumeWhitespace(code, index), index =>
-    expec(typeExpression(code, index), err(code, index, "Promise result type"), ({ parsed: resultType, newIndex: index }) =>
+    expec(typeExpression(code, index), err(code, index, "Plan result type"), ({ parsed: resultType, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ">"), err(code, index, '">"'), index => ({
         parsed: {
-            kind: "promise-type",
+            kind: "plan-type",
             resultType,
             code,
             startIndex,
