@@ -151,7 +151,7 @@ function compileTypeExpression(expr: TypeExpression): string {
         case "iterator-type": return `${HIDDEN_IDENTIFIER_PREFIX}Iter<${compileTypeExpression(expr.itemType)}>`;
         case "promise-type": return `Promise<${compileTypeExpression(expr.resultType)}>`;
         // HUGE HACK but should be fine in practice...
-        case "literal-type": return `Promise<${compileOne(undefined as any, expr.value)}>`;
+        case "literal-type": return `${compileOne(undefined as any, expr.value)}`;
         case "string-type": return `string`;
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;
