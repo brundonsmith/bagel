@@ -1,0 +1,10 @@
+
+js# import { log } from "./core.ts" #js
+
+export proc logp(x: unknown) {
+    js# console.log(x) #js
+}
+
+export func logf(x: unknown): string => 
+    js# (() => { console.log(x); return x })() #js
+

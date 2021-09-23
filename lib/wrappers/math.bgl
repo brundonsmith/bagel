@@ -1,0 +1,8 @@
+
+js#
+import * as math from "../src/math.ts"
+#js
+
+export func floor(n: number): number => js# math.floor(n) #js
+export func ceil(n: number): number => js# math.ceil(n) #js
+export func abs(n: number): number => js# math.abs(n) #js

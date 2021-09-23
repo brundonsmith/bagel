@@ -155,8 +155,6 @@ export function log<T>(expr: T): T {
     return expr;
 }
 
-export const floor = Math.floor;
-export const arrayFrom = <T>(iter: RawIter<T>): T[] => Array.from(iter);
 export const fromEntries = Object.fromEntries;
 
 const INNER_ITER = Symbol('INNER_ITER')
@@ -216,45 +214,58 @@ const CHAINABLE_PROTOTYPE: Omit<Iter<unknown>, typeof INNER_ITER> = {
     }    
 }
 
-function iter<T>(iter: RawIter<T>): Iter<T> {
+export function iter<T>(iter: RawIter<T>): Iter<T> {
     const res = Object.create(CHAINABLE_PROTOTYPE)
     res[INNER_ITER] = iter
     return res
 }
 
-// Object.assign(Array.prototype, {
-//     map(fn: any) {
-//         return iter(map(fn)(this))
-//     },
-    
-//     filter(fn: any) {
-//         return iter(filter(fn)(this))
-//     },
 
-//     slice(start: any, end?: any) {
-//         return iter(slice(start)(end)(this))
-//     },
+// Plans
+type PlanChain<T> = {
+    then<N>(transformFn: (p: T) => N): Plan<N>;
+}
 
-//     count() {
-//         return count(this)
-//     },
+const PLAN_PROTOTYPE: PlanChain<unknown> = {
+    then(transformFn) {
+        return plan(() => (this as Plan<unknown>).planned().then(transformFn))
+    }
+}
 
-//     concat(other: any) {
-//         return iter(concat(this)((other as any)[INNER_ITER] ?? other))
-//     },
+export type Plan<T> = PlanChain<T> & { planned: () => Promise<T> }
 
-//     zip(other: any) {
-//         return iter(zip(this)((other as any)[INNER_ITER] ?? other))
-//     },
+export function plan<T>(fn: () => Promise<T>): Plan<T> {
+    const plan: Plan<T> = Object.create(PLAN_PROTOTYPE);
+    plan.planned = fn;
+    return plan;
+}
 
-//     array() {
-//         return Array.from(this)
-//     }
-// } as any)
+export function resolve<T>(plan: Plan<T>): Promise<T> {
+    return plan.planned()
+}
 
-const res = iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    .map(el => 'num is ' + el)
-    .filter(s => s.length < 9)
-    .join(',')
+export function concurrent<P extends unknown[], R>(fn: (...params: P) => R, ...params: P): Plan<R> {
+    return plan(() => asWorker(fn)(...params))
+}
 
-console.log(res)
+function asWorker<P extends unknown[], R>(fn: (...params: P) => R): (...params: P) => Promise<R> {
+    const code = `
+        const fn = (${fn.toString()})
+
+        onmessage = function(event) {
+            const args = JSON.parse(event.data);
+            const result = fn(...args)
+            postMessage(JSON.stringify(result))
+        }
+    `
+
+    const worker = new Worker(`data:text/javascript;base64,${btoa(code)}`, { type: "module" });
+
+    return (...params) => new Promise(res => {
+        worker.onmessage = function (event) {
+            res(JSON.parse(event.data))
+        }
+
+        worker.postMessage(JSON.stringify(params))
+    })
+}

@@ -33,11 +33,11 @@ function bagelFileToJsBundleFile(module: string): string {
 }
 
 const IMPORTED_ITEMS = ['observable', 'computed', 'reactionUntil', 'configure', 
-'h', 'render', 'range', 'entries', 'log', 'floor', 'arrayFrom', 'fromEntries', 'Iter', 'RawIter'
+'h', 'render', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan'
 ].map(s => `${s} as ${HIDDEN_IDENTIFIER_PREFIX}${s}`).join(', ')
 
 const LIB_IMPORTS = `
-import { ${IMPORTED_ITEMS} } from "../../lib/src/index.ts";
+import { ${IMPORTED_ITEMS} } from "../../lib/src/core.ts";
 
 ___configure({
     enforceActions: "never",
