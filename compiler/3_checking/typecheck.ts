@@ -119,6 +119,16 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
 
                 return scope;
             }
+            case "switch-expression": {
+                const valueType = modulesStore.getTypeOf(ast.value);
+                for (const { match } of ast.cases) {
+                    const caseType = modulesStore.getTypeOf(match)
+                    if (!subsumes(scope, valueType, caseType)) {
+                        reportError(assignmentError(match, valueType, caseType));
+                    }
+                }
+                return scope;
+            }
             case "property-accessor": {
                 const baseType = modulesStore.getTypeOf(ast.base);
                 if (baseType.kind !== "object-type" && baseType.kind !== "class-type") {

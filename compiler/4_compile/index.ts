@@ -39,6 +39,8 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "pipe": return compilePipe(modulesStore, ast.expressions, ast.expressions.length - 1);
         case "binary-operator": return `${compileOne(modulesStore, ast.left)} ${ast.operator} ${compileOne(modulesStore, ast.right)}`;
         case "if-else-expression": return `(${compileOne(modulesStore, ast.ifCondition)}) ? (${compileOne(modulesStore, ast.ifResult)}) : (${ast.elseResult == null ? NIL : compileOne(modulesStore, ast.elseResult)})`;
+        case "switch-expression": return '(' + ast.cases.map(({ match, outcome }) => `(${compileOne(modulesStore, ast.value)} === ${compileOne(modulesStore, match)}) ? (${compileOne(modulesStore, outcome)}) :`).join('\n')
+                                        + (ast.defaultCase ? compileOne(modulesStore, ast.defaultCase) : NIL) + ')'
         case "range": return `${HIDDEN_IDENTIFIER_PREFIX}range(${ast.start})(${ast.end})`;
         case "parenthesized-expression": return `(${compileOne(modulesStore, ast.inner)})`;
         case "property-accessor": return `${compileOne(modulesStore, ast.base)}.${ast.properties.map(p => compileOne(modulesStore, p)).join(".")}`;

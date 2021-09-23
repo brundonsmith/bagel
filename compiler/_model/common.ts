@@ -16,7 +16,7 @@ export type Block = SourceInfo & {
     statements: Statement[],
 }
 
-export const KEYWORDS = [ "func", "proc", "if", "else", 
+export const KEYWORDS = [ "func", "proc", "if", "else", "switch", "case",
 "type", "typeof", "class", "let", "const", "for", "while", 
 "of", "nil", "public", "visible", "private", "reaction", 
 "triggers", "until", "true", "false", "import", "export", "from", "as" ] as const;

@@ -1,7 +1,7 @@
 import { Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
-import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, DeepReadonly, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
 import { BagelTypeError, subsumes } from "./typecheck.ts";
@@ -179,6 +179,30 @@ function determineType(
                     endIndex: undefined,
                 };
             }
+        }
+        case "switch-expression": {
+            const valueType = determineTypeAndStore(reportError, modulesStore, ast.value, scope)
+
+            const caseTypes = ast.cases.map(({ outcome }) => 
+                determineTypeAndStore(reportError, modulesStore, outcome, scope))
+
+            const unionType: UnionType = {
+                kind: "union-type",
+                members: caseTypes,
+                code: undefined,
+                startIndex: undefined,
+                endIndex: undefined,
+            };
+
+            if (!subsumes(scope, unionType, valueType)) {
+                unionType.members.push(
+                    ast.defaultCase 
+                        ? determineTypeAndStore(reportError, modulesStore, ast.defaultCase, scope) 
+                        : NIL_TYPE
+                )
+            }
+            
+            return unionType
         }
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
         case "parenthesized-expression": return determineTypeAndStore(reportError, modulesStore, ast.inner, scope);

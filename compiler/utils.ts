@@ -180,6 +180,16 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
                 walkParseTree(nextPayload, ast.elseResult, fn);
             }
         } break;
+        case "switch-expression": {
+            walkParseTree(nextPayload, ast.value, fn);
+            for (const { match, outcome } of ast.cases) {
+                walkParseTree(nextPayload, match, fn);
+                walkParseTree(nextPayload, outcome, fn);
+            }
+            if (ast.defaultCase != null) {
+                walkParseTree(nextPayload, ast.defaultCase, fn);
+            }
+        } break;
         case "parenthesized-expression": {
             walkParseTree(nextPayload, ast.inner, fn);
         } break;

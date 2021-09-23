@@ -15,6 +15,7 @@ export type Expression =
     | PropertyAccessor
     | LocalIdentifier
     | IfElseExpression
+    | SwitchExpression
     | BooleanLiteral
     | NilLiteral
     | ObjectLiteral
@@ -99,6 +100,13 @@ export type IfElseExpression = SourceInfo & {
     elseResult?: Expression,
 }
 
+export type SwitchExpression = SourceInfo & {
+    kind: "switch-expression",
+    value: Expression,
+    cases: { match: Expression, outcome: Expression }[],
+    defaultCase?: Expression
+}
+
 export type BooleanLiteral = SourceInfo & {
     kind: "boolean-literal",
     value: boolean,
@@ -149,6 +157,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "invocation": undefined,
     "indexer": undefined,
     "if-else-expression": undefined,
+    "switch-expression": undefined,
     "range": undefined,
     "parenthesized-expression": undefined,
     "property-accessor": undefined,
