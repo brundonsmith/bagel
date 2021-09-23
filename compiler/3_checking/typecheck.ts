@@ -391,7 +391,7 @@ function displayForm(typeExpression: TypeExpression): string {
         case "nil-type": return `nil`;
         case "literal-type": return JSON.stringify(typeExpression.value.kind === "string-literal" 
                                         ? typeExpression.value.segments.join('') 
-                                        : typeExpression.value.value);
+                                        : typeExpression.value.value).replaceAll('"', "'");
         case "nominal-type": return typeExpression.name;
         case "iterator-type": return `Iterator<${displayForm(typeExpression.itemType)}>`;
         case "promise-type": return `Promise<${displayForm(typeExpression.resultType)}>`;
@@ -443,15 +443,15 @@ export type BagelCannotFindExportError = {
 export function errorMessage(error: BagelTypeError): string {
     switch (error.kind) {
         case "bagel-assignable-to-error":
-            return `Type '${displayForm(error.value)}' is not assignable to type '${displayForm(error.destination)}'`;
+            return `Type "${displayForm(error.value)}" is not assignable to type "${displayForm(error.destination)}"`;
         case "bagel-cannot-find-name-error":
-            return `Cannot find name '${error.ast.name}'`;
+            return `Cannot find name "${error.ast.name}"`;
         case "bagel-misc-type-error":
             return error.message;
         case "bagel-cannot-find-module-error":
-            return `Failed to resolve module '${error.ast.path.segments[0]}'`
+            return `Failed to resolve module "${error.ast.path.segments[0]}"`
         case "bagel-cannot-find-export-error":
-            return `Module '${error.importDeclaration.path.segments[0]}' has no export named ${error.ast.name.name}`
+            return `Module "${error.importDeclaration.path.segments[0]}" has no export named ${error.ast.name.name}`
     }
 }
 
