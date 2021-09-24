@@ -49,3 +49,5 @@ export class ModulesStore {
         return type;
     }
 }
+
+// TODO: Determine mutability for any AST node, to use when type-checking

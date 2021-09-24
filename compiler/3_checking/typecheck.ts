@@ -168,6 +168,10 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
 
                 return scope;
             }
+            case "assignment": {
+                // TODO: Prevent assignment to non-mutable targets
+                return scope;
+            }
 
             // not expressions, but should have their contents checked
             case "reaction": {
