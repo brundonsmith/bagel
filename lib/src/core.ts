@@ -228,19 +228,22 @@ type PlanChain<T> = {
 
 const PLAN_PROTOTYPE: PlanChain<unknown> = {
     then(transformFn) {
-        return plan(() => (this as Plan<unknown>).planned().then(transformFn))
+        return plan(async () => {
+            const res = await (this as Plan<unknown>).planned()
+            return transformFn(res)
+        })
     }
 }
 
-export type Plan<T> = PlanChain<T> & { planned: () => Promise<T> }
+export type Plan<T> = PlanChain<T> & { planned: () => Promise<T>|T }
 
-export function plan<T>(fn: () => Promise<T>): Plan<T> {
+export function plan<T>(fn: () => Promise<T>|T): Plan<T> {
     const plan: Plan<T> = Object.create(PLAN_PROTOTYPE);
     plan.planned = fn;
     return plan;
 }
 
-export function resolve<T>(plan: Plan<T>): Promise<T> {
+export function resolve<T>(plan: Plan<T>): Promise<T>|T {
     return plan.planned()
 }
 
