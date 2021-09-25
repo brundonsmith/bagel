@@ -2,7 +2,7 @@ import { deepEquals } from "../compiler/utils.ts";
 import { UNKNOWN_TYPE } from "../compiler/_model/type-expressions.ts";
 
 Deno.test({
-  name: "deepEqualsWithUndefined",
+  name: "Deep-equals with undefined",
   fn() {
     const val1 = {
 
@@ -17,7 +17,7 @@ Deno.test({
 }})
 
 Deno.test({
-  name: "deepEqualsArrays",
+  name: "Deep-equals arrays",
   fn() {
     const val1 = [
         {
@@ -68,7 +68,7 @@ Deno.test({
 }})
 
 Deno.test({
-  name: "deepEqualsBig",
+  name: "Deep-equals big",
   fn() {
     const val = {
         kind: "func-declaration",
@@ -168,5 +168,3 @@ Deno.test({
         throw "Values should be considered equal but were not"
     }
 }})
-
-console.log("")

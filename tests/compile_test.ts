@@ -34,7 +34,7 @@ function normalize(ts: string): string {
 }
 
 Deno.test({
-  name: "simpleFuncDeclaration",
+  name: "Simple func declaration",
   fn() {
     testCompile(
       `func uid() => '12345'`,
@@ -44,7 +44,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "binary operator",
+  name: "Binary operator",
   fn() {
     testCompile(
       `const x = a < b`,
@@ -54,7 +54,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "func with constants",
+  name: "Func with constants",
   fn() {
     testCompile(
       `func uid(n: number) => 
@@ -71,7 +71,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "propertyAccess",
+  name: "Property access",
   fn() {
     testCompile(
       `const x = a.b.c`,
@@ -81,7 +81,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "methodCall",
+  name: "Method call",
   fn() {
     testCompile(
       `const x = a.b()`,
@@ -91,7 +91,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "doubleMethodCall",
+  name: "Double method call",
   fn() {
     testCompile(
       `const x = a.b()()`,
@@ -101,7 +101,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "deepMethodCall",
+  name: "Deep method call",
   fn() {
     testCompile(
       `const x = a.b.c()`,
@@ -111,7 +111,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "methodChain",
+  name: "Method chain",
   fn() {
     testCompile(
       `const x = a.b().c()`,
@@ -121,7 +121,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "propertyAccessWithSpace",
+  name: "Property access with space",
   fn() {
     testCompile(
       `const x = a
@@ -133,7 +133,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "methodChainWithSpace",
+  name: "Method chain with space",
   fn() {
     testCompile(
       `const x = a
@@ -145,7 +145,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "ifExpression",
+  name: "If expression",
   fn() {
     testCompile(
       `func merge() =>
@@ -160,7 +160,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "indexerExpression",
+  name: "Indexer expression",
   fn() {
     testCompile(
       `func uid(arr, i) => arr[i]`,
@@ -170,7 +170,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "indexArray",
+  name: "Indexing an array",
   fn() {
     testCompile(
       `const x = [ arr1[0] ]`,
@@ -180,7 +180,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "simpleProcDeclaration",
+  name: "Simple proc declaration",
   fn() {
     testCompile(
       `proc doStuff(a) { }`,
@@ -190,7 +190,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "basicProcDeclaration",
+  name: "Basic proc declaration",
   fn() {
     testCompile(
       `proc doStuff(a) {
@@ -215,7 +215,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "procDeclarationWithStatements",
+  name: "Proc declaration with statements",
   fn() {
     testCompile(
       `proc doStuff(a) {
@@ -259,7 +259,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "constDeclarationWithType",
+  name: "Const declaration with type",
   fn() {
     testCompile(
       `const foo: FooType = 'stuff'`,
@@ -269,7 +269,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "basicPropertyAccess",
+  name: "Basic property access",
   fn() {
     testCompile(
       `const foo = bar.prop1.prop2`,
@@ -279,7 +279,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "funcDeclarationWithPipe",
+  name: "Func declaration with pipe",
   fn() {
     testCompile(
       `func classNames(cn) =>
@@ -293,7 +293,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "funcDeclarationWithIteration",
+  name: "Func delcaration with iteration",
   fn() {
     testCompile(
       `func myFunc(a, b) => 
@@ -307,7 +307,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "typedFuncDeclaration",
+  name: "Typed func declaration",
   fn() {
     testCompile(
       `func foo(a: string, b: number): number => 0`,
@@ -317,7 +317,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "typedProcDeclaration",
+  name: "Typed proc declaration",
   fn() {
     testCompile(
       `proc bar(a: string[], b: { foo: number }) { }`,
@@ -327,7 +327,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "funcTypeType",
+  name: "Func type",
   fn() {
     testCompile(
       `export type MyFn = (a: number, b: string) => string[]`,
