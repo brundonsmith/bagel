@@ -1,3 +1,3 @@
 import { plan } from "./core.ts";
 
-export const random = () => plan(() => Promise.resolve(Math.random()))
+export const random = () => plan(() => Math.random())
