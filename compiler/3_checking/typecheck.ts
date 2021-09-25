@@ -7,7 +7,7 @@ import { deepEquals, DeepReadonly, given, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
 
 
-export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: (error: BagelTypeError) => void) {
+export function typecheck(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module) {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         switch(ast.kind) {
             case "block": {
@@ -70,6 +70,8 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                 return scope;
             }
             case "invocation": {
+                const invocationScope = modulesStore.getScopeFor(ast)
+
                 const subjectType = modulesStore.getTypeOf(ast.subject);
 
                 if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {
@@ -82,14 +84,14 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                         const subjectArgType = subjectType.args[i].type
 
                         const argValueType = modulesStore.getTypeOf(arg)
-    
-                        if (!subsumes(scope, subjectArgType, argValueType)) {
+
+                        if (!subsumes(invocationScope, subjectArgType, argValueType)) {
                             reportError(assignmentError(arg, subjectArgType, argValueType));
                         }
                     }
                 }
 
-                return scope;
+                return invocationScope;
             }
             case "indexer": {
                 const baseType = modulesStore.getTypeOf(ast.base);
@@ -166,10 +168,6 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
                     }
                 }
 
-                return scope;
-            }
-            case "assignment": {
-                // TODO: Prevent assignment to non-mutable targets
                 return scope;
             }
 
@@ -283,11 +281,9 @@ export function typecheck(modulesStore: ModulesStore, ast: Module, reportError: 
     });
 }
 
-export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression, value: TypeExpression): boolean {
+export function subsumes(scope: Scope, destination: TypeExpression, value: TypeExpression): boolean {
     const resolvedDestination = resolve(scope, destination);
     const resolvedValue = resolve(scope, value);
-
-    // console.log({ resolvedDestination, resolvedValue })
 
     if (resolvedDestination == null || resolvedValue == null) {
         return false;
@@ -337,7 +333,7 @@ export function subsumes(scope: DeepReadonly<Scope>, destination: TypeExpression
     return false;
 }
 
-function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpression>): DeepReadonly<TypeExpression> | undefined {
+export function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpression>): DeepReadonly<TypeExpression> | undefined {
     if (type.kind === "named-type") {
         if (scope.types[type.name.name]) {
             return resolve(scope, scope.types[type.name.name])
@@ -358,9 +354,9 @@ function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpression>)
             return {
                 kind: "union-type",
                 members: memberTypes as DeepReadonly<TypeExpression>[],
-                code: undefined,
-                startIndex: undefined,
-                endIndex: undefined,
+                code: type.code,
+                startIndex: type.startIndex,
+                endIndex: type.endIndex,
             };
         }
     } else if(type.kind === "object-type") {
@@ -378,12 +374,31 @@ function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpression>)
         return given(resolve(scope, type.element), element => ({
             kind: "array-type",
             element,
-            code: undefined,
-            startIndex: undefined,
-            endIndex: undefined,
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
         }));
+    } else if(type.kind === "func-type") {
+        return {
+            kind: "func-type",
+            typeParams: type.typeParams,
+            args: type.args.map(({ name, type }) => ({ name, type: resolve(scope, type) ?? type })),
+            returnType: resolve(scope, type.returnType) ?? type.returnType,
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
+        };
+    } else if(type.kind === "proc-type") {
+        return {
+            kind: "proc-type",
+            typeParams: type.typeParams,
+            args: type.args.map(({ name, type }) => ({ name, type: resolve(scope, type) ?? type })),
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
+        };
     } else {
-        // TODO: Recurse on ProcType, FuncType, IndexerType, TupleType
+        // TODO: Recurse onIndexerType, TupleType, etc
         return type;
     }
 }

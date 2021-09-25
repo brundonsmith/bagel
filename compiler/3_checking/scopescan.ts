@@ -1,9 +1,9 @@
 import { path } from "../deps.ts";
 
-import { Module } from "../_model/ast.ts";
+import { AST, Module } from "../_model/ast.ts";
 import { Block } from "../_model/common.ts";
 import { ClassDeclaration, Declaration } from "../_model/declarations.ts";
-import { Func, Proc, Expression, StringLiteral } from "../_model/expressions.ts";
+import { Func, Proc, Expression, StringLiteral, Invocation } from "../_model/expressions.ts";
 import { ForLoop } from "../_model/statements.ts";
 import { TypeExpression, UNKNOWN_TYPE, NUMBER_TYPE } from "../_model/type-expressions.ts";
 import { walkParseTree } from "../utils.ts";
@@ -17,26 +17,29 @@ export function scopescan(reportError: (error: BagelTypeError) => void, modulesS
         
         // If ast is of a type that defines its own scope, define that and 
         // mark it as this ast's scope
-        switch(ast.kind) {
-            case "module":
-            case "func":
-            case "proc":
-            case "block":
-            case "for-loop":
-            case "class-declaration": {
-                const scope = scopeFrom(reportError, modulesStore, ast, module, payload);
-                modulesStore.scopeFor.set(ast, scope);
-                return scope;
-            }
+        if (isScopeOwner(ast)) {
+            const scope = scopeFrom(reportError, modulesStore, ast, module, payload);
+            modulesStore.scopeFor.set(ast, scope);
+            return scope;
+        } else {
+            // Otherwise, mark the containing scope as this ast's scope
+            modulesStore.scopeFor.set(ast, payload as Scope);
+            return payload;
         }
-
-        // Otherwise, mark the containing scope as this ast's scope
-        modulesStore.scopeFor.set(ast, payload as Scope);
-        return payload;
     });
 }
 
-export type ScopeOwner = Module|Func|Proc|Block|ForLoop|ClassDeclaration;
+export type ScopeOwner = Module|Func|Proc|Block|ForLoop|ClassDeclaration|Invocation;
+
+function isScopeOwner(ast: AST): ast is ScopeOwner {
+    return ast.kind === "module" 
+        || ast.kind === "func" 
+        || ast.kind === "proc" 
+        || ast.kind === "block" 
+        || ast.kind === "for-loop" 
+        || ast.kind === "class-declaration" 
+        || ast.kind === "invocation"
+}
 
 export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
     const scope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {}, classes: {} };
@@ -130,7 +133,8 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                     }
                 }
             }
-            break;
+            
+            return scope;
         case "func":
         case "proc":
             
@@ -165,7 +169,8 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                     }
                 }
             }
-            break;
+            
+            return scope;
         case "block":
             // add let-declarations to scope
             for (const statement of ast.statements) {
@@ -181,7 +186,8 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                     };
                 }
             }
-            break;
+            
+            return scope;
         case "for-loop":
             if (scope.values[ast.itemIdentifier.name] != null || scope.classes[ast.itemIdentifier.name] != null) {
                 reportError(alreadyDeclared(ast.itemIdentifier))
@@ -192,7 +198,8 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                 mutability: "properties-only",
                 declaredType: NUMBER_TYPE, // TODO: ast.iterator;
             }
-            break;
+            
+            return scope;
         case "class-declaration":
             scope.values["this"] = {
                 mutability: "properties-only",
@@ -204,10 +211,14 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
                     endIndex: undefined
                 },
             }
-            break;
-    }
+            
+            return scope;
+        case "invocation": {
+            // TODO
 
-    return scope;
+            return scope;
+        }
+    }
 }
 
 function declExported(declaration: Declaration): boolean|undefined {

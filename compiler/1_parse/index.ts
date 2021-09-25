@@ -1026,7 +1026,7 @@ const binaryOperator: ParseFunction<BinaryOperator> = (code, startIndex) =>
 
 const invocation: ParseFunction<Invocation> = (code, startIndex) =>
     given(parseBeneath(code, startIndex, invocation), ({ parsed: subject, newIndex: index }) =>
-    given(parseOptional(code, startIndex, (code, index) =>
+    given(parseOptional(code, index, (code, index) =>
         given(consume(code, index, "<"), index =>
         given(consumeWhitespace(code, index), index =>
         given(parseSeries(code, index, typeExpression, ','), ({ parsed: typeArgs, newIndex: index }) =>

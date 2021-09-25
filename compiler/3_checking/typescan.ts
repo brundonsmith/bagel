@@ -4,7 +4,7 @@ import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, DeepReadonly, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
-import { BagelTypeError, subsumes } from "./typecheck.ts";
+import { BagelTypeError, miscError, resolve, subsumes } from "./typecheck.ts";
 import { ClassMember } from "../_model/declarations.ts";
 
 export function typescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
@@ -33,10 +33,37 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
                 modulesStore.astTypes.set(ast.itemIdentifier, iteratorType.itemType)
             }
         } else if (ast.kind === "invocation") {
-            const subjectType = determineTypeAndStore(reportError, modulesStore, ast.subject, scope);
-            // console.log({ funcType })
+            let subjectType = determineTypeAndStore(reportError, modulesStore, ast.subject, scope);
 
             if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
+
+                // bind type-args for this invocation
+                // HACK: this is really scopescanning...
+                if (subjectType.typeParams.length > 0) {
+                    if (subjectType.typeParams.length !== ast.typeArgs.length) {
+                        reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
+                    }
+
+                    const scope = modulesStore.getScopeFor(ast)
+                    for (let i = 0; i < subjectType.typeParams.length; i++) {
+                        const typeParam = subjectType.typeParams[i]
+                        const typeArg = ast.typeArgs[i]
+
+
+                        scope.types[typeParam.name] = typeArg
+                    }
+
+                    // HACK: re-evaluate type with new scope contents
+                    subjectType = resolve(scope, subjectType) ?? subjectType;
+                    modulesStore.astTypes.set(ast.subject, subjectType)
+                    if (subjectType.kind === "func-type") {
+                        modulesStore.astTypes.set(ast, subjectType.returnType)
+                    }
+                }
+            }
+
+            if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
+
                 // infer callback argument types based on context
                 for (let i = 0; i < Math.min(subjectType.args.length, ast.args.length); i++) {
                     const subjectTypeArg = subjectType.args[i]
@@ -45,12 +72,6 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
                     if ((subjectTypeArg.type.kind === "func-type" && argExpr.kind === "func") 
                         || (subjectTypeArg.type.kind === "proc-type" && argExpr.kind === "proc")) {
 
-                        // console.log({ argType, argExpr })
-
-                        // console.log({ argArgType })
-
-                        // if (argExpr.type.arg != null && argExpr.type.arg.type.kind === "unknown-type" && argType.arg != null) {
-
                         for (let j = 0; j < Math.min(subjectTypeArg.type.args.length, argExpr.type.args.length); j++) {
                             if (argExpr.type.args[j].type.kind === "unknown-type") {
                                 modulesStore.astTypes.set(argExpr.type.args[j].name, subjectTypeArg.type.args[j].type);
@@ -58,6 +79,7 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
                         }
                     }
                 }
+
             }
         }
 

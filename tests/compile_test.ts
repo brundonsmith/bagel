@@ -44,6 +44,16 @@ Deno.test({
 });
 
 Deno.test({
+  name: "binary operator",
+  fn() {
+    testCompile(
+      `const x = a < b`,
+      `const x = a < b;`,
+    );
+  },
+});
+
+Deno.test({
   name: "func with constants",
   fn() {
     testCompile(

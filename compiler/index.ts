@@ -2,12 +2,13 @@ import { path } from "./deps.ts";
 
 import { ModulesStore } from "./3_checking/modules-store.ts";
 import { canonicalModuleName, scopescan } from "./3_checking/scopescan.ts";
-import { typecheck } from "./3_checking/typecheck.ts";
+import { BagelTypeError, typecheck } from "./3_checking/typecheck.ts";
 import { typescan } from "./3_checking/typescan.ts";
 import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { printError } from "./utils.ts";
+import { BagelSyntaxError } from "./1_parse/common.ts";
 
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
@@ -126,7 +127,7 @@ async function bundleOutput(entryFile: string) {
     // typecheck all parsed modules
     for (const [module, ast] of modulesStore.modules) {
         try {
-            typecheck(modulesStore, ast, printError(path.basename(module)));
+            typecheck(printError(path.basename(module)), modulesStore, ast);
         } catch (e: any) {
             console.error(`Encountered exception typechecking module "${module}":\n${e.stack}\n`);
         }
@@ -171,15 +172,16 @@ async function bundleOutput(entryFile: string) {
                                 printError(path.basename(module))(err)
                             }));
                             modulesStore.modules.set(module, parsed);
-        
-                            scopescan(printError(path.basename(module)), modulesStore, parsed, module);
-                            typescan(printError(path.basename(module)), modulesStore, parsed);
+
+                            const printErrorForModule = (error: BagelTypeError | BagelSyntaxError) => {
+                                hadError = true;
+                                printError(path.basename(module))(error)
+                            }
         
                             try {
-                                typecheck(modulesStore, parsed, err => {
-                                    hadError = true;
-                                    printError(path.basename(module))(err)
-                                });
+                                scopescan(printErrorForModule, modulesStore, parsed, module);
+                                typescan(printErrorForModule, modulesStore, parsed);    
+                                typecheck(printErrorForModule, modulesStore, parsed);
                             } catch (e: any) {
                                 console.error(`Encountered exception typechecking module "${module}":\n${e.stack}`);
                                 hadError = true;
