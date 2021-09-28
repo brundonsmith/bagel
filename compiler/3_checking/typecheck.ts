@@ -3,12 +3,12 @@ import { PlainIdentifier } from "../_model/common.ts";
 import { ImportDeclaration, ImportItem } from "../_model/declarations.ts";
 import { LocalIdentifier } from "../_model/expressions.ts";
 import { FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions.ts";
-import { deepEquals, DeepReadonly, given, walkParseTree } from "../utils.ts";
+import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
 
 
 export function typecheck(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module) {
-    walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
+    walkParseTree<Scope>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         switch(ast.kind) {
             case "block": {
                 return modulesStore.getScopeFor(ast);
@@ -333,7 +333,7 @@ export function subsumes(scope: Scope, destination: TypeExpression, value: TypeE
     return false;
 }
 
-export function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpression>): DeepReadonly<TypeExpression> | undefined {
+export function resolve(scope: Scope, type: TypeExpression): TypeExpression | undefined {
     if (type.kind === "named-type") {
         if (scope.types[type.name.name]) {
             return resolve(scope, scope.types[type.name.name])
@@ -353,15 +353,15 @@ export function resolve(scope: DeepReadonly<Scope>, type: DeepReadonly<TypeExpre
         } else {
             return {
                 kind: "union-type",
-                members: memberTypes as DeepReadonly<TypeExpression>[],
+                members: memberTypes as TypeExpression[],
                 code: type.code,
                 startIndex: type.startIndex,
                 endIndex: type.endIndex,
             };
         }
     } else if(type.kind === "object-type") {
-        const entries: [PlainIdentifier, DeepReadonly<TypeExpression>][] = type.entries.map(([ key, valueType ]) => 
-            [key, resolve(scope, valueType as DeepReadonly<TypeExpression>)] as [PlainIdentifier, DeepReadonly<TypeExpression>]);
+        const entries: [PlainIdentifier, TypeExpression][] = type.entries.map(([ key, valueType ]) => 
+            [key, resolve(scope, valueType as TypeExpression)] as [PlainIdentifier, TypeExpression]);
 
         return {
             kind: "object-type",

@@ -1,7 +1,6 @@
 import { AST, Module } from "../_model/ast.ts";
 import { Expression } from "../_model/expressions.ts";
 import { TypeExpression } from "../_model/type-expressions.ts";
-import { DeepReadonly } from "../utils.ts";
 import { ClassDeclaration } from "../_model/declarations.ts";
 
 
@@ -11,13 +10,13 @@ export type Scope = {
     readonly classes: {[key: string]: ClassDeclaration},
 }
 
-export type Mutability = "all"|"properties-only"|"none";
-
 export type DeclarationDescriptor = {
     mutability: Mutability,
     declaredType?: TypeExpression,
     initialValue?: Expression,
 }
+
+export type Mutability = "all"|"properties-only"|"none";
 
 export type ReadonlyScope = {
     readonly types: Readonly<{[key: string]: TypeExpression}>,
@@ -29,7 +28,7 @@ export class ModulesStore {
     readonly scopeFor = new WeakMap<AST, Scope>();
     readonly astTypes = new WeakMap<AST, TypeExpression>();
 
-    getScopeFor(ast: AST): DeepReadonly<Scope> {
+    getScopeFor(ast: AST): Scope {
         const scope = this.scopeFor.get(ast);
 
         if (scope == null) {

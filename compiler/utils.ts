@@ -24,12 +24,7 @@ type BasicData =
     | boolean
     | undefined
 
-export type DeepReadonly<T extends BasicData> = T
-    // T extends {[key: string]: BasicData} ? Readonly<{[key in keyof T]: DeepReadonly<T[key]>}> :
-    // T extends BasicData[] ? Readonly<DeepReadonly<T[number]>[]> :
-    // T
-
-export function deepEquals(a: DeepReadonly<BasicData>, b: DeepReadonly<BasicData>, ignorePropNames: string[] = []): boolean {
+export function deepEquals(a: BasicData, b: BasicData, ignorePropNames: string[] = []): boolean {
     if (a === b) {
         return true;
     } else if(a == null && b == null) {

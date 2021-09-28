@@ -2,13 +2,13 @@ import { Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, DeepReadonly, walkParseTree } from "../utils.ts";
+import { deepEquals, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
 import { BagelTypeError, miscError, resolve, subsumes } from "./typecheck.ts";
 import { ClassMember } from "../_model/declarations.ts";
 
 export function typeinfer(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
-    walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
+    walkParseTree<Scope>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         if (modulesStore.astTypes.get(ast) == null && isExpression(ast)) {
             inferTypeAndStore(reportError, modulesStore, scope, ast)
         }
@@ -90,7 +90,7 @@ export function typeinfer(reportError: (error: BagelTypeError) => void, modulesS
 function inferTypeAndStore(
     reportError: (error: BagelTypeError) => void, 
     modulesStore: ModulesStore,  
-    scope: DeepReadonly<Scope>,
+    scope: Scope,
     ast: Expression|ClassMember,
 ): TypeExpression {
     const type = handleSingletonUnion(
@@ -104,7 +104,7 @@ function inferTypeAndStore(
 function inferType(
     reportError: (error: BagelTypeError) => void, 
     modulesStore: ModulesStore, 
-    scope: DeepReadonly<Scope>,
+    scope: Scope,
     ast: Expression|ClassMember, 
 ): TypeExpression {
     switch(ast.kind) {
