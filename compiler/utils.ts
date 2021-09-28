@@ -1,5 +1,5 @@
 import { BagelSyntaxError, getLineContents, lineAndColumn } from "./1_parse/common.ts";
-import { BagelTypeError,errorMessage } from "./3_checking/typecheck.ts";
+import { BagelTypeError, errorMessage } from "./3_checking/typecheck.ts";
 import { Colors } from "./deps.ts";
 import { AST } from "./_model/ast.ts";
 
@@ -353,6 +353,12 @@ export function wasOrWere(num: number): string {
 }
 
 export const printError = (modulePath: string) => (error: BagelTypeError|BagelSyntaxError) => {
+    console.log(prettyError(modulePath)(error))
+}
+
+export const prettyError = (modulePath: string) => (error: BagelTypeError|BagelSyntaxError): string => {
+    let output = "";
+
     const code = error.kind === 'bagel-syntax-error' ? error.code : error.ast?.kind !== "module" ? error.ast?.code : undefined
     const startIndex = error.kind === 'bagel-syntax-error' ? error.index : error.ast?.kind !== "module" ? error.ast?.startIndex : undefined
     const endIndex = error.kind === 'bagel-syntax-error' ? undefined : error.ast?.kind !== "module" ? error.ast?.endIndex : undefined
@@ -374,7 +380,7 @@ export const printError = (modulePath: string) => (error: BagelTypeError|BagelSy
         + Colors.red("error")
         + Colors.white(" " + (error.kind === "bagel-syntax-error" ? error.message : errorMessage(error)))
 
-    console.log(infoLine)
+    output += infoLine + "\n"
 
     // print the problematic line of code, with the issue underlined
     if (code != null && startIndex != null && line != null) {
@@ -383,19 +389,19 @@ export const printError = (modulePath: string) => (error: BagelTypeError|BagelSy
         if (lineContent) {
             const padding = '  '
 
-            console.log(Colors.bgWhite(Colors.black(String(line))) + padding + lineContent.content)
+            output += Colors.bgWhite(Colors.black(String(line))) + padding + lineContent.content + "\n"
 
             const digitsInLineNum = String(line).length
             const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
 
             if (endIndex != null) {
                 const underline = new Array(endIndex - startIndex).fill('~').join('')
-                console.log(Colors.red(underlineSpacing + underline))
+                output += Colors.red(underlineSpacing + underline) + "\n"
             } else {
-                console.log(Colors.red(underlineSpacing + Colors.red("^")))
+                output += Colors.red(underlineSpacing + Colors.red("^")) + "\n"
             }
         }
     }
 
-    console.log()
+    return output
 }

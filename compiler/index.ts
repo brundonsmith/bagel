@@ -3,7 +3,7 @@ import { path } from "./deps.ts";
 import { ModulesStore } from "./3_checking/modules-store.ts";
 import { canonicalModuleName, scopescan } from "./3_checking/scopescan.ts";
 import { BagelTypeError, typecheck } from "./3_checking/typecheck.ts";
-import { typescan } from "./3_checking/typescan.ts";
+import { typeinfer } from "./3_checking/typeinfer.ts";
 import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
@@ -118,7 +118,7 @@ async function bundleOutput(entryFile: string) {
     // typescan all parsed modules
     for (const [module, ast] of modulesStore.modules) {
         try {
-            typescan(printError(path.basename(module)), modulesStore, ast);
+            typeinfer(printError(path.basename(module)), modulesStore, ast);
         } catch {
             console.error("Failed to typecheck module " + module + "\n")
         }
@@ -180,7 +180,7 @@ async function bundleOutput(entryFile: string) {
         
                             try {
                                 scopescan(printErrorForModule, modulesStore, parsed, module);
-                                typescan(printErrorForModule, modulesStore, parsed);    
+                                typeinfer(printErrorForModule, modulesStore, parsed);    
                                 typecheck(printErrorForModule, modulesStore, parsed);
                             } catch (e: any) {
                                 console.error(`Encountered exception typechecking module "${module}":\n${e.stack}`);

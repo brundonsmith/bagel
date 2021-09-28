@@ -7,10 +7,10 @@ import { ModulesStore, Scope } from "./modules-store.ts";
 import { BagelTypeError, miscError, resolve, subsumes } from "./typecheck.ts";
 import { ClassMember } from "../_model/declarations.ts";
 
-export function typescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
+export function typeinfer(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
     walkParseTree<DeepReadonly<Scope>>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         if (modulesStore.astTypes.get(ast) == null && isExpression(ast)) {
-            determineTypeAndStore(reportError, modulesStore, ast, scope)
+            inferTypeAndStore(reportError, modulesStore, scope, ast)
         }
   
         if (ast.kind === "reaction") {
@@ -18,22 +18,22 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
             // to a proc call taking a function and proc, to leverage the same
             // type inference mechanism for arguments that will be used 
             // elsewhere 
-            const dataType = determineTypeAndStore(reportError, modulesStore, ast.data, scope)
-            const effectType = determineTypeAndStore(reportError, modulesStore, ast.effect, scope)
+            const dataType = inferTypeAndStore(reportError, modulesStore, scope, ast.data)
+            const effectType = inferTypeAndStore(reportError, modulesStore, scope, ast.effect)
 
             if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.args[0]?.type.kind === "unknown-type") {
                 effectType.args[0].type = dataType.returnType;
             }
         } else if (ast.kind === "computation") {
-            determineTypeAndStore(reportError, modulesStore, ast.expression, scope)
+            inferTypeAndStore(reportError, modulesStore, scope, ast.expression)
         } else if (ast.kind === "for-loop") {
-            const iteratorType = determineTypeAndStore(reportError, modulesStore, ast.iterator, scope)
+            const iteratorType = inferTypeAndStore(reportError, modulesStore, scope, ast.iterator)
 
             if (iteratorType.kind === "iterator-type") {
                 modulesStore.astTypes.set(ast.itemIdentifier, iteratorType.itemType)
             }
         } else if (ast.kind === "invocation") {
-            let subjectType = determineTypeAndStore(reportError, modulesStore, ast.subject, scope);
+            let subjectType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
 
             if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
 
@@ -87,22 +87,25 @@ export function typescan(reportError: (error: BagelTypeError) => void, modulesSt
     });
 }
 
-function determineTypeAndStore(
+function inferTypeAndStore(
     reportError: (error: BagelTypeError) => void, 
-    modulesStore: ModulesStore, 
-    ast: Expression|ClassMember, 
-    scope: DeepReadonly<Scope>
+    modulesStore: ModulesStore,  
+    scope: DeepReadonly<Scope>,
+    ast: Expression|ClassMember,
 ): TypeExpression {
-    const type = handleSingletonUnion(distillUnion(scope, flattenUnions(determineType(reportError, modulesStore, ast, scope))));
+    const type = handleSingletonUnion(
+        distillUnion(scope, 
+            flattenUnions(
+                inferType(reportError, modulesStore, scope, ast))));
     modulesStore.astTypes.set(ast, type);
     return type;
 }
 
-function determineType(
+function inferType(
     reportError: (error: BagelTypeError) => void, 
     modulesStore: ModulesStore, 
+    scope: DeepReadonly<Scope>,
     ast: Expression|ClassMember, 
-    scope: DeepReadonly<Scope>
 ): TypeExpression {
     switch(ast.kind) {
         case "proc": {
@@ -114,13 +117,13 @@ function determineType(
 
                 // if no return-type is declared, try inferring the type from the inner expression
                 returnType: ast.type.returnType.kind === "unknown-type" 
-                    ? determineTypeAndStore(reportError, modulesStore, ast.body, modulesStore.getScopeFor(ast)) 
+                    ? inferTypeAndStore(reportError, modulesStore, modulesStore.getScopeFor(ast), ast.body) 
                     : ast.type.returnType,
             }
         }
         case "pipe": {
             const lastPipeExpression = ast.expressions[ast.expressions.length - 1];
-            const lastStageType = determineTypeAndStore(reportError, modulesStore, lastPipeExpression, scope);
+            const lastStageType = inferTypeAndStore(reportError, modulesStore, scope, lastPipeExpression);
 
             if (lastStageType.kind === "func-type") {
                 return lastStageType.returnType;
@@ -130,8 +133,8 @@ function determineType(
             }
         }
         case "binary-operator": {
-            const leftType = determineTypeAndStore(reportError, modulesStore, ast.left, scope);
-            const rightType = determineTypeAndStore(reportError, modulesStore, ast.right, scope);
+            const leftType = inferTypeAndStore(reportError, modulesStore, scope, ast.left);
+            const rightType = inferTypeAndStore(reportError, modulesStore, scope, ast.right);
 
             for (const types of BINARY_OPERATOR_TYPES[ast.operator]) {
                 const { left, right, output } = types;
@@ -144,7 +147,7 @@ function determineType(
             return UNKNOWN_TYPE;
         }
         case "invocation": {
-            const funcType = determineTypeAndStore(reportError, modulesStore, ast.subject, scope);
+            const funcType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
 
             if (funcType.kind === "func-type") {
                 return funcType.returnType;
@@ -153,8 +156,8 @@ function determineType(
             }
         }
         case "indexer": {
-            const baseType = determineTypeAndStore(reportError, modulesStore, ast.base, scope);
-            const indexerType = determineTypeAndStore(reportError, modulesStore, ast.indexer, scope);
+            const baseType = inferTypeAndStore(reportError, modulesStore, scope, ast.base);
+            const indexerType = inferTypeAndStore(reportError, modulesStore, scope, ast.indexer);
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
                 const key = indexerType.value.segments[0];
@@ -180,7 +183,7 @@ function determineType(
             return UNKNOWN_TYPE;
         }
         case "if-else-expression": {
-            const ifType = determineTypeAndStore(reportError, modulesStore, ast.ifResult, scope);
+            const ifType = inferTypeAndStore(reportError, modulesStore, scope, ast.ifResult);
 
             if (ast.elseResult == null) {
                 return {
@@ -191,7 +194,7 @@ function determineType(
                     endIndex: undefined,
                 };
             } else {
-                const elseType = determineTypeAndStore(reportError, modulesStore, ast.elseResult, scope);
+                const elseType = inferTypeAndStore(reportError, modulesStore, scope, ast.elseResult);
 
                 return {
                     kind: "union-type",
@@ -203,10 +206,10 @@ function determineType(
             }
         }
         case "switch-expression": {
-            const valueType = determineTypeAndStore(reportError, modulesStore, ast.value, scope)
+            const valueType = inferTypeAndStore(reportError, modulesStore, scope, ast.value)
 
             const caseTypes = ast.cases.map(({ outcome }) => 
-                determineTypeAndStore(reportError, modulesStore, outcome, scope))
+                inferTypeAndStore(reportError, modulesStore, scope, outcome))
 
             const unionType: UnionType = {
                 kind: "union-type",
@@ -219,7 +222,7 @@ function determineType(
             if (!subsumes(scope, unionType, valueType)) {
                 unionType.members.push(
                     ast.defaultCase 
-                        ? determineTypeAndStore(reportError, modulesStore, ast.defaultCase, scope) 
+                        ? inferTypeAndStore(reportError, modulesStore, scope, ast.defaultCase) 
                         : NIL_TYPE
                 )
             }
@@ -227,9 +230,9 @@ function determineType(
             return unionType
         }
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
-        case "parenthesized-expression": return determineTypeAndStore(reportError, modulesStore, ast.inner, scope);
+        case "parenthesized-expression": return inferTypeAndStore(reportError, modulesStore, scope, ast.inner);
         case "property-accessor": {
-            const baseType = determineTypeAndStore(reportError, modulesStore, ast.base, scope);
+            const baseType = inferTypeAndStore(reportError, modulesStore, scope, ast.base);
 
             let lastPropType = baseType;
             for (const prop of ast.properties) {
@@ -246,7 +249,7 @@ function determineType(
                         return UNKNOWN_TYPE;
                     }
 
-                    const valueType = determineTypeAndStore(reportError, modulesStore, member, scope);
+                    const valueType = inferTypeAndStore(reportError, modulesStore, scope, member);
                     if (valueType == null) {
                         return UNKNOWN_TYPE;
                     }
@@ -267,7 +270,7 @@ function determineType(
             } else if (descriptor.declaredType) {
                 return descriptor.declaredType;
             } else if (descriptor.initialValue != null) {
-                return determineTypeAndStore(reportError, modulesStore, descriptor.initialValue, scope);
+                return inferTypeAndStore(reportError, modulesStore, scope, descriptor.initialValue);
             } else {
                 return UNKNOWN_TYPE;
             }
@@ -284,7 +287,7 @@ function determineType(
         }
         case "object-literal": {
             const entries = ast.entries.map(([key, value]) => 
-                [key, determineTypeAndStore(reportError, modulesStore, value, scope)] as [PlainIdentifier, TypeExpression]);
+                [key, inferTypeAndStore(reportError, modulesStore, scope, value)] as [PlainIdentifier, TypeExpression]);
 
             return {
                 kind: "object-type",
@@ -295,7 +298,7 @@ function determineType(
             };
         }
         case "array-literal": {
-            const entries = ast.entries.map(entry => determineTypeAndStore(reportError, modulesStore, entry, scope));
+            const entries = ast.entries.map(entry => inferTypeAndStore(reportError, modulesStore, scope, entry));
 
             // NOTE: This could be slightly better where different element types overlap each other
             const uniqueEntryTypes = entries.filter((el, index, arr) => 
@@ -324,9 +327,9 @@ function determineType(
             startIndex: ast.clazz.startIndex,
             endIndex: ast.clazz.endIndex
         };
-        case "class-property": return ast.type ?? determineTypeAndStore(reportError, modulesStore, ast.value, scope);
-        case "class-function": return determineTypeAndStore(reportError, modulesStore, ast.func, scope);
-        case "class-procedure": return determineTypeAndStore(reportError, modulesStore, ast.proc, scope);
+        case "class-property": return ast.type ?? inferTypeAndStore(reportError, modulesStore, scope, ast.value);
+        case "class-function": return inferTypeAndStore(reportError, modulesStore, scope, ast.func);
+        case "class-procedure": return inferTypeAndStore(reportError, modulesStore, scope, ast.proc);
         case "string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
         case "boolean-literal": return BOOLEAN_TYPE;
