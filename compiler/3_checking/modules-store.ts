@@ -11,16 +11,9 @@ export type Scope = {
 }
 
 export type DeclarationDescriptor = {
-    mutability: Mutability,
+    mutability: "all"|"properties-only"|"none",
     declaredType?: TypeExpression,
     initialValue?: Expression,
-}
-
-export type Mutability = "all"|"properties-only"|"none";
-
-export type ReadonlyScope = {
-    readonly types: Readonly<{[key: string]: TypeExpression}>,
-    readonly values: Readonly<{[key: string]: TypeExpression}>,
 }
 
 export class ModulesStore {
