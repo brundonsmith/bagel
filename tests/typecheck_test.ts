@@ -1,10 +1,9 @@
 import { ModulesStore } from "../compiler/3_checking/modules-store.ts";
 import { scopescan } from "../compiler/3_checking/scopescan.ts";
-import { BagelTypeError, typecheck } from "../compiler/3_checking/typecheck.ts";
+import { typecheck } from "../compiler/3_checking/typecheck.ts";
 import { typeinfer } from "../compiler/3_checking/typeinfer.ts";
 import { parse } from "../compiler/1_parse/index.ts";
-import { prettyError } from "../compiler/utils.ts";
-import { BagelSyntaxError } from "../compiler/1_parse/common.ts";
+import { BagelError,prettyError } from "../compiler/errors.ts";
 
 Deno.test({
   name: "Basic constant",
@@ -128,8 +127,8 @@ Deno.test({
 // TODO: Generics
 
 function testTypecheck(code: string, shouldFail: boolean): void {
-  const errors: (BagelSyntaxError | BagelTypeError)[] = [];
-  function reportError(err: BagelSyntaxError | BagelTypeError) {
+  const errors: BagelError[] = [];
+  function reportError(err: BagelError) {
     errors.push(err);
   }
 

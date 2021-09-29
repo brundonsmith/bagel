@@ -1,13 +1,14 @@
+import { BagelError, isError } from "../errors.ts";
 import { Module } from "../_model/ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { BagelSyntaxError, consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isError, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
+import { consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 
-export function parse(code: string, reportError: (error: BagelSyntaxError) => void): Module {
+export function parse(code: string, reportError: (error: BagelError) => void): Module {
     let index = 0;
 
     const declarations: Declaration[] = [];
@@ -188,7 +189,7 @@ const objectType: ParseFunction<ObjectType> = (code, startIndex) =>
         newIndex: index,
     }))))))
 
-const _objectTypeEntry = (code: string, index: number): ParseResult<[PlainIdentifier, TypeExpression]> | BagelSyntaxError | undefined =>
+const _objectTypeEntry = (code: string, index: number): ParseResult<[PlainIdentifier, TypeExpression]> | BagelError | undefined =>
     given(plainIdentifier(code, index), ({ parsed: key, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ":"), index => 
@@ -880,7 +881,7 @@ const parseBlock: ParseFunction<Block> = (code, startIndex) =>
 class ParseMemo {
     private memo = new Map<string, Map<ParseFunction<Expression>, Map<number, ParseResult<Expression>>>>();
 
-    memoize(fn: ParseFunction<Expression>, code: string, index: number, result: ParseResult<Expression>|BagelSyntaxError|undefined) {
+    memoize(fn: ParseFunction<Expression>, code: string, index: number, result: ParseResult<Expression>|BagelError|undefined) {
         if (result != null && !isError(result)) {
             if (!this.memo.has(code)) {
                 this.memo.set(code, new Map());
@@ -902,7 +903,7 @@ class ParseMemo {
     }
 
     cachedOrParse<T extends Expression>(fn: ParseFunction<T>): ParseFunction<T> {
-        return (code: string, index: number): ParseResult<T>|BagelSyntaxError|undefined => {
+        return (code: string, index: number): ParseResult<T>|BagelError|undefined => {
             const cached = this.get(fn, code, index);
 
             if (cached != null) {
@@ -960,7 +961,7 @@ const func: ParseFunction<Func> = (code, startIndex) =>
         newIndex: index,
     })))))))))))))
 
-const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: PlainIdentifier, type?: TypeExpression }> | BagelSyntaxError | undefined => 
+const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: PlainIdentifier, type?: TypeExpression }> | BagelError | undefined => 
     given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index => 
     given(parseOptional(code, index, (code, index) =>
@@ -973,7 +974,7 @@ const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: 
         newIndex: newIndex ?? index
     }))))
 
-const _funcConst = (code: string, index: number): ParseResult<{ name: PlainIdentifier, type?: TypeExpression, value: Expression }> | BagelSyntaxError | undefined =>
+const _funcConst = (code: string, index: number): ParseResult<{ name: PlainIdentifier, type?: TypeExpression, value: Expression }> | BagelError | undefined =>
     given(consume(code, index, 'const'), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
@@ -1343,7 +1344,7 @@ export const objectLiteral: ParseFunction<ObjectLiteral> = (code, startIndex) =>
         newIndex: index,
     }))))
 
-const _objectEntry = (code: string, index: number): ParseResult<[PlainIdentifier, Expression]> | BagelSyntaxError | undefined =>
+const _objectEntry = (code: string, index: number): ParseResult<[PlainIdentifier, Expression]> | BagelError | undefined =>
     given(plainIdentifier(code, index), ({ parsed: key, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ":"), index => 

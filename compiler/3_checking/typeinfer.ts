@@ -4,10 +4,11 @@ import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
-import { BagelTypeError, miscError, resolve, subsumes } from "./typecheck.ts";
+import { resolve, subsumes } from "./typecheck.ts";
 import { ClassMember } from "../_model/declarations.ts";
+import { BagelError,miscError } from "../errors.ts";
 
-export function typeinfer(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module): void {
+export function typeinfer(reportError: (error: BagelError) => void, modulesStore: ModulesStore, ast: Module): void {
     walkParseTree<Scope>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         if (modulesStore.astTypes.get(ast) == null && isExpression(ast)) {
             inferTypeAndStore(reportError, modulesStore, scope, ast)
@@ -88,7 +89,7 @@ export function typeinfer(reportError: (error: BagelTypeError) => void, modulesS
 }
 
 function inferTypeAndStore(
-    reportError: (error: BagelTypeError) => void, 
+    reportError: (error: BagelError) => void, 
     modulesStore: ModulesStore,  
     scope: Scope,
     ast: Expression|ClassMember,
@@ -102,7 +103,7 @@ function inferTypeAndStore(
 }
 
 function inferType(
-    reportError: (error: BagelTypeError) => void, 
+    reportError: (error: BagelError) => void, 
     modulesStore: ModulesStore, 
     scope: Scope,
     ast: Expression|ClassMember, 

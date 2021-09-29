@@ -8,10 +8,10 @@ import { ForLoop } from "../_model/statements.ts";
 import { TypeExpression, UNKNOWN_TYPE, NUMBER_TYPE } from "../_model/type-expressions.ts";
 import { walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
-import { alreadyDeclared, BagelTypeError, cannotFindExport, cannotFindModule } from "./typecheck.ts";
+import { alreadyDeclared, BagelError, cannotFindExport, cannotFindModule } from "../errors.ts";
 
 
-export function scopescan(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module, module: string) {
+export function scopescan(reportError: (error: BagelError) => void, modulesStore: ModulesStore, ast: Module, module: string) {
 
     walkParseTree<Scope|undefined>(undefined, ast, (payload, ast) => {
         
@@ -41,7 +41,7 @@ function isScopeOwner(ast: AST): ast is ScopeOwner {
         || ast.kind === "invocation"
 }
 
-export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
+export function scopeFrom(reportError: (error: BagelError) => void, modulesStore: ModulesStore, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
     const scope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {}, classes: {} };
 
     switch (ast.kind) {

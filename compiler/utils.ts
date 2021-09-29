@@ -1,6 +1,3 @@
-import { BagelSyntaxError, getLineContents, lineAndColumn } from "./1_parse/common.ts";
-import { BagelTypeError, errorMessage } from "./3_checking/typecheck.ts";
-import { Colors } from "./deps.ts";
 import { AST } from "./_model/ast.ts";
 
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
@@ -332,58 +329,4 @@ export function sOrNone(num: number): string {
 }
 export function wasOrWere(num: number): string {
     return num > 1 ? 'were' : 'was';
-}
-
-export const printError = (modulePath: string) => (error: BagelTypeError|BagelSyntaxError) => {
-    console.log(prettyError(modulePath)(error))
-}
-
-export const prettyError = (modulePath: string) => (error: BagelTypeError|BagelSyntaxError): string => {
-    let output = "";
-
-    const code = error.kind === 'bagel-syntax-error' ? error.code : error.ast?.kind !== "module" ? error.ast?.code : undefined
-    const startIndex = error.kind === 'bagel-syntax-error' ? error.index : error.ast?.kind !== "module" ? error.ast?.startIndex : undefined
-    const endIndex = error.kind === 'bagel-syntax-error' ? undefined : error.ast?.kind !== "module" ? error.ast?.endIndex : undefined
-
-    let infoLine = Colors.cyan(modulePath)
-    
-    const { line, column } = 
-        given(code, code => 
-        given(startIndex, startIndex => 
-            lineAndColumn(code, startIndex))) ?? {}
-    if (line != null && column != null) {
-        infoLine += Colors.white(":") 
-            + Colors.yellow(String(line)) 
-            + Colors.white(":") 
-            + Colors.yellow(String(column))
-    }
-    
-    infoLine += Colors.white(" - ")
-        + Colors.red("error")
-        + Colors.white(" " + (error.kind === "bagel-syntax-error" ? error.message : errorMessage(error)))
-
-    output += infoLine + "\n"
-
-    // print the problematic line of code, with the issue underlined
-    if (code != null && startIndex != null && line != null) {
-        const lineContent = getLineContents(code, line);
-
-        if (lineContent) {
-            const padding = '  '
-
-            output += Colors.bgWhite(Colors.black(String(line))) + padding + lineContent.content + "\n"
-
-            const digitsInLineNum = String(line).length
-            const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
-
-            if (endIndex != null) {
-                const underline = new Array(endIndex - startIndex).fill('~').join('')
-                output += Colors.red(underlineSpacing + underline) + "\n"
-            } else {
-                output += Colors.red(underlineSpacing + Colors.red("^")) + "\n"
-            }
-        }
-    }
-
-    return output
 }

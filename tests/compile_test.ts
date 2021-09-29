@@ -3,14 +3,15 @@ import { reshape } from "../compiler/2_reshape/index.ts";
 import { ModulesStore } from "../compiler/3_checking/modules-store.ts";
 import { scopescan } from "../compiler/3_checking/scopescan.ts";
 import { compile } from "../compiler/4_compile/index.ts";
-import { printError } from "../compiler/utils.ts";
+import { printError } from "../compiler/errors.ts";
+import { withoutSourceInfo } from "../compiler/utils.ts";
 
 const module = "module";
 function testCompile(bgl: string, exp: string) {
   let error: string | undefined;
 
   const ast = reshape(parse(bgl, printError('<test>')));
-
+  // console.log(JSON.stringify(withoutSourceInfo(ast), null, 2))
   const modulesStore = new ModulesStore();
   modulesStore.modules.set(module, ast);
   scopescan(printError('<test>'), modulesStore, ast, module);

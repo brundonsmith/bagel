@@ -1,3 +1,4 @@
+import { BagelError, isError } from "../errors.ts";
 import { KEYWORDS, PlainIdentifier } from "../_model/common.ts";
 import { BinaryOp, BINARY_OPS, Expression } from "../_model/expressions.ts";
 
@@ -80,7 +81,7 @@ export function isBinaryOp(str: string): str is BinaryOp {
 
 export type ParseResult<T> = { parsed: T, newIndex: number };
 
-export function parseSeries<T>(code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string, options: Partial<SeriesOptions> = {}): ParseResult<T[]>|BagelSyntaxError {
+export function parseSeries<T>(code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string, options: Partial<SeriesOptions> = {}): ParseResult<T[]>|BagelError {
     const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], newIndex: index };
 
     const { leadingDelimiter, trailingDelimiter, whitespace } = { ...DEFAULT_SERIES_OPTIONS, ...options };
@@ -151,7 +152,7 @@ const DEFAULT_SERIES_OPTIONS: SeriesOptions = {
     whitespace: "optional",
 }
 
-export function parseOptional<T>(code: string, index: number, parseFn: ParseFunction<T>): Partial<ParseResult<T>> | BagelSyntaxError {
+export function parseOptional<T>(code: string, index: number, parseFn: ParseFunction<T>): Partial<ParseResult<T>> | BagelError {
     const result = parseFn(code, index);
 
     if (isError(result)) {
@@ -164,64 +165,15 @@ export function parseOptional<T>(code: string, index: number, parseFn: ParseFunc
     }
 }
 
-export function given<T, R>(val: T|BagelSyntaxError|undefined, fn: (val: T) => R): R|BagelSyntaxError|undefined {
+export function given<T, R>(val: T|BagelError|undefined, fn: (val: T) => R): R|BagelError|undefined {
     if (val != null && !(isError(val))) {
         return fn(val);
     } else {
-        return val as BagelSyntaxError|undefined;
+        return val as BagelError|undefined;
     }
 }
 
-export type BagelSyntaxError = {
-    kind: "bagel-syntax-error",
-    code: string,
-    index: number,
-    message: string,
-    stack: string|undefined,
-}
-
-export function lineAndColumn(code: string, index: number): { line: number, column: number } {
-    let line = 1;
-    let column = 0;
-    for (let i = 0; i <= index; i++) {
-        if (code[i] === "\n") {
-            line++;
-            column = 0;
-        } else {
-            column++;
-        }
-    }
-
-    return { line, column };
-}
-
-export function getLineContents(code: string, line: number) {
-    let currentLine = 1;
-    let startIndex;
-    for (startIndex = 0; startIndex < code.length && currentLine < line; startIndex++) {
-        if (code[startIndex] === "\n") {
-            currentLine++;
-        }
-    }
-
-    if (currentLine === line) {
-        for (let endIndex = startIndex; endIndex < code.length; endIndex++) {
-            if (code[endIndex] === "\n") {
-                return { startIndex: startIndex, content: code.substring(startIndex, endIndex) }
-            }
-        }
-        return { startIndex: startIndex, content: code.substring(startIndex, code.length) }
-    }
-
-    return undefined
-}
-
-export function isError(x: unknown): x is BagelSyntaxError {
-    return x != null && typeof x === "object" && (x as any).kind === "bagel-syntax-error";
-}
-
-
-export function expec<T, R>(val: T|BagelSyntaxError|undefined, err: BagelSyntaxError, fn: (val: T) => R): R|BagelSyntaxError {
+export function expec<T, R>(val: T|BagelError|undefined, err: BagelError, fn: (val: T) => R): R|BagelError {
     if (isError(val)) {
         return val;
     } else if (val != null) {
@@ -231,17 +183,17 @@ export function expec<T, R>(val: T|BagelSyntaxError|undefined, err: BagelSyntaxE
     }
 }
 
-export function err(code: string, index: number, expected: string): BagelSyntaxError {
+export function err(code: string, index: number, expected: string): BagelError {
     return { kind: "bagel-syntax-error", code, index, message: `${expected} expected`, stack: undefined };
 }
 
-export type ParseFunction<T> = (code: string, index: number) => ParseResult<T> | BagelSyntaxError | undefined;
+export type ParseFunction<T> = (code: string, index: number) => ParseResult<T> | BagelError | undefined;
 
 
 export class ParseMemo {
     private memo = new Map<string, Map<ParseFunction<Expression>, Map<number, ParseResult<Expression>>>>();
 
-    memoize(fn: ParseFunction<Expression>, code: string, index: number, result: ParseResult<Expression>|BagelSyntaxError|undefined) {
+    memoize(fn: ParseFunction<Expression>, code: string, index: number, result: ParseResult<Expression>|BagelError|undefined) {
         if (result != null && !isError(result)) {
             if (!this.memo.has(code)) {
                 this.memo.set(code, new Map());
@@ -263,7 +215,7 @@ export class ParseMemo {
     }
 
     cachedOrParse<T extends Expression>(fn: ParseFunction<T>): ParseFunction<T> {
-        return (code: string, index: number): ParseResult<T>|BagelSyntaxError|undefined => {
+        return (code: string, index: number): ParseResult<T>|BagelError|undefined => {
             const cached = this.get(fn, code, index);
 
             if (cached != null) {

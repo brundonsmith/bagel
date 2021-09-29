@@ -2,13 +2,12 @@ import { path } from "./deps.ts";
 
 import { ModulesStore } from "./3_checking/modules-store.ts";
 import { canonicalModuleName, scopescan } from "./3_checking/scopescan.ts";
-import { BagelTypeError, typecheck } from "./3_checking/typecheck.ts";
+import { typecheck } from "./3_checking/typecheck.ts";
 import { typeinfer } from "./3_checking/typeinfer.ts";
 import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
-import { printError } from "./utils.ts";
-import { BagelSyntaxError } from "./1_parse/common.ts";
+import { printError, BagelError } from "./errors.ts";
 
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
@@ -173,7 +172,7 @@ async function bundleOutput(entryFile: string) {
                             }));
                             modulesStore.modules.set(module, parsed);
 
-                            const printErrorForModule = (error: BagelTypeError | BagelSyntaxError) => {
+                            const printErrorForModule = (error: BagelError) => {
                                 hadError = true;
                                 printError(path.basename(module))(error)
                             }

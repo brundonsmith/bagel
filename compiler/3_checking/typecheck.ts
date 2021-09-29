@@ -1,13 +1,12 @@
-import { AST, Module } from "../_model/ast.ts";
+import { Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
-import { ImportDeclaration, ImportItem } from "../_model/declarations.ts";
-import { LocalIdentifier } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions.ts";
 import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
+import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
 
 
-export function typecheck(reportError: (error: BagelTypeError) => void, modulesStore: ModulesStore, ast: Module) {
+export function typecheck(reportError: (error: BagelError) => void, modulesStore: ModulesStore, ast: Module) {
     walkParseTree<Scope>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
         switch(ast.kind) {
             case "block": {
@@ -387,7 +386,7 @@ export function resolve(scope: Scope, type: TypeExpression): TypeExpression | un
     }
 }
 
-function displayForm(typeExpression: TypeExpression): string {
+export function displayForm(typeExpression: TypeExpression): string {
     switch (typeExpression.kind) {
         case "union-type": return typeExpression.members.map(displayForm).join(" | ");
         case "named-type": return typeExpression.name.name;
@@ -414,92 +413,4 @@ function displayForm(typeExpression: TypeExpression): string {
         case "javascript-escape-type": return "<js escape>";
         case "class-type": return typeExpression.clazz.name.name;
     }
-}
-
-export type BagelTypeError =
-    | BagelAssignableToError
-    | BagelCannotFindNameError
-    | BagelAlreadyDeclaredError
-    | BagelMiscTypeError
-    | BagelCannotFindModuleError
-    | BagelCannotFindExportError
-
-export type BagelAssignableToError = {
-    kind: "bagel-assignable-to-error",
-    ast: AST,
-    destination: TypeExpression,
-    value: TypeExpression,
-    stack?: string|undefined,
-}
-
-export type BagelCannotFindNameError = {
-    kind: "bagel-cannot-find-name-error",
-    ast: LocalIdentifier,
-}
-
-export type BagelAlreadyDeclaredError = {
-    kind: "bagel-already-declared-error",
-    ast: PlainIdentifier,
-}
-
-export type BagelMiscTypeError = {
-    kind: "bagel-misc-type-error",
-    ast: AST|undefined,
-    message: string,
-}
-
-export type BagelCannotFindModuleError = {
-    kind: "bagel-cannot-find-module-error",
-    ast: ImportDeclaration
-}
-
-export type BagelCannotFindExportError = {
-    kind: "bagel-cannot-find-export-error",
-    ast: ImportItem,
-    importDeclaration: ImportDeclaration
-}
-
-export function errorMessage(error: BagelTypeError): string {
-    switch (error.kind) {
-        case "bagel-assignable-to-error":
-            return `Type "${displayForm(error.value)}" is not assignable to type "${displayForm(error.destination)}"`;
-        case "bagel-cannot-find-name-error":
-            return `Cannot find name "${error.ast.name}"`;
-        case "bagel-already-declared-error":
-            return `Identifier "${error.ast.name}" has already been declared in this scope`;
-        case "bagel-misc-type-error":
-            return error.message;
-        case "bagel-cannot-find-module-error":
-            return `Failed to resolve module "${error.ast.path.segments[0]}"`
-        case "bagel-cannot-find-export-error":
-            return `Module "${error.importDeclaration.path.segments[0]}" has no export named ${error.ast.name.name}`
-    }
-}
-
-// export function isError(x: unknown): x is BagelTypeError {
-//     return x != null && typeof x === "object" && ((x as any).kind === "bagel-assignable-to-error" || (x as any).kind === "bagel-misc-type-error");
-// }
-
-export function assignmentError(ast: AST, destination: TypeExpression, value: TypeExpression): BagelAssignableToError {
-    return { kind: "bagel-assignable-to-error", ast, destination, value, stack: undefined };
-}
-
-export function cannotFindName(ast: LocalIdentifier): BagelCannotFindNameError {
-    return { kind: "bagel-cannot-find-name-error", ast };
-}
-
-export function alreadyDeclared(ast: PlainIdentifier): BagelAlreadyDeclaredError {
-    return { kind: "bagel-already-declared-error", ast };
-}
-
-export function miscError(ast: AST|undefined, message: string): BagelMiscTypeError {
-    return { kind: "bagel-misc-type-error", ast, message }
-}
-
-export function cannotFindModule(ast: ImportDeclaration): BagelCannotFindModuleError {
-    return { kind: "bagel-cannot-find-module-error", ast }
-}
-
-export function cannotFindExport(ast: ImportItem, importDeclaration: ImportDeclaration): BagelCannotFindExportError {
-    return { kind: "bagel-cannot-find-export-error", ast, importDeclaration }
 }
