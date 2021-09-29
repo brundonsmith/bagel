@@ -77,14 +77,14 @@ export type ClassProperty = SourceInfo & {
 export type ClassFunction = SourceInfo & {
     kind: "class-function",
     name: PlainIdentifier,
-    func: Func,
+    value: Func,
     access: 'private'|'public',
 }
 
 export type ClassProcedure = SourceInfo & {
     kind: "class-procedure",
     name: PlainIdentifier,
-    proc: Func|Proc,
+    value: Proc,
     access: 'private'|'public',
 }
 

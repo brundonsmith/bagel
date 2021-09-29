@@ -106,17 +106,14 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
                 walkParseTree(nextPayload, member, fn);
             }
         } break;
-        case "class-property": {
-            walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.value, fn);
-        } break;
-        case "class-function": {
-            walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.func, fn);
-        } break;
+        case "class-property":
+        case "class-function":
         case "class-procedure": {
             walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.proc, fn);
+            if (ast.kind === "class-property" && ast.type) {
+                walkParseTree(nextPayload, ast.type, fn);
+            }
+            walkParseTree(nextPayload, ast.value, fn);
         } break;
         case "proc":
         case "func": {

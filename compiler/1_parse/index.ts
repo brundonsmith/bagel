@@ -576,7 +576,7 @@ const classFunction: ParseFunction<ClassFunction> = (code, startIndex) => {
             startIndex,
             endIndex: index,
             name,
-            func: value,
+            value,
             access
         },
         newIndex: index,
@@ -603,7 +603,7 @@ const classProcedure: ParseFunction<ClassProcedure> = (code, startIndex) => {
             startIndex,
             endIndex: index,
             name,
-            proc: value,
+            value,
             access
         },
         newIndex: index,

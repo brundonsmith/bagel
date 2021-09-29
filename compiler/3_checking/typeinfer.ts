@@ -295,9 +295,9 @@ function inferType(
             startIndex: ast.clazz.startIndex,
             endIndex: ast.clazz.endIndex
         };
-        case "class-property": return ast.type ?? inferTypeAndStore(reportError, modulesStore, scope, ast.value);
-        case "class-function": return inferTypeAndStore(reportError, modulesStore, scope, ast.func);
-        case "class-procedure": return inferTypeAndStore(reportError, modulesStore, scope, ast.proc);
+        case "class-property":
+        case "class-function":
+        case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferTypeAndStore(reportError, modulesStore, scope, ast.value);
         case "string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
         case "boolean-literal": return BOOLEAN_TYPE;

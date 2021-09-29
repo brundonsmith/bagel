@@ -25,15 +25,15 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(modulesStore, ast.name)}${ast.type ? `: ${compileOne(modulesStore, ast.type)}` : ''} = ${compileOne(modulesStore, ast.value)};`;
         case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(modulesStore, ast.name)} {\n${ast.members.map(m => compileOne(modulesStore, m)).join('\n')}\n}`;
         case "class-property": return  compileClassProperty(modulesStore, ast)
-        case "class-function": return  `    ${ast.access} readonly ${ast.name.name} = ${compileFunc(modulesStore, ast.func)}`
-        case "class-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${(ast.proc.kind === 'proc' ? compileProc(modulesStore, ast.proc) : compileFunc(modulesStore, ast.proc))}`
-        case "proc": return compileProc(modulesStore, ast);
+        case "class-function":
+        case "class-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${compileOne(modulesStore, ast.value)}`
         case "let-declaration": return `${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)}`;
         case "assignment": return `${compileOne(modulesStore, ast.target)} = ${compileOne(modulesStore, ast.value)}`;
         case "if-else-statement": return `if(${compileOne(modulesStore, ast.ifCondition)}) ${compileOne(modulesStore, ast.ifResult)}` 
             + (ast.elseResult != null ? ` else ${compileOne(modulesStore, ast.elseResult)}` : ``);
         case "for-loop": return `for (const ${compileOne(modulesStore, ast.itemIdentifier)} of ${compileOne(modulesStore, ast.iterator)}) ${compileOne(modulesStore, ast.body)}`;
         case "while-loop": return `while (${compileOne(modulesStore, ast.condition)}) ${compileOne(modulesStore, ast.body)}`;
+        case "proc": return compileProc(modulesStore, ast);
         case "func": return compileFunc(modulesStore, ast);
         case "pipe":
         case "invocation": return `${compileOne(modulesStore, ast.subject)}(${ast.args.map(arg => compileOne(modulesStore, arg)).join(', ')})`;
