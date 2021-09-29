@@ -995,14 +995,15 @@ const pipe: ParseFunction<Pipe> = (code, startIndex) =>
     given(parseSeries(code, startIndex, parseStartingFromTier(NEXT_TIER_FOR.get(pipe) as number), "|>", { trailingDelimiter: "forbidden" }), ({ parsed: expressions, newIndex: index }) =>
         expressions.length >= 2
             ? {
-                parsed: {
+                parsed: expressions.slice(1).reduce((acc, expr) => ({
                     kind: "pipe",
-                    code,
-                    startIndex,
-                    endIndex: index,
-                    expressions,
-                },
-                newIndex: index,
+                    subject: expr,
+                    args: [acc],
+                    code: expr.code,
+                    startIndex: expr.startIndex,
+                    endIndex: expr.endIndex
+                }), expressions[0]) as Pipe,
+                newIndex: index
             }
             : undefined)
 

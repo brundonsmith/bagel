@@ -32,7 +32,8 @@ export type JavascriptEscape = SourceInfo & {
   
 export type Pipe = SourceInfo & {
     kind: "pipe",
-    expressions: Expression[],
+    subject: Expression,
+    args: [Expression],
 }
   
 export type Func = SourceInfo & {

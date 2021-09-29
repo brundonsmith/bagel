@@ -121,17 +121,6 @@ function inferType(
                     : ast.type.returnType,
             }
         }
-        case "pipe": {
-            const lastPipeExpression = ast.expressions[ast.expressions.length - 1];
-            const lastStageType = inferTypeAndStore(reportError, modulesStore, scope, lastPipeExpression);
-
-            if (lastStageType.kind === "func-type") {
-                return lastStageType.returnType;
-            } else {
-                // reportError(miscError(lastPipeExpression, `Expected function in pipe expression, got '${lastStageType.kind}'`))
-                return UNKNOWN_TYPE;
-            }
-        }
         case "binary-operator": {
             const leftType = inferTypeAndStore(reportError, modulesStore, scope, ast.left);
             const rightType = inferTypeAndStore(reportError, modulesStore, scope, ast.right);
@@ -146,6 +135,7 @@ function inferType(
 
             return UNKNOWN_TYPE;
         }
+        case "pipe":
         case "invocation": {
             const funcType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
 

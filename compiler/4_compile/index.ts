@@ -35,8 +35,8 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "for-loop": return `for (const ${compileOne(modulesStore, ast.itemIdentifier)} of ${compileOne(modulesStore, ast.iterator)}) ${compileOne(modulesStore, ast.body)}`;
         case "while-loop": return `while (${compileOne(modulesStore, ast.condition)}) ${compileOne(modulesStore, ast.body)}`;
         case "func": return compileFunc(modulesStore, ast);
+        case "pipe":
         case "invocation": return `${compileOne(modulesStore, ast.subject)}(${ast.args.map(arg => compileOne(modulesStore, arg)).join(', ')})`;
-        case "pipe": return compilePipe(modulesStore, ast.expressions, ast.expressions.length - 1);
         case "binary-operator": return `${compileOne(modulesStore, ast.left)} ${ast.operator} ${compileOne(modulesStore, ast.right)}`;
         case "if-else-expression":
         case "switch-expression": return '(' + ast.cases
@@ -152,13 +152,5 @@ function compileClassProperty(modulesStore: ModulesStore, ast: ClassProperty): s
                `    }\n`
     } else {
         return `    ${ast.access} ${ast.name.name}${typeDeclaration} = ${compileOne(modulesStore, ast.value)};`
-    }
-}
-
-function compilePipe(modulesStore: ModulesStore, expressions: readonly Expression[], end: number): string {
-    if (end === 0) {
-        return compileOne(modulesStore, expressions[end]);
-    } else {
-        return `${compileOne(modulesStore, expressions[end])}(${compilePipe(modulesStore, expressions, end - 1)})`;
     }
 }

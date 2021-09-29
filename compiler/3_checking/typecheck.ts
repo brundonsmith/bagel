@@ -40,25 +40,6 @@ export function typecheck(reportError: (error: BagelTypeError) => void, modulesS
                 
                 return funcScope;
             }
-            case "pipe": {
-                let inputType = modulesStore.getTypeOf(ast.expressions[0]);
-
-                for (const expr of ast.expressions.slice(1)) {
-                    const typeOfPipe = modulesStore.getTypeOf(expr);
-
-                    if (typeOfPipe.kind !== "func-type") {
-                        reportError(miscError(expr, `Each transformation in pipeline expression must be a function: found '${typeOfPipe.kind}'`));
-                    } else if (typeOfPipe.args.length !== 1) {
-                        reportError(miscError(expr, `Pipeline function expected to take one argument, but takes ${typeOfPipe.args.length} arguments`));
-                    } else if (!subsumes(scope, typeOfPipe.args[0].type, inputType)) {
-                        reportError(assignmentError(ast, typeOfPipe.args[0].type, inputType));
-                    } else {
-                        inputType = typeOfPipe.returnType;
-                    }
-                }
-
-                return scope;
-            }
             case "binary-operator": {
                 if (modulesStore.getTypeOf(ast).kind === "unknown-type") {
                     const leftType = modulesStore.getTypeOf(ast.left);
@@ -69,6 +50,7 @@ export function typecheck(reportError: (error: BagelTypeError) => void, modulesS
 
                 return scope;
             }
+            case "pipe":
             case "invocation": {
                 const invocationScope = modulesStore.getScopeFor(ast)
 
@@ -77,7 +59,8 @@ export function typecheck(reportError: (error: BagelTypeError) => void, modulesS
                 if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {
                     reportError(miscError(ast, "Expression must be a function or procedure to be called"));
                 } else if (subjectType.args.length !== ast.args.length) {
-                    reportError(miscError(ast, `Function or procedure expected ${subjectType.args.length} arguments but got ${ast.args.length}`));
+                    const functionOrProcedure = subjectType.kind === "func-type" ? "Function" : "Procedure"
+                    reportError(miscError(ast, `${functionOrProcedure} expected ${subjectType.args.length} arguments but got ${ast.args.length}`));
                 } else {
                     for (let i = 0; i < ast.args.length; i++) {
                         const arg = ast.args[i]

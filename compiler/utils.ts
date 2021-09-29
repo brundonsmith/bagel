@@ -134,15 +134,11 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             
             walkParseTree(nextPayload, ast.body, fn);
         } break;
-        case "pipe": {
-            for (const stage of ast.expressions) {
-                walkParseTree(nextPayload, stage, fn);
-            }
-        } break;
         case "binary-operator": {
             walkParseTree(nextPayload, ast.left, fn);
             walkParseTree(nextPayload, ast.right, fn);
         } break;
+        case "pipe":
         case "invocation": {
             walkParseTree(nextPayload, ast.subject, fn);
             for (const arg of ast.args) {
