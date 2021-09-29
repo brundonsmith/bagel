@@ -1136,8 +1136,10 @@ const ifElseExpression: ParseFunction<IfElseExpression> = (code, startIndex) =>
                     code,
                     startIndex,
                     endIndex: index,
-                    ifCondition,
-                    ifResult,
+                    cases: [{
+                        condition: ifCondition,
+                        outcome: ifResult
+                    }]
                 },
                 newIndex: index,
             }
@@ -1148,9 +1150,11 @@ const ifElseExpression: ParseFunction<IfElseExpression> = (code, startIndex) =>
                     code,
                     startIndex,
                     endIndex: index,
-                    ifCondition,
-                    ifResult,
-                    elseResult: elseResultResult.parsed,
+                    cases: [{
+                        condition: ifCondition,
+                        outcome: ifResult
+                    }],
+                    defaultCase: elseResultResult.parsed,
                 },
                 newIndex: elseResultResult.newIndex,
             }
@@ -1185,15 +1189,15 @@ const switchExpression: ParseFunction<SwitchExpression> = (code, startIndex) =>
         newIndex: index
     }))))))))))))))))
 
-const _switchCase: ParseFunction<{ match: Expression, outcome: Expression }> = (code, startIndex) =>
+const _switchCase: ParseFunction<{ condition: Expression, outcome: Expression }> = (code, startIndex) =>
     given(consume(code, startIndex, 'case'), index =>
     given(consumeWhitespaceRequired(code, index), index =>
-    expec(expression(code, index), err(code, index, 'Case expression'), ({ parsed: match, newIndex: index }) =>
+    expec(expression(code, index), err(code, index, 'Case expression'), ({ parsed: condition, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ':'), err(code, index, '":"'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(code, index), err(code, index, 'Case result'), ({ parsed: outcome, newIndex: index }) => ({
-        parsed: { match, outcome },
+        parsed: { condition, outcome },
         newIndex: index
     }))))))))
 

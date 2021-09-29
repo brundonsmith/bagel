@@ -182,31 +182,9 @@ function inferType(
 
             return UNKNOWN_TYPE;
         }
-        case "if-else-expression": {
-            const ifType = inferTypeAndStore(reportError, modulesStore, scope, ast.ifResult);
-
-            if (ast.elseResult == null) {
-                return {
-                    kind: "union-type",
-                    members: [ ifType, NIL_TYPE ],
-                    code: undefined,
-                    startIndex: undefined,
-                    endIndex: undefined,
-                };
-            } else {
-                const elseType = inferTypeAndStore(reportError, modulesStore, scope, ast.elseResult);
-
-                return {
-                    kind: "union-type",
-                    members: [ ifType, elseType ],
-                    code: undefined,
-                    startIndex: undefined,
-                    endIndex: undefined,
-                };
-            }
-        }
+        case "if-else-expression":
         case "switch-expression": {
-            const valueType = inferTypeAndStore(reportError, modulesStore, scope, ast.value)
+            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferTypeAndStore(reportError, modulesStore, scope, ast.value)
 
             const caseTypes = ast.cases.map(({ outcome }) => 
                 inferTypeAndStore(reportError, modulesStore, scope, outcome))

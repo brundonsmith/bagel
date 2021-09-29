@@ -95,15 +95,14 @@ export type LocalIdentifier = SourceInfo & {
 
 export type IfElseExpression = SourceInfo & {
     kind: "if-else-expression",
-    ifCondition: Expression,
-    ifResult: Expression,
-    elseResult?: Expression,
+    cases: { condition: Expression, outcome: Expression }[],
+    defaultCase?: Expression
 }
 
 export type SwitchExpression = SourceInfo & {
     kind: "switch-expression",
     value: Expression,
-    cases: { match: Expression, outcome: Expression }[],
+    cases: { condition: Expression, outcome: Expression }[],
     defaultCase?: Expression
 }
 

@@ -165,17 +165,13 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.base, fn);
             walkParseTree(nextPayload, ast.indexer, fn);
         } break;
-        case "if-else-expression": {
-            walkParseTree(nextPayload, ast.ifCondition, fn);
-            walkParseTree(nextPayload, ast.ifResult, fn);
-            if (ast.elseResult != null) {
-                walkParseTree(nextPayload, ast.elseResult, fn);
-            }
-        } break;
+        case "if-else-expression":
         case "switch-expression": {
-            walkParseTree(nextPayload, ast.value, fn);
-            for (const { match, outcome } of ast.cases) {
-                walkParseTree(nextPayload, match, fn);
+            if (ast.kind === "switch-expression") {
+                walkParseTree(nextPayload, ast.value, fn);
+            }
+            for (const { condition, outcome } of ast.cases) {
+                walkParseTree(nextPayload, condition, fn);
                 walkParseTree(nextPayload, outcome, fn);
             }
             if (ast.defaultCase != null) {

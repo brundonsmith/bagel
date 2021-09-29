@@ -2,7 +2,7 @@ import { AST, Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
 import { ImportDeclaration, ImportItem } from "../_model/declarations.ts";
 import { LocalIdentifier } from "../_model/expressions.ts";
-import { FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions.ts";
 import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
 
@@ -113,22 +113,17 @@ export function typecheck(reportError: (error: BagelTypeError) => void, modulesS
 
                 return scope;
             }
-            case "if-else-expression": {
-                const ifConditionType = modulesStore.getTypeOf(ast.ifCondition);
-                if (ifConditionType?.kind !== "boolean-type") {
-                    reportError(miscError(ast, "Condition for if expression must be boolean"));
-                }
-
-                return scope;
-            }
+            case "if-else-expression":
             case "switch-expression": {
-                const valueType = modulesStore.getTypeOf(ast.value);
-                for (const { match } of ast.cases) {
-                    const caseType = modulesStore.getTypeOf(match)
-                    if (!subsumes(scope, valueType, caseType)) {
-                        reportError(assignmentError(match, valueType, caseType));
+                const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : modulesStore.getTypeOf(ast.value);
+
+                for (const { condition } of ast.cases) {
+                    const conditionType = modulesStore.getTypeOf(condition);
+                    if (!subsumes(scope, valueType, conditionType)) {
+                        reportError(assignmentError(condition, valueType, conditionType));
                     }
                 }
+
                 return scope;
             }
             case "property-accessor": {

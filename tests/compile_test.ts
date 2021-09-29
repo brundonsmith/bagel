@@ -154,7 +154,7 @@ Deno.test({
             } else {
                 3
             }`,
-      `const merge = () => (arr1.length <= 0) ? (2) : (3)`,
+      `const merge = () => (arr1.length <= 0 ? 2 : 3)`,
     );
   },
 });
