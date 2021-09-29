@@ -137,7 +137,13 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             if (ast.kind !== "binary-operator") {
                 walkParseTree(nextPayload, ast.subject, fn);
             }
-            
+
+            if (ast.kind === "invocation" && ast.typeArgs) {
+                for (const arg of ast.typeArgs) {
+                    walkParseTree(nextPayload, arg, fn);
+                }
+            }
+
             for (const arg of ast.args) {
                 walkParseTree(nextPayload, arg, fn);
             }

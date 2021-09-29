@@ -119,12 +119,47 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Basic explicit genericz",
+  fn() {
+    testTypecheck(
+      `
+      func other<T>(a: T): T => a
+      const c: number = other<number>(12)`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Basic explicit generic mismatch argument",
+  fn() {
+    testTypecheck(
+      `
+      func other<T>(a: T): T => a
+      const c: number = other<number>('foo')`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Basic explicit generic mismatch return",
+  fn() {
+    testTypecheck(
+      `
+      func other<T>(a: T): T => a
+      const c: string = other<number>(12)`,
+      true,
+    );
+  },
+});
+
 // TODO: Invocation arguments
 // TODO: Reactions
 // TODO: Classes
 // TODO: if/else/switch
 // TODO: object property access
-// TODO: Generics
 
 function testTypecheck(code: string, shouldFail: boolean): void {
   const errors: BagelError[] = [];

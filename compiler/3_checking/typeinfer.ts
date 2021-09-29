@@ -36,19 +36,18 @@ export function typeinfer(reportError: (error: BagelError) => void, modulesStore
         } else if (ast.kind === "invocation") {
             let subjectType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
 
-            if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
-
                 // bind type-args for this invocation
                 // HACK: this is really scopescanning...
+            if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
                 if (subjectType.typeParams.length > 0) {
-                    if (subjectType.typeParams.length !== ast.typeArgs.length) {
-                        reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
+                    if (subjectType.typeParams.length !== ast.typeArgs?.length) {
+                        reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs?.length ?? 0}`))
                     }
 
                     const scope = modulesStore.getScopeFor(ast)
                     for (let i = 0; i < subjectType.typeParams.length; i++) {
                         const typeParam = subjectType.typeParams[i]
-                        const typeArg = ast.typeArgs[i]
+                        const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
 
                         scope.types[typeParam.name] = typeArg
                     }

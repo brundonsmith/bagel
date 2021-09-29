@@ -69,7 +69,7 @@ export type Invocation = SourceInfo & {
     kind: "invocation",
     subject: Expression,
     args: Expression[],
-    typeArgs: TypeExpression[],
+    typeArgs?: TypeExpression[],
 }
 
 export type Indexer = SourceInfo & {

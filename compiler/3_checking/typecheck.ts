@@ -53,7 +53,6 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
             case "pipe":
             case "invocation": {
                 const invocationScope = modulesStore.getScopeFor(ast)
-
                 const subjectType = modulesStore.getTypeOf(ast.subject);
 
                 if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {
@@ -200,8 +199,6 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
                 return scope;
             }
             case "let-declaration": {
-                // console.log(JSON.stringify(scope, null, 2))
-                // console.log(JSON.stringify(ast, null, 2))
                 const valueType = modulesStore.getTypeOf(ast.value);
 
                 if (ast.type != null) {
