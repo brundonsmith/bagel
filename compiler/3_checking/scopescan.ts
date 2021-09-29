@@ -202,15 +202,13 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
 }
 
 function declExported(declaration: Declaration): boolean|undefined {
-    if (declaration.kind === "type-declaration" || declaration.kind === "func-declaration" ||
-        declaration.kind === "proc-declaration" || declaration.kind === "const-declaration") {
+    if (declaration.kind !== "import-declaration" && declaration.kind !== "javascript-escape") {
         return declaration.exported;
     }
 }
 
 function declName(declaration: Declaration): string|undefined {
-    if (declaration.kind === "type-declaration" || declaration.kind === "func-declaration" ||
-        declaration.kind === "proc-declaration" || declaration.kind === "const-declaration") {
+    if (declaration.kind !== "import-declaration" && declaration.kind !== "javascript-escape") {
         return declaration.name.name;
     }
 }
@@ -218,15 +216,21 @@ function declName(declaration: Declaration): string|undefined {
 function declType(declaration: Declaration): TypeExpression|undefined {
     if (declaration.kind === "func-declaration" || declaration.kind === "proc-declaration") {
         return declaration.value.type;
-    }else if (declaration.kind === "const-declaration") {
+    } else if (declaration.kind === "const-declaration") {
         return declaration.type;
+    } else if (declaration.kind === "class-declaration") {
+        return {
+            kind: "class-type",
+            clazz: declaration,
+            code: declaration.code,
+            startIndex: declaration.startIndex,
+            endIndex: declaration.endIndex
+        }
     }
 }
 
 function declValue(declaration: Declaration): Expression|undefined {
-    if (declaration.kind === "func-declaration") {
-        return declaration.value;
-    } else if (declaration.kind === "const-declaration") {
+    if (declaration.kind === "func-declaration" || declaration.kind === "proc-declaration" || declaration.kind === "const-declaration") {
         return declaration.value;
     }
 }

@@ -37,7 +37,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "func": return compileFunc(modulesStore, ast);
         case "pipe":
         case "invocation": return `${compileOne(modulesStore, ast.subject)}(${ast.args.map(arg => compileOne(modulesStore, arg)).join(', ')})`;
-        case "binary-operator": return `${compileOne(modulesStore, ast.left)} ${ast.operator} ${compileOne(modulesStore, ast.right)}`;
+        case "binary-operator": return `${compileOne(modulesStore, ast.args[0])} ${ast.operator} ${compileOne(modulesStore, ast.args[1])}`;
         case "if-else-expression":
         case "switch-expression": return '(' + ast.cases
             .map(({ condition, outcome }) => 

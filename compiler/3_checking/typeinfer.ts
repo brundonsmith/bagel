@@ -122,8 +122,8 @@ function inferType(
             }
         }
         case "binary-operator": {
-            const leftType = inferTypeAndStore(reportError, modulesStore, scope, ast.left);
-            const rightType = inferTypeAndStore(reportError, modulesStore, scope, ast.right);
+            const leftType = inferTypeAndStore(reportError, modulesStore, scope, ast.args[0]);
+            const rightType = inferTypeAndStore(reportError, modulesStore, scope, ast.args[1]);
 
             for (const types of BINARY_OPERATOR_TYPES[ast.operator]) {
                 const { left, right, output } = types;

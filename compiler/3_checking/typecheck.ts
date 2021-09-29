@@ -42,8 +42,9 @@ export function typecheck(reportError: (error: BagelTypeError) => void, modulesS
             }
             case "binary-operator": {
                 if (modulesStore.getTypeOf(ast).kind === "unknown-type") {
-                    const leftType = modulesStore.getTypeOf(ast.left);
-                    const rightType = modulesStore.getTypeOf(ast.right);
+                    // TODO: Once generics are fully functional, use `type` property here
+                    const leftType = modulesStore.getTypeOf(ast.args[0]);
+                    const rightType = modulesStore.getTypeOf(ast.args[1]);
 
                     reportError(miscError(ast, `Operator '${ast.operator}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
                 }
@@ -76,6 +77,19 @@ export function typecheck(reportError: (error: BagelTypeError) => void, modulesS
 
                 return invocationScope;
             }
+            case "if-else-expression":
+            case "switch-expression": {
+                const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : modulesStore.getTypeOf(ast.value);
+
+                for (const { condition } of ast.cases) {
+                    const conditionType = modulesStore.getTypeOf(condition);
+                    if (!subsumes(scope, valueType, conditionType)) {
+                        reportError(assignmentError(condition, valueType, conditionType));
+                    }
+                }
+
+                return scope;
+            }
             case "indexer": {
                 const baseType = modulesStore.getTypeOf(ast.base);
                 const indexerType = modulesStore.getTypeOf(ast.indexer);
@@ -96,21 +110,9 @@ export function typecheck(reportError: (error: BagelTypeError) => void, modulesS
 
                 return scope;
             }
-            case "if-else-expression":
-            case "switch-expression": {
-                const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : modulesStore.getTypeOf(ast.value);
-
-                for (const { condition } of ast.cases) {
-                    const conditionType = modulesStore.getTypeOf(condition);
-                    if (!subsumes(scope, valueType, conditionType)) {
-                        reportError(assignmentError(condition, valueType, conditionType));
-                    }
-                }
-
-                return scope;
-            }
             case "property-accessor": {
                 const baseType = modulesStore.getTypeOf(ast.base);
+                
                 if (baseType.kind !== "object-type" && baseType.kind !== "class-type") {
                     reportError(miscError(ast.base, `Can only use dot operator (".") on objects with known properties`));
                     return scope;

@@ -1019,8 +1019,7 @@ const binaryOperator: ParseFunction<BinaryOperator> = (code, startIndex) =>
             startIndex,
             endIndex: index,
             operator,
-            left,
-            right,
+            args: [left, right],
         },
         newIndex: index,
     }))))))

@@ -57,9 +57,9 @@ export type Range = SourceInfo & {
 
 export type BinaryOperator = SourceInfo & {
     kind: "binary-operator",
-    left: Expression,
-    right: Expression,
     operator: BinaryOp,
+    args: [Expression, Expression],
+    // TODO: Once generics are fully functional, create a `type: FuncType` property
 }
 
 export const BINARY_OPS = [ "+", "-", "*", "/", "<=", ">=", "<", ">", "==", "&&", "||", "??" ] as const;

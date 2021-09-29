@@ -98,6 +98,9 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         } break;
         case "const-declaration": {
             walkParseTree(nextPayload, ast.name, fn);
+            if (ast.type) {
+                walkParseTree(nextPayload, ast.type, fn);
+            }
             walkParseTree(nextPayload, ast.value, fn);
         } break;
         case "class-declaration": {
@@ -131,13 +134,13 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             
             walkParseTree(nextPayload, ast.body, fn);
         } break;
-        case "binary-operator": {
-            walkParseTree(nextPayload, ast.left, fn);
-            walkParseTree(nextPayload, ast.right, fn);
-        } break;
+        case "binary-operator":
         case "pipe":
         case "invocation": {
-            walkParseTree(nextPayload, ast.subject, fn);
+            if (ast.kind !== "binary-operator") {
+                walkParseTree(nextPayload, ast.subject, fn);
+            }
+            
             for (const arg of ast.args) {
                 walkParseTree(nextPayload, arg, fn);
             }
