@@ -293,7 +293,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Func delcaration with iteration",
+  name: "Func declaration with iteration",
   fn() {
     testCompile(
       `func myFunc(a, b) => 

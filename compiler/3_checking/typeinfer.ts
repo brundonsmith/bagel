@@ -146,7 +146,7 @@ function inferType(
             }
         }
         case "indexer": {
-            const baseType = inferTypeAndStore(reportError, modulesStore, scope, ast.base);
+            const baseType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
             const indexerType = inferTypeAndStore(reportError, modulesStore, scope, ast.indexer);
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
@@ -200,35 +200,22 @@ function inferType(
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
         case "parenthesized-expression": return inferTypeAndStore(reportError, modulesStore, scope, ast.inner);
         case "property-accessor": {
-            const baseType = inferTypeAndStore(reportError, modulesStore, scope, ast.base);
-
-            let lastPropType = baseType;
-            for (const prop of ast.properties) {
-                if (lastPropType.kind === "object-type") {
-                    const valueType = lastPropType.entries.find(entry => entry[0].name === prop.name)?.[1];
-                    if (valueType == null) {
-                        return UNKNOWN_TYPE;
+            const subjectType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
+            
+            if (subjectType.kind === "object-type") {
+                return subjectType.entries.find(entry => entry[0].name === ast.property.name)?.[1] ?? UNKNOWN_TYPE
+            } else if (subjectType.kind === "class-type") {
+                const member = subjectType.clazz.members.find(member => member.name.name === ast.property.name)
+                if (member) {
+                    if (member.kind === "class-function" || member.kind === "class-procedure") {
+                        return inferTypeAndStore(reportError, modulesStore, scope, member.value)
+                    } else {
+                        return member.type ?? inferTypeAndStore(reportError, modulesStore, scope, member.value)
                     }
-    
-                    lastPropType = valueType;
-                } else if (lastPropType.kind === "class-type") {
-                    const member = lastPropType.clazz.members.find(({ name }) => name.name === prop.name);
-                    if (member == null) {
-                        return UNKNOWN_TYPE;
-                    }
-
-                    const valueType = inferTypeAndStore(reportError, modulesStore, scope, member);
-                    if (valueType == null) {
-                        return UNKNOWN_TYPE;
-                    }
-    
-                    lastPropType = valueType;
-                } else {
-                    return UNKNOWN_TYPE;
                 }
             }
             
-            return lastPropType;
+            return UNKNOWN_TYPE
         }
         case "local-identifier": {
             const descriptor = scope.values[ast.name];

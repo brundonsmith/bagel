@@ -49,7 +49,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         + (ast.defaultCase ? compileOne(modulesStore, ast.defaultCase) : NIL) + ')'
         case "range": return `${HIDDEN_IDENTIFIER_PREFIX}range(${ast.start})(${ast.end})`;
         case "parenthesized-expression": return `(${compileOne(modulesStore, ast.inner)})`;
-        case "property-accessor": return `${compileOne(modulesStore, ast.base)}.${ast.properties.map(p => compileOne(modulesStore, p)).join(".")}`;
+        case "property-accessor": return `${compileOne(modulesStore, ast.subject)}.${compileOne(modulesStore, ast.property)}`;
         case "local-identifier": return modulesStore.getScopeFor(ast).values[ast.name]?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
         case "plain-identifier": return ast.name;
         case "object-literal":  return `{${objectEntries(modulesStore, ast.entries)}}`;
@@ -67,7 +67,7 @@ ${compileOne(modulesStore, ast.data)},
 ${compileOne(modulesStore, ast.effect)},
 ${given(ast.until, until => compileOne(modulesStore, until))});`;
         case "computation": return `const ${ast.name.name} = ${HIDDEN_IDENTIFIER_PREFIX}computed(() => ${compileOne(modulesStore, ast.expression)});`;
-        case "indexer": return `${compileOne(modulesStore, ast.base)}[${compileOne(modulesStore, ast.indexer)}]`;
+        case "indexer": return `${compileOne(modulesStore, ast.subject)}[${compileOne(modulesStore, ast.indexer)}]`;
         case "block": return `{ ${ast.statements.map(s => compileOne(modulesStore, s)).join(" ")} }`;
         case "element-tag": return `${HIDDEN_IDENTIFIER_PREFIX}h('${ast.tagName.name}',{${
             objectEntries(modulesStore, (ast.attributes as [PlainIdentifier, Expression|Expression[]][]))}}, ${ast.children.map(c => compileOne(modulesStore, c)).join(', ')})`;

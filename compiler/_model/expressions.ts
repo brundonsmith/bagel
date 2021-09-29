@@ -74,19 +74,19 @@ export type Invocation = SourceInfo & {
 
 export type Indexer = SourceInfo & {
     kind: "indexer",
-    base: Expression,
+    subject: Expression,
     indexer: Expression,
+}
+
+export type PropertyAccessor = SourceInfo & {
+    kind: "property-accessor",
+    subject: Expression,
+    property: PlainIdentifier,
 }
 
 export type ParenthesizedExpression = SourceInfo & {
     kind: "parenthesized-expression",
     inner: Expression,
-}
-
-export type PropertyAccessor = SourceInfo & {
-    kind: "property-accessor",
-    base: Expression,
-    properties: PlainIdentifier[],
 }
 
 export type LocalIdentifier = SourceInfo & {

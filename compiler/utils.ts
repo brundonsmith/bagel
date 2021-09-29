@@ -158,7 +158,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.clazz, fn);
         } break;
         case "indexer": {
-            walkParseTree(nextPayload, ast.base, fn);
+            walkParseTree(nextPayload, ast.subject, fn);
             walkParseTree(nextPayload, ast.indexer, fn);
         } break;
         case "if-else-expression":
@@ -178,10 +178,8 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.inner, fn);
         } break;
         case "property-accessor": {
-            walkParseTree(nextPayload, ast.base, fn);
-            for (const property of ast.properties) {
-                walkParseTree(nextPayload, property, fn);
-            }
+            walkParseTree(nextPayload, ast.subject, fn);
+            walkParseTree(nextPayload, ast.property, fn);
         } break;
         case "object-literal": {
             for (const [key, value] of ast.entries) {

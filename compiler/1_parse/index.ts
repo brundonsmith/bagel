@@ -738,13 +738,14 @@ const letDeclaration: ParseFunction<LetDeclaration> = (code, startIndex) =>
         }))))))))))))
 
 const assignment: ParseFunction<Assignment> = (code, startIndex) =>
-    given(propertyAccessor(code, startIndex) ?? localIdentifier(code, startIndex), ({ parsed: target, newIndex: index }) =>
+    given(invocationAccessorChain(code, startIndex) ?? localIdentifier(code, startIndex), ({ parsed: target, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "="), index =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(code, index), err(code, index, "Assignment value"), ({ parsed: value, newIndex: index }) => 
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
+    expec(consume(code, index, ";"), err(code, index, '";"'), index => 
+        target.kind === "local-identifier" || target.kind === "property-accessor" ? {
         parsed: {
             kind: "assignment",
             code,
@@ -754,14 +755,16 @@ const assignment: ParseFunction<Assignment> = (code, startIndex) =>
             value,
         },
         newIndex: index,
-    }))))))))
+        } : undefined
+    )))))))
 
 const procCall: ParseFunction<Invocation> = (code, startIndex) =>
-    given(invocation(code, startIndex), ({ parsed, newIndex: index }) =>
-    expec(consume(code, index, ';'), err(code, index, '";"'), index => ({
+    given(invocationAccessorChain(code, startIndex), ({ parsed, newIndex: index }) =>
+    expec(consume(code, index, ';'), err(code, index, '";"'), index => 
+        parsed.kind === "invocation" ? {
         parsed,
         newIndex: index
-    })))
+        } : undefined))
     
 
 const ifElseStatement: ParseFunction<IfElseStatement> = (code, startIndex) =>
@@ -1024,71 +1027,17 @@ const binaryOperator: ParseFunction<BinaryOperator> = (code, startIndex) =>
         newIndex: index,
     }))))))
 
-const invocation: ParseFunction<Invocation> = (code, startIndex) =>
-    given(parseBeneath(code, startIndex, invocation), ({ parsed: subject, newIndex: index }) =>
-    given(parseOptional(code, index, (code, index) =>
-        given(consume(code, index, "<"), index =>
-        given(consumeWhitespace(code, index), index =>
-        given(parseSeries(code, index, typeExpression, ','), ({ parsed: typeArgs, newIndex: index }) =>
-        given(consumeWhitespace(code, index), index => 
-        given(consume(code, index, ">"), index => ({ parsed: typeArgs, newIndex: index }))))))), ({ parsed: typeArgs, newIndex: indexAfterTypeArgs }) =>
-    given(parseSeries(code, indexAfterTypeArgs ?? index, _argExpressions), ({ parsed: argLists, newIndex: index }) => 
-        argLists.length > 0 ? {
-            parsed: argListsToInvocations(
-                subject,
-                argLists,
-                typeArgs ?? [],
-                {
-                    code,
-                    startIndex,
-                    endIndex: index
-                }
-            ),
-            newIndex: index
-        } : undefined
-    )))
-
-const argListsToInvocations = (subject: Expression, argLists: Expression[][], typeArgs: TypeExpression[], sourceInfo: SourceInfo): Invocation => {
-    let outer: Invocation = {
-        kind: "invocation",
-        subject,
-        args: argLists[0],
-        typeArgs: typeArgs ?? [],
-        ...sourceInfo
-    }
-
-    for (let i = 1; i < argLists.length; i++) {
-        outer = {
-            kind: "invocation",
-            subject: outer,
-            args: argLists[i],
-            typeArgs: [],
-            ...sourceInfo
-        }
-    }
-
-    return outer
-}
-
-const _argExpressions: ParseFunction<Expression[]> = (code, index) =>
-    given(consume(code, index, "("), index => 
-    given(parseSeries(code, index, expression, ","), ({ parsed: args, newIndex: index }) =>
-    expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
-        parsed: args,
-        newIndex: index
-    }))))
-
 const indexer: ParseFunction<Indexer> = (code, startIndex) =>
     given(parseBeneath(code, startIndex, indexer), ({ parsed: base, newIndex: index }) =>
     given(parseSeries(code, index, _indexerExpression), ({ parsed: indexers, newIndex: index }) => 
         indexers.length > 0 ? 
             {
-                parsed: indexers.reduce((base: Expression, indexer: Expression) => ({
+                parsed: indexers.reduce((subject: Expression, indexer: Expression) => ({
                     kind: "indexer",
                     code,
                     startIndex,
                     endIndex: index,
-                    base,
+                    subject,
                     indexer,
                 }), base) as Indexer,
                 newIndex: index,
@@ -1241,23 +1190,73 @@ const parenthesized: ParseFunction<ParenthesizedExpression> = (code, startIndex)
         newIndex: index,
     }))))
 
-const propertyAccessor: ParseFunction<PropertyAccessor> = (code, startIndex) =>
-    given(parseBeneath(code, startIndex, propertyAccessor), ({ parsed: base, newIndex: index }) =>
+const invocationAccessorChain: ParseFunction<Invocation|PropertyAccessor> = (code, index) =>
+    given(parseBeneath(code, index, invocationAccessorChain), ({ parsed: subject, newIndex: index }) =>
+    given(parseSeries<InvocationArgs|PropertyAccess>(code, index, (code, index) => 
+        _invocationArgs(code, index) ?? _propertyAccess(code, index)), ({ parsed: gets, newIndex: index }) => 
+        gets.length > 0 ? {
+            parsed: _getsToInvocationsAndAccesses(subject, gets),
+            newIndex: index
+        } : undefined))
+
+const _getsToInvocationsAndAccesses = (subject: Expression, gets: (InvocationArgs|PropertyAccess)[]): Invocation|PropertyAccessor => {
+    let current: Invocation|PropertyAccessor = _oneGetToInvocationOrAccess(subject, gets[0])
+
+    for (let i = 1; i < gets.length; i++) {
+        current = _oneGetToInvocationOrAccess(current, gets[i])
+    }
+
+    return current
+}
+
+const _oneGetToInvocationOrAccess = (subject: Expression, get: InvocationArgs|PropertyAccess): Invocation|PropertyAccessor => {
+    if (get.kind === "invocation-args") {
+        return {
+            kind: "invocation",
+            subject,
+            typeArgs: get.typeArgs,
+            args: get.exprs,
+            code: get.code,
+            startIndex: subject.startIndex,
+            endIndex: get.endIndex
+        }
+    } else {
+        return {
+            kind: "property-accessor",
+            subject,
+            property: get.property,
+            code: get.code,
+            startIndex: subject.startIndex,
+            endIndex: get.endIndex
+        }
+    }
+}
+    
+type InvocationArgs = SourceInfo & { kind: "invocation-args", exprs: Expression[], typeArgs: TypeExpression[] }
+
+const _invocationArgs: ParseFunction<InvocationArgs> = (code, startIndex) =>
+    given(parseOptional(code, startIndex, (code, index) =>
+        given(consume(code, index, "<"), index =>
+        given(consumeWhitespace(code, index), index =>
+        given(parseSeries(code, index, typeExpression, ','), ({ parsed: typeArgs, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
-    given(parseSeries(code, index, plainIdentifier, ".", { leadingDelimiter: "required", trailingDelimiter: "forbidden" }), ({ parsed: properties, newIndex: index }) => 
-        properties.length > 0
-            ? {
-                parsed: {
-                    kind: "property-accessor",
-                    code,
-                    startIndex,
-                    endIndex: index,
-                    base,
-                    properties,
-                },
+        given(consume(code, index, ">"), index => ({ parsed: typeArgs, newIndex: index }))))))), ({ parsed: typeArgs, newIndex: indexAfterTypeArgs }) =>
+    given(consume(code, indexAfterTypeArgs ?? startIndex, "("), index => 
+    given(parseSeries(code, index, expression, ","), ({ parsed: exprs, newIndex: index }) =>
+    expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
+        parsed: { kind: "invocation-args", exprs, typeArgs: typeArgs ?? [], code, startIndex, endIndex: index },
                 newIndex: index
-            }
-            : undefined)))
+    })))))
+
+type PropertyAccess = SourceInfo & { kind: "property-access", property: PlainIdentifier }
+
+const _propertyAccess: ParseFunction<PropertyAccess> = (code, startIndex) =>
+    given(consume(code, startIndex, "."), index =>
+    expec(plainIdentifier(code, index), err(code, index, "Property name"), ({ parsed: property, newIndex: index }) => ({
+        parsed: { kind: "property-access", property, code, startIndex, endIndex: index },
+        newIndex: index
+    })))
+
 
 const localIdentifier: ParseFunction<LocalIdentifier> = (code, startIndex) => 
     given(identifierSegment(code, startIndex), ({ segment: name, newIndex: index }) => ({
@@ -1528,9 +1527,9 @@ function consumeComments(code: string, index: number): number {
 const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
     [ javascriptEscape, pipe, classConstruction, elementTag ],
     [ func, proc, range, binaryOperator ],
-    [ invocation ],
     [ indexer ],
-    [ parenthesized, propertyAccessor ],
+    [ invocationAccessorChain ],
+    [ parenthesized ],
     [ localIdentifier ],
     [ ifElseExpression, switchExpression, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
         stringLiteral, numberLiteral ],

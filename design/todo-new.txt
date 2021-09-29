@@ -8,7 +8,6 @@ Design tasks:
 Implementation tasks:
 - Generics
 - Type refinement
-- Solve parsing issues around method chains
 - Hoisting and/or order-checking for declarations that depend on each other
 
 Gruntwork tasks:

@@ -91,7 +91,7 @@ export function typecheck(reportError: (error: BagelTypeError) => void, modulesS
                 return scope;
             }
             case "indexer": {
-                const baseType = modulesStore.getTypeOf(ast.base);
+                const baseType = modulesStore.getTypeOf(ast.subject);
                 const indexerType = modulesStore.getTypeOf(ast.indexer);
                 
                 if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
@@ -111,23 +111,27 @@ export function typecheck(reportError: (error: BagelTypeError) => void, modulesS
                 return scope;
             }
             case "property-accessor": {
-                const baseType = modulesStore.getTypeOf(ast.base);
+                const subjectType = modulesStore.getTypeOf(ast.subject);
                 
-                if (baseType.kind !== "object-type" && baseType.kind !== "class-type") {
-                    reportError(miscError(ast.base, `Can only use dot operator (".") on objects with known properties`));
+                if (subjectType.kind !== "object-type" && subjectType.kind !== "class-type") {
+                    reportError(miscError(ast.subject, `Can only use dot operator (".") on objects with known properties`));
                     return scope;
                 }
 
-                for (let i = 0; i < ast.properties.length - 1; i++) {
-                    const propertyType = modulesStore.getTypeOf(ast.properties[i])
-                    if (propertyType.kind !== "object-type" && propertyType.kind !== "class-type") {
-                        reportError(miscError(ast.properties[i], `Can only use dot operator (".") on objects with known properties`));
-                        return scope;
+                if (subjectType.kind === "object-type") {
+                    const propertyExists = subjectType.entries.some(member => member[0].name === ast.property.name)
+
+                    if (!propertyExists) {
+                        reportError(miscError(ast.property, `Property '${ast.property.name}' does not exist on type '${displayForm(subjectType)}'`));
+                    }
+                } else {
+                    const propertyExists = subjectType.clazz.members.some(member => member.name.name === ast.property.name)
+
+                    if (!propertyExists) {
+                        reportError(miscError(ast.property, `Property '${ast.property.name}' does not exist on class '${subjectType.clazz.name.name}'`));
                     }
                 }
-                
-                // TODO: Check that property exists on each subject
-                
+
                 return scope;
             }
             case "local-identifier": {
