@@ -57,7 +57,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, modulesStore
                     
                     scope.values[declaration.name.name] = {
                         mutability: "none",
-                        declaredType: declaration.kind === "const-declaration" ? declaration.type : declaration.value.type,
+                        declaredType: declaration.kind === "const-declaration" ? declaration.type : undefined,
                         initialValue: declaration.value
                     };
                 } else if (declaration.kind === "class-declaration") {

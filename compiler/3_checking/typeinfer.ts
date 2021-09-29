@@ -121,9 +121,8 @@ function inferType(
                 ...ast.type,
 
                 // if no return-type is declared, try inferring the type from the inner expression
-                returnType: ast.type.returnType == null
-                    ? inferTypeAndStore(reportError, modulesStore, modulesStore.getScopeFor(ast), ast.body) 
-                    : ast.type.returnType,
+                returnType: ast.type.returnType ??
+                    inferTypeAndStore(reportError, modulesStore, modulesStore.getScopeFor(ast), ast.body)
             }
         }
         case "binary-operator": {
@@ -142,10 +141,10 @@ function inferType(
         }
         case "pipe":
         case "invocation": {
-            const funcType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
+            const subjectType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
 
-            if (funcType.kind === "func-type") {
-                return funcType.returnType ?? UNKNOWN_TYPE;
+            if (subjectType.kind === "func-type") {
+                return subjectType.returnType ?? UNKNOWN_TYPE;
             } else {
                 return UNKNOWN_TYPE;
             }
