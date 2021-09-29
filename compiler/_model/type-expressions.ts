@@ -37,14 +37,14 @@ export type NamedType = SourceInfo & {
 export type ProcType = SourceInfo & {
     kind: "proc-type",
     typeParams: PlainIdentifier[],
-    args: { name: PlainIdentifier, type: TypeExpression}[],
+    args: { name: PlainIdentifier, type?: TypeExpression}[],
 }
 
 export type FuncType = SourceInfo & {
     kind: "func-type",
     typeParams: PlainIdentifier[],
-    args: { name: PlainIdentifier, type: TypeExpression}[],
-    returnType: TypeExpression,
+    args: { name: PlainIdentifier, type?: TypeExpression}[],
+    returnType?: TypeExpression,
 }
 
 export type ElementType = SourceInfo & {

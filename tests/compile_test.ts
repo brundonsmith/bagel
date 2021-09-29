@@ -165,7 +165,7 @@ Deno.test({
   fn() {
     testCompile(
       `func uid(arr, i) => arr[i]`,
-      `const uid = (arr: unknown, i: unknown) => arr[i]`,
+      `const uid = (arr, i) => arr[i]`,
     );
   },
 });
@@ -185,7 +185,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc doStuff(a) { }`,
-      `const doStuff = (a: unknown): void => { }`,
+      `const doStuff = (a): void => { }`,
     );
   },
 });
@@ -202,7 +202,7 @@ Deno.test({
 
             console.log(count);
         }`,
-      `const doStuff = (a: unknown): void => {
+      `const doStuff = (a): void => {
             const ___locals: {count?: unknown} = ___observable({});
         
             ___locals["count"] = 0;
@@ -236,7 +236,7 @@ Deno.test({
 
             console.log(count);
         }`,
-      `const doStuff = (a: unknown): void => {
+      `const doStuff = (a): void => {
             const ___locals: {count?: unknown} = ___observable({});
         
             ___locals["count"] = 0;
@@ -287,7 +287,7 @@ Deno.test({
                 cn
                     |> entries 
                     |> fromEntries`,
-      `const classNames = (cn: unknown) => 
+      `const classNames = (cn) => 
             fromEntries(entries(cn))`,
     );
   },
@@ -301,8 +301,8 @@ Deno.test({
                 0..10 
                 |> map((n) => n * 2) 
                 |> filter((n) => n < 10)`,
-      `const myFunc = (a: unknown, b: unknown) =>
-            filter((n: unknown) => n < 10)(map((n: unknown) => n * 2)(___range(0)(10)))`,
+      `const myFunc = (a, b) =>
+            filter((n) => n < 10)(map((n) => n * 2)(___range(0)(10)))`,
     );
   },
 });

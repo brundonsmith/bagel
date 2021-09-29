@@ -1,6 +1,6 @@
 import { Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
-import { BOOLEAN_TYPE, FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
@@ -33,7 +33,7 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
                     }
                 }
 
-                if (ast.type.returnType.kind !== "unknown-type" && !subsumes(funcScope, ast.type.returnType, bodyType)) {
+                if (ast.type.returnType != null && !subsumes(funcScope, ast.type.returnType, bodyType)) {
                     reportError(assignmentError(ast.body, ast.type.returnType, bodyType));
                 }
                 
@@ -64,7 +64,7 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
                 } else {
                     for (let i = 0; i < ast.args.length; i++) {
                         const arg = ast.args[i]
-                        const subjectArgType = subjectType.args[i].type
+                        const subjectArgType = subjectType.args[i].type ?? UNKNOWN_TYPE
 
                         const argValueType = modulesStore.getTypeOf(arg)
 
@@ -193,8 +193,8 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
                 // TODO: This may become generalized later by generics/inverted inference
                 if (effectType.kind !== "proc-type" || effectType.args.length !== 1) {
                     reportError(miscError(ast.data, `Expected procedure taking one argument`));
-                } else if (dataType.kind === "func-type" && effectType.kind === "proc-type" && !subsumes(scope, effectType.args[0].type, dataType.returnType)) {
-                    reportError(assignmentError(effectType.args[0].name, effectType.args[0].type, dataType.returnType));
+                } else if (dataType.kind === "func-type" && effectType.kind === "proc-type" && !subsumes(scope, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE)) {
+                    reportError(assignmentError(effectType.args[0].name, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE));
                 }
 
                 return scope;
@@ -297,12 +297,12 @@ export function subsumes(scope: Scope, destination: TypeExpression, value: TypeE
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
             // NOTE: Value and destination are flipped on purpose for args!
-            && resolvedDestination.args.every((_, i) => subsumes(scope, resolvedValue.args[i].type, resolvedDestination.args[i].type))
-            && subsumes(scope, resolvedDestination.returnType, resolvedValue.returnType)) {
+            && resolvedDestination.args.every((_, i) => subsumes(scope, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))
+            && subsumes(scope, resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)) {
         return true;
     } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" 
             // NOTE: Value and destination are flipped on purpose for args!
-            && resolvedDestination.args.every((_, i) => subsumes(scope, resolvedValue.args[i].type, resolvedDestination.args[i].type))) {
+            && resolvedDestination.args.every((_, i) => subsumes(scope, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))) {
         return true;
     } else if (resolvedDestination.kind === "array-type" && resolvedValue.kind === "array-type") {
         return subsumes(scope, resolvedDestination.element, resolvedValue.element)
@@ -349,9 +349,9 @@ export function resolve(scope: Scope, type: TypeExpression): TypeExpression | un
         return {
             kind: "object-type",
             entries,
-            code: undefined,
-            startIndex: undefined,
-            endIndex: undefined,
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
         }
     } else if(type.kind === "array-type") {
         return given(resolve(scope, type.element), element => ({
@@ -365,8 +365,8 @@ export function resolve(scope: Scope, type: TypeExpression): TypeExpression | un
         return {
             kind: "func-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: resolve(scope, type) ?? type })),
-            returnType: resolve(scope, type.returnType) ?? type.returnType,
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t) ?? t) ?? UNKNOWN_TYPE })),
+            returnType: given(type.returnType, returnType => resolve(scope, returnType) ?? returnType) ?? UNKNOWN_TYPE,
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -375,7 +375,7 @@ export function resolve(scope: Scope, type: TypeExpression): TypeExpression | un
         return {
             kind: "proc-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: resolve(scope, type) ?? type })),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t) ?? t) ?? UNKNOWN_TYPE })),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -391,8 +391,8 @@ export function displayForm(typeExpression: TypeExpression): string {
         case "union-type": return typeExpression.members.map(displayForm).join(" | ");
         case "named-type": return typeExpression.name.name;
         // TODO: proc-type and func-type should display to users as (arg0, arg1, arg2) instead of (arg0) => (arg1) => (arg2)
-        case "proc-type": return `(${typeExpression.args.map(arg => `${arg.name.name}: ${displayForm(arg.type)}`).join(', ')}) {}`;
-        case "func-type": return `(${typeExpression.args.map(arg => `${arg.name.name}: ${displayForm(arg.type)}`).join(', ')}) => ${displayForm(typeExpression.returnType)}`;
+        case "proc-type": return `(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) {}`;
+        case "func-type": return `(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) => ${displayForm(typeExpression.returnType ?? UNKNOWN_TYPE)}`;
         case "object-type": return `{ ${typeExpression.entries.map(([ key, value ]) => `${key.name}: ${displayForm(value)}`)} }`;
         case "indexer-type": return `{ [${displayForm(typeExpression.keyType)}]: ${displayForm(typeExpression.valueType)} }`;
         case "array-type": return `${displayForm(typeExpression.element)}[]`;

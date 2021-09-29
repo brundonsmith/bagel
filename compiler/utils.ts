@@ -250,24 +250,21 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "named-type": {
             walkParseTree(nextPayload, ast.name, fn);
         } break;
-        case "proc-type": {
-            for (const m of ast.typeParams) {
-                walkParseTree(nextPayload, m, fn);
-            }
-            for (const arg of ast.args) {
-                walkParseTree(nextPayload, arg.name, fn);
-                walkParseTree(nextPayload, arg.type, fn);
-            }
-        } break;
+        case "proc-type":
         case "func-type": {
             for (const m of ast.typeParams) {
                 walkParseTree(nextPayload, m, fn);
             }
             for (const arg of ast.args) {
                 walkParseTree(nextPayload, arg.name, fn);
-                walkParseTree(nextPayload, arg.type, fn);
+                if (arg.type) {
+                    walkParseTree(nextPayload, arg.type, fn);
+                }
             }
-            walkParseTree(nextPayload, ast.returnType, fn);
+
+            if (ast.kind === "func-type" && ast.returnType) {
+                walkParseTree(nextPayload, ast.returnType, fn);
+            }
         } break;
         case "object-type": {
             for (const [k, v] of ast.entries) {

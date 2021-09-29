@@ -4,7 +4,7 @@ import { Module, AST } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
 import { ClassProperty } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
-import { UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
 export function compile(modulesStore: ModulesStore, module: Module): string {
@@ -74,8 +74,8 @@ ${given(ast.until, until => compileOne(modulesStore, until))});`;
         case "class-construction": return `new ${ast.clazz.name}()`;
         case "union-type": return ast.members.map(m => compileOne(modulesStore, m)).join(" | ");
         case "named-type": return ast.name.name;
-        case "proc-type": return `(${ast.args.map(arg => `${arg.name.name}: ${compileOne(modulesStore, arg.type)}`).join(', ')}) => void`;
-        case "func-type": return `(${ast.args.map(arg => `${arg.name.name}: ${compileOne(modulesStore, arg.type)}`).join(', ')}) => ${compileOne(modulesStore, ast.returnType)}`;
+        case "proc-type": return `(${compileArgs(modulesStore, ast.args)}) => void`;
+        case "func-type": return `(${compileArgs(modulesStore, ast.args)}) => ${compileOne(modulesStore, ast.returnType ?? UNKNOWN_TYPE)}`;
         case "element-type": return `unknown`;
         case "object-type": return `{${ast.entries
             .map(([ key, value ]) => `${key.name}: ${compileOne(modulesStore, value)}`)
@@ -116,7 +116,7 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
     const mutableLocals = Object.entries(modulesStore.getScopeFor(proc.body).values)
         .filter(e => e[1].mutability === "all");
 
-    return `(${proc.type.args.map(arg => `${arg.name.name}: ${compileOne(modulesStore, arg.type)}`).join(', ')}): void => {
+    return `(${compileArgs(modulesStore, proc.type.args)}): void => {
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
 `    const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileOne(modulesStore, e[1].declaredType ?? UNKNOWN_TYPE)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});
     
@@ -127,7 +127,7 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
 // TODO: dispose of reactions somehow... at some point...
 
 const compileFunc = (modulesStore: ModulesStore, func: Func): string => {
-    const signature = `(${func.type.args.map(arg => `${arg.name.name}: ${compileOne(modulesStore, arg.type)}`).join(', ')})${func.type.returnType.kind !== 'unknown-type' ? `: ${compileOne(modulesStore, func.type.returnType)}` : ''} => `;
+    const signature = `(${compileArgs(modulesStore, func.type.args)})${func.type.returnType != null ? `: ${compileOne(modulesStore, func.type.returnType)}` : ''} => `;
     const body = compileOne(modulesStore, func.body);
 
     if (func.consts.length > 0) {
@@ -153,4 +153,8 @@ function compileClassProperty(modulesStore: ModulesStore, ast: ClassProperty): s
     } else {
         return `    ${ast.access} ${ast.name.name}${typeDeclaration} = ${compileOne(modulesStore, ast.value)};`
     }
+}
+
+function compileArgs(modulesStore: ModulesStore, args: { name: PlainIdentifier, type?: TypeExpression}[]): string {
+    return args.map(arg => arg.name.name + (arg.type ? `: ${compileOne(modulesStore, arg.type)}` : '')).join(', ')
 }

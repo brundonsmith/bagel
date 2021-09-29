@@ -152,7 +152,6 @@ export function scopeFrom(reportError: (error: BagelError) => void, modulesStore
             
             return scope;
         case "block":
-            // add let-declarations to scope
             for (const statement of ast.statements) {
                 if (statement.kind === "let-declaration") {
                     if (scope.values[statement.name.name] != null || scope.classes[statement.name.name] != null) {
@@ -161,7 +160,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, modulesStore
 
                     scope.values[statement.name.name] = {
                         mutability: "all",
-                        declaredType: statement.type ?? UNKNOWN_TYPE, 
+                        declaredType: statement.type, 
                         initialValue: statement.value
                     };
                 }

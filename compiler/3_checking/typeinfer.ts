@@ -2,7 +2,7 @@ import { Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, walkParseTree } from "../utils.ts";
+import { deepEquals, walkParseTree, given } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
 import { resolve, subsumes } from "./typecheck.ts";
 import { ClassMember } from "../_model/declarations.ts";
@@ -22,7 +22,7 @@ export function typeinfer(reportError: (error: BagelError) => void, modulesStore
             const dataType = inferTypeAndStore(reportError, modulesStore, scope, ast.data)
             const effectType = inferTypeAndStore(reportError, modulesStore, scope, ast.effect)
 
-            if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.args[0]?.type.kind === "unknown-type") {
+            if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.args[0]?.type == null) {
                 effectType.args[0].type = dataType.returnType;
             }
         } else if (ast.kind === "computation") {
@@ -50,7 +50,6 @@ export function typeinfer(reportError: (error: BagelError) => void, modulesStore
                         const typeParam = subjectType.typeParams[i]
                         const typeArg = ast.typeArgs[i]
 
-
                         scope.types[typeParam.name] = typeArg
                     }
 
@@ -58,7 +57,7 @@ export function typeinfer(reportError: (error: BagelError) => void, modulesStore
                     subjectType = resolve(scope, subjectType) ?? subjectType;
                     modulesStore.astTypes.set(ast.subject, subjectType)
                     if (subjectType.kind === "func-type") {
-                        modulesStore.astTypes.set(ast, subjectType.returnType)
+                        modulesStore.astTypes.set(ast, subjectType.returnType ?? UNKNOWN_TYPE)
                     }
                 }
             }
@@ -70,12 +69,12 @@ export function typeinfer(reportError: (error: BagelError) => void, modulesStore
                     const subjectTypeArg = subjectType.args[i]
                     const argExpr = ast.args[i]
 
-                    if ((subjectTypeArg.type.kind === "func-type" && argExpr.kind === "func") 
-                        || (subjectTypeArg.type.kind === "proc-type" && argExpr.kind === "proc")) {
+                    if ((subjectTypeArg.type?.kind === "func-type" && argExpr.kind === "func") 
+                        || (subjectTypeArg.type?.kind === "proc-type" && argExpr.kind === "proc")) {
 
                         for (let j = 0; j < Math.min(subjectTypeArg.type.args.length, argExpr.type.args.length); j++) {
-                            if (argExpr.type.args[j].type.kind === "unknown-type") {
-                                modulesStore.astTypes.set(argExpr.type.args[j].name, subjectTypeArg.type.args[j].type);
+                            if (argExpr.type.args[j].type == null) {
+                                modulesStore.astTypes.set(argExpr.type.args[j].name, subjectTypeArg.type.args[j].type ?? UNKNOWN_TYPE);
                             }
                         }
                     }
@@ -94,12 +93,17 @@ function inferTypeAndStore(
     scope: Scope,
     ast: Expression|ClassMember,
 ): TypeExpression {
-    const type = handleSingletonUnion(
-        distillUnion(scope, 
-            flattenUnions(
-                inferType(reportError, modulesStore, scope, ast))));
-    modulesStore.astTypes.set(ast, type);
-    return type;
+    const cached = modulesStore.astTypes.get(ast)
+    if (cached != null) {
+        return cached
+    } else {
+        const type = handleSingletonUnion(
+            distillUnion(scope, 
+                flattenUnions(
+                    inferType(reportError, modulesStore, scope, ast))));
+        modulesStore.astTypes.set(ast, type);
+        return type;
+    }
 }
 
 function inferType(
@@ -117,7 +121,7 @@ function inferType(
                 ...ast.type,
 
                 // if no return-type is declared, try inferring the type from the inner expression
-                returnType: ast.type.returnType.kind === "unknown-type" 
+                returnType: ast.type.returnType == null
                     ? inferTypeAndStore(reportError, modulesStore, modulesStore.getScopeFor(ast), ast.body) 
                     : ast.type.returnType,
             }
@@ -141,7 +145,7 @@ function inferType(
             const funcType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
 
             if (funcType.kind === "func-type") {
-                return funcType.returnType;
+                return funcType.returnType ?? UNKNOWN_TYPE;
             } else {
                 return UNKNOWN_TYPE;
             }
@@ -219,17 +223,11 @@ function inferType(
             return UNKNOWN_TYPE
         }
         case "local-identifier": {
-            const descriptor = scope.values[ast.name];
+            const valueDescriptor = scope.values[ast.name]
 
-            if (descriptor == null) {
-                return UNKNOWN_TYPE;
-            } else if (descriptor.declaredType) {
-                return descriptor.declaredType;
-            } else if (descriptor.initialValue != null) {
-                return inferTypeAndStore(reportError, modulesStore, scope, descriptor.initialValue);
-            } else {
-                return UNKNOWN_TYPE;
-            }
+            return valueDescriptor?.declaredType 
+                ?? given(valueDescriptor?.initialValue, initialValue => inferTypeAndStore(reportError, modulesStore, scope, initialValue))
+                ?? UNKNOWN_TYPE
         }
         case "element-tag": {
             return {

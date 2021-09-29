@@ -4,7 +4,7 @@ import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
-import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType } from "../_model/type-expressions.ts";
 import { consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 
@@ -298,7 +298,7 @@ const funcType: ParseFunction<FuncType> = (code, startIndex) =>
         parsed: {
             kind: "func-type",
             typeParams: typeParams ?? [],
-            args: args.map(a => ({ name: a.name, type: a.type ?? UNKNOWN_TYPE })),
+            args,
             returnType,
             code,
             startIndex,
@@ -318,7 +318,7 @@ const procType: ParseFunction<FuncType|ProcType> = (code, startIndex) =>
         parsed: {
             kind: "proc-type",
             typeParams: [], // TODO
-            args: args.map(a => ({ name: a.name, type: a.type ?? UNKNOWN_TYPE })),
+            args,
             code,
             startIndex,
             endIndex: index
@@ -639,7 +639,7 @@ const proc: ParseFunction<Proc> = (code, startIndex) =>
             type: {
                 kind: "proc-type",
                 typeParams: [], // TODO
-                args: args.map(a => ({ name: a.name, type: a.type ?? UNKNOWN_TYPE })),
+                args: args,
                 code,
                 startIndex,
                 endIndex: index
@@ -733,7 +733,7 @@ const letDeclaration: ParseFunction<LetDeclaration> = (code, startIndex) =>
                 endIndex: index,
                 name,
                 value,
-                type: type ?? UNKNOWN_TYPE,
+                type
             },
             newIndex: index,
         }))))))))))))
@@ -946,8 +946,8 @@ const func: ParseFunction<Func> = (code, startIndex) =>
             type: {
                 kind: "func-type",
                 typeParams: typeParams ?? [],
-                args: args.map(a => ({ name: a.name, type: a.type ?? UNKNOWN_TYPE })),
-                returnType: returnType ?? UNKNOWN_TYPE,
+                args,
+                returnType,
                 code,
                 startIndex,
                 endIndex: index
