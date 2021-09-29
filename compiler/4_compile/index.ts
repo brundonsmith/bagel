@@ -27,7 +27,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "class-property": return  compileClassProperty(modulesStore, ast)
         case "class-function":
         case "class-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${compileOne(modulesStore, ast.value)}`
-        case "let-declaration": return `${compileOne(modulesStore, ast.name)} = ${compileOne(modulesStore, ast.value)}`;
+        case "let-declaration": return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(modulesStore, ast.value)}`;
         case "assignment": return `${compileOne(modulesStore, ast.target)} = ${compileOne(modulesStore, ast.value)}`;
         case "if-else-statement": return `if(${compileOne(modulesStore, ast.ifCondition)}) ${compileOne(modulesStore, ast.ifResult)}` 
             + (ast.elseResult != null ? ` else ${compileOne(modulesStore, ast.elseResult)}` : ``);
@@ -50,8 +50,8 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "range": return `${HIDDEN_IDENTIFIER_PREFIX}range(${ast.start})(${ast.end})`;
         case "parenthesized-expression": return `(${compileOne(modulesStore, ast.inner)})`;
         case "property-accessor": return `${compileOne(modulesStore, ast.subject)}.${compileOne(modulesStore, ast.property)}`;
-        case "local-identifier": return modulesStore.getScopeFor(ast).values[ast.name]?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
         case "plain-identifier": return ast.name;
+        case "local-identifier": return modulesStore.getScopeFor(ast).values[ast.name]?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
         case "object-literal":  return `{${objectEntries(modulesStore, ast.entries)}}`;
         case "array-literal":   return `[${ast.entries.map(e => compileOne(modulesStore, e)).join(", ")}]`;
         case "string-literal":  return `\`${ast.segments.map(segment =>
