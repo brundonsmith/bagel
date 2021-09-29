@@ -50,34 +50,14 @@ export function scopeFrom(reportError: (error: BagelTypeError) => void, modulesS
             for (const declaration of ast.declarations) {
                 if (declaration.kind === "type-declaration") {
                     scope.types[declaration.name.name] = declaration.type;
-                } else if (declaration.kind === "func-declaration") {
+                } else if (declaration.kind === "func-declaration" || declaration.kind === "proc-declaration" || declaration.kind === "const-declaration") {
                     if (scope.values[declaration.name.name] != null || scope.classes[declaration.name.name] != null) {
                         reportError(alreadyDeclared(declaration.name))
                     }
                     
                     scope.values[declaration.name.name] = {
                         mutability: "none",
-                        declaredType: declaration.func.type,
-                        initialValue: declaration.func
-                    };
-                } else if (declaration.kind === "proc-declaration") {
-                    if (scope.values[declaration.name.name] != null || scope.classes[declaration.name.name] != null) {
-                        reportError(alreadyDeclared(declaration.name))
-                    }
-
-                    scope.values[declaration.name.name] = {
-                        mutability: "none",
-                        declaredType: declaration.proc.type,
-                        initialValue: declaration.proc
-                    };
-                } else if (declaration.kind === "const-declaration") {
-                    if (scope.values[declaration.name.name] != null || scope.classes[declaration.name.name] != null) {
-                        reportError(alreadyDeclared(declaration.name))
-                    }
-                    
-                    scope.values[declaration.name.name] = {
-                        mutability: "none",
-                        declaredType: declaration.type,
+                        declaredType: declaration.kind === "const-declaration" ? declaration.type : declaration.value.type,
                         initialValue: declaration.value
                     };
                 } else if (declaration.kind === "class-declaration") {
@@ -236,20 +216,16 @@ function declName(declaration: Declaration): string|undefined {
 }
 
 function declType(declaration: Declaration): TypeExpression|undefined {
-    if (declaration.kind === "func-declaration") {
-        return declaration.func.type;
-    } else if (declaration.kind === "proc-declaration") {
-        return declaration.proc.type;
-    } else if (declaration.kind === "const-declaration") {
+    if (declaration.kind === "func-declaration" || declaration.kind === "proc-declaration") {
+        return declaration.value.type;
+    }else if (declaration.kind === "const-declaration") {
         return declaration.type;
     }
 }
 
 function declValue(declaration: Declaration): Expression|undefined {
     if (declaration.kind === "func-declaration") {
-        return declaration.func;
-    } else if (declaration.kind === "proc-declaration") {
-        return declaration.proc;
+        return declaration.value;
     } else if (declaration.kind === "const-declaration") {
         return declaration.value;
     }

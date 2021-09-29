@@ -20,8 +20,8 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
             compileOne(modulesStore, name) + (alias ? ` as ${compileOne(modulesStore, alias)}` : ``)
         ).join(", ")} } from "${ast.path.segments.join("")}.bgl.ts";`;
         case "type-declaration": return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileTypeExpression(ast.type)}`;
-        case "proc-declaration": return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + (ast.proc.kind === 'proc' ? compileProc(modulesStore, ast.proc) : compileFunc(modulesStore, ast.proc));
-        case "func-declaration": return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileFunc(modulesStore, ast.func);
+        case "proc-declaration":
+        case "func-declaration": return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(modulesStore, ast.value);
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(modulesStore, ast.name)}${ast.type ? `: ${compileTypeExpression(ast.type)}` : ''} = ${compileOne(modulesStore, ast.value)};`;
         case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(modulesStore, ast.name)} {\n${ast.members.map(m => compileOne(modulesStore, m)).join('\n')}\n}`;
         case "class-property": return  compileClassProperty(modulesStore, ast)

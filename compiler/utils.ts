@@ -91,13 +91,10 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.name, fn);
             walkParseTree(nextPayload, ast.type, fn);
         } break;
-        case "func-declaration": {
-            walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.func, fn);
-        } break;
+        case "func-declaration":
         case "proc-declaration": {
             walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.proc, fn);
+            walkParseTree(nextPayload, ast.value, fn);
         } break;
         case "const-declaration": {
             walkParseTree(nextPayload, ast.name, fn);

@@ -413,7 +413,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (code, startIndex) => {
                 code,
                 startIndex,
                 endIndex: index,
-                proc,
+                value: proc,
                 exported,
             },
             newIndex: index,
@@ -441,7 +441,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (code, startIndex) => {
                 code,
                 startIndex,
                 endIndex: index,
-                func,
+                value: func,
                 exported,
             },
             newIndex: index,
@@ -569,14 +569,14 @@ const classFunction: ParseFunction<ClassFunction> = (code, startIndex) => {
 
     const access = accessResult?.parsed ?? 'public';
     
-    return given(funcDeclaration(code, accessResult?.newIndex ?? startIndex), ({ parsed: { name, func }, newIndex: index }) => ({
+    return given(funcDeclaration(code, accessResult?.newIndex ?? startIndex), ({ parsed: { name, value }, newIndex: index }) => ({
         parsed: {
             kind: "class-function",
             code,
             startIndex,
             endIndex: index,
             name,
-            func,
+            func: value,
             access
         },
         newIndex: index,
@@ -596,14 +596,14 @@ const classProcedure: ParseFunction<ClassProcedure> = (code, startIndex) => {
 
     const access = accessResult?.parsed ?? 'public';
     
-    return given(procDeclaration(code, accessResult?.newIndex ?? startIndex), ({ parsed: { name, proc }, newIndex: index }) => ({
+    return given(procDeclaration(code, accessResult?.newIndex ?? startIndex), ({ parsed: { name, value }, newIndex: index }) => ({
         parsed: {
             kind: "class-procedure",
             code,
             startIndex,
             endIndex: index,
             name,
-            proc,
+            proc: value,
             access
         },
         newIndex: index,

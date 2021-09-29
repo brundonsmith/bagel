@@ -33,14 +33,14 @@ export type TypeDeclaration = SourceInfo & {
 export type ProcDeclaration = SourceInfo & {
     kind: "proc-declaration",
     name: PlainIdentifier,
-    proc: Proc,
+    value: Proc,
     exported: boolean,
 }
 
 export type FuncDeclaration = SourceInfo & {
     kind: "func-declaration",
     name: PlainIdentifier,
-    func: Func,
+    value: Func,
     exported: boolean,
 }
 
