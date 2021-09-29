@@ -33,7 +33,7 @@ export type TypeDeclaration = SourceInfo & {
 export type ProcDeclaration = SourceInfo & {
     kind: "proc-declaration",
     name: PlainIdentifier,
-    proc: Func|Proc,
+    proc: Proc,
     exported: boolean,
 }
 

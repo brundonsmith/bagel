@@ -627,7 +627,7 @@ const _accessModifier: ParseFunction<'private'|'public'> = (code, startIndex) =>
         newIndex: index
     }))
 
-const proc: ParseFunction<Func|Proc> = (code, startIndex) =>
+const proc: ParseFunction<Proc> = (code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
     given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
     given(consume(code, index, ")"), index =>
