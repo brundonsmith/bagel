@@ -1,8 +1,8 @@
-import { PlainIdentifier } from "../_model/common.ts";
+import { getScopeFor, PlainIdentifier, Scope } from "../_model/common.ts";
 import { BinaryOp, Expression } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given } from "../utils.ts";
-import { ModulesStore, Scope } from "./modules-store.ts";
+import { ModulesStore } from "./modules-store.ts";
 import { subsumes } from "./typecheck.ts";
 import { ClassMember } from "../_model/declarations.ts";
 import { BagelError } from "../errors.ts";
@@ -13,9 +13,9 @@ export function inferType(
     ast: Expression|ClassMember,
     preserveGenerics?: boolean,
 ): TypeExpression {
-    return resolve(modulesStore,
+    return resolve(undefined,
         handleSingletonUnion(
-            distillUnion(modulesStore.getScopeFor(ast),
+            distillUnion(getScopeFor(ast),
                 flattenUnions(
                     inferTypeInner(reportError, modulesStore, ast, !!preserveGenerics)))), preserveGenerics);
 }
@@ -26,7 +26,7 @@ function inferTypeInner(
     ast: Expression|ClassMember,
     preserveGenerics: boolean,
 ): TypeExpression {
-    const scope = modulesStore.getScopeFor(ast)
+    const scope = getScopeFor(ast)
 
     switch(ast.kind) {
         case "proc":
@@ -183,7 +183,7 @@ function inferTypeInner(
             return UNKNOWN_TYPE
         }
         case "local-identifier": {
-            const valueDescriptor = modulesStore.getScopeFor(ast).values[ast.name]
+            const valueDescriptor = getScopeFor(ast).values[ast.name]
             // console.log({ value: valueDescriptor.initialValue, uninferredType: (valueDescriptor?.initialValue as any).type, thingType: valueDescriptor?.declaredType 
             //     ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, modulesStore, initialValue, preserveGenerics))
             //     ?? UNKNOWN_TYPE })
@@ -239,7 +239,7 @@ function inferTypeInner(
         }
         case "class-construction": return {
             kind: "class-type",
-            clazz: modulesStore.getScopeFor(ast).classes[ast.clazz.name],
+            clazz: getScopeFor(ast).classes[ast.clazz.name],
             code: ast.clazz.code,
             startIndex: ast.clazz.startIndex,
             endIndex: ast.clazz.endIndex
@@ -255,17 +255,17 @@ function inferTypeInner(
     }
 }
 
-export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
+export function resolve(scope: undefined|Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
     if (type.kind === "named-type") {
-        const resolutionScope = modulesStoreOrScope instanceof ModulesStore
-            ? modulesStoreOrScope.getScopeFor(type)
-            : modulesStoreOrScope
+        const resolutionScope = scope == null
+            ? getScopeFor(type)
+            : scope
 
         // console.log({ type })
 
         if (resolutionScope.types[type.name.name]) {
             if (!resolutionScope.types[type.name.name].isGenericParameter || !preserveGenerics) {
-                return resolve(modulesStoreOrScope, resolutionScope.types[type.name.name].type)
+                return resolve(scope, resolutionScope.types[type.name.name].type)
             } else {
                 return type
             }
@@ -279,7 +279,7 @@ export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpre
             }
         }
     } else if(type.kind === "union-type") {
-        const memberTypes = type.members.map(member => resolve(modulesStoreOrScope, member));
+        const memberTypes = type.members.map(member => resolve(scope, member));
         if (memberTypes.some(member => member == null)) {
             return UNKNOWN_TYPE;
         } else {
@@ -293,7 +293,7 @@ export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpre
         }
     } else if(type.kind === "object-type") {
         const entries: [PlainIdentifier, TypeExpression][] = type.entries.map(([ key, valueType ]) => 
-            [key, resolve(modulesStoreOrScope, valueType as TypeExpression)] as [PlainIdentifier, TypeExpression]);
+            [key, resolve(scope, valueType as TypeExpression)] as [PlainIdentifier, TypeExpression]);
 
         return {
             kind: "object-type",
@@ -303,7 +303,7 @@ export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpre
             endIndex: type.endIndex,
         }
     } else if(type.kind === "array-type") {
-        const element = resolve(modulesStoreOrScope, type.element)
+        const element = resolve(scope, type.element)
 
         return {
             kind: "array-type",
@@ -316,8 +316,8 @@ export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpre
         return {
             kind: "func-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(modulesStoreOrScope, t, true) ?? t) })),
-            returnType: given(type.returnType, returnType => resolve(modulesStoreOrScope, returnType, true) ?? returnType),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t, true) ?? t) })),
+            returnType: given(type.returnType, returnType => resolve(scope, returnType, true) ?? returnType),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -326,7 +326,7 @@ export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpre
         return {
             kind: "proc-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(modulesStoreOrScope, t) ?? t) })),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t) ?? t) })),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,

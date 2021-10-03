@@ -1,14 +1,15 @@
 import { Module } from "../_model/ast.ts";
 import { BOOLEAN_TYPE, FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, walkParseTree } from "../utils.ts";
-import { ModulesStore, Scope } from "./modules-store.ts";
+import { ModulesStore } from "./modules-store.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
 import { inferType, resolve } from "./typeinfer.ts";
+import { getScopeFor, Scope } from "../_model/common.ts";
 
 
 export function typecheck(reportError: (error: BagelError) => void, modulesStore: ModulesStore, ast: Module) {
     walkParseTree<void>(undefined, ast, (_, ast) => {
-        const scope = modulesStore.getScopeFor(ast)
+        const scope = getScopeFor(ast)
 
         switch(ast.kind) {
             case "const-declaration": {
@@ -181,7 +182,7 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
                 }
             } break;
             case "assignment": {
-                if (ast.target.kind === "local-identifier" && modulesStore.getScopeFor(ast.target).values[ast.target.name].mutability !== "all") {
+                if (ast.target.kind === "local-identifier" && getScopeFor(ast.target).values[ast.target.name].mutability !== "all") {
                     reportError(miscError(ast.target, `Cannot assign to '${ast.target.name}' because it is not mutable`));
                 }
                 //  else if(ast.target.kind === "property-accessor" && scope.values[ast.target.]) {
@@ -249,7 +250,7 @@ export function subsumes(scope: Scope, destination: TypeExpression, value: TypeE
         }
     } else if (resolvedValue.kind === "union-type") {
         return false;
-    } else if(deepEquals(resolvedDestination, resolvedValue, ["code", "startIndex", "endIndex"])) {
+    } else if(deepEquals(resolvedDestination, resolvedValue, ["code", "startIndex", "endIndex", "scope"])) {
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
             // NOTE: Value and destination are flipped on purpose for args!
@@ -264,7 +265,7 @@ export function subsumes(scope: Scope, destination: TypeExpression, value: TypeE
         return subsumes(scope, resolvedDestination.element, resolvedValue.element)
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
         return resolvedDestination.entries.every(([key, destinationValue]) => 
-            given(resolvedValue.entries.find(e => deepEquals(e[0], key, ["code", "startIndex", "endIndex"]))?.[1], value => subsumes(scope, destinationValue, value)));
+            given(resolvedValue.entries.find(e => deepEquals(e[0], key, ["code", "startIndex", "endIndex", "scope"]))?.[1], value => subsumes(scope, destinationValue, value)));
     } else if (resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") {
         return subsumes(scope, resolvedDestination.itemType, resolvedValue.itemType);
     }

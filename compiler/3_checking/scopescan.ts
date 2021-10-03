@@ -1,13 +1,13 @@
 import { path } from "../deps.ts";
 
 import { AST, Module } from "../_model/ast.ts";
-import { Block } from "../_model/common.ts";
+import { Block, getScopeFor, Scope } from "../_model/common.ts";
 import { ClassDeclaration, Declaration } from "../_model/declarations.ts";
 import { Func, Proc, Expression, StringLiteral, Invocation } from "../_model/expressions.ts";
 import { ForLoop } from "../_model/statements.ts";
 import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { walkParseTree } from "../utils.ts";
-import { ModulesStore, Scope } from "./modules-store.ts";
+import { ModulesStore } from "./modules-store.ts";
 import { alreadyDeclared, BagelError, cannotFindExport, cannotFindModule, miscError } from "../errors.ts";
 import { inferType } from "./typeinfer.ts";
 
@@ -24,20 +24,19 @@ export function scopescan(reportError: (error: BagelError) => void, modulesStore
         // If ast is of a type that defines its own scope, define that and 
         // mark it as this ast's scope
         if (isScopeOwner(ast)) {
-            const scope = scopeFrom(reportError, modulesStore.modules, ast, module, payload);
-            modulesStore.scopeFor.set(ast, scope);
-            return scope;
+            ast.scope = scopeFrom(reportError, modulesStore.modules, ast, module, payload);
         } else {
             // Otherwise, mark the containing scope as this ast's scope
-            modulesStore.scopeFor.set(ast, payload as Scope);
-            return payload;
+            ast.scope = payload
         }
+        
+        return ast.scope;
     });
 
     walkParseTree<void>(undefined, ast, (_, ast) => {
 
         // infer
-        const scope = modulesStore.getScopeFor(ast)
+        const scope = getScopeFor(ast)
         switch(ast.kind) {
             case "for-loop": {
 

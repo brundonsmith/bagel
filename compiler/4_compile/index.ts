@@ -1,7 +1,7 @@
 import { ModulesStore } from "../3_checking/modules-store.ts";
 import { given } from "../utils.ts";
 import { Module, AST } from "../_model/ast.ts";
-import { PlainIdentifier } from "../_model/common.ts";
+import { getScopeFor, PlainIdentifier } from "../_model/common.ts";
 import { ClassProperty } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
 import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
@@ -51,7 +51,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "parenthesized-expression": return `(${compileOne(modulesStore, ast.inner)})`;
         case "property-accessor": return `${compileOne(modulesStore, ast.subject)}.${compileOne(modulesStore, ast.property)}`;
         case "plain-identifier": return ast.name;
-        case "local-identifier": return modulesStore.getScopeFor(ast).values[ast.name]?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
+        case "local-identifier": return getScopeFor(ast).values[ast.name]?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
         case "object-literal":  return `{${objectEntries(modulesStore, ast.entries)}}`;
         case "array-literal":   return `[${ast.entries.map(e => compileOne(modulesStore, e)).join(", ")}]`;
         case "string-literal":  return `\`${ast.segments.map(segment =>
@@ -113,7 +113,7 @@ const LOCALS_OBJ = HIDDEN_IDENTIFIER_PREFIX + "locals";
 // const SENTINEL_OBJ = HIDDEN_IDENTIFIER_PREFIX + "sentinel";
 
 function compileProc(modulesStore: ModulesStore, proc: Proc): string {
-    const mutableLocals = Object.entries(modulesStore.getScopeFor(proc.body).values)
+    const mutableLocals = Object.entries(getScopeFor(proc.body).values)
         .filter(e => e[1].mutability === "all");
 
     return `(${compileArgs(modulesStore, proc.type.args)}): void => {
