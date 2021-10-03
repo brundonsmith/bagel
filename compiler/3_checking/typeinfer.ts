@@ -62,7 +62,7 @@ function inferTypeInner(
                 
                 // if no return-type is declared, try inferring the type from the inner expression
                 const returnType = ast.type.returnType ??
-                    inferType(reportError, modulesStore, ast.body, preserveGenerics)
+                    inferType(reportError, modulesStore, ast.body, true)
 
                 // console.log({ inferredReturnType: returnType })
                 
@@ -310,8 +310,8 @@ export function resolve(scope: Scope, type: TypeExpression, preserveGenerics?: b
         return {
             kind: "func-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t) ?? t) })),
-            returnType: given(type.returnType, returnType => resolve(scope, returnType) ?? returnType),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t, true) ?? t) })),
+            returnType: given(type.returnType, returnType => resolve(scope, returnType, true) ?? returnType),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
