@@ -1,19 +1,19 @@
 import { Statement } from "./statements.ts";
 
 export type SourceInfo = {
-    code: string|undefined,
-    startIndex: number|undefined,
-    endIndex: number|undefined,
+    readonly code: string|undefined,
+    readonly startIndex: number|undefined,
+    readonly endIndex: number|undefined,
 }
 
 export type PlainIdentifier = SourceInfo & {
-    kind: "plain-identifier",
-    name: string,
+    readonly kind: "plain-identifier",
+    readonly name: string,
 }
 
 export type Block = SourceInfo & {
-    kind: "block",
-    statements: Statement[],
+    readonly kind: "block",
+    readonly statements: readonly Statement[],
 }
 
 export const KEYWORDS = [ "func", "proc", "if", "else", "switch", "case",

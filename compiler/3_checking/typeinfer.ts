@@ -1,132 +1,82 @@
-import { Module } from "../_model/ast.ts";
 import { PlainIdentifier } from "../_model/common.ts";
-import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
+import { BinaryOp, Expression } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, walkParseTree, given } from "../utils.ts";
+import { deepEquals, given } from "../utils.ts";
 import { ModulesStore, Scope } from "./modules-store.ts";
-import { resolve, subsumes } from "./typecheck.ts";
+import { subsumes } from "./typecheck.ts";
 import { ClassMember } from "../_model/declarations.ts";
-import { BagelError,miscError } from "../errors.ts";
+import { BagelError } from "../errors.ts";
 
-export function typeinfer(reportError: (error: BagelError) => void, modulesStore: ModulesStore, ast: Module): void {
-    walkParseTree<Scope>(modulesStore.getScopeFor(ast), ast, (scope, ast) => {
-        if (modulesStore.astTypes.get(ast) == null && isExpression(ast)) {
-            inferTypeAndStore(reportError, modulesStore, scope, ast)
-        }
-  
-        if (ast.kind === "reaction") {
-            // TODO: Might be best to transform the reaction ast under the hood 
-            // to a proc call taking a function and proc, to leverage the same
-            // type inference mechanism for arguments that will be used 
-            // elsewhere 
-            const dataType = inferTypeAndStore(reportError, modulesStore, scope, ast.data)
-            const effectType = inferTypeAndStore(reportError, modulesStore, scope, ast.effect)
-
-            if (dataType.kind === "func-type" && effectType.kind === "proc-type" && effectType.args[0]?.type == null) {
-                effectType.args[0].type = dataType.returnType;
-            }
-        } else if (ast.kind === "computation") {
-            inferTypeAndStore(reportError, modulesStore, scope, ast.expression)
-        } else if (ast.kind === "for-loop") {
-            const iteratorType = inferTypeAndStore(reportError, modulesStore, scope, ast.iterator)
-
-            if (iteratorType.kind === "iterator-type") {
-                modulesStore.astTypes.set(ast.itemIdentifier, iteratorType.itemType)
-            }
-        } else if (ast.kind === "invocation") {
-            let subjectType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
-
-                // bind type-args for this invocation
-                // HACK: this is really scopescanning...
-            if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
-                if (subjectType.typeParams.length > 0) {
-                    if (subjectType.typeParams.length !== ast.typeArgs?.length) {
-                        reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs?.length ?? 0}`))
-                    }
-
-                    const scope = modulesStore.getScopeFor(ast)
-                    for (let i = 0; i < subjectType.typeParams.length; i++) {
-                        const typeParam = subjectType.typeParams[i]
-                        const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
-
-                        scope.types[typeParam.name] = typeArg
-                    }
-
-                    // HACK: re-evaluate type with new scope contents
-                    subjectType = resolve(scope, subjectType) ?? subjectType;
-                    modulesStore.astTypes.set(ast.subject, subjectType)
-                    if (subjectType.kind === "func-type") {
-                        modulesStore.astTypes.set(ast, subjectType.returnType ?? UNKNOWN_TYPE)
-                    }
-                }
-            }
-
-            if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
-
-                // infer callback argument types based on context
-                for (let i = 0; i < Math.min(subjectType.args.length, ast.args.length); i++) {
-                    const subjectTypeArg = subjectType.args[i]
-                    const argExpr = ast.args[i]
-
-                    if ((subjectTypeArg.type?.kind === "func-type" && argExpr.kind === "func") 
-                        || (subjectTypeArg.type?.kind === "proc-type" && argExpr.kind === "proc")) {
-
-                        for (let j = 0; j < Math.min(subjectTypeArg.type.args.length, argExpr.type.args.length); j++) {
-                            if (argExpr.type.args[j].type == null) {
-                                modulesStore.astTypes.set(argExpr.type.args[j].name, subjectTypeArg.type.args[j].type ?? UNKNOWN_TYPE);
-                            }
-                        }
-                    }
-                }
-
-            }
-        }
-
-        return modulesStore.scopeFor.get(ast) ?? scope;
-    });
-}
-
-function inferTypeAndStore(
+export function inferType(
     reportError: (error: BagelError) => void, 
-    modulesStore: ModulesStore,  
-    scope: Scope,
+    modulesStore: ModulesStore,
     ast: Expression|ClassMember,
+    preserveGenerics?: boolean,
 ): TypeExpression {
-    const cached = modulesStore.astTypes.get(ast)
-    if (cached != null) {
-        return cached
-    } else {
-        const type = handleSingletonUnion(
-            distillUnion(scope, 
+    return resolve(modulesStore.getScopeFor(ast),
+        handleSingletonUnion(
+            distillUnion(modulesStore.getScopeFor(ast),
                 flattenUnions(
-                    inferType(reportError, modulesStore, scope, ast))));
-        modulesStore.astTypes.set(ast, type);
-        return type;
-    }
+                    inferTypeInner(reportError, modulesStore, ast, !!preserveGenerics)))), preserveGenerics);
 }
 
-function inferType(
+function inferTypeInner(
     reportError: (error: BagelError) => void, 
-    modulesStore: ModulesStore, 
-    scope: Scope,
-    ast: Expression|ClassMember, 
+    modulesStore: ModulesStore,
+    ast: Expression|ClassMember,
+    preserveGenerics: boolean,
 ): TypeExpression {
-    switch(ast.kind) {
-        case "proc": {
-            return ast.type;
-        }
-        case "func": {
-            return {
-                ...ast.type,
+    const scope = modulesStore.getScopeFor(ast)
 
-                // if no return-type is declared, try inferring the type from the inner expression
-                returnType: ast.type.returnType ??
-                    inferTypeAndStore(reportError, modulesStore, modulesStore.getScopeFor(ast), ast.body)
+    switch(ast.kind) {
+        case "proc":
+        case "func": {
+            let args = ast.type.args
+            
+            // infer callback argument types based on context
+            const parent = modulesStore.parentAst.get(ast)
+            if (parent?.kind === "invocation") {
+                const parentSubjectType = inferType(reportError, modulesStore, parent.subject, preserveGenerics)
+                const thisArgIndex = parent.args.findIndex(a => a === ast)
+
+                if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
+                    const thisArgParentType = parentSubjectType.args[thisArgIndex]?.type
+
+                    if (thisArgParentType && thisArgParentType.kind === ast.type.kind) {
+                        args = ast.type.args.map((arg, i) => 
+                            arg.type == null
+                                ? { ...arg, type: thisArgParentType.args[i].type }
+                                : arg)
+                    }
+                }
             }
+
+            if (ast.kind === "proc") {
+                return {
+                    ...ast.type,
+                    args,
+                }
+            } else {
+
+                // console.log({ returnType: ast.type.returnType })
+                
+                // if no return-type is declared, try inferring the type from the inner expression
+                const returnType = ast.type.returnType ??
+                    inferType(reportError, modulesStore, ast.body, preserveGenerics)
+
+                // console.log({ inferredReturnType: returnType })
+                
+                return {
+                    ...ast.type,
+                    args,
+                    returnType, 
+                }
+            }
+
         }
         case "binary-operator": {
-            const leftType = inferTypeAndStore(reportError, modulesStore, scope, ast.args[0]);
-            const rightType = inferTypeAndStore(reportError, modulesStore, scope, ast.args[1]);
+            const leftType = inferType(reportError, modulesStore, ast.args[0], preserveGenerics);
+            const rightType = inferType(reportError, modulesStore, ast.args[1], preserveGenerics);
 
             for (const types of BINARY_OPERATOR_TYPES[ast.operator]) {
                 const { left, right, output } = types;
@@ -140,7 +90,15 @@ function inferType(
         }
         case "pipe":
         case "invocation": {
-            const subjectType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
+            // console.log('---------begin invocation-------------')
+            // console.log({ preserveGenerics, subject: ast.subject })
+            let subjectType = inferType(reportError, modulesStore, ast.subject, true);
+            // console.log({ subjectType })
+            subjectType = resolve(scope, subjectType, false);
+            // console.log({ resolvedSubjectType: subjectType })
+            // console.log({ scope: modulesStore.getScopeFor(ast.subject).types })
+            // console.log({ invocationScope: modulesStore.getScopeFor(ast).types })
+
 
             if (subjectType.kind === "func-type") {
                 return subjectType.returnType ?? UNKNOWN_TYPE;
@@ -149,8 +107,8 @@ function inferType(
             }
         }
         case "indexer": {
-            const baseType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
-            const indexerType = inferTypeAndStore(reportError, modulesStore, scope, ast.indexer);
+            const baseType = inferType(reportError, modulesStore, ast.subject, preserveGenerics);
+            const indexerType = inferType(reportError, modulesStore, ast.indexer, preserveGenerics);
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
                 const key = indexerType.value.segments[0];
@@ -177,10 +135,10 @@ function inferType(
         }
         case "if-else-expression":
         case "switch-expression": {
-            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferTypeAndStore(reportError, modulesStore, scope, ast.value)
+            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, modulesStore, ast.value, preserveGenerics)
 
             const caseTypes = ast.cases.map(({ outcome }) => 
-                inferTypeAndStore(reportError, modulesStore, scope, outcome))
+                inferType(reportError, modulesStore,outcome, preserveGenerics))
 
             const unionType: UnionType = {
                 kind: "union-type",
@@ -191,19 +149,23 @@ function inferType(
             };
 
             if (!subsumes(scope, unionType, valueType)) {
-                unionType.members.push(
-                    ast.defaultCase 
-                        ? inferTypeAndStore(reportError, modulesStore, scope, ast.defaultCase) 
-                        : NIL_TYPE
-                )
+                return {
+                    ...unionType,
+                    members: [
+                        ...unionType.members,
+                        ast.defaultCase 
+                            ? inferType(reportError, modulesStore, ast.defaultCase, preserveGenerics) 
+                            : NIL_TYPE
+                    ]
+                }
             }
             
             return unionType
         }
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
-        case "parenthesized-expression": return inferTypeAndStore(reportError, modulesStore, scope, ast.inner);
+        case "parenthesized-expression": return inferType(reportError, modulesStore, ast.inner, preserveGenerics);
         case "property-accessor": {
-            const subjectType = inferTypeAndStore(reportError, modulesStore, scope, ast.subject);
+            const subjectType = inferType(reportError, modulesStore, ast.subject, preserveGenerics);
             
             if (subjectType.kind === "object-type") {
                 return subjectType.entries.find(entry => entry[0].name === ast.property.name)?.[1] ?? UNKNOWN_TYPE
@@ -211,9 +173,9 @@ function inferType(
                 const member = subjectType.clazz.members.find(member => member.name.name === ast.property.name)
                 if (member) {
                     if (member.kind === "class-function" || member.kind === "class-procedure") {
-                        return inferTypeAndStore(reportError, modulesStore, scope, member.value)
+                        return inferType(reportError, modulesStore,member.value, preserveGenerics)
                     } else {
-                        return member.type ?? inferTypeAndStore(reportError, modulesStore, scope, member.value)
+                        return member.type ?? inferType(reportError, modulesStore,member.value, preserveGenerics)
                     }
                 }
             }
@@ -221,10 +183,13 @@ function inferType(
             return UNKNOWN_TYPE
         }
         case "local-identifier": {
-            const valueDescriptor = scope.values[ast.name]
+            const valueDescriptor = modulesStore.getScopeFor(ast).values[ast.name]
+            // console.log({ value: valueDescriptor.initialValue, uninferredType: (valueDescriptor?.initialValue as any).type, thingType: valueDescriptor?.declaredType 
+            //     ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, modulesStore, initialValue, preserveGenerics))
+            //     ?? UNKNOWN_TYPE })
 
             return valueDescriptor?.declaredType 
-                ?? given(valueDescriptor?.initialValue, initialValue => inferTypeAndStore(reportError, modulesStore, scope, initialValue))
+                ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, modulesStore, initialValue, preserveGenerics))
                 ?? UNKNOWN_TYPE
         }
         case "element-tag": {
@@ -239,7 +204,7 @@ function inferType(
         }
         case "object-literal": {
             const entries = ast.entries.map(([key, value]) => 
-                [key, inferTypeAndStore(reportError, modulesStore, scope, value)] as [PlainIdentifier, TypeExpression]);
+                [key, inferType(reportError, modulesStore,value, preserveGenerics)] as [PlainIdentifier, TypeExpression]);
 
             return {
                 kind: "object-type",
@@ -250,7 +215,7 @@ function inferType(
             };
         }
         case "array-literal": {
-            const entries = ast.entries.map(entry => inferTypeAndStore(reportError, modulesStore, scope, entry));
+            const entries = ast.entries.map(entry => inferType(reportError, modulesStore, entry, preserveGenerics));
 
             // NOTE: This could be slightly better where different element types overlap each other
             const uniqueEntryTypes = entries.filter((el, index, arr) => 
@@ -274,14 +239,14 @@ function inferType(
         }
         case "class-construction": return {
             kind: "class-type",
-            clazz: scope.classes[ast.clazz.name],
+            clazz: modulesStore.getScopeFor(ast).classes[ast.clazz.name],
             code: ast.clazz.code,
             startIndex: ast.clazz.startIndex,
             endIndex: ast.clazz.endIndex
         };
         case "class-property":
         case "class-function":
-        case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferTypeAndStore(reportError, modulesStore, scope, ast.value);
+        case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferType(reportError, modulesStore, ast.value, preserveGenerics);
         case "string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
         case "boolean-literal": return BOOLEAN_TYPE;
@@ -290,50 +255,80 @@ function inferType(
     }
 }
 
-const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
-    "+": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE },
-        { left: STRING_TYPE, right: STRING_TYPE, output: STRING_TYPE },
-        { left: NUMBER_TYPE, right: STRING_TYPE, output: STRING_TYPE },
-        { left: STRING_TYPE, right: NUMBER_TYPE, output: STRING_TYPE },
-    ],
-    "-": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
-    ],
-    "*": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
-    ],
-    "/": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
-    ],
-    "<": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    ">": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "<=": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    ">=": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "&&": [
-        { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "||": [
-        { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "==": [
-        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "??": [
-        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: UNKNOWN_TYPE }
-    ],
-    // "??": {
-    //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
-    //     output: BOOLEAN_TYPE
-    // },
+export function resolve(scope: Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
+    if (type.kind === "named-type") {
+        if (scope.types[type.name.name]) {
+            if (!scope.types[type.name.name].isGenericParameter || !preserveGenerics) {
+                return resolve(scope, scope.types[type.name.name].type)
+            } else {
+                return type
+            }
+        } else if (scope.classes[type.name.name]) {
+            return {
+                kind: "class-type",
+                clazz: scope.classes[type.name.name],
+                code: type.code,
+                startIndex: type.startIndex,
+                endIndex: type.endIndex
+            }
+        }
+    } else if(type.kind === "union-type") {
+        const memberTypes = type.members.map(member => resolve(scope, member));
+        if (memberTypes.some(member => member == null)) {
+            return UNKNOWN_TYPE;
+        } else {
+            return {
+                kind: "union-type",
+                members: memberTypes as TypeExpression[],
+                code: type.code,
+                startIndex: type.startIndex,
+                endIndex: type.endIndex,
+            };
+        }
+    } else if(type.kind === "object-type") {
+        const entries: [PlainIdentifier, TypeExpression][] = type.entries.map(([ key, valueType ]) => 
+            [key, resolve(scope, valueType as TypeExpression)] as [PlainIdentifier, TypeExpression]);
+
+        return {
+            kind: "object-type",
+            entries,
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
+        }
+    } else if(type.kind === "array-type") {
+        const element = resolve(scope, type.element)
+
+        return {
+            kind: "array-type",
+            element,
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
+        };
+    } else if(type.kind === "func-type") {
+        return {
+            kind: "func-type",
+            typeParams: type.typeParams,
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t) ?? t) })),
+            returnType: given(type.returnType, returnType => resolve(scope, returnType) ?? returnType),
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
+        };
+    } else if(type.kind === "proc-type") {
+        return {
+            kind: "proc-type",
+            typeParams: type.typeParams,
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t) ?? t) })),
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
+        };
+    }
+
+    // TODO: Recurse onIndexerType, TupleType, etc
+    return type;
 }
 
 function flattenUnions(type: TypeExpression): TypeExpression {
@@ -403,4 +398,50 @@ function unknownFallback(type: TypeExpression, fallback: Expression): TypeExpres
     } else {
         return type;
     }
+}
+
+const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
+    "+": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE },
+        { left: STRING_TYPE, right: STRING_TYPE, output: STRING_TYPE },
+        { left: NUMBER_TYPE, right: STRING_TYPE, output: STRING_TYPE },
+        { left: STRING_TYPE, right: NUMBER_TYPE, output: STRING_TYPE },
+    ],
+    "-": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
+    ],
+    "*": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
+    ],
+    "/": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
+    ],
+    "<": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
+    ],
+    ">": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "<=": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
+    ],
+    ">=": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "&&": [
+        { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "||": [
+        { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "==": [
+        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "??": [
+        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: UNKNOWN_TYPE }
+    ],
+    // "??": {
+    //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
+    //     output: BOOLEAN_TYPE
+    // },
 }

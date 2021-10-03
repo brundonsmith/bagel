@@ -1,6 +1,7 @@
 import { Module } from "../_model/ast.ts";
 import { UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { walkParseTree } from "../utils.ts";
+import { Statement } from "../_model/statements.ts";
 
 /**
  * Reshape the parse tree in various ways, including simplification of later 
@@ -19,7 +20,8 @@ export function reshape(ast: Module): Module {
 
                         // TODO: Once constants within procedures are a thing, 
                         // this should be a constant
-                        ast.statements[i] = {
+                        // HACK: Type cast is safe because we clone above
+                        (ast.statements as Statement[])[i] = {
                             kind: "let-declaration",
                             name,
                             code,

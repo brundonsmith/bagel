@@ -15,6 +15,6 @@ export type AST =
     | Block
 
 export type Module = {
-    kind: "module",
-    declarations: Declaration[],
+    readonly kind: "module",
+    readonly declarations: readonly Declaration[],
 }

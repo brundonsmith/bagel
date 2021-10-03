@@ -1,7 +1,6 @@
 import { ModulesStore } from "../compiler/3_checking/modules-store.ts";
 import { scopescan } from "../compiler/3_checking/scopescan.ts";
 import { typecheck } from "../compiler/3_checking/typecheck.ts";
-import { typeinfer } from "../compiler/3_checking/typeinfer.ts";
 import { parse } from "../compiler/1_parse/index.ts";
 import { BagelError,prettyError } from "../compiler/errors.ts";
 
@@ -173,7 +172,6 @@ function testTypecheck(code: string, shouldFail: boolean): void {
   modulesStore.modules.set("foo", parsed);
 
   scopescan(reportError, modulesStore, parsed, "foo");
-  typeinfer(reportError, modulesStore, parsed);
   typecheck(reportError, modulesStore, parsed);
 
   if (!shouldFail && errors.length > 0) {

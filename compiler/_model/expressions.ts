@@ -26,39 +26,39 @@ export type Expression =
     | ClassConstruction
 
 export type JavascriptEscape = SourceInfo & {
-    kind: "javascript-escape",
-    js: string,
+    readonly kind: "javascript-escape",
+    readonly js: string,
 }
   
 export type Pipe = SourceInfo & {
-    kind: "pipe",
-    subject: Expression,
-    args: [Expression],
+    readonly kind: "pipe",
+    readonly subject: Expression,
+    readonly args: [Expression],
 }
   
 export type Func = SourceInfo & {
-    kind: "func",
-    type: FuncType,
-    consts: { name: PlainIdentifier, type?: TypeExpression, value: Expression }[],
-    body: Expression,
+    readonly kind: "func",
+    readonly type: FuncType,
+    readonly consts: readonly { readonly name: PlainIdentifier, readonly type?: TypeExpression, readonly value: Expression }[],
+    readonly body: Expression,
 }
 
 export type Proc = SourceInfo & {
-    kind: "proc",
-    type: ProcType,
-    body: Block,
+    readonly kind: "proc",
+    readonly type: ProcType,
+    readonly body: Block,
 }
 
 export type Range = SourceInfo & {
-    kind: "range",
-    start: number,
-    end: number,
+    readonly kind: "range",
+    readonly start: number,
+    readonly end: number,
 }
 
 export type BinaryOperator = SourceInfo & {
-    kind: "binary-operator",
-    operator: BinaryOp,
-    args: [Expression, Expression],
+    readonly kind: "binary-operator",
+    readonly operator: BinaryOp,
+    readonly args: readonly [Expression, Expression],
     // TODO: Once generics are fully functional, create a `type: FuncType` property
 }
 
@@ -66,86 +66,86 @@ export const BINARY_OPS = [ "+", "-", "*", "/", "<=", ">=", "<", ">", "==", "&&"
 export type BinaryOp = typeof BINARY_OPS[number];
 
 export type Invocation = SourceInfo & {
-    kind: "invocation",
-    subject: Expression,
-    args: Expression[],
-    typeArgs?: TypeExpression[],
+    readonly kind: "invocation",
+    readonly subject: Expression,
+    readonly args: readonly Expression[],
+    readonly typeArgs?: readonly TypeExpression[],
 }
 
 export type Indexer = SourceInfo & {
-    kind: "indexer",
-    subject: Expression,
-    indexer: Expression,
+    readonly kind: "indexer",
+    readonly subject: Expression,
+    readonly indexer: Expression,
 }
 
 export type PropertyAccessor = SourceInfo & {
-    kind: "property-accessor",
-    subject: Expression,
-    property: PlainIdentifier,
+    readonly kind: "property-accessor",
+    readonly subject: Expression,
+    readonly property: PlainIdentifier,
 }
 
 export type ParenthesizedExpression = SourceInfo & {
-    kind: "parenthesized-expression",
-    inner: Expression,
+    readonly kind: "parenthesized-expression",
+    readonly inner: Expression,
 }
 
 export type LocalIdentifier = SourceInfo & {
-    kind: "local-identifier",
-    name: string,
+    readonly kind: "local-identifier",
+    readonly name: string,
 }
 
 export type IfElseExpression = SourceInfo & {
-    kind: "if-else-expression",
-    cases: { condition: Expression, outcome: Expression }[],
-    defaultCase?: Expression
+    readonly kind: "if-else-expression",
+    readonly cases: readonly { readonly condition: Expression, readonly outcome: Expression }[],
+    readonly defaultCase?: Expression
 }
 
 export type SwitchExpression = SourceInfo & {
-    kind: "switch-expression",
-    value: Expression,
-    cases: { condition: Expression, outcome: Expression }[],
-    defaultCase?: Expression
+    readonly kind: "switch-expression",
+    readonly value: Expression,
+    readonly cases: readonly { readonly condition: Expression, readonly outcome: Expression }[],
+    readonly defaultCase?: Expression
 }
 
 export type BooleanLiteral = SourceInfo & {
-    kind: "boolean-literal",
-    value: boolean,
+    readonly kind: "boolean-literal",
+    readonly value: boolean,
 }
 
 export type NilLiteral = SourceInfo & {
-    kind: "nil-literal",
+    readonly kind: "nil-literal",
 }
 
 export type ObjectLiteral = SourceInfo & {
-    kind: "object-literal",
-    entries: [PlainIdentifier, Expression][],
+    readonly kind: "object-literal",
+    readonly entries: readonly (readonly [PlainIdentifier, Expression])[],
 }
 
 export type ArrayLiteral = SourceInfo & {
-    kind: "array-literal",
-    entries: Expression[],
+    readonly kind: "array-literal",
+    readonly entries: readonly Expression[],
 }
 
 export type StringLiteral = SourceInfo & {
-    kind: "string-literal",
-    segments: (string|Expression)[],
+    readonly kind: "string-literal",
+    readonly segments: readonly (string|Expression)[],
 }
 
 export type NumberLiteral = SourceInfo & {
-    kind: "number-literal",
-    value: number,
+    readonly kind: "number-literal",
+    readonly value: number,
 }
 
 export type ElementTag = SourceInfo & {
-    kind: "element-tag",
-    tagName: PlainIdentifier,
-    attributes: [PlainIdentifier, Expression][],
-    children: Expression[],
+    readonly kind: "element-tag",
+    readonly tagName: PlainIdentifier,
+    readonly attributes: readonly (readonly [PlainIdentifier, Expression])[],
+    readonly children: readonly Expression[],
 }
 
 export type ClassConstruction = SourceInfo & {
-    kind: "class-construction",
-    clazz: LocalIdentifier,
+    readonly kind: "class-construction",
+    readonly clazz: LocalIdentifier,
     
 }
 

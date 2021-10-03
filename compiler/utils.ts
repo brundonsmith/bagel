@@ -14,8 +14,8 @@ export function log<T>(expr: T, fn?: (expr: T) => string): T {
 }
 
 type BasicData =
-    | {[key: string]: BasicData}
-    | BasicData[]
+    | {readonly [key: string]: BasicData}
+    | readonly BasicData[]
     | string
     | number
     | boolean
@@ -39,7 +39,10 @@ export function deepEquals(a: BasicData, b: BasicData, ignorePropNames: string[]
                 return true;
             }
         } else if(!Array.isArray(a) && !Array.isArray(b)) {
-            const keysSet = Array.from(new Set([...Object.keys(a as {}), ...Object.keys(b as {})]));
+            a = a as {readonly [key: string]: BasicData}
+            b = b as {readonly [key: string]: BasicData}
+            
+            const keysSet = Array.from(new Set([...Object.keys(a), ...Object.keys(b)]));
             
             for (const key of keysSet) {
                 if (!ignorePropNames.includes(key) && !deepEquals(a[key], b[key], ignorePropNames)) {

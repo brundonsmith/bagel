@@ -4,7 +4,6 @@ import { ModulesStore } from "../compiler/3_checking/modules-store.ts";
 import { scopescan } from "../compiler/3_checking/scopescan.ts";
 import { compile } from "../compiler/4_compile/index.ts";
 import { printError } from "../compiler/errors.ts";
-import { withoutSourceInfo } from "../compiler/utils.ts";
 
 const module = "module";
 function testCompile(bgl: string, exp: string) {

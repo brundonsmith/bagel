@@ -25,53 +25,53 @@ export type TypeExpression =
     | JavascriptEscapeType
 
 export type UnionType = SourceInfo & {
-    kind: "union-type",
-    members: TypeExpression[],
+    readonly kind: "union-type",
+    readonly members: readonly TypeExpression[],
 }
 
 export type NamedType = SourceInfo & {
-    kind: "named-type",
-    name: PlainIdentifier,
+    readonly kind: "named-type",
+    readonly name: PlainIdentifier,
 }
 
 export type ProcType = SourceInfo & {
-    kind: "proc-type",
-    typeParams: PlainIdentifier[],
-    args: { name: PlainIdentifier, type?: TypeExpression}[],
+    readonly kind: "proc-type",
+    readonly typeParams: readonly PlainIdentifier[],
+    readonly args: readonly { readonly name: PlainIdentifier, readonly type?: TypeExpression}[],
 }
 
 export type FuncType = SourceInfo & {
-    kind: "func-type",
-    typeParams: PlainIdentifier[],
-    args: { name: PlainIdentifier, type?: TypeExpression}[],
-    returnType?: TypeExpression,
+    readonly kind: "func-type",
+    readonly typeParams: PlainIdentifier[],
+    readonly args: readonly { readonly name: PlainIdentifier, readonly type?: TypeExpression}[],
+    readonly returnType?: TypeExpression,
 }
 
 export type ElementType = SourceInfo & {
-    kind: "element-type",
+    readonly kind: "element-type",
     // tagName: PlainIdentifier,
     // attributes: [PlainIdentifier, Expression][],
 }
 
 export type ObjectType = SourceInfo & {
-    kind: "object-type",
-    entries: [PlainIdentifier, TypeExpression][],
+    readonly kind: "object-type",
+    readonly entries: readonly (readonly [PlainIdentifier, TypeExpression])[],
 }
 
 export type IndexerType = SourceInfo & {
-    kind: "indexer-type",
-    keyType: TypeExpression,
-    valueType: TypeExpression,
+    readonly kind: "indexer-type",
+    readonly keyType: TypeExpression,
+    readonly valueType: TypeExpression,
 }
 
 export type ArrayType = SourceInfo & {
-    kind: "array-type",
-    element: TypeExpression,
+    readonly kind: "array-type",
+    readonly element: TypeExpression,
 }
 
 export type TupleType = SourceInfo & {
-    kind: "tuple-type",
-    members: TypeExpression[],
+    readonly kind: "tuple-type",
+    readonly members: readonly TypeExpression[],
 }
 
 export type PrimitiveType = 
@@ -82,53 +82,53 @@ export type PrimitiveType =
     | UnknownType
 
 export type StringType = SourceInfo & {
-    kind: "string-type",
+    readonly kind: "string-type",
 }
 
 export type NumberType = SourceInfo & {
-    kind: "number-type",
+    readonly kind: "number-type",
 }
 
 export type BooleanType = SourceInfo & {
-    kind: "boolean-type",
+    readonly kind: "boolean-type",
 }
 
 export type NilType = SourceInfo & {
-    kind: "nil-type",
+    readonly kind: "nil-type",
 }
 
 export type LiteralType = SourceInfo & {
-    kind: "literal-type",
-    value: StringLiteral | NumberLiteral | BooleanLiteral,
+    readonly kind: "literal-type",
+    readonly value: StringLiteral | NumberLiteral | BooleanLiteral,
 }
 
 export type ClassType = SourceInfo & {
-    kind: "class-type",
-    clazz: ClassDeclaration
+    readonly kind: "class-type",
+    readonly clazz: ClassDeclaration
 }
 
 export type NominalType = SourceInfo & {
-    kind: "nominal-type",
-    name: string,
-    inner: TypeExpression,
+    readonly kind: "nominal-type",
+    readonly name: string,
+    readonly inner: TypeExpression,
 }
 
 export type IteratorType = SourceInfo & {
-    kind: "iterator-type",
-    itemType: TypeExpression,
+    readonly kind: "iterator-type",
+    readonly itemType: TypeExpression,
 }
 
 export type PlanType = SourceInfo & {
-    kind: "plan-type",
-    resultType: TypeExpression,
+    readonly kind: "plan-type",
+    readonly resultType: TypeExpression,
 }
 
 export type UnknownType = SourceInfo & {
-    kind: "unknown-type",
+    readonly kind: "unknown-type",
 }
 
 export type JavascriptEscapeType = SourceInfo & {
-    kind: "javascript-escape-type",
+    readonly kind: "javascript-escape-type",
 }
 
 export const STRING_TYPE: StringType = {

@@ -14,47 +14,47 @@ export type Statement =
     | Computation
 
 export type LetDeclaration = SourceInfo & {
-    kind: "let-declaration",
-    name: PlainIdentifier,
-    type?: TypeExpression,
-    value: Expression,
+    readonly kind: "let-declaration",
+    readonly name: PlainIdentifier,
+    readonly type?: TypeExpression,
+    readonly value: Expression,
 }
 
 export type IfElseStatement = SourceInfo & {
-    kind: "if-else-statement",
-    ifCondition: Expression,
-    ifResult: Block,
-    elseResult?: Block,
+    readonly kind: "if-else-statement",
+    readonly ifCondition: Expression,
+    readonly ifResult: Block,
+    readonly elseResult?: Block,
 }
 
 export type ForLoop = SourceInfo & {
-    kind: "for-loop",
-    itemIdentifier: PlainIdentifier,
-    iterator: Expression,
-    body: Block,
+    readonly kind: "for-loop",
+    readonly itemIdentifier: PlainIdentifier,
+    readonly iterator: Expression,
+    readonly body: Block,
 }
 
 export type WhileLoop = SourceInfo & {
-    kind: "while-loop",
-    condition: Expression,
-    body: Block,
+    readonly kind: "while-loop",
+    readonly condition: Expression,
+    readonly body: Block,
 }
 
 export type Assignment = SourceInfo & {
-    kind: "assignment",
-    target: LocalIdentifier | PropertyAccessor,
-    value: Expression,
+    readonly kind: "assignment",
+    readonly target: LocalIdentifier | PropertyAccessor,
+    readonly value: Expression,
 }
 
 export type Reaction = SourceInfo & {
-    kind: "reaction",
-    data: Expression,
-    effect: Expression,
-    until: Expression|undefined,
+    readonly kind: "reaction",
+    readonly data: Expression,
+    readonly effect: Expression,
+    readonly until: Expression|undefined,
 }
 
 export type Computation = SourceInfo & {
-    kind: "computation",
-    name: PlainIdentifier,
-    expression: Expression,
+    readonly kind: "computation",
+    readonly name: PlainIdentifier,
+    readonly expression: Expression,
 }

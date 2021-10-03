@@ -3,7 +3,6 @@ import { path } from "./deps.ts";
 import { ModulesStore } from "./3_checking/modules-store.ts";
 import { canonicalModuleName, scopescan } from "./3_checking/scopescan.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
-import { typeinfer } from "./3_checking/typeinfer.ts";
 import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
@@ -115,13 +114,13 @@ async function bundleOutput(entryFile: string) {
     }
 
     // typescan all parsed modules
-    for (const [module, ast] of modulesStore.modules) {
-        try {
-            typeinfer(printError(path.basename(module)), modulesStore, ast);
-        } catch {
-            console.error("Failed to typecheck module " + module + "\n")
-        }
-    }
+    // for (const [module, ast] of modulesStore.modules) {
+    //     try {
+    //         typeinfer(printError(path.basename(module)), modulesStore, ast);
+    //     } catch {
+    //         console.error("Failed to typecheck module " + module + "\n")
+    //     }
+    // }
 
     // typecheck all parsed modules
     for (const [module, ast] of modulesStore.modules) {
@@ -179,7 +178,7 @@ async function bundleOutput(entryFile: string) {
         
                             try {
                                 scopescan(printErrorForModule, modulesStore, parsed, module);
-                                typeinfer(printErrorForModule, modulesStore, parsed);    
+                                // typeinfer(printErrorForModule, modulesStore, parsed);    
                                 typecheck(printErrorForModule, modulesStore, parsed);
                             } catch (e: any) {
                                 console.error(`Encountered exception typechecking module "${module}":\n${e.stack}`);

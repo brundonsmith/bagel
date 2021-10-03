@@ -12,52 +12,52 @@ export type Declaration =
     | ClassDeclaration
 
 export type ImportDeclaration = SourceInfo & {
-    kind: "import-declaration",
-    imports: Array<ImportItem>,
-    path: StringLiteral,
+    readonly kind: "import-declaration",
+    readonly imports: readonly ImportItem[],
+    readonly path: StringLiteral,
 }
 
 export type ImportItem = SourceInfo & {
-    kind: "import-item",
-    name: PlainIdentifier,
-    alias?: PlainIdentifier,
+    readonly kind: "import-item",
+    readonly name: PlainIdentifier,
+    readonly alias?: PlainIdentifier,
 }
 
 export type TypeDeclaration = SourceInfo & {
-    kind: "type-declaration",
-    name: PlainIdentifier,
-    type: TypeExpression,
-    exported: boolean,
+    readonly kind: "type-declaration",
+    readonly name: PlainIdentifier,
+    readonly type: TypeExpression,
+    readonly exported: boolean,
 }
 
 export type ProcDeclaration = SourceInfo & {
-    kind: "proc-declaration",
-    name: PlainIdentifier,
-    value: Proc,
-    exported: boolean,
+    readonly kind: "proc-declaration",
+    readonly name: PlainIdentifier,
+    readonly value: Proc,
+    readonly exported: boolean,
 }
 
 export type FuncDeclaration = SourceInfo & {
-    kind: "func-declaration",
-    name: PlainIdentifier,
-    value: Func,
-    exported: boolean,
+    readonly kind: "func-declaration",
+    readonly name: PlainIdentifier,
+    readonly value: Func,
+    readonly exported: boolean,
 }
 
 export type ConstDeclaration = SourceInfo & {
-    kind: "const-declaration",
-    name: PlainIdentifier,
-    type: TypeExpression|undefined,
-    value: Expression,
-    exported: boolean,
+    readonly kind: "const-declaration",
+    readonly name: PlainIdentifier,
+    readonly type: TypeExpression|undefined,
+    readonly value: Expression,
+    readonly exported: boolean,
 }
 
 export type ClassDeclaration = SourceInfo & {
-    kind: "class-declaration",
-    name: PlainIdentifier,
-    typeParams: PlainIdentifier[],
-    members: ClassMember[],
-    exported: boolean,
+    readonly kind: "class-declaration",
+    readonly name: PlainIdentifier,
+    readonly typeParams: readonly PlainIdentifier[],
+    readonly members: readonly ClassMember[],
+    readonly exported: boolean,
     // TODO: constructor
 }
 
@@ -67,25 +67,25 @@ export type ClassMember =
     | ClassProcedure
 
 export type ClassProperty = SourceInfo & {
-    kind: "class-property",
-    name: PlainIdentifier,
-    type?: TypeExpression,
-    value: Expression,
-    access: 'private'|'public'|'visible',
+    readonly kind: "class-property",
+    readonly name: PlainIdentifier,
+    readonly type?: TypeExpression,
+    readonly value: Expression,
+    readonly access: 'private'|'public'|'visible',
 }
 
 export type ClassFunction = SourceInfo & {
-    kind: "class-function",
-    name: PlainIdentifier,
-    value: Func,
-    access: 'private'|'public',
+    readonly kind: "class-function",
+    readonly name: PlainIdentifier,
+    readonly value: Func,
+    readonly access: 'private'|'public',
 }
 
 export type ClassProcedure = SourceInfo & {
-    kind: "class-procedure",
-    name: PlainIdentifier,
-    value: Proc,
-    access: 'private'|'public',
+    readonly kind: "class-procedure",
+    readonly name: PlainIdentifier,
+    readonly value: Proc,
+    readonly access: 'private'|'public',
 }
 
 // TODO: ClassReaction

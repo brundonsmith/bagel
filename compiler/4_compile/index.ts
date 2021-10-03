@@ -99,9 +99,9 @@ ${given(ast.until, until => compileOne(modulesStore, until))});`;
 
 }
 
-function objectEntries(modulesStore: ModulesStore, entries: [PlainIdentifier, Expression|Expression[]][]): string {
+function objectEntries(modulesStore: ModulesStore, entries: readonly (readonly [PlainIdentifier, Expression | readonly Expression[]])[]): string {
     return entries
-        .map(([ key, value ]) => `${compileOne(modulesStore, key)}: ${Array.isArray(value) ? value.map(c => compileOne(modulesStore, c)) : compileOne(modulesStore, value)}`)
+        .map(([ key, value ]) => `${compileOne(modulesStore, key)}: ${Array.isArray(value) ? value.map(c => compileOne(modulesStore, c)) : compileOne(modulesStore, value as Expression)}`)
         .join(", ")
 }
 
@@ -155,6 +155,6 @@ function compileClassProperty(modulesStore: ModulesStore, ast: ClassProperty): s
     }
 }
 
-function compileArgs(modulesStore: ModulesStore, args: { name: PlainIdentifier, type?: TypeExpression}[]): string {
+function compileArgs(modulesStore: ModulesStore, args: readonly { readonly name: PlainIdentifier, readonly type?: TypeExpression}[]): string {
     return args.map(arg => arg.name.name + (arg.type ? `: ${compileOne(modulesStore, arg.type)}` : '')).join(', ')
 }
