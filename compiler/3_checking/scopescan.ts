@@ -1,7 +1,7 @@
 import { path } from "../deps.ts";
 
 import { AST, Module } from "../_model/ast.ts";
-import { Block, display, getScopeFor, Scope } from "../_model/common.ts";
+import { Block, getScopeFor, Scope } from "../_model/common.ts";
 import { ClassDeclaration, Declaration } from "../_model/declarations.ts";
 import { Func, Proc, Expression, StringLiteral, Invocation } from "../_model/expressions.ts";
 import { ForLoop } from "../_model/statements.ts";
@@ -101,7 +101,15 @@ export function scopeFrom(reportError: (error: BagelError) => void, modules: Map
                     if (newScope.values[declaration.name.name] != null || newScope.classes[declaration.name.name] != null) {
                         reportError(alreadyDeclared(declaration.name))
                     }
-                    
+
+                    // each const should establish a new scope to ensure their 
+                    // order of evaluation works out
+                    if (declaration.kind === "const-declaration") {
+                        declaration.scope = newScope
+
+                        newScope = extendScope(newScope)
+                    }
+
                     newScope.values[declaration.name.name] = {
                         mutability: "none",
                         declaredType: declaration.kind === "const-declaration" ? declaration.type : undefined,

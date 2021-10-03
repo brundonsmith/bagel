@@ -259,6 +259,30 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Const declarations out of order",
+  fn() {
+    testTypecheck(
+      `
+      const a = b + 2
+      const b = 12`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Const declarations in order",
+  fn() {
+    testTypecheck(
+      `
+      const b = 12
+      const a = b + 2`,
+      false,
+    );
+  },
+});
+
 // TODO: Invocation arguments
 // TODO: Reactions
 // TODO: Classes

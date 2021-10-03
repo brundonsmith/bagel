@@ -8,7 +8,6 @@ Design tasks:
 Implementation tasks:
 - Generics
 - Type refinement
-- Hoisting and/or order-checking for declarations that depend on each other
 
 Gruntwork tasks:
 - Build out standard libraries, including wrappers around browser APIs
