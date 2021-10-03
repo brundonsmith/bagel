@@ -39,7 +39,10 @@ export function parse(code: string, reportError: (error: BagelError) => void): M
 
     return {
         kind: "module",
-        declarations
+        declarations,
+        code,
+        startIndex: 0,
+        endIndex: index
     };
 }
 

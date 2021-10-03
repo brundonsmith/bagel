@@ -2,7 +2,7 @@ import { ClassMember, Declaration } from "./declarations.ts";
 import { Expression } from "./expressions.ts";
 import { Statement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
-import { Block, PlainIdentifier } from "./common.ts";
+import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
 
 export type AST =
     | Module
@@ -14,7 +14,7 @@ export type AST =
     | PlainIdentifier
     | Block
 
-export type Module = {
+export type Module = SourceInfo & {
     readonly kind: "module",
     readonly declarations: readonly Declaration[],
 }

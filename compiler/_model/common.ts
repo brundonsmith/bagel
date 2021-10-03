@@ -37,6 +37,19 @@ export function getScopeFor(ast: AST): Scope {
     }
 }
 
+export function display(ast: AST): string {
+    if (isTypeExpression(ast)) {
+        return displayForm(ast)
+    }
+
+    const { code, startIndex, endIndex } = ast
+    if (code == null || startIndex == null || endIndex == null) {
+        return `<${ast.kind}>`
+    } else {
+        return code.substring(startIndex, endIndex)
+    }
+}
+
 export type PlainIdentifier = SourceInfo & {
     readonly kind: "plain-identifier",
     readonly name: string,

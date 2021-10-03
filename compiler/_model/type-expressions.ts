@@ -1,3 +1,4 @@
+import { AST } from "./ast.ts";
 import { PlainIdentifier, SourceInfo } from "./common.ts";
 import { ClassDeclaration } from "./declarations.ts";
 import { BooleanLiteral, NumberLiteral, StringLiteral } from "./expressions.ts";
@@ -213,4 +214,31 @@ export const REACTION_UNTIL_TYPE: TypeExpression = {
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
+}
+
+const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } = {
+    "union-type": undefined,
+    "named-type": undefined,
+    "proc-type": undefined,
+    "func-type": undefined,
+    "element-type": undefined,
+    "object-type": undefined,
+    "indexer-type": undefined,
+    "array-type": undefined,
+    "string-type": undefined,
+    "number-type": undefined,
+    "boolean-type": undefined,
+    "nil-type": undefined,
+    "unknown-type": undefined,
+    "iterator-type": undefined,
+    "plan-type": undefined,
+    "literal-type": undefined,
+    "tuple-type": undefined,
+    "class-type": undefined,
+    "nominal-type": undefined,
+    "javascript-escape-type": undefined,
+}
+
+export function isTypeExpression(ast: AST): ast is TypeExpression {
+    return Object.prototype.hasOwnProperty.call(ALL_TYPE_EXPRESSION_TYPES, ast.kind);
 }
