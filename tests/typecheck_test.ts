@@ -119,7 +119,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Basic explicit genericz",
+  name: "Basic explicit generic",
   fn() {
     testTypecheck(
       `
@@ -150,6 +150,83 @@ Deno.test({
       func other<T>(a: T): T => a
       const c: string = other<number>(12)`,
       true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Basic generic with inference",
+  fn() {
+    testTypecheck(
+      `
+      func other<T>(a: T) => a
+      const c: number = other<number>(12)`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Nested generic calls",
+  fn() {
+    testTypecheck(
+      `
+      func fnA<R>(a: R) => a
+      func fnB<T>(b: T): T => fnA<T>(b)
+      const c: number = fnB<number>(12)`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Nested generic calls mismatch",
+  fn() {
+    testTypecheck(
+      `
+      func fnA<T>(a: R) => a
+      func fnB<T>(b: T): T => fnA<T>(12)
+      const c: number = fnB<number>(12)`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Nested generic calls with inference",
+  fn() {
+    testTypecheck(
+      `
+      func fnA<R>(a: R): R => a
+      func fnB<T>(b: T) => fnA<T>(b)
+      const c: number = fnB<number>(12)`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Nested generic calls with inference mismatch",
+  fn() {
+    testTypecheck(
+      `
+      func fnA<T>(a: R): R => a
+      func fnB<T>(b: T) => fnA<T>(b)
+      const c: string = fnB<number>(12)`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Nested generic calls with same param names",
+  fn() {
+    testTypecheck(
+      `
+      func fnA<R>(a: T): T => a
+      func fnB<T>(b: T): T => fnA<T>(b)
+      const c: number = fnB<number>(12)`,
+      false,
     );
   },
 });

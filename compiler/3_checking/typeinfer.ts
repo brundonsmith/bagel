@@ -13,7 +13,7 @@ export function inferType(
     ast: Expression|ClassMember,
     preserveGenerics?: boolean,
 ): TypeExpression {
-    return resolve(modulesStore.getScopeFor(ast),
+    return resolve(modulesStore,
         handleSingletonUnion(
             distillUnion(modulesStore.getScopeFor(ast),
                 flattenUnions(
@@ -255,25 +255,31 @@ function inferTypeInner(
     }
 }
 
-export function resolve(scope: Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
+export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
     if (type.kind === "named-type") {
-        if (scope.types[type.name.name]) {
-            if (!scope.types[type.name.name].isGenericParameter || !preserveGenerics) {
-                return resolve(scope, scope.types[type.name.name].type)
+        const resolutionScope = modulesStoreOrScope instanceof ModulesStore
+            ? modulesStoreOrScope.getScopeFor(type)
+            : modulesStoreOrScope
+
+        // console.log({ type })
+
+        if (resolutionScope.types[type.name.name]) {
+            if (!resolutionScope.types[type.name.name].isGenericParameter || !preserveGenerics) {
+                return resolve(modulesStoreOrScope, resolutionScope.types[type.name.name].type)
             } else {
                 return type
             }
-        } else if (scope.classes[type.name.name]) {
+        } else if (resolutionScope.classes[type.name.name]) {
             return {
                 kind: "class-type",
-                clazz: scope.classes[type.name.name],
+                clazz: resolutionScope.classes[type.name.name],
                 code: type.code,
                 startIndex: type.startIndex,
                 endIndex: type.endIndex
             }
         }
     } else if(type.kind === "union-type") {
-        const memberTypes = type.members.map(member => resolve(scope, member));
+        const memberTypes = type.members.map(member => resolve(modulesStoreOrScope, member));
         if (memberTypes.some(member => member == null)) {
             return UNKNOWN_TYPE;
         } else {
@@ -287,7 +293,7 @@ export function resolve(scope: Scope, type: TypeExpression, preserveGenerics?: b
         }
     } else if(type.kind === "object-type") {
         const entries: [PlainIdentifier, TypeExpression][] = type.entries.map(([ key, valueType ]) => 
-            [key, resolve(scope, valueType as TypeExpression)] as [PlainIdentifier, TypeExpression]);
+            [key, resolve(modulesStoreOrScope, valueType as TypeExpression)] as [PlainIdentifier, TypeExpression]);
 
         return {
             kind: "object-type",
@@ -297,7 +303,7 @@ export function resolve(scope: Scope, type: TypeExpression, preserveGenerics?: b
             endIndex: type.endIndex,
         }
     } else if(type.kind === "array-type") {
-        const element = resolve(scope, type.element)
+        const element = resolve(modulesStoreOrScope, type.element)
 
         return {
             kind: "array-type",
@@ -310,8 +316,8 @@ export function resolve(scope: Scope, type: TypeExpression, preserveGenerics?: b
         return {
             kind: "func-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t, true) ?? t) })),
-            returnType: given(type.returnType, returnType => resolve(scope, returnType, true) ?? returnType),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(modulesStoreOrScope, t, true) ?? t) })),
+            returnType: given(type.returnType, returnType => resolve(modulesStoreOrScope, returnType, true) ?? returnType),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -320,7 +326,7 @@ export function resolve(scope: Scope, type: TypeExpression, preserveGenerics?: b
         return {
             kind: "proc-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t) ?? t) })),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(modulesStoreOrScope, t) ?? t) })),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
