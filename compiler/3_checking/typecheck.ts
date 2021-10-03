@@ -4,15 +4,16 @@ import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { ModulesStore } from "./modules-store.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
 import { inferType, resolve } from "./typeinfer.ts";
-import { getScopeFor, Scope } from "../_model/common.ts";
+import { display, getScopeFor, Scope } from "../_model/common.ts";
 
 
 export function typecheck(reportError: (error: BagelError) => void, modulesStore: ModulesStore, ast: Module) {
     walkParseTree<void>(undefined, ast, (_, ast) => {
-        const scope = getScopeFor(ast)
+        const scope = getScopeFor(modulesStore, ast)
 
         switch(ast.kind) {
             case "const-declaration": {
+                // console.log('-----------------------------checking const decl----------------------------')
                 const valueType = inferType(reportError, modulesStore, ast.value);
 
                 if (ast.type != null && !subsumes(scope, ast.type, valueType)) {
@@ -20,6 +21,7 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
                 }
             } break;
             case "func": {
+                // console.log('-----------------------------checking func----------------------------')
                 const bodyType = inferType(reportError, modulesStore, ast.body);
 
                 for (const c of ast.consts) {
@@ -47,7 +49,7 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
                 const subjectType = inferType(reportError, modulesStore, ast.subject);
 
                 if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {
-                    reportError(miscError(ast, "Expression must be a function or procedure to be called"));
+                    reportError(miscError(ast.subject, "Expression must be a function or procedure to be called"));
                 } else if (subjectType.args.length !== ast.args.length) {
                     const functionOrProcedure = subjectType.kind === "func-type" ? "Function" : "Procedure"
                     reportError(miscError(ast, `${functionOrProcedure} expected ${subjectType.args.length} arguments but got ${ast.args.length}`));
@@ -113,6 +115,7 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
                 }
             } break;
             case "local-identifier": {
+                // console.log({ name: ast.name, scope: scope.values })
                 if (scope.values[ast.name] == null && scope.classes[ast.name] == null) {
                     reportError(cannotFindName(ast));
                 }
@@ -182,7 +185,7 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
                 }
             } break;
             case "assignment": {
-                if (ast.target.kind === "local-identifier" && getScopeFor(ast.target).values[ast.target.name].mutability !== "all") {
+                if (ast.target.kind === "local-identifier" && getScopeFor(modulesStore, ast.target).values[ast.target.name].mutability !== "all") {
                     reportError(miscError(ast.target, `Cannot assign to '${ast.target.name}' because it is not mutable`));
                 }
                 //  else if(ast.target.kind === "property-accessor" && scope.values[ast.target.]) {
@@ -225,14 +228,12 @@ export function subsumes(scope: Scope, destination: TypeExpression, value: TypeE
     const resolvedDestination = resolve(scope, destination)
     const resolvedValue = resolve(scope, value)
 
-    if (resolvedDestination == null || resolvedValue == null) {
-        return false;
-    } else if (resolvedValue.kind === "javascript-escape-type") {
-        return true;
-    } else if (resolvedDestination.kind === "unknown-type") {
+    if (resolvedDestination.kind === "unknown-type") {
         return true;
     } else if(resolvedValue.kind === "unknown-type") {
         return false;
+    } else if (resolvedValue.kind === "javascript-escape-type") {
+        return true;
     } else if(resolvedDestination.kind === "number-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "number-literal") {
         return true;
     } else if(resolvedDestination.kind === "string-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "string-literal") {
@@ -277,7 +278,6 @@ export function displayForm(typeExpression: TypeExpression): string {
     switch (typeExpression.kind) {
         case "union-type": return typeExpression.members.map(displayForm).join(" | ");
         case "named-type": return typeExpression.name.name;
-        // TODO: proc-type and func-type should display to users as (arg0, arg1, arg2) instead of (arg0) => (arg1) => (arg2)
         case "proc-type": return `(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) {}`;
         case "func-type": return `(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) => ${displayForm(typeExpression.returnType ?? UNKNOWN_TYPE)}`;
         case "object-type": return `{ ${typeExpression.entries.map(([ key, value ]) => `${key.name}: ${displayForm(value)}`)} }`;

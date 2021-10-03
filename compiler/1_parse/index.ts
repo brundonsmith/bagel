@@ -37,6 +37,12 @@ export function parse(code: string, reportError: (error: BagelError) => void): M
 
     memo.delete(code);
 
+    // Move consts to the bottom so that all other declarations will be available to them
+    declarations.sort((a, b) =>
+        a.kind === "const-declaration" && b.kind !== "const-declaration" ? 1 :
+        a.kind !== "const-declaration" && b.kind === "const-declaration" ? -1 :
+        0)
+
     return {
         kind: "module",
         declarations,
@@ -943,7 +949,7 @@ const func: ParseFunction<Func> = (code, startIndex) =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(code, index, _funcConst, ',', { trailingDelimiter: 'required' }), ({ parsed: consts, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
-    expec(expression(code, index), err(code, index, 'Function body'), ({ parsed: body, newIndex: index }) => ({
+    expec(expression(code, index), err(code, index, 'Function body' + (consts.length === 0 ? ' or comma-separated consts' : '')), ({ parsed: body, newIndex: index }) => ({
         parsed: {
             kind: "func",
             type: {

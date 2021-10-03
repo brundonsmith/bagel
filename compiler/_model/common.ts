@@ -4,6 +4,7 @@ import { isTypeExpression, TypeExpression } from "./type-expressions.ts";
 import { displayForm } from "../3_checking/typecheck.ts";
 import { ClassDeclaration } from "./declarations.ts";
 import { Expression } from "./expressions.ts";
+import { ModulesStore } from "../3_checking/modules-store.ts";
 
 export type SourceInfo = {
     readonly code: string|undefined,
@@ -29,12 +30,18 @@ export type DeclarationDescriptor = {
     readonly initialValue?: Expression,
 }
 
-export function getScopeFor(ast: AST): Scope {
-    if (ast.scope == null) {
-        throw Error("No scope was created for:" + JSON.stringify(ast, null, 2));
-    } else {
-        return ast.scope;
+export function getScopeFor(modulesStore: ModulesStore, ast: AST): Scope {
+    let current: AST|undefined = ast
+
+    while (current != null) {
+        if (current.scope) {
+            return current.scope
+        } else {
+            current = modulesStore.parentAst.get(current)
+        }
     }
+
+    throw Error("No scope found for:" + display(ast));
 }
 
 export function display(ast: AST): string {

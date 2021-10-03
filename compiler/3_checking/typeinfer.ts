@@ -13,9 +13,9 @@ export function inferType(
     ast: Expression|ClassMember,
     preserveGenerics?: boolean,
 ): TypeExpression {
-    return resolve(undefined,
+    return resolve(modulesStore,
         handleSingletonUnion(
-            distillUnion(getScopeFor(ast),
+            distillUnion(modulesStore,
                 flattenUnions(
                     inferTypeInner(reportError, modulesStore, ast, !!preserveGenerics)))), preserveGenerics);
 }
@@ -26,7 +26,7 @@ function inferTypeInner(
     ast: Expression|ClassMember,
     preserveGenerics: boolean,
 ): TypeExpression {
-    const scope = getScopeFor(ast)
+    const scope = getScopeFor(modulesStore, ast)
 
     switch(ast.kind) {
         case "proc":
@@ -91,13 +91,12 @@ function inferTypeInner(
         case "pipe":
         case "invocation": {
             // console.log('---------begin invocation-------------')
-            // console.log({ preserveGenerics, subject: ast.subject })
+            // console.log({ preserveGenerics, subject: displaySource(ast.subject) })
             let subjectType = inferType(reportError, modulesStore, ast.subject, true);
             // console.log({ subjectType })
             subjectType = resolve(scope, subjectType, false);
             // console.log({ resolvedSubjectType: subjectType })
-            // console.log({ scope: modulesStore.getScopeFor(ast.subject).types })
-            // console.log({ invocationScope: modulesStore.getScopeFor(ast).types })
+            // console.log({ ...modulesStore.getScopeFor(ast).types })
 
 
             if (subjectType.kind === "func-type") {
@@ -183,7 +182,7 @@ function inferTypeInner(
             return UNKNOWN_TYPE
         }
         case "local-identifier": {
-            const valueDescriptor = getScopeFor(ast).values[ast.name]
+            const valueDescriptor = getScopeFor(modulesStore, ast).values[ast.name]
             // console.log({ value: valueDescriptor.initialValue, uninferredType: (valueDescriptor?.initialValue as any).type, thingType: valueDescriptor?.declaredType 
             //     ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, modulesStore, initialValue, preserveGenerics))
             //     ?? UNKNOWN_TYPE })
@@ -239,7 +238,7 @@ function inferTypeInner(
         }
         case "class-construction": return {
             kind: "class-type",
-            clazz: getScopeFor(ast).classes[ast.clazz.name],
+            clazz: getScopeFor(modulesStore, ast).classes[ast.clazz.name],
             code: ast.clazz.code,
             startIndex: ast.clazz.startIndex,
             endIndex: ast.clazz.endIndex
@@ -255,17 +254,17 @@ function inferTypeInner(
     }
 }
 
-export function resolve(scope: undefined|Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
+export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
     if (type.kind === "named-type") {
-        const resolutionScope = scope == null
-            ? getScopeFor(type)
-            : scope
+        const resolutionScope = modulesStoreOrScope instanceof ModulesStore
+            ? getScopeFor(modulesStoreOrScope, type)
+            : modulesStoreOrScope
 
         // console.log({ type })
 
         if (resolutionScope.types[type.name.name]) {
             if (!resolutionScope.types[type.name.name].isGenericParameter || !preserveGenerics) {
-                return resolve(scope, resolutionScope.types[type.name.name].type)
+                return resolve(modulesStoreOrScope, resolutionScope.types[type.name.name].type)
             } else {
                 return type
             }
@@ -279,7 +278,7 @@ export function resolve(scope: undefined|Scope, type: TypeExpression, preserveGe
             }
         }
     } else if(type.kind === "union-type") {
-        const memberTypes = type.members.map(member => resolve(scope, member));
+        const memberTypes = type.members.map(member => resolve(modulesStoreOrScope, member));
         if (memberTypes.some(member => member == null)) {
             return UNKNOWN_TYPE;
         } else {
@@ -293,7 +292,7 @@ export function resolve(scope: undefined|Scope, type: TypeExpression, preserveGe
         }
     } else if(type.kind === "object-type") {
         const entries: [PlainIdentifier, TypeExpression][] = type.entries.map(([ key, valueType ]) => 
-            [key, resolve(scope, valueType as TypeExpression)] as [PlainIdentifier, TypeExpression]);
+            [key, resolve(modulesStoreOrScope, valueType as TypeExpression)] as [PlainIdentifier, TypeExpression]);
 
         return {
             kind: "object-type",
@@ -303,7 +302,7 @@ export function resolve(scope: undefined|Scope, type: TypeExpression, preserveGe
             endIndex: type.endIndex,
         }
     } else if(type.kind === "array-type") {
-        const element = resolve(scope, type.element)
+        const element = resolve(modulesStoreOrScope, type.element)
 
         return {
             kind: "array-type",
@@ -316,8 +315,8 @@ export function resolve(scope: undefined|Scope, type: TypeExpression, preserveGe
         return {
             kind: "func-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t, true) ?? t) })),
-            returnType: given(type.returnType, returnType => resolve(scope, returnType, true) ?? returnType),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(modulesStoreOrScope, t, true) ?? t) })),
+            returnType: given(type.returnType, returnType => resolve(modulesStoreOrScope, returnType, true) ?? returnType),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -326,7 +325,7 @@ export function resolve(scope: undefined|Scope, type: TypeExpression, preserveGe
         return {
             kind: "proc-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(scope, t) ?? t) })),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(modulesStoreOrScope, t) ?? t) })),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -337,6 +336,9 @@ export function resolve(scope: undefined|Scope, type: TypeExpression, preserveGe
     return type;
 }
 
+/**
+ * Nested unions can be flattened
+ */
 function flattenUnions(type: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         const members: TypeExpression[] = [];
@@ -361,7 +363,10 @@ function flattenUnions(type: TypeExpression): TypeExpression {
     }
 }
 
-function distillUnion(scope: Scope, type: TypeExpression): TypeExpression {
+/**
+ * Remove redundant members in union type (members subsumed by other members)
+ */
+function distillUnion(modulesStore: ModulesStore, type: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         const indicesToDrop = new Set<number>();
 
@@ -371,7 +376,7 @@ function distillUnion(scope: Scope, type: TypeExpression): TypeExpression {
                     const a = type.members[i];
                     const b = type.members[j];
 
-                    if (subsumes(scope, b, a) && !indicesToDrop.has(j)) {
+                    if (subsumes(getScopeFor(modulesStore, type), b, a) && !indicesToDrop.has(j)) {
                         indicesToDrop.add(i);
                     }
                 }
@@ -390,6 +395,9 @@ function distillUnion(scope: Scope, type: TypeExpression): TypeExpression {
     }
 }
 
+/**
+ * If union only has one member, putting it in a union-type is redundant
+ */
 function handleSingletonUnion(type: TypeExpression): TypeExpression {
     if (type.kind === "union-type" && type.members.length === 1) {
         return type.members[0];

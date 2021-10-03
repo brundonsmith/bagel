@@ -19,9 +19,9 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(modulesStore, name) + (alias ? ` as ${compileOne(modulesStore, alias)}` : ``)
         ).join(", ")} } from "${ast.path.segments.join("")}.bgl.ts";`;
-        case "type-declaration": return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileOne(modulesStore, ast.type)}`;
+        case "type-declaration": return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileOne(modulesStore, ast.type)};`;
         case "proc-declaration":
-        case "func-declaration": return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(modulesStore, ast.value);
+        case "func-declaration": return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(modulesStore, ast.value) + ';';
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(modulesStore, ast.name)}${ast.type ? `: ${compileOne(modulesStore, ast.type)}` : ''} = ${compileOne(modulesStore, ast.value)};`;
         case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(modulesStore, ast.name)} {\n${ast.members.map(m => compileOne(modulesStore, m)).join('\n')}\n}`;
         case "class-property": return  compileClassProperty(modulesStore, ast)
@@ -51,7 +51,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "parenthesized-expression": return `(${compileOne(modulesStore, ast.inner)})`;
         case "property-accessor": return `${compileOne(modulesStore, ast.subject)}.${compileOne(modulesStore, ast.property)}`;
         case "plain-identifier": return ast.name;
-        case "local-identifier": return getScopeFor(ast).values[ast.name]?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
+        case "local-identifier": return getScopeFor(modulesStore, ast).values[ast.name]?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
         case "object-literal":  return `{${objectEntries(modulesStore, ast.entries)}}`;
         case "array-literal":   return `[${ast.entries.map(e => compileOne(modulesStore, e)).join(", ")}]`;
         case "string-literal":  return `\`${ast.segments.map(segment =>
@@ -113,7 +113,7 @@ const LOCALS_OBJ = HIDDEN_IDENTIFIER_PREFIX + "locals";
 // const SENTINEL_OBJ = HIDDEN_IDENTIFIER_PREFIX + "sentinel";
 
 function compileProc(modulesStore: ModulesStore, proc: Proc): string {
-    const mutableLocals = Object.entries(getScopeFor(proc.body).values)
+    const mutableLocals = Object.entries(getScopeFor(modulesStore, proc.body).values)
         .filter(e => e[1].mutability === "all");
 
     return `(${compileArgs(modulesStore, proc.type.args)}): void => {

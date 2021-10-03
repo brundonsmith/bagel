@@ -231,6 +231,34 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Function consts out of order",
+  fn() {
+    testTypecheck(
+      `
+      func foo() =>
+        const a = b + 2,
+        const b = 12,
+        2 * a`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Function consts in order",
+  fn() {
+    testTypecheck(
+      `
+      func foo() =>
+        const b = 12,
+        const a = b + 2,
+        2 * a`,
+      false,
+    );
+  },
+});
+
 // TODO: Invocation arguments
 // TODO: Reactions
 // TODO: Classes

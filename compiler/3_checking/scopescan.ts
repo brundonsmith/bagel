@@ -1,7 +1,7 @@
 import { path } from "../deps.ts";
 
 import { AST, Module } from "../_model/ast.ts";
-import { Block, getScopeFor, Scope } from "../_model/common.ts";
+import { Block, display, getScopeFor, Scope } from "../_model/common.ts";
 import { ClassDeclaration, Declaration } from "../_model/declarations.ts";
 import { Func, Proc, Expression, StringLiteral, Invocation } from "../_model/expressions.ts";
 import { ForLoop } from "../_model/statements.ts";
@@ -14,8 +14,10 @@ import { inferType } from "./typeinfer.ts";
 
 export function scopescan(reportError: (error: BagelError) => void, modulesStore: ModulesStore, ast: Module, module: string) {
 
-    walkParseTree<AST>(ast, ast, (payload, ast) => {
-        modulesStore.parentAst.set(ast, payload)
+    walkParseTree<AST|undefined>(undefined, ast, (payload, ast) => {
+        if (payload != null) {
+            modulesStore.parentAst.set(ast, payload)
+        }
         return ast
     });
 
@@ -25,18 +27,16 @@ export function scopescan(reportError: (error: BagelError) => void, modulesStore
         // mark it as this ast's scope
         if (isScopeOwner(ast)) {
             ast.scope = scopeFrom(reportError, modulesStore.modules, ast, module, payload);
+            return ast.scope;
         } else {
-            // Otherwise, mark the containing scope as this ast's scope
-            ast.scope = payload
+            return payload;
         }
-        
-        return ast.scope;
     });
 
     walkParseTree<void>(undefined, ast, (_, ast) => {
 
         // infer
-        const scope = getScopeFor(ast)
+        const scope = getScopeFor(modulesStore, ast)
         switch(ast.kind) {
             case "for-loop": {
 
@@ -86,7 +86,7 @@ function isScopeOwner(ast: AST): ast is ScopeOwner {
 }
 
 export function scopeFrom(reportError: (error: BagelError) => void, modules: Map<string, Module>, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
-    const newScope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {}, classes: {} };
+    let newScope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {}, classes: {} };
 
     switch (ast.kind) {
         case "module":
@@ -186,20 +186,29 @@ export function scopeFrom(reportError: (error: BagelError) => void, modules: Map
                 }
             }
 
+            // add inline constants to scope
             if (ast.kind === "func") {
+                // console.log(ast.consts)
                 for (const c of ast.consts) {
                     if (newScope.values[c.name.name] != null || newScope.classes[c.name.name] != null) {
                         reportError(alreadyDeclared(c.name))
                     }
 
+                    c.value.scope = newScope
+
+                    newScope = extendScope(newScope)
                     newScope.values[c.name.name] = {
                         mutability: "none",
                         declaredType: c.type,
                         initialValue: c.value
                     }
                 }
+                // console.log('scope:')
+                // console.log(ast.consts[0].value.scope?.values)
+                // console.log(Object.getPrototypeOf(ast.consts[0].value.scope?.values))
+                
             }
-            
+
             return newScope;
         case "block":
             for (const statement of ast.statements) {

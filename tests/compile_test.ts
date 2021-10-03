@@ -38,7 +38,7 @@ Deno.test({
   fn() {
     testCompile(
       `func uid() => '12345'`,
-      `const uid = () => \`12345\``,
+      `const uid = () => \`12345\`;`,
     );
   },
 });
@@ -65,7 +65,7 @@ Deno.test({
         const double = 2 * n;
         const ten = 5 * double;
         return ten;
-      }`,
+      };`,
     );
   },
 });
@@ -154,7 +154,7 @@ Deno.test({
             } else {
                 3
             }`,
-      `const merge = () => (arr1.length <= 0 ? 2 : 3)`,
+      `const merge = () => (arr1.length <= 0 ? 2 : 3);`,
     );
   },
 });
@@ -164,7 +164,7 @@ Deno.test({
   fn() {
     testCompile(
       `func uid(arr, i) => arr[i]`,
-      `const uid = (arr, i) => arr[i]`,
+      `const uid = (arr, i) => arr[i];`,
     );
   },
 });
@@ -184,7 +184,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc doStuff(a) { }`,
-      `const doStuff = (a): void => { }`,
+      `const doStuff = (a): void => { };`,
     );
   },
 });
@@ -209,7 +209,7 @@ Deno.test({
             for (const item of items) {  };
 
             console.log(___locals["count"]);
-        }`,
+        };`,
     );
   },
 });
@@ -253,7 +253,7 @@ Deno.test({
             };
 
             console.log(___locals["count"]);
-        }`,
+        };`,
     );
   },
 });
@@ -287,7 +287,7 @@ Deno.test({
                     |> entries 
                     |> fromEntries`,
       `const classNames = (cn) => 
-            fromEntries(entries(cn))`,
+            fromEntries(entries(cn));`,
     );
   },
 });
@@ -301,7 +301,7 @@ Deno.test({
                 |> map((n) => n * 2) 
                 |> filter((n) => n < 10)`,
       `const myFunc = (a, b) =>
-            filter((n) => n < 10)(map((n) => n * 2)(___range(0)(10)))`,
+            filter((n) => n < 10)(map((n) => n * 2)(___range(0)(10)));`,
     );
   },
 });
@@ -311,7 +311,7 @@ Deno.test({
   fn() {
     testCompile(
       `func foo(a: string, b: number): number => 0`,
-      `const foo = (a: string, b: number): number => 0`,
+      `const foo = (a: string, b: number): number => 0;`,
     );
   },
 });
@@ -321,7 +321,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc bar(a: string[], b: { foo: number }) { }`,
-      `const bar = (a: string[], b: {foo: number}): void => { }`,
+      `const bar = (a: string[], b: {foo: number}): void => { };`,
     );
   },
 });
@@ -331,7 +331,19 @@ Deno.test({
   fn() {
     testCompile(
       `export type MyFn = (a: number, b: string) => string[]`,
-      `export type MyFn = (a: number, b: string) => string[]`,
+      `export type MyFn = (a: number, b: string) => string[];`,
+    );
+  },
+});
+
+Deno.test({
+  name: "Top-level const reordering",
+  fn() {
+    testCompile(
+      `const a = 12
+            func foo() => 13`,
+      `const foo = () => 13;
+            const a = 12;`,
     );
   },
 });
