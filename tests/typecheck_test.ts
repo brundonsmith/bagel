@@ -283,6 +283,34 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Let declarations out of order",
+  fn() {
+    testTypecheck(
+      `
+      proc foo() {
+        let a = b;
+        let b = 12;
+      }`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Let declarations in order",
+  fn() {
+    testTypecheck(
+      `
+      proc foo() {
+        let b = 12;
+        let a = b;
+      }`,
+      false,
+    );
+  },
+});
+
 // TODO: Invocation arguments
 // TODO: Reactions
 // TODO: Classes

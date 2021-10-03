@@ -86,7 +86,9 @@ function isScopeOwner(ast: AST): ast is ScopeOwner {
 }
 
 export function scopeFrom(reportError: (error: BagelError) => void, modules: Map<string, Module>, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
-    let newScope: Scope = parentScope != null ? extendScope(parentScope) : { types: {}, values: {}, classes: {} };
+    let newScope: Scope = parentScope != null 
+        ? extendScope(parentScope) 
+        : { types: {}, values: {}, classes: {} };
 
     switch (ast.kind) {
         case "module":
@@ -225,9 +227,12 @@ export function scopeFrom(reportError: (error: BagelError) => void, modules: Map
                         reportError(alreadyDeclared(statement.name))
                     }
 
+                    statement.scope = newScope
+
+                    newScope = extendScope(newScope)
                     newScope.values[statement.name.name] = {
                         mutability: "all",
-                        declaredType: statement.type, 
+                        declaredType: statement.type,
                         initialValue: statement.value
                     };
                 }
