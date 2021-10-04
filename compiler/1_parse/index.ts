@@ -779,31 +779,22 @@ const procCall: ParseFunction<Invocation> = (code, startIndex) =>
 
 const ifElseStatement: ParseFunction<IfElseStatement> = (code, startIndex) =>
     given(consume(code, startIndex, "if"), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "("), err(code, index, '"("'), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(expression(code, index), err(code, index, "Condition"), ({ parsed: ifCondition, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ")"), err(code, index, '")"'), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(parseBlock(code, index), err(code, index, 'If block'), ({ parsed: ifResult, newIndex: index }) => 
-    given(consumeWhitespace(code, index), index => {
-        const elseResultResult = 
+    given(parseSeries(code, index, _conditionAndOutcomeBlock, 'else if', { trailingDelimiter: "forbidden" }), ({ parsed: cases, newIndex: index }) => {
+        const elseResult = 
             given(consume(code, index, "else"), index => 
             given(consumeWhitespace(code, index), index =>
             expec(parseBlock(code, index), err(code, index, 'Else block'), result => result)));
 
-        if (isError(elseResultResult)) {
-            return elseResultResult
-        } else if (elseResultResult == null) {
+        if (isError(elseResult)) {
+            return elseResult
+        } else if (elseResult == null) {
             return {
                 parsed: {
                     kind: "if-else-statement",
                     code,
                     startIndex,
                     endIndex: index,
-                    ifCondition,
-                    ifResult,
+                    cases,
                 },
                 newIndex: index,
             }
@@ -814,14 +805,28 @@ const ifElseStatement: ParseFunction<IfElseStatement> = (code, startIndex) =>
                     code,
                     startIndex,
                     endIndex: index,
-                    ifCondition,
-                    ifResult,
-                    elseResult: elseResultResult.parsed,
+                    cases,
+                    defaultCase: elseResult.parsed,
                 },
-                newIndex: elseResultResult.newIndex,
+                newIndex: elseResult.newIndex,
             }
         }
-    }))))))))))
+    }))
+
+const _conditionAndOutcomeBlock: ParseFunction<{ readonly condition: Expression, readonly outcome: Block }> = (code, startIndex) =>
+    given(consume(code, startIndex, "("), index =>
+    given(consumeWhitespace(code, index), index =>
+    given(expression(code, index), ({ parsed: condition, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(consume(code, index, ")"), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(parseBlock(code, index), err(code, index, 'Block for if clause'), ({ parsed: outcome, newIndex: index }) => ({
+        parsed: {
+            condition,
+            outcome
+        },
+        newIndex: index
+    }))))))))
 
 const forLoop: ParseFunction<ForLoop> = (code, startIndex) =>
     given(consume(code, startIndex, "for"), index =>
@@ -1064,18 +1069,7 @@ const _indexerExpression: ParseFunction<Expression> = (code, index) =>
 
 const ifElseExpression: ParseFunction<IfElseExpression> = (code, startIndex) =>
     given(consume(code, startIndex, "if"), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "("), err(code, index, '"("'), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(expression(code, index), err(code, index, "Condition"), ({ parsed: ifCondition, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ")"), err(code, index, '")"'), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(expression(code, index), err(code, index, 'Result expression for if clause'), ({ parsed: ifResult, newIndex: index }) => 
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "}"), err(code, index, '"}"'), index => {
+    given(parseSeries(code, index, _conditionAndOutcomeExpression, 'else if', { trailingDelimiter: "forbidden" }), ({ parsed: cases, newIndex: index }) => {
         const elseResultResult = 
             given(consumeWhitespace(code, index), index =>
             given(consume(code, index, "else"), index => 
@@ -1095,10 +1089,7 @@ const ifElseExpression: ParseFunction<IfElseExpression> = (code, startIndex) =>
                     code,
                     startIndex,
                     endIndex: index,
-                    cases: [{
-                        condition: ifCondition,
-                        outcome: ifResult
-                    }]
+                    cases
                 },
                 newIndex: index,
             }
@@ -1109,16 +1100,32 @@ const ifElseExpression: ParseFunction<IfElseExpression> = (code, startIndex) =>
                     code,
                     startIndex,
                     endIndex: index,
-                    cases: [{
-                        condition: ifCondition,
-                        outcome: ifResult
-                    }],
+                    cases,
                     defaultCase: elseResultResult.parsed,
                 },
                 newIndex: elseResultResult.newIndex,
             }
         }
-    })))))))))))))
+    }))
+
+const _conditionAndOutcomeExpression: ParseFunction<{ readonly condition: Expression, readonly outcome: Expression }> = (code, startIndex) =>
+    given(consume(code, startIndex, "("), index =>
+    given(consumeWhitespace(code, index), index =>
+    given(expression(code, index), ({ parsed: condition, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(consume(code, index, ")"), index =>
+    given(consumeWhitespace(code, index), index =>
+    given(consume(code, index, "{"), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(expression(code, index), err(code, index, 'Result expression for if clause'), ({ parsed: outcome, newIndex: index }) => 
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
+        parsed: {
+            condition,
+            outcome
+        },
+        newIndex: index
+    }))))))))))))
 
 const switchExpression: ParseFunction<SwitchExpression> = (code, startIndex) =>
     given(consume(code, startIndex, "switch"), index =>

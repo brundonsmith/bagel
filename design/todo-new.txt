@@ -7,6 +7,7 @@ Design tasks:
 Implementation tasks:
 - Generics
 - Type refinement
+- Mutability levels as part of the type system
 
 Gruntwork tasks:
 - Build out standard libraries, including wrappers around browser APIs

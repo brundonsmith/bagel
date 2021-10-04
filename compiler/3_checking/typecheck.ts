@@ -67,8 +67,9 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
                 }
             } break;
             case "if-else-expression":
+            case "if-else-statement":
             case "switch-expression": {
-                const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, modulesStore, ast.value);
+                const valueType = ast.kind === "if-else-expression" || ast.kind === "if-else-statement" ? BOOLEAN_TYPE : inferType(reportError, modulesStore, ast.value);
 
                 for (const { condition } of ast.cases) {
                     const conditionType = inferType(reportError, modulesStore, condition);
@@ -197,13 +198,6 @@ export function typecheck(reportError: (error: BagelError) => void, modulesStore
 
                 if (!subsumes(scope, targetType, valueType)) {
                     reportError(assignmentError(ast.value, targetType, valueType));
-                }
-            } break;
-            case "if-else-statement": {
-                const conditionType = inferType(reportError, modulesStore, ast.ifCondition);
-
-                if (conditionType.kind !== "boolean-type") {
-                    reportError(miscError(ast.ifCondition, `Condition for if statement must be boolean`));
                 }
             } break;
             case "for-loop": {

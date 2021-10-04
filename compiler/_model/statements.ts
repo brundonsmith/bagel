@@ -22,9 +22,8 @@ export type LetDeclaration = SourceInfo & {
 
 export type IfElseStatement = SourceInfo & {
     readonly kind: "if-else-statement",
-    readonly ifCondition: Expression,
-    readonly ifResult: Block,
-    readonly elseResult?: Block,
+    readonly cases: readonly { readonly condition: Expression, readonly outcome: Block }[],
+    readonly defaultCase?: Block
 }
 
 export type ForLoop = SourceInfo & {

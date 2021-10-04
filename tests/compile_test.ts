@@ -30,7 +30,7 @@ function testCompile(bgl: string, exp: string) {
 }
 
 function normalize(ts: string): string {
-  return ts.replace(/[\s]+/g, " ");
+  return ts.replace(/[\s\n]+/gm, " ");
 }
 
 Deno.test({
@@ -160,6 +160,49 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Chained if expression",
+  fn() {
+    testCompile(
+      `func merge() =>
+            if (arr1.length <= 0) {
+                2
+            } else if (arr1.length <= 1) {
+                3
+            } else {
+              4
+            }`,
+      `const merge = () => (arr1.length <= 0 ? 2 : arr1.length <= 1 ? 3 : 4);`,
+    );
+  },
+});
+
+Deno.test({
+  name: "Chained if statements",
+  fn() {
+    testCompile(
+      `proc foo() {
+              if (true) {
+                log('true');
+              } else if (false) {
+                log('false');
+              } else {
+                log('other');
+              }
+            }`,
+      `const foo = (): void => {
+        if (true) {
+          log(\`true\`);
+        } else if (false) {
+          log(\`false\`);
+        } else {
+          log(\`other\`);
+        };
+      };`,
+    );
+  },
+});
+
+Deno.test({
   name: "Indexer expression",
   fn() {
     testCompile(
@@ -206,7 +249,7 @@ Deno.test({
         
             ___locals["count"] = 0;
 
-            for (const item of items) {  };
+            for (const item of items) { ; };
 
             console.log(___locals["count"]);
         };`,
@@ -241,15 +284,15 @@ Deno.test({
             ___locals["count"] = 0;
 
             for (const item of items) {
-                if(item.foo) {
-                    ___locals["count"] = ___locals["count"] + 1 
-                }
+                if (item.foo) {
+                    ___locals["count"] = ___locals["count"] + 1;
+                };
                 
-                if(___locals["count"] > 12) {
-                    console.log(a)
+                if (___locals["count"] > 12) {
+                    console.log(a);
                 } else {
-                    console.log(undefined)
-                }
+                    console.log(undefined);
+                };
             };
 
             console.log(___locals["count"]);

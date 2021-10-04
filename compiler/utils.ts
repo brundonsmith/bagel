@@ -168,6 +168,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.indexer, fn);
         } break;
         case "if-else-expression":
+        case "if-else-statement":
         case "switch-expression": {
             if (ast.kind === "switch-expression") {
                 walkParseTree(nextPayload, ast.value, fn);
@@ -223,13 +224,6 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "assignment": {
             walkParseTree(nextPayload, ast.target, fn);
             walkParseTree(nextPayload, ast.value, fn);
-        } break;
-        case "if-else-statement": {
-            walkParseTree(nextPayload, ast.ifCondition, fn);
-            walkParseTree(nextPayload, ast.ifResult, fn);
-            if (ast.elseResult != null) {
-                walkParseTree(nextPayload, ast.elseResult, fn);
-            }
         } break;
         case "for-loop": {
             walkParseTree(nextPayload, ast.itemIdentifier, fn);

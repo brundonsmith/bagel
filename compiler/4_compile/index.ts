@@ -29,8 +29,11 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "class-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${compileOne(modulesStore, ast.value)}`
         case "let-declaration": return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(modulesStore, ast.value)}`;
         case "assignment": return `${compileOne(modulesStore, ast.target)} = ${compileOne(modulesStore, ast.value)}`;
-        case "if-else-statement": return `if(${compileOne(modulesStore, ast.ifCondition)}) ${compileOne(modulesStore, ast.ifResult)}` 
-            + (ast.elseResult != null ? ` else ${compileOne(modulesStore, ast.elseResult)}` : ``);
+        case "if-else-statement": return 'if ' + ast.cases
+            .map(({ condition, outcome }) => 
+                `(${compileOne(modulesStore, condition)}) ${compileOne(modulesStore, outcome)}`)
+            .join(' else if ')
+            + (ast.defaultCase ? ` else ${compileOne(modulesStore, ast.defaultCase)}` : '');
         case "for-loop": return `for (const ${compileOne(modulesStore, ast.itemIdentifier)} of ${compileOne(modulesStore, ast.iterator)}) ${compileOne(modulesStore, ast.body)}`;
         case "while-loop": return `while (${compileOne(modulesStore, ast.condition)}) ${compileOne(modulesStore, ast.body)}`;
         case "proc": return compileProc(modulesStore, ast);
@@ -65,10 +68,10 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "reaction": return `${HIDDEN_IDENTIFIER_PREFIX}reactionUntil(
 ${compileOne(modulesStore, ast.data)},
 ${compileOne(modulesStore, ast.effect)},
-${given(ast.until, until => compileOne(modulesStore, until))});`;
-        case "computation": return `const ${ast.name.name} = ${HIDDEN_IDENTIFIER_PREFIX}computed(() => ${compileOne(modulesStore, ast.expression)});`;
+${given(ast.until, until => compileOne(modulesStore, until))})`;
+        case "computation": return `const ${ast.name.name} = ${HIDDEN_IDENTIFIER_PREFIX}computed(() => ${compileOne(modulesStore, ast.expression)})`;
         case "indexer": return `${compileOne(modulesStore, ast.subject)}[${compileOne(modulesStore, ast.indexer)}]`;
-        case "block": return `{ ${ast.statements.map(s => compileOne(modulesStore, s)).join(" ")} }`;
+        case "block": return `{ ${ast.statements.map(s => compileOne(modulesStore, s)).join("; ")}; }`;
         case "element-tag": return `${HIDDEN_IDENTIFIER_PREFIX}h('${ast.tagName.name}',{${
             objectEntries(modulesStore, (ast.attributes as [PlainIdentifier, Expression|Expression[]][]))}}, ${ast.children.map(c => compileOne(modulesStore, c)).join(', ')})`;
         case "class-construction": return `new ${ast.clazz.name}()`;
