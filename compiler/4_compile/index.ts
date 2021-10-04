@@ -36,7 +36,7 @@ function compileOne(modulesStore: ModulesStore, ast: AST): string {
         case "proc": return compileProc(modulesStore, ast);
         case "func": return compileFunc(modulesStore, ast);
         case "pipe":
-        case "invocation": return `${compileOne(modulesStore, ast.subject)}(${ast.args.map(arg => compileOne(modulesStore, arg)).join(', ')})`;
+        case "invocation": return `${compileOne(modulesStore, ast.subject)}${ast.kind === "invocation" && ast.typeArgs && ast.typeArgs.length > 0 ? `<${ast.typeArgs.map(p => compileOne(modulesStore, p)).join(',')}>` : ''}(${ast.args.map(arg => compileOne(modulesStore, arg)).join(', ')})`;
         case "binary-operator": return `${compileOne(modulesStore, ast.args[0])} ${ast.operator} ${compileOne(modulesStore, ast.args[1])}`;
         case "if-else-expression":
         case "switch-expression": return '(' + ast.cases
@@ -116,7 +116,8 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
     const mutableLocals = Object.entries(getScopeFor(modulesStore, proc.body).values)
         .filter(e => e[1].mutability === "all");
 
-    return `(${compileArgs(modulesStore, proc.type.args)}): void => {
+    return (proc.type.typeParams.length > 0 ? `<${proc.type.typeParams.map(p => p.name).join(',')}>` : '')
+        + `(${compileArgs(modulesStore, proc.type.args)}): void => {
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
 `    const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileOne(modulesStore, e[1].declaredType ?? UNKNOWN_TYPE)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});
     
@@ -127,7 +128,8 @@ function compileProc(modulesStore: ModulesStore, proc: Proc): string {
 // TODO: dispose of reactions somehow... at some point...
 
 const compileFunc = (modulesStore: ModulesStore, func: Func): string => {
-    const signature = `(${compileArgs(modulesStore, func.type.args)})${func.type.returnType != null ? `: ${compileOne(modulesStore, func.type.returnType)}` : ''} => `;
+    const signature = (func.type.typeParams.length > 0 ? `<${func.type.typeParams.map(p => p.name).join(',')}>` : '')
+        + `(${compileArgs(modulesStore, func.type.args)})${func.type.returnType != null ? `: ${compileOne(modulesStore, func.type.returnType)}` : ''} => `;
     const body = compileOne(modulesStore, func.body);
 
     if (func.consts.length > 0) {
