@@ -347,3 +347,28 @@ Deno.test({
     );
   },
 });
+
+Deno.test({
+  name: "Comment test line",
+  fn() {
+    testCompile(
+      `func foo() => 13 // foo bar comment
+            const a = 12`,
+      `const foo = () => 13;
+            const a = 12;`,
+    );
+  },
+});
+
+Deno.test({
+  name: "Comment test block",
+  fn() {
+    testCompile(
+      `func foo() => 13 /* foo bar comment
+            moar comment*/
+            const a = 12`,
+      `const foo = () => 13;
+            const a = 12;`,
+    );
+  },
+});

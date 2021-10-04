@@ -26,14 +26,45 @@ export function parseBinaryOp(code: string, index: number): ParseResult<BinaryOp
 }
 
 export function consumeWhitespace(code: string, index: number): number {
-    return consumeWhile(code, index, ch => ch.match(/[\s]/) != null);
+    let currentIndex = index;
+    let inComment: 'no'|'line'|'block' = 'no';
+
+    while (currentIndex < code.length) {
+        const char = code[currentIndex]
+        const next = code[currentIndex+1]
+
+        if (inComment === 'no') {
+            if (char === '/') {
+                if (next === '/') {
+                    inComment = 'line'
+                    currentIndex++
+                } else if (next === '*') {
+                    inComment = 'block'
+                    currentIndex++
+                }
+            } else if (!char.match(/[\s]/)) {
+                return currentIndex
+            }
+        } else if (inComment === 'line' && char === '\n') {
+            inComment = 'no'
+        } else if (inComment === 'block' && char === '*' && next === '/') {
+            inComment = 'no'
+            currentIndex++
+        }
+
+        currentIndex++
+    }
+
+    return currentIndex;
 }
 
 export function consumeWhitespaceRequired(code: string, index: number): number|undefined {
-    const newIndex = consumeWhile(code, index, ch => ch.match(/[\s]/) != null);
+    const newIndex = consumeWhitespace(code, index);
     
     if (newIndex > index) {
         return newIndex;
+    } else {
+        return undefined;
     }
 }
 
