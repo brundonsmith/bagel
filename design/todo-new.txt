@@ -12,4 +12,3 @@ Implementation tasks:
 Gruntwork tasks:
 - Build out standard libraries, including wrappers around browser APIs
 - Various spread/destructuring syntaxes for objects, arrays, tuples, etc
-- Parse chained if/else
