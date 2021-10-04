@@ -451,6 +451,9 @@ const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right:
     "==": [
         { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
     ],
+    "!=": [
+        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
+    ],
     "??": [
         { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: UNKNOWN_TYPE }
     ],

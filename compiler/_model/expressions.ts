@@ -62,7 +62,7 @@ export type BinaryOperator = SourceInfo & {
     // TODO: Once generics are fully functional, create a `type: FuncType` property
 }
 
-export const BINARY_OPS = [ "+", "-", "*", "/", "<=", ">=", "<", ">", "==", "&&", "||", "??" ] as const;
+export const BINARY_OPS = [ "+", "-", "*", "/", "<=", ">=", "<", ">", "==", "!=", "&&", "||", "??" ] as const;
 export type BinaryOp = typeof BINARY_OPS[number];
 
 export type Invocation = SourceInfo & {

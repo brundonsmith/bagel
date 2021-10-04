@@ -41,7 +41,7 @@ export function getScopeFor(modulesStore: ModulesStore, ast: AST): Scope {
         }
     }
 
-    throw Error("No scope found for:" + display(ast));
+    throw Error("No scope found for: " + display(ast));
 }
 
 export function display(ast: AST): string {
