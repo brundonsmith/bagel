@@ -1,82 +1,52 @@
-import { getScopeFor, PlainIdentifier, Scope } from "../_model/common.ts";
-import { BinaryOp, Expression } from "../_model/expressions.ts";
-import { BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { getScopeFor, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
+import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
+import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given } from "../utils.ts";
-import { ModulesStore } from "./modules-store.ts";
 import { subsumes } from "./typecheck.ts";
-import { ClassMember } from "../_model/declarations.ts";
+import { ClassMember, memberDeclaredType } from "../_model/declarations.ts";
 import { BagelError } from "../errors.ts";
+import { withoutSourceInfo } from "../debugging.ts";
 
 export function inferType(
     reportError: (error: BagelError) => void, 
-    modulesStore: ModulesStore,
+    parents: ParentsMap,
+    scopes: ScopesMap,
     ast: Expression|ClassMember,
     preserveGenerics?: boolean,
 ): TypeExpression {
-    return resolve(modulesStore,
+    return resolve([parents, scopes],
         handleSingletonUnion(
-            distillUnion(modulesStore,
+            distillUnion(parents, scopes,
                 flattenUnions(
-                    inferTypeInner(reportError, modulesStore, ast, !!preserveGenerics)))), preserveGenerics);
+                    inferTypeInner(reportError, parents, scopes, ast, !!preserveGenerics)))), preserveGenerics);
 }
 
 function inferTypeInner(
     reportError: (error: BagelError) => void, 
-    modulesStore: ModulesStore,
+    parents: ParentsMap,
+    scopes: ScopesMap,
     ast: Expression|ClassMember,
     preserveGenerics: boolean,
 ): TypeExpression {
-    const scope = getScopeFor(modulesStore, ast)
+    const scope = getScopeFor(parents, scopes, ast)
 
     switch(ast.kind) {
         case "proc":
+            return ast.type
         case "func": {
-            let args = ast.type.args
-            
-            // infer callback argument types based on context
-            const parent = modulesStore.parentAst.get(ast)
-            if (parent?.kind === "invocation") {
-                const parentSubjectType = inferType(reportError, modulesStore, parent.subject, preserveGenerics)
-                const thisArgIndex = parent.args.findIndex(a => a === ast)
+            // if no return-type is declared, try inferring the type from the inner expression
+            const returnType = ast.type.returnType ??
+                inferType(reportError, parents, scopes, ast.body, true)
 
-                if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
-                    const thisArgParentType = parentSubjectType.args[thisArgIndex]?.type
-
-                    if (thisArgParentType && thisArgParentType.kind === ast.type.kind) {
-                        args = ast.type.args.map((arg, i) => 
-                            arg.type == null
-                                ? { ...arg, type: thisArgParentType.args[i].type }
-                                : arg)
-                    }
-                }
-            }
-
-            if (ast.kind === "proc") {
-                return {
-                    ...ast.type,
-                    args,
-                }
-            } else {
-
-                // console.log({ returnType: ast.type.returnType })
-                
-                // if no return-type is declared, try inferring the type from the inner expression
-                const returnType = ast.type.returnType ??
-                    inferType(reportError, modulesStore, ast.body, true)
-
-                // console.log({ inferredReturnType: returnType })
-                
-                return {
-                    ...ast.type,
-                    args,
-                    returnType, 
-                }
+            return {
+                ...ast.type,
+                returnType, 
             }
 
         }
         case "binary-operator": {
-            const leftType = inferType(reportError, modulesStore, ast.args[0], preserveGenerics);
-            const rightType = inferType(reportError, modulesStore, ast.args[1], preserveGenerics);
+            const leftType = inferType(reportError, parents, scopes, ast.args[0], preserveGenerics);
+            const rightType = inferType(reportError, parents, scopes, ast.args[1], preserveGenerics);
 
             for (const types of BINARY_OPERATOR_TYPES[ast.operator]) {
                 const { left, right, output } = types;
@@ -90,14 +60,8 @@ function inferTypeInner(
         }
         case "pipe":
         case "invocation": {
-            // console.log('---------begin invocation-------------')
-            // console.log({ preserveGenerics, subject: displaySource(ast.subject) })
-            let subjectType = inferType(reportError, modulesStore, ast.subject, true);
-            // console.log({ subjectType })
+            let subjectType = inferType(reportError, parents, scopes, ast.subject, true);
             subjectType = resolve(scope, subjectType, false);
-            // console.log({ resolvedSubjectType: subjectType })
-            // console.log({ ...modulesStore.getScopeFor(ast).types })
-
 
             if (subjectType.kind === "func-type") {
                 return subjectType.returnType ?? UNKNOWN_TYPE;
@@ -106,12 +70,12 @@ function inferTypeInner(
             }
         }
         case "indexer": {
-            const baseType = inferType(reportError, modulesStore, ast.subject, preserveGenerics);
-            const indexerType = inferType(reportError, modulesStore, ast.indexer, preserveGenerics);
+            const baseType = inferType(reportError, parents, scopes, ast.subject, preserveGenerics);
+            const indexerType = inferType(reportError, parents, scopes, ast.indexer, preserveGenerics);
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
                 const key = indexerType.value.segments[0];
-                const valueType = baseType.entries.find(entry => entry[0].name === key)?.[1];
+                const valueType = baseType.entries.find(entry => entry.name.name === key)?.type;
 
                 return valueType ?? UNKNOWN_TYPE;
             } else if (baseType.kind === "indexer-type") {
@@ -134,10 +98,10 @@ function inferTypeInner(
         }
         case "if-else-expression":
         case "switch-expression": {
-            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, modulesStore, ast.value, preserveGenerics)
+            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, parents, scopes, ast.value, preserveGenerics)
 
             const caseTypes = ast.cases.map(({ outcome }) => 
-                inferType(reportError, modulesStore,outcome, preserveGenerics))
+                inferType(reportError, parents, scopes, outcome, preserveGenerics))
 
             const unionType: UnionType = {
                 kind: "union-type",
@@ -153,7 +117,7 @@ function inferTypeInner(
                     members: [
                         ...unionType.members,
                         ast.defaultCase 
-                            ? inferType(reportError, modulesStore, ast.defaultCase, preserveGenerics) 
+                            ? inferType(reportError, parents, scopes, ast.defaultCase, preserveGenerics) 
                             : NIL_TYPE
                     ]
                 }
@@ -162,33 +126,34 @@ function inferTypeInner(
             return unionType
         }
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
-        case "parenthesized-expression": return inferType(reportError, modulesStore, ast.inner, preserveGenerics);
-        case "property-accessor": {
-            const subjectType = inferType(reportError, modulesStore, ast.subject, preserveGenerics);
-            
-            if (subjectType.kind === "object-type") {
-                return subjectType.entries.find(entry => entry[0].name === ast.property.name)?.[1] ?? UNKNOWN_TYPE
-            } else if (subjectType.kind === "class-type") {
-                const member = subjectType.clazz.members.find(member => member.name.name === ast.property.name)
-                if (member) {
-                    if (member.kind === "class-function" || member.kind === "class-procedure") {
-                        return inferType(reportError, modulesStore,member.value, preserveGenerics)
-                    } else {
-                        return member.type ?? inferType(reportError, modulesStore,member.value, preserveGenerics)
-                    }
-                }
+        case "debug": {
+            if (isExpression(ast.inner)) {
+                const type = inferType(reportError, parents, scopes, ast.inner, preserveGenerics)
+                console.log(JSON.stringify({
+                    bgl: given(ast.inner.code, code =>
+                        given(ast.inner.startIndex, startIndex =>
+                        given(ast.inner.endIndex, endIndex =>
+                            code.substring(startIndex, endIndex)))),
+                    type: withoutSourceInfo(type)
+                }, null, 2));
+                return type;
+            } else {
+                return UNKNOWN_TYPE
             }
-            
-            return UNKNOWN_TYPE
+        }
+        case "parenthesized-expression":
+            return inferType(reportError, parents, scopes, ast.inner, preserveGenerics);
+        case "property-accessor": {
+            const subjectType = inferType(reportError, parents, scopes, ast.subject, preserveGenerics);
+            const propertyType = propertiesOf(reportError, parents, scopes, subjectType)?.find(entry => entry.name.name === ast.property.name)?.type
+
+            return propertyType ?? UNKNOWN_TYPE
         }
         case "local-identifier": {
-            const valueDescriptor = getScopeFor(modulesStore, ast).values[ast.name]
-            // console.log({ value: valueDescriptor.initialValue, uninferredType: (valueDescriptor?.initialValue as any).type, thingType: valueDescriptor?.declaredType 
-            //     ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, modulesStore, initialValue, preserveGenerics))
-            //     ?? UNKNOWN_TYPE })
+            const valueDescriptor = getScopeFor(parents, scopes, ast).values[ast.name]
 
             return valueDescriptor?.declaredType 
-                ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, modulesStore, initialValue, preserveGenerics))
+                ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, parents, scopes, initialValue, preserveGenerics))
                 ?? UNKNOWN_TYPE
         }
         case "element-tag": {
@@ -202,8 +167,14 @@ function inferTypeInner(
             };
         }
         case "object-literal": {
-            const entries = ast.entries.map(([key, value]) => 
-                [key, inferType(reportError, modulesStore,value, preserveGenerics)] as [PlainIdentifier, TypeExpression]);
+            const entries: Attribute[] = ast.entries.map(([name, value]) => ({
+                kind: "attribute",
+                name,
+                type: inferType(reportError, parents, scopes, value, preserveGenerics),
+                code: undefined,
+                startIndex: undefined,
+                endIndex: undefined,
+            }));
 
             return {
                 kind: "object-type",
@@ -214,7 +185,7 @@ function inferTypeInner(
             };
         }
         case "array-literal": {
-            const entries = ast.entries.map(entry => inferType(reportError, modulesStore, entry, preserveGenerics));
+            const entries = ast.entries.map(entry => inferType(reportError, parents, scopes, entry, preserveGenerics));
 
             // NOTE: This could be slightly better where different element types overlap each other
             const uniqueEntryTypes = entries.filter((el, index, arr) => 
@@ -238,14 +209,14 @@ function inferTypeInner(
         }
         case "class-construction": return {
             kind: "class-type",
-            clazz: getScopeFor(modulesStore, ast).classes[ast.clazz.name],
+            clazz: getScopeFor(parents, scopes, ast).classes[ast.clazz.name],
             code: ast.clazz.code,
             startIndex: ast.clazz.startIndex,
             endIndex: ast.clazz.endIndex
         };
         case "class-property":
         case "class-function":
-        case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferType(reportError, modulesStore, ast.value, preserveGenerics);
+        case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferType(reportError, parents, scopes, ast.value, preserveGenerics);
         case "string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
         case "boolean-literal": return BOOLEAN_TYPE;
@@ -254,17 +225,15 @@ function inferTypeInner(
     }
 }
 
-export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
+export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
     if (type.kind === "named-type") {
-        const resolutionScope = modulesStoreOrScope instanceof ModulesStore
-            ? getScopeFor(modulesStoreOrScope, type)
-            : modulesStoreOrScope
-
-        // console.log({ type })
+        const resolutionScope = Array.isArray(contextOrScope)
+            ? getScopeFor(contextOrScope[0], contextOrScope[1], type)
+            : contextOrScope
 
         if (resolutionScope.types[type.name.name]) {
             if (!resolutionScope.types[type.name.name].isGenericParameter || !preserveGenerics) {
-                return resolve(modulesStoreOrScope, resolutionScope.types[type.name.name].type)
+                return resolve(contextOrScope, resolutionScope.types[type.name.name].type, preserveGenerics)
             } else {
                 return type
             }
@@ -278,7 +247,7 @@ export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpre
             }
         }
     } else if(type.kind === "union-type") {
-        const memberTypes = type.members.map(member => resolve(modulesStoreOrScope, member));
+        const memberTypes = type.members.map(member => resolve(contextOrScope, member, preserveGenerics));
         if (memberTypes.some(member => member == null)) {
             return UNKNOWN_TYPE;
         } else {
@@ -291,8 +260,8 @@ export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpre
             };
         }
     } else if(type.kind === "object-type") {
-        const entries: [PlainIdentifier, TypeExpression][] = type.entries.map(([ key, valueType ]) => 
-            [key, resolve(modulesStoreOrScope, valueType as TypeExpression)] as [PlainIdentifier, TypeExpression]);
+        const entries = type.entries.map(({ type, ...rest }) => 
+            ({ ...rest, type: resolve(contextOrScope, type, preserveGenerics) }))
 
         return {
             kind: "object-type",
@@ -302,7 +271,7 @@ export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpre
             endIndex: type.endIndex,
         }
     } else if(type.kind === "array-type") {
-        const element = resolve(modulesStoreOrScope, type.element)
+        const element = resolve(contextOrScope, type.element, preserveGenerics)
 
         return {
             kind: "array-type",
@@ -315,8 +284,8 @@ export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpre
         return {
             kind: "func-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(modulesStoreOrScope, t, true) ?? t) })),
-            returnType: given(type.returnType, returnType => resolve(modulesStoreOrScope, returnType, true) ?? returnType),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, preserveGenerics)) })),
+            returnType: given(type.returnType, returnType => resolve(contextOrScope, returnType, preserveGenerics)),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -325,7 +294,23 @@ export function resolve(modulesStoreOrScope: ModulesStore|Scope, type: TypeExpre
         return {
             kind: "proc-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(modulesStoreOrScope, t) ?? t) })),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, preserveGenerics)) })),
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
+        };
+    } else if(type.kind === "iterator-type") {
+        return {
+            kind: "iterator-type",
+            itemType: resolve(contextOrScope, type.itemType, preserveGenerics),
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
+        };
+    } else if(type.kind === "plan-type") {
+        return {
+            kind: "plan-type",
+            resultType: resolve(contextOrScope, type.resultType, preserveGenerics),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -366,7 +351,7 @@ function flattenUnions(type: TypeExpression): TypeExpression {
 /**
  * Remove redundant members in union type (members subsumed by other members)
  */
-function distillUnion(modulesStore: ModulesStore, type: TypeExpression): TypeExpression {
+function distillUnion(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         const indicesToDrop = new Set<number>();
 
@@ -376,7 +361,7 @@ function distillUnion(modulesStore: ModulesStore, type: TypeExpression): TypeExp
                     const a = type.members[i];
                     const b = type.members[j];
 
-                    if (subsumes(getScopeFor(modulesStore, type), b, a) && !indicesToDrop.has(j)) {
+                    if (subsumes(getScopeFor(parents, scopes, type), b, a) && !indicesToDrop.has(j)) {
                         indicesToDrop.add(i);
                     }
                 }
@@ -461,4 +446,132 @@ const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right:
     //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
     //     output: BOOLEAN_TYPE
     // },
+}
+
+export function propertiesOf(
+    reportError: (error: BagelError) => void, 
+    parents: ParentsMap,
+    scopes: ScopesMap,
+    type: TypeExpression
+): readonly Attribute[] | undefined {
+    switch (type.kind) {
+        case "object-type":
+            return type.entries
+        case "class-type":
+            return type.clazz.members.map(member => ({
+                kind: "attribute",
+                name: member.name,
+                type: memberDeclaredType(member) ?? inferType(reportError, parents, scopes, member.value, true),
+                code: undefined, startIndex: undefined, endIndex: undefined
+            }))
+        case "iterator-type": {
+            const { code: _, startIndex: _1, endIndex: _2, ...item } = type.itemType
+            const itemType = { ...item, code: undefined, startIndex: undefined, endIndex: undefined }
+
+            const iteratorProps: readonly Attribute[] = [
+                {
+                    kind: "attribute",
+                    name: { kind: "plain-identifier", name: "filter", code: undefined, startIndex: undefined, endIndex: undefined },
+                    type: {
+                        kind: "func-type",
+                        typeParams: [],
+                        args: [{
+                            name: { kind: "plain-identifier", name: "fn", code: undefined, startIndex: undefined, endIndex: undefined },
+                            type: {
+                                kind: "func-type",
+                                typeParams: [],
+                                args: [{ name: { kind: "plain-identifier", name: "el", code: undefined, startIndex: undefined, endIndex: undefined }, type: itemType }],
+                                returnType: BOOLEAN_TYPE,
+                                code: undefined, startIndex: undefined, endIndex: undefined
+                            }
+                        }],
+                        returnType: {
+                            kind: "iterator-type",
+                            itemType,
+                            code: undefined, startIndex: undefined, endIndex: undefined
+                        },
+                        code: undefined, startIndex: undefined, endIndex: undefined
+                    },
+                    code: undefined, startIndex: undefined, endIndex: undefined
+                },
+                {
+                    kind: "attribute",
+                    name: { kind: "plain-identifier", name: "map", code: undefined, startIndex: undefined, endIndex: undefined },
+                    type: {
+                        kind: "func-type",
+                        typeParams: [
+                            { kind: "plain-identifier", name: "R", code: undefined, startIndex: undefined, endIndex: undefined }
+                        ],
+                        args: [{
+                            name: { kind: "plain-identifier", name: "fn", code: undefined, startIndex: undefined, endIndex: undefined },
+                            type: {
+                                kind: "func-type",
+                                args: [{ name: { kind: "plain-identifier", name: "el", code: undefined, startIndex: undefined, endIndex: undefined }, type: itemType }],
+                                returnType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", code: undefined, startIndex: undefined, endIndex: undefined }, code: undefined, startIndex: undefined, endIndex: undefined },
+                                typeParams: [],
+                                code: undefined, startIndex: undefined, endIndex: undefined
+                            }
+                        }],
+                        returnType: {
+                            kind: "iterator-type",
+                            itemType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", code: undefined, startIndex: undefined, endIndex: undefined }, code: undefined, startIndex: undefined, endIndex: undefined },
+                            code: undefined, startIndex: undefined, endIndex: undefined
+                        },
+                        code: undefined, startIndex: undefined, endIndex: undefined
+                    },
+                    code: undefined, startIndex: undefined, endIndex: undefined
+                },
+                {
+                    kind: "attribute",
+                    name: { kind: "plain-identifier", name: "array", code: undefined, startIndex: undefined, endIndex: undefined },
+                    type: {
+                        kind: "func-type",
+                        typeParams: [],
+                        args: [],
+                        returnType: { kind: "array-type", element: itemType, code: undefined, startIndex: undefined, endIndex: undefined },
+                        code: undefined, startIndex: undefined, endIndex: undefined
+                    },
+                    code: undefined, startIndex: undefined, endIndex: undefined
+                }
+            ]
+
+            return iteratorProps
+        }
+        case "plan-type": {
+            const { code: _, startIndex: _1, endIndex: _2, ...result } = type.resultType
+            const resultType = { ...result, code: undefined, startIndex: undefined, endIndex: undefined }
+
+            const planProps: readonly Attribute[] = [
+                {
+                    kind: "attribute",
+                    name: { kind: "plain-identifier", name: "then", code: undefined, startIndex: undefined, endIndex: undefined },
+                    type: {
+                        kind: "func-type",
+                        typeParams: [
+                            { kind: "plain-identifier", name: "R", code: undefined, startIndex: undefined, endIndex: undefined }
+                        ],
+                        args: [{
+                            name: { kind: "plain-identifier", name: "fn", code: undefined, startIndex: undefined, endIndex: undefined },
+                            type: {
+                                kind: "func-type",
+                                args: [{ name: { kind: "plain-identifier", name: "el", code: undefined, startIndex: undefined, endIndex: undefined }, type: resultType }],
+                                returnType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", code: undefined, startIndex: undefined, endIndex: undefined }, code: undefined, startIndex: undefined, endIndex: undefined },
+                                typeParams: [],
+                                code: undefined, startIndex: undefined, endIndex: undefined
+                            }
+                        }],
+                        returnType: {
+                            kind: "plan-type",
+                            resultType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", code: undefined, startIndex: undefined, endIndex: undefined }, code: undefined, startIndex: undefined, endIndex: undefined },
+                            code: undefined, startIndex: undefined, endIndex: undefined
+                        },
+                        code: undefined, startIndex: undefined, endIndex: undefined
+                    },
+                    code: undefined, startIndex: undefined, endIndex: undefined
+                },
+            ]
+
+            return planProps
+        }
+    }
 }

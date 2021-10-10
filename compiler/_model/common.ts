@@ -1,19 +1,27 @@
 import { AST } from "./ast.ts";
 import { Statement } from "./statements.ts";
-import { isTypeExpression, TypeExpression } from "./type-expressions.ts";
-import { displayForm } from "../3_checking/typecheck.ts";
+import { TypeExpression } from "./type-expressions.ts";
 import { ClassDeclaration } from "./declarations.ts";
 import { Expression } from "./expressions.ts";
-import { ModulesStore } from "../3_checking/modules-store.ts";
+import { display } from "../debugging.ts";
 
 export type SourceInfo = {
     readonly code: string|undefined,
     readonly startIndex: number|undefined,
     readonly endIndex: number|undefined,
-    scope?: Scope,  // TODO: Make this readonly
 }
 
+export type ParentsMap = Omit<WeakMap<AST, AST>, 'set'|'delete'>
+
+export type ScopesMap = Omit<WeakMap<AST, Scope>, 'set'|'delete'>
+
 export type Scope = {
+    readonly types: {readonly [key: string]: TypeDeclarationDescriptor},
+    readonly values: {readonly [key: string]: DeclarationDescriptor},
+    readonly classes: {readonly [key: string]: ClassDeclaration},
+}
+
+export type MutableScope = {
     readonly types: {[key: string]: TypeDeclarationDescriptor},
     readonly values: {[key: string]: DeclarationDescriptor},
     readonly classes: {[key: string]: ClassDeclaration},
@@ -30,31 +38,19 @@ export type DeclarationDescriptor = {
     readonly initialValue?: Expression,
 }
 
-export function getScopeFor(modulesStore: ModulesStore, ast: AST): Scope {
+export function getScopeFor(parentsMap: ParentsMap, scopesMap: ScopesMap, ast: AST): Scope {
     let current: AST|undefined = ast
 
     while (current != null) {
-        if (current.scope) {
-            return current.scope
+        const currentScope = scopesMap.get(current)
+        if (currentScope) {
+            return currentScope
         } else {
-            current = modulesStore.parentAst.get(current)
+            current = parentsMap.get(current)
         }
     }
 
     throw Error("No scope found for: " + display(ast));
-}
-
-export function display(ast: AST): string {
-    if (isTypeExpression(ast)) {
-        return displayForm(ast)
-    }
-
-    const { code, startIndex, endIndex } = ast
-    if (code == null || startIndex == null || endIndex == null) {
-        return `<${ast.kind}>`
-    } else {
-        return code.substring(startIndex, endIndex)
-    }
 }
 
 export type PlainIdentifier = SourceInfo & {

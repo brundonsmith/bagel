@@ -1,37 +1,8 @@
 import { parse } from "../compiler/1_parse/index.ts";
 import { reshape } from "../compiler/2_reshape/index.ts";
-import { ModulesStore } from "../compiler/3_checking/modules-store.ts";
-import { scopescan } from "../compiler/3_checking/scopescan.ts";
+import { getParentsMap, scopescan } from "../compiler/3_checking/scopescan.ts";
 import { compile } from "../compiler/4_compile/index.ts";
 import { printError } from "../compiler/errors.ts";
-
-const module = "module";
-function testCompile(bgl: string, exp: string) {
-  let error: string | undefined;
-
-  const ast = reshape(parse(bgl, printError('<test>')));
-  // console.log(JSON.stringify(withoutSourceInfo(ast), null, 2))
-  const modulesStore = new ModulesStore();
-  modulesStore.modules.set(module, ast);
-  scopescan(printError('<test>'), modulesStore, ast, module);
-
-  const compiled = compile(modulesStore, ast);
-
-  if (error) {
-    throw error
-  }
-
-  if (normalize(compiled) !== normalize(exp)) {
-    throw `Compiler output did not match expected:
-    bagel:    ${bgl}
-    expected: ${exp}
-    received: ${compiled}`;
-  }
-}
-
-function normalize(ts: string): string {
-  return ts.replace(/[\s\n]+/gm, " ");
-}
 
 Deno.test({
   name: "Simple func declaration",
@@ -415,3 +386,30 @@ Deno.test({
     );
   },
 });
+
+const module = "module";
+function testCompile(bgl: string, exp: string) {
+  let error: string | undefined;
+
+  const ast = reshape(parse(bgl, printError('<test>')));
+  // console.log(JSON.stringify(withoutSourceInfo(ast), null, 2))
+  const parents = getParentsMap(ast)
+  const scopes = scopescan(printError('<test>'), parents, () => undefined, ast, module);
+
+  const compiled = compile(parents, scopes, ast);
+
+  if (error) {
+    throw error
+  }
+
+  if (normalize(compiled) !== normalize(exp)) {
+    throw `Compiler output did not match expected:
+    bagel:    ${bgl}
+    expected: ${exp}
+    received: ${compiled}`;
+  }
+}
+
+function normalize(ts: string): string {
+  return ts.replace(/[\s\n]+/gm, " ");
+}

@@ -1,9 +1,10 @@
-import { AST } from "./ast.ts";
+import { AST, Debug } from "./ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
 import { FuncType, ProcType, TypeExpression } from "./type-expressions.ts";
 
 export type Expression = 
     | JavascriptEscape
+    | Debug
     | Pipe
     | Func
     | Proc
@@ -29,7 +30,7 @@ export type JavascriptEscape = SourceInfo & {
     readonly kind: "javascript-escape",
     readonly js: string,
 }
-  
+
 export type Pipe = SourceInfo & {
     readonly kind: "pipe",
     readonly subject: Expression,
@@ -39,8 +40,15 @@ export type Pipe = SourceInfo & {
 export type Func = SourceInfo & {
     readonly kind: "func",
     readonly type: FuncType,
-    readonly consts: readonly { readonly name: PlainIdentifier, readonly type?: TypeExpression, readonly value: Expression }[],
+    readonly consts: readonly InlineConst[],
     readonly body: Expression,
+}
+
+export type InlineConst = SourceInfo & {
+    readonly kind: "inline-const",
+    readonly name: PlainIdentifier,
+    readonly type?: TypeExpression,
+    readonly value: Expression
 }
 
 export type Proc = SourceInfo & {
@@ -170,6 +178,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "boolean-literal": undefined,
     "nil-literal": undefined,
     "javascript-escape": undefined,
+    "debug": undefined,
     "class-construction": undefined,
 };
 

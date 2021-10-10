@@ -8,11 +8,6 @@ export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
     }
 }
 
-export function log<T>(expr: T, fn?: (expr: T) => string): T {
-    console.log(fn == null ? expr : fn(expr));
-    return expr;
-}
-
 type BasicData =
     | {readonly [key: string]: BasicData}
     | readonly BasicData[]
@@ -54,23 +49,6 @@ export function deepEquals(a: BasicData, b: BasicData, ignorePropNames: string[]
     }
 
     return false;
-}
-
-export function withoutSourceInfo(ast: AST) {
-    const clone = JSON.parse(JSON.stringify(ast))
-
-    walkParseTree(undefined, clone, (_, ast) => {
-        // @ts-ignore
-        delete ast.code
-        // @ts-ignore
-        delete ast.startIndex
-        // @ts-ignore
-        delete ast.endIndex
-
-        return undefined
-    })
-
-    return clone
 }
 
 export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST) => T): void {
@@ -124,16 +102,19 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
 
             if (ast.kind === "func") {
                 for (const c of ast.consts) {
-                    walkParseTree(nextPayload, c.name, fn);
-                    if (c.type) {
-                        walkParseTree(nextPayload, c.type, fn);
-                    }
-                    walkParseTree(nextPayload, c.value, fn);
+                    walkParseTree(nextPayload, c, fn);
                 }
             }
             
             walkParseTree(nextPayload, ast.body, fn);
         } break;
+        case "inline-const":
+            walkParseTree(nextPayload, ast.name, fn);
+            if (ast.type) {
+                walkParseTree(nextPayload, ast.type, fn);
+            }
+            walkParseTree(nextPayload, ast.value, fn);
+            break;
         case "binary-operator":
         case "pipe":
         case "invocation": {
@@ -181,7 +162,8 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
                 walkParseTree(nextPayload, ast.defaultCase, fn);
             }
         } break;
-        case "parenthesized-expression": {
+        case "parenthesized-expression":
+        case "debug": {
             walkParseTree(nextPayload, ast.inner, fn);
         } break;
         case "property-accessor": {
@@ -270,10 +252,13 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             }
         } break;
         case "object-type": {
-            for (const [k, v] of ast.entries) {
-                walkParseTree(nextPayload, k, fn);
-                walkParseTree(nextPayload, v, fn);
+            for (const attribute of ast.entries) {
+                walkParseTree(nextPayload, attribute, fn)
             }
+        } break;
+        case "attribute": {
+            walkParseTree(nextPayload, ast.name, fn);
+            walkParseTree(nextPayload, ast.type, fn);
         } break;
         case "indexer-type": {
             walkParseTree(nextPayload, ast.keyType, fn);
@@ -329,4 +314,10 @@ export function sOrNone(num: number): string {
 }
 export function wasOrWere(num: number): string {
     return num > 1 ? 'were' : 'was';
+}
+
+export async function on<T>(iter: AsyncIterable<T>, cb: (val: T) => void) {
+    for await (const val of iter) {
+        cb(val)
+    }
 }

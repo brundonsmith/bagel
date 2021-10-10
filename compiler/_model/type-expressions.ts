@@ -56,7 +56,13 @@ export type ElementType = SourceInfo & {
 
 export type ObjectType = SourceInfo & {
     readonly kind: "object-type",
-    readonly entries: readonly (readonly [PlainIdentifier, TypeExpression])[],
+    readonly entries: readonly Attribute[],
+}
+
+export type Attribute = SourceInfo & {
+    readonly kind: "attribute",
+    readonly name: PlainIdentifier,
+    readonly type: TypeExpression,
 }
 
 export type IndexerType = SourceInfo & {

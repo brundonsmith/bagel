@@ -1,12 +1,38 @@
-import { path } from "./deps.ts";
+import { path, walk } from "./deps.ts";
 
-import { ModulesStore } from "./3_checking/modules-store.ts";
-import { canonicalModuleName, scopescan } from "./3_checking/scopescan.ts";
+import { canonicalModuleName, getParentsMap, scopescan } from "./3_checking/scopescan.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
 import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { printError, BagelError } from "./errors.ts";
+import { given, on } from "./utils.ts";
+import { Module } from "./_model/ast.ts";
+
+import { observable, action, autorun, configure } from "https://jspm.dev/mobx"
+import { createTransformer } from "https://jspm.dev/mobx-utils"
+import { ScopesMap } from "./_model/common.ts";
+
+configure({
+    enforceActions: "never",
+    computedRequiresReaction: false,
+    reactionRequiresObservable: false,
+    observableRequiresReaction: false,
+});
+
+{ // start
+    const command = Deno.args[0]
+    const bundle = Deno.args.includes("--bundle");
+    const watch = Deno.args.includes("--watch");
+
+    switch (command) {
+        case "build": buildMobX({ entry: Deno.args[1], bundle, watch, emit: true }); break;
+        case "check": buildMobX({ entry: Deno.args[1], bundle, watch, emit: false }); break;
+        case "test": throw Error("Unimplemented!"); break; // test(Deno.args[1]); break;
+        case "run": throw Error("Unimplemented!"); break;
+        case "format": throw Error("Unimplemented!"); break;
+    }
+}
 
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
@@ -46,168 +72,153 @@ ___configure({
 });
 `
 
-async function bundleOutput(entryFile: string) {
-   const esbuild = await import("https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js")
-
-   await esbuild.build({
-       write: true,
-       bundle: true,
-       minify: true,
-       entryPoints: [ bagelFileToTsFile(entryFile) ],
-       outfile: bagelFileToJsBundleFile(entryFile)
-   })
-
-   console.log('done')
-}
-
-{
-    const entryArg = Deno.args[0]
-    if (!entryArg) throw Error("Bagel: No file or directory provided")
-    const entryFileOrDir = path.resolve(Deno.cwd(), entryArg);
+async function buildMobX({ entry, bundle, watch, emit }: { entry: string, bundle?: boolean, watch?: boolean, emit: boolean }) {
+    if (!entry) throw Error("Bagel: No file or directory provided")
+    const entryFileOrDir = path.resolve(Deno.cwd(), entry);
     const singleEntry = !(await Deno.stat(entryFileOrDir)).isDirectory
     const allFiles = singleEntry ? [ entryFileOrDir ] : await getAllFiles(entryFileOrDir);
-    // const outDir = Deno.args[1] || path.dirname(fileOrDir);
-    const bundle = Deno.args.includes("--bundle");
-    const watch = Deno.args.includes("--watch");
-    const emit = !Deno.args.includes("--noEmit");
-    
-    const modulesStore = new ModulesStore();
-    
-    const allModules = new Set<string>(allFiles.filter(f => f.match(/\.bgl$/i)));
-    const doneModules = new Set<string>();
 
-    let timeSpentParsing = 0;
+    const modules: Set<string> = observable(new Set<string>(allFiles.filter(f => f.match(/\.bgl$/i))));
+    const modulesSource: Map<string, string> = observable(new Map())
 
-    // parse all modules
-    while (doneModules.size < allModules.size) {
-        const module = Array.from(allModules).find(m => !doneModules.has(m)) as string;
-        doneModules.add(module);
-    
-        if (!modulesStore.modules.has(module)) {
-            try {
-                const fileContents = await Deno.readTextFile(module);
-            
-                const startParse = Date.now();
-                const parsed = reshape(parse(fileContents, printError(path.basename(module))));
-                // console.log(JSON.stringify(parsed, null, 2))
-                timeSpentParsing += Date.now() - startParse;
-
-                for (const declaration of parsed.declarations) {
-                    if (declaration.kind === "import-declaration") {
-                        const importedModule = canonicalModuleName(module, declaration.path);
-                        allModules.add(importedModule);
-                    }
-                }
-
-                modulesStore.modules.set(module, parsed);
-            } catch (e) {
-                console.error("Failed to read module " + module + "\n")
-                console.error(e)
+    // HACK
+    autorun(() => {
+        for (const module of modules) {
+            if (modulesSource.get(module) == null) {
+                Deno.readTextFile(module).then(action((source: string) => {
+                    modulesSource.set(module, source)
+                }))
             }
         }
-    }
-
-    const startTypecheck = Date.now();
-    // scopescan all parsed modules
-    for (const [module, ast] of modulesStore.modules) {
-        scopescan(printError(path.basename(module)), modulesStore, ast, module);
-    }
-
-    // typescan all parsed modules
-    // for (const [module, ast] of modulesStore.modules) {
-    //     try {
-    //         typeinfer(printError(path.basename(module)), modulesStore, ast);
-    //     } catch {
-    //         console.error("Failed to typecheck module " + module + "\n")
-    //     }
-    // }
-
-    // typecheck all parsed modules
-    for (const [module, ast] of modulesStore.modules) {
-        try {
-            typecheck(printError(path.basename(module)), modulesStore, ast);
-        } catch (e: any) {
-            console.error(`Encountered exception typechecking module "${module}":\n${e.stack}\n`);
-        }
-    }
-    const endTypecheck = Date.now();
-
-    // compile to TS
-    if (emit) {
-        await Promise.all(Array.from(modulesStore.modules.entries()).map(([ module, ast ]) => {
-            const jsPath = bagelFileToTsFile(module);
-            const compiled = compile(modulesStore, ast);
-            const compiledWithLib = LIB_IMPORTS + compiled;
-            return Deno.writeFile(jsPath, new TextEncoder().encode(compiledWithLib));
-        }))
-
-        if (bundle && singleEntry) {
-            await bundleOutput(entryFileOrDir)
-        }
-    }
-
-    console.log();
-    console.log(`Spent ${timeSpentParsing}ms parsing`)
-    console.log(`Spent ${endTypecheck - startTypecheck}ms typechecking`)
-
-    if (watch) {
-        for (const module of modulesStore.modules.keys()) {
-            let lastFileContents: string|undefined
-            (async () => {
-                const watcher = Deno.watchFs(module)
-                for await (const _ of watcher) {
+    })
     
-                    try {
-                        const fileContents = await Deno.readTextFile(module);
+    const _parsed = (module: string, source: string): Module =>
+        reshape(parse(source, printError(path.basename(module))));
+    const parsed: (module: string) => (source: string) => Module = createTransformer((module: string) => createTransformer((source: string) => _parsed(module, source)));
 
-                        if (fileContents && (lastFileContents == null || lastFileContents !== fileContents)) {
-                            lastFileContents = fileContents
-                            let hadError = false;
+    const _scopesMap = (module: string, ast: Module): ScopesMap =>
+        scopescan(printError(path.basename(module)), parentsMap(ast), module => given(modulesSource.get(module), source => parsed(module)(source)), ast, module);
+    const scopesMap: (module: string) => (ast: Module) => ScopesMap = createTransformer((module: string) => createTransformer((ast: Module) => _scopesMap(module, ast)));
 
-                            console.log(`Typechecking ${module}...`)
-                            const parsed = reshape(parse(fileContents, err => {
-                                hadError = true;
-                                printError(path.basename(module))(err)
-                            }));
-                            modulesStore.modules.set(module, parsed);
+    const parentsMap: typeof getParentsMap = createTransformer(getParentsMap)
 
-                            const printErrorForModule = (error: BagelError) => {
-                                hadError = true;
-                                printError(path.basename(module))(error)
-                            }
-        
-                            try {
-                                scopescan(printErrorForModule, modulesStore, parsed, module);
-                                // typeinfer(printErrorForModule, modulesStore, parsed);    
-                                typecheck(printErrorForModule, modulesStore, parsed);
-                            } catch (e: any) {
-                                console.error(`Encountered exception typechecking module "${module}":\n${e.stack}`);
-                                hadError = true;
-                            }
-        
-                            if (!hadError) {
-                                console.log("No errors")
-                            }
-                            
-                            if (emit) {
-                                const jsPath = bagelFileToTsFile(module);
-                                const compiled = compile(modulesStore, parsed);
-                                const compiledWithLib = LIB_IMPORTS + compiled;
-                                await Deno.writeFile(jsPath, new TextEncoder().encode(compiledWithLib));
-                                
-                                if (bundle && singleEntry) {
-                                    await bundleOutput(entryFileOrDir)
-                                }
-                            }
+    const _typeerrors = (module: string, ast: Module): BagelError[] => {
+        const errors: BagelError[] = []
+        typecheck(err => errors.push(err), parentsMap(ast), scopesMap(module)(ast), ast)
+        return errors
+    }
+    const typeerrors: (module: string) => (ast: Module) => BagelError[] = createTransformer((module: string) => createTransformer((ast: Module) => _typeerrors(module, ast)));
+
+    const _compiled = (module: string, ast: Module): string => LIB_IMPORTS + compile(parentsMap(ast), scopesMap(module)(ast), ast)
+    const compiled: (module: string) => (ast: Module) => string = createTransformer((module: string) => createTransformer((ast: Module) => _compiled(module, ast)));
+
+    // add imported modules to set
+    autorun(() => {
+        for (const module of modules) {
+            const source = modulesSource.get(module)
+            if (source) {
+                const ast = parsed(module)(source)
+                // console.log({ ast })
+                for (const decl of ast.declarations) {
+                    if (decl.kind === "import-declaration") {
+                        // console.log({ decl })
+                        const importedModule = canonicalModuleName(module, decl.path)
+
+                        if (!modules.has(importedModule)) {
+                            modules.add(importedModule)
                         }
-                    } catch (e) {
-                        console.error("Failed to read module " + module + "\n")
-                        console.error(e)
                     }
                 }
-            })()
+            }
         }
-    } else {
-        Deno.exit()
+    })
+
+    // print errors as they occur
+    setTimeout(() => {
+        autorun(() => {
+            for (const module of modules) {
+                const source = modulesSource.get(module)
+                if (source) {
+                    const ast = parsed(module)(source)
+                    for (const err of typeerrors(module)(ast)) {
+                        printError(module)(err)
+                    }
+                }
+            }
+        })
+    }, 1000)
+
+    // write compiled code to disk
+    autorun(() => {
+        for (const module of modules) {
+            const source = modulesSource.get(module)
+            if (source) {
+                const jsPath = bagelFileToTsFile(module);
+                const js = compiled(module)(parsed(module)(source))
+                Deno.writeFile(jsPath, new TextEncoder().encode(js));
+            }
+        }
+    })
+
+    if (watch) {
+        const watchers = new Map<string, Deno.FsWatcher>()
+
+        autorun(() => {
+            for (const module of modules) {
+                if (watchers.get(module) == null) {
+                    const watcher = Deno.watchFs(module);
+                    watchers.set(module, watcher);
+
+                    on(watcher, async () => {
+                        try {
+                            const fileContents = await Deno.readTextFile(module);
+
+                            if (fileContents && fileContents !== modulesSource.get(module)) {
+                                modulesSource.set(module, fileContents)
+                            }
+                        } catch (e) {
+                            console.error("Failed to read module " + module + "\n")
+                            console.error(e)
+                        }
+                    })
+                }
+            }
+        })
     }
 }
+
+async function bundleOutput(entryFile: string) {
+    const esbuild = await import("https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js")
+ 
+    await esbuild.build({
+        write: true,
+        bundle: true,
+        minify: true,
+        entryPoints: [ bagelFileToTsFile(entryFile) ],
+        outfile: bagelFileToJsBundleFile(entryFile)
+    })
+ 
+    console.log('done')
+}
+
+// function test(filePattern?: string) {
+//     const filesToTest = walk(Deno.cwd(), {
+//         match: given(filePattern, pattern => [ new RegExp(pattern) ]),
+//         exts: ['.bgl']
+//     })
+
+//     for await (const file of filesToTest) {
+//         if (file.isFile) {
+//             (async function() {
+//                 const module = (await build({ entry: file.path, emit: true })) as Module
+//                 const tests = module.declarations
+//                     // .filter(decl => decl.kind === "test-declaration")
+//                     // .map(decl => decl.name.name)
+
+//                 for (const test of tests) {
+                    
+//                 }
+//             })()
+//         }
+//     }
+// }

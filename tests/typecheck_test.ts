@@ -1,5 +1,4 @@
-import { ModulesStore } from "../compiler/3_checking/modules-store.ts";
-import { scopescan } from "../compiler/3_checking/scopescan.ts";
+import { getParentsMap, scopescan } from "../compiler/3_checking/scopescan.ts";
 import { typecheck } from "../compiler/3_checking/typecheck.ts";
 import { parse } from "../compiler/1_parse/index.ts";
 import { BagelError,prettyError } from "../compiler/errors.ts";
@@ -325,18 +324,14 @@ function testTypecheck(code: string, shouldFail: boolean): void {
 
   const parsed = parse(code, reportError);
 
-  const modulesStore = new ModulesStore();
-  modulesStore.modules.set("foo", parsed);
-
-  scopescan(reportError, modulesStore, parsed, "foo");
-  typecheck(reportError, modulesStore, parsed);
+  const parents = getParentsMap(parsed)
+  const scopes = scopescan(reportError, parents, () => undefined, parsed, '<test>');
+  typecheck(reportError, parents, scopes, parsed);
 
   if (!shouldFail && errors.length > 0) {
-    throw Error(
-      `\n${code}\nType check should have succeeded but failed with errors\n` +
-        errors.map(prettyError("foo")).join("\n"),
-    );
+    throw `\n${code}\nType check should have succeeded but failed with errors\n` +
+      errors.map(prettyError("foo")).join("\n")
   } else if (shouldFail && errors.length === 0) {
-    throw Error("Type check should have failed but succeeded");
+    throw `\n${code}\nType check should have failed but succeeded`
   }
 }

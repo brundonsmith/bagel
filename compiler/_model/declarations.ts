@@ -1,3 +1,4 @@
+import { Debug } from "./ast.ts";
 import { PlainIdentifier, SourceInfo } from "./common.ts";
 import { Expression, Func, JavascriptEscape, Proc, StringLiteral } from "./expressions.ts";
 import { TypeExpression } from "./type-expressions.ts";
@@ -10,6 +11,7 @@ export type Declaration =
     | FuncDeclaration
     | ConstDeclaration
     | ClassDeclaration
+    | Debug
 
 export type ImportDeclaration = SourceInfo & {
     readonly kind: "import-declaration",
@@ -86,6 +88,10 @@ export type ClassProcedure = SourceInfo & {
     readonly name: PlainIdentifier,
     readonly value: Proc,
     readonly access: 'private'|'public',
+}
+
+export function memberDeclaredType(m: ClassMember): TypeExpression|undefined {
+    return m.kind === "class-property" ? m.type : m.value.type
 }
 
 // TODO: ClassReaction

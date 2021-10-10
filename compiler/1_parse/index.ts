@@ -1,11 +1,12 @@
+import { log, withoutSourceInfo } from "../debugging.ts";
 import { BagelError, isError } from "../errors.ts";
-import { Module } from "../_model/ast.ts";
+import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
-import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType } from "../_model/type-expressions.ts";
-import { consume, consumeWhile, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
+import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute } from "../_model/type-expressions.ts";
+import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 
 export function parse(code: string, reportError: (error: BagelError) => void): Module {
@@ -53,7 +54,8 @@ export function parse(code: string, reportError: (error: BagelError) => void): M
 }
 
 const declaration: ParseFunction<Declaration> = (code, index) =>
-    importDeclaration(code, index)
+    debug(code, index)
+    ?? importDeclaration(code, index)
     ?? typeDeclaration(code, index)
     ?? procDeclaration(code, index)
     ?? funcDeclaration(code, index)
@@ -198,13 +200,20 @@ const objectType: ParseFunction<ObjectType> = (code, startIndex) =>
         newIndex: index,
     }))))))
 
-const _objectTypeEntry = (code: string, index: number): ParseResult<[PlainIdentifier, TypeExpression]> | BagelError | undefined =>
-    given(plainIdentifier(code, index), ({ parsed: key, newIndex: index }) =>
+const _objectTypeEntry: ParseFunction<Attribute> = (code, startIndex) =>
+    given(plainIdentifier(code, startIndex), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ":"), index => 
     given(consumeWhitespace(code, index), index =>
-    given(typeExpression(code, index), ({ parsed: value, newIndex: index }) => ({
-        parsed: [key, value],
+    given(typeExpression(code, index), ({ parsed: type, newIndex: index }) => ({
+        parsed: {
+            kind: "attribute",
+            name,
+            type,
+            code,
+            startIndex,
+            endIndex: index
+        },
         newIndex: index,
     }))))))
 
@@ -988,8 +997,8 @@ const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: 
         newIndex: newIndex ?? index
     }))))
 
-const _funcConst = (code: string, index: number): ParseResult<{ name: PlainIdentifier, type?: TypeExpression, value: Expression }> | BagelError | undefined =>
-    given(consume(code, index, 'const'), index =>
+const _funcConst: ParseFunction<InlineConst> = (code, startIndex) =>
+    given(consume(code, startIndex, 'const'), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -1002,9 +1011,13 @@ const _funcConst = (code: string, index: number): ParseResult<{ name: PlainIdent
     given(consumeWhitespace(code, index), index =>
     expec(expression(code, index), err(code, index, "Value"), ({ parsed: value, newIndex: index }) => ({
         parsed: {
+            kind: "inline-const",
             name,
             type,
-            value
+            value,
+            code,
+            startIndex,
+            endIndex: index
         },
         newIndex: index
     }))))))))))
@@ -1529,17 +1542,21 @@ const javascriptEscape: ParseFunction<JavascriptEscape> = (code, startIndex) =>
         }));
 })
 
-function consumeComments(code: string, index: number): number {
-    if (code[0] === "/") {
-        if (code[1] === "/") {
-            return consumeWhile(code, index, ch => ch !== "\n");
-        } else if (code[1] === "*") {
-            // TODO
-        }
-    }
-
-    return index;
-}
+const debug: ParseFunction<Debug> = (code, startIndex) =>
+    given(consume(code, startIndex, '!debug['), index => 
+    given(consumeWhitespace(code, index), index =>
+    given(expression(code, index) ?? declaration(code, index), ({ parsed: inner, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(consume(code, index, ']'), index => ({
+        parsed: {
+            kind: "debug",
+            inner: log(inner, ast => JSON.stringify({ bgl: code.substring(ast.startIndex ?? startIndex, ast.endIndex ?? index), ast: withoutSourceInfo(ast) }, null, 2)),
+            code,
+            startIndex,
+            endIndex: index
+        },
+        newIndex: index
+    }))))))
 
 const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
     [ javascriptEscape, pipe, classConstruction, elementTag ],
@@ -1548,7 +1565,7 @@ const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
     [ invocationAccessorChain ],
     [ parenthesized ],
     [ localIdentifier ],
-    [ ifElseExpression, switchExpression, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
+    [ ifElseExpression, debug, switchExpression, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
         stringLiteral, numberLiteral ],
 ];
 
