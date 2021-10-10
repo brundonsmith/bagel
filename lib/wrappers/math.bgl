@@ -1,6 +1,6 @@
 
 js#
-import * as math from "../src/math.ts"
+import * as math from '../src/math.ts'
 #js
 
 export func floor(n: number): number => js# math.floor(n) #js

@@ -1,6 +1,6 @@
 
 js#
-import * as random from "../src/random.ts"
+import * as random from '../src/random.ts'
 #js
 
 export func random(): Plan<number> => js# random() #js

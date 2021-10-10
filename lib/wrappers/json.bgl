@@ -1,5 +1,5 @@
 js#
-import * as json from "../src/json.ts"
+import * as json from '../src/json.ts'
 #js
 
 export func parse(str: string): unknown => js# json.parse(str) #js

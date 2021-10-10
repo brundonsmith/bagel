@@ -272,3 +272,33 @@ function asWorker<P extends unknown[], R>(fn: (...params: P) => R): (...params: 
         worker.postMessage(JSON.stringify(params))
     })
 }
+
+
+// misc
+export function ___typeof(val: unknown) {
+    const to = typeof val;
+
+    switch (to) {
+        case "string":
+        case "number":
+        case "boolean":
+            return to
+        case "undefined":
+            return "nil"
+        case "object":
+            if (val === null) {
+                return "nil"
+            } else if (Array.isArray(val)) {
+                return "array"
+            } else if (val instanceof Set) {
+                return "set"
+            } else if (Object.getPrototypeOf(val).constructor.name === "object") {
+                return "object"
+            } else {
+                // class instance
+                return "class-instance"
+            }
+    }
+
+    throw Error("Failed to determine a typeof for " + val)
+}
