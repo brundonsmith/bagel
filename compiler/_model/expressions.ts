@@ -66,9 +66,14 @@ export type Range = SourceInfo & {
 
 export type BinaryOperator = SourceInfo & {
     readonly kind: "binary-operator",
-    readonly operator: BinaryOp,
+    readonly operator: Operator,
     readonly args: readonly [Expression, Expression],
     // TODO: Once generics are fully functional, create a `type: FuncType` property
+}
+
+export type Operator = SourceInfo & {
+    readonly kind: "operator",
+    readonly op: BinaryOp,
 }
 
 export const BINARY_OPS = [ "+", "-", "*", "/", "<=", ">=", "<", ">", "==", "!=", "&&", "||", "??" ] as const;
@@ -160,7 +165,6 @@ export type ElementTag = SourceInfo & {
 export type ClassConstruction = SourceInfo & {
     readonly kind: "class-construction",
     readonly clazz: LocalIdentifier,
-    
 }
 
 const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {

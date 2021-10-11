@@ -128,6 +128,8 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "invocation": {
             if (ast.kind !== "binary-operator") {
                 walkParseTree(nextPayload, ast.subject, fn);
+            } else {
+                walkParseTree(nextPayload, ast.operator, fn)
             }
 
             if (ast.kind === "invocation" && ast.typeArgs) {
@@ -310,6 +312,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "nil-type":
         case "unknown-type":
         case "javascript-escape-type":
+        case "operator":
             break;
 
         default:

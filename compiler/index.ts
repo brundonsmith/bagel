@@ -11,7 +11,7 @@ import { Module } from "./_model/ast.ts";
 
 import { observable, action, autorun, configure } from "https://jspm.dev/mobx"
 import { createTransformer } from "https://jspm.dev/mobx-utils"
-import { ScopesMap } from "./_model/common.ts";
+import { moreSpecificThan, ScopesMap } from "./_model/common.ts";
 
 configure({
     enforceActions: "never",
@@ -136,21 +136,31 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
 
     // print errors as they occur
     autorun(() => {
-        let errors = false
-        console.clear()
+        if (watch) {
+            console.clear()
+        }
+
+        let encounteredErrors = false
 
         for (const module of modules) {
             const source = modulesSource.get(module)
             if (source) {
                 const ast = parsed(module)(source)
-                for (const err of typeerrors(module)(ast)) {
-                    errors = true
+                const errors = typeerrors(module)(ast)
+                    // .filter((err, _, arr) => 
+                    //     err.kind === "bagel-syntax-error" ||
+                    //     !arr.some(other =>
+                    //         other !== err && 
+                    //         other.kind !== "bagel-syntax-error" && moreSpecificThan(other.ast ?? {}, err.ast ?? {})))
+
+                for (const err of errors) {
+                    encounteredErrors = true
                     printError(module)(err)
                 }
             }
         }
 
-        if (!errors) {
+        if (!encounteredErrors) {
             console.log('No errors')
         }
     })

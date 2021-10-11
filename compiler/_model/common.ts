@@ -11,6 +11,23 @@ export type SourceInfo = {
     readonly endIndex: number|undefined,
 }
 
+export function moreSpecificThan(a: Partial<SourceInfo>, b: Partial<SourceInfo>): boolean {
+    const missingInA = a.code == null
+    const missingInB = b.code == null
+
+    if (!missingInA && missingInB) {
+        return true
+    } else if (missingInA && !missingInB) {
+        return false
+    } else if (missingInA && missingInB) {
+        return false
+    } else if ((a.startIndex as number) === (b.startIndex as number) && (a.endIndex as number) === (b.endIndex as number)) {
+        return false
+    }
+
+    return (a.startIndex as number) >= (b.startIndex as number) && (a.endIndex as number) <= (b.endIndex as number)
+}
+
 export type ParentsMap = Omit<WeakMap<AST, AST>, 'set'|'delete'>
 
 export type ScopesMap = Omit<WeakMap<AST, Scope>, 'set'|'delete'>

@@ -46,7 +46,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                     const leftType = inferType(reportError, parents, scopes, ast.args[0]);
                     const rightType = inferType(reportError, parents, scopes, ast.args[1]);
 
-                    reportError(miscError(ast, `Operator '${ast.operator}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
+                    reportError(miscError(ast.operator, `Operator '${ast.operator.op}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
                 }
             } break;
             case "pipe":

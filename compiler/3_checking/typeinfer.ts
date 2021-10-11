@@ -48,7 +48,7 @@ function inferTypeInner(
             const leftType = inferType(reportError, parents, scopes, ast.args[0], preserveGenerics);
             const rightType = inferType(reportError, parents, scopes, ast.args[1], preserveGenerics);
 
-            for (const types of BINARY_OPERATOR_TYPES[ast.operator]) {
+            for (const types of BINARY_OPERATOR_TYPES[ast.operator.op]) {
                 const { left, right, output } = types;
 
                 if (subsumes(scope, left, leftType) && subsumes(scope, right, rightType)) {

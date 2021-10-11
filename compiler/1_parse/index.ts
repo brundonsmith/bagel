@@ -1082,17 +1082,23 @@ const pipe: ParseFunction<Pipe> = (code, startIndex) =>
 
 const binaryOperator: ParseFunction<BinaryOperator> = (code, startIndex) => 
     given(parseBeneath(code, startIndex, binaryOperator), ({ parsed: left, newIndex: index }) => 
-    given(consumeWhitespace(code, index), index =>
-    given(parseBinaryOp(code, index), ({ parsed: operator, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
+    given(consumeWhitespace(code, index), opStartIndex =>
+    given(parseBinaryOp(code, opStartIndex), ({ parsed: op, newIndex: opEndIndex }) =>
+    given(consumeWhitespace(code, opEndIndex), index =>
     expec(expression(code, index), err(code, index, "Right operand"), ({ parsed: right, newIndex: index }) => ({
         parsed: {
             kind: "binary-operator",
+            operator: {
+                kind: "operator",
+                op,
+                code,
+                startIndex: opStartIndex,
+                endIndex: opEndIndex
+            },
+            args: [left, right],
             code,
             startIndex,
             endIndex: index,
-            operator,
-            args: [left, right],
         },
         newIndex: index,
     }))))))
