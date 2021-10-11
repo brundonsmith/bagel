@@ -170,7 +170,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                     
                     newScope.classes[declaration.name.name] = declaration;
                 } else if (declaration.kind === "import-declaration") {
-                    const otherModule = getModule(canonicalModuleName(module, declaration.path));
+                    const otherModule = getModule(canonicalModuleName(module, declaration.path.value));
                     
                     if (otherModule == null) {
                         reportError(cannotFindModule(declaration));
@@ -338,7 +338,7 @@ export function extendScope(scope: Scope): Scope {
     }
 }
 
-export function canonicalModuleName(importerModule: string, importPath: StringLiteral) {
+export function canonicalModuleName(importerModule: string, importPath: string) {
     const moduleDir = path.dirname(importerModule);
-    return path.resolve(moduleDir, importPath.segments.join("")) + ".bgl"
+    return path.resolve(moduleDir, importPath) + ".bgl"
 }

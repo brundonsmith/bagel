@@ -22,6 +22,7 @@ export type Expression =
     | ObjectLiteral
     | ArrayLiteral
     | StringLiteral
+    | ExactStringLiteral
     | NumberLiteral
     | ElementTag
     | ClassConstruction
@@ -139,6 +140,11 @@ export type StringLiteral = SourceInfo & {
     readonly segments: readonly (string|Expression)[],
 }
 
+export type ExactStringLiteral = SourceInfo & {
+    readonly kind: "exact-string-literal",
+    readonly value: string,
+}
+
 export type NumberLiteral = SourceInfo & {
     readonly kind: "number-literal",
     readonly value: number,
@@ -174,6 +180,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "object-literal": undefined,
     "array-literal": undefined,
     "string-literal": undefined,
+    "exact-string-literal": undefined,
     "number-literal": undefined,
     "boolean-literal": undefined,
     "nil-literal": undefined,

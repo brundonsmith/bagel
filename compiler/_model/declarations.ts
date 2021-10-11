@@ -1,6 +1,5 @@
 import { Debug } from "./ast.ts";
-import { PlainIdentifier, SourceInfo } from "./common.ts";
-import { Expression, Func, JavascriptEscape, Proc, StringLiteral } from "./expressions.ts";
+import { ExactStringLiteral, Expression, Func, JavascriptEscape, Proc } from "./expressions.ts";
 import { TypeExpression } from "./type-expressions.ts";
 
 export type Declaration =
@@ -16,7 +15,7 @@ export type Declaration =
 export type ImportDeclaration = SourceInfo & {
     readonly kind: "import-declaration",
     readonly imports: readonly ImportItem[],
-    readonly path: StringLiteral,
+    readonly path: ExactStringLiteral,
 }
 
 export type ImportItem = SourceInfo & {

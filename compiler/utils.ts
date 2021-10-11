@@ -292,6 +292,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "local-identifier":
         case "number-literal":
         case "boolean-literal":
+        case "exact-string-literal":
         case "nil-literal":
         case "javascript-escape":
         case "element-type":

@@ -73,8 +73,8 @@ function inferTypeInner(
             const baseType = inferType(reportError, parents, scopes, ast.subject, preserveGenerics);
             const indexerType = inferType(reportError, parents, scopes, ast.indexer, preserveGenerics);
             
-            if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
-                const key = indexerType.value.segments[0];
+            if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "exact-string-literal") {
+                const key = indexerType.value.value;
                 const valueType = baseType.entries.find(entry => entry.name.name === key)?.type;
 
                 return valueType ?? UNKNOWN_TYPE;
@@ -218,6 +218,7 @@ function inferTypeInner(
         case "class-function":
         case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferType(reportError, parents, scopes, ast.value, preserveGenerics);
         case "string-literal": return STRING_TYPE;
+        case "exact-string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
         case "boolean-literal": return BOOLEAN_TYPE;
         case "nil-literal": return NIL_TYPE;

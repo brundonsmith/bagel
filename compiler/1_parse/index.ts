@@ -3,7 +3,7 @@ import { BagelError, isError } from "../errors.ts";
 import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
@@ -66,7 +66,7 @@ const declaration: ParseFunction<Declaration> = (code, index) =>
 const importDeclaration: ParseFunction<ImportDeclaration> = (code, startIndex) =>
     given(consume(code, startIndex, "from"), index =>
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
-    expec(stringLiteral(code, index), err(code, index, 'Import path'), ({ parsed: path, newIndex: index }) => 
+    expec(exactStringLiteral(code, index), err(code, index, 'Import path'), ({ parsed: path, newIndex: index }) => 
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(consume(code, index, "import"), err(code, index, '"import"'), index =>
     given(consumeWhitespace(code, index), index =>
@@ -377,7 +377,7 @@ const planType: ParseFunction<PlanType> = (code, startIndex) =>
     }))))))
 
 const literalType: ParseFunction<LiteralType> = (code, startIndex) =>
-    given(stringLiteral(code, startIndex) 
+    given(exactStringLiteral(code, startIndex) 
         ?? numberLiteral(code, startIndex) 
         ?? booleanLiteral(code, startIndex), 
     ({ parsed: value, newIndex: index }) => ({
@@ -1452,6 +1452,21 @@ const stringLiteral: ParseFunction<StringLiteral> = (code, startIndex) => {
         }
     }
 }
+
+const exactStringLiteral: ParseFunction<ExactStringLiteral> = (code, startIndex) =>
+    given(stringLiteral(code, startIndex), ({ parsed: literal, newIndex: index }) =>
+        literal.segments.length === 1 && typeof literal.segments[0] === 'string' ?
+            {
+                parsed: {
+                    kind: "exact-string-literal",
+                    value: literal.segments[0],
+                    code,
+                    startIndex,
+                    endIndex: index
+                },
+                newIndex: index
+            }
+        : undefined)
 
 const numberLiteral: ParseFunction<NumberLiteral> = (code, startIndex) => {
     let index = startIndex;

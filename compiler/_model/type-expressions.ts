@@ -1,7 +1,7 @@
 import { AST } from "./ast.ts";
 import { PlainIdentifier, SourceInfo } from "./common.ts";
 import { ClassDeclaration } from "./declarations.ts";
-import { BooleanLiteral, NumberLiteral, StringLiteral } from "./expressions.ts";
+import { BooleanLiteral, ExactStringLiteral, NumberLiteral } from "./expressions.ts";
 
 export type TypeExpression =
     | UnionType
@@ -106,7 +106,7 @@ export type NilType = SourceInfo & {
 
 export type LiteralType = SourceInfo & {
     readonly kind: "literal-type",
-    readonly value: StringLiteral | NumberLiteral | BooleanLiteral,
+    readonly value: ExactStringLiteral | NumberLiteral | BooleanLiteral,
 }
 
 export type ClassType = SourceInfo & {

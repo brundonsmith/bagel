@@ -17,10 +17,10 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, ast: AST): string {
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(parents, scopes, name) + (alias ? ` as ${compileOne(parents, scopes, alias)}` : ``)
-        ).join(", ")} } from "${ast.path.segments.join("")}.bgl.ts";`;
-        case "type-declaration": return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileOne(parents, scopes, ast.type)};`;
+        ).join(", ")} } from "${compileOne(parents, scopes, ast.path)}.bgl.ts";`;
+        case "type-declaration":  return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileOne(parents, scopes, ast.type)};`;
         case "proc-declaration":
-        case "func-declaration": return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(parents, scopes, ast.value) + ';';
+        case "func-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(parents, scopes, ast.value) + ';';
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(parents, scopes, ast.name)}${ast.type ? `: ${compileOne(parents, scopes, ast.type)}` : ''} = ${compileOne(parents, scopes, ast.value)};`;
         case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(parents, scopes, ast.name)} {\n${ast.members.map(m => compileOne(parents, scopes, m)).join('\n')}\n}`;
         case "class-property": return  compileClassProperty(parents, scopes, ast)
@@ -61,6 +61,7 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, ast: AST): string {
                                             typeof segment === "string"
                                                 ? segment
                                                 : '${' + compileOne(parents, scopes, segment) + '}').join("")}\``;
+        case "exact-string-literal": return `'${ast.value}'`;
         case "number-literal":  return JSON.stringify(ast.value);
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
