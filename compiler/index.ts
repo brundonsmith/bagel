@@ -217,10 +217,10 @@ function test() {
         for (const file of filesToTest) {
             if (file.isFile) {
                 const moduleDir = path.dirname(file.path).replaceAll('\\', '/')
-                const moduleName = path.basename(file.path) + '.ts'
+                const moduleName = path.basename(file.path)
                 const modulePath = path.relative(thisModulePath, moduleDir).replaceAll('\\', '/') + '/' + moduleName
 
-                const { tests } = await import(modulePath)
+                const { tests } = await import(modulePath + '.ts')
                 
                 if (tests.testExprs.length > 0 || tests.testBlocks.length > 0) {
                     allTests[modulePath] = []
@@ -254,11 +254,8 @@ function test() {
         for (const module of Object.keys(allTests)) {
             console.log('\nIn ' + module)
             for (const test of allTests[module]) {
-                if (test.passed) {
-                    console.log('    ' + Colors.green('[Passed]') + ' ' + test.name)
-                } else {
-                    console.log('    ' + Colors.red('[Failed]') + ' ' + test.name)
-                }
+                const label = test.passed ? Colors.green('[Passed]') : Colors.red('[Failed]')
+                console.log(`    ${label} ${test.name}`)
             }
         }
 
