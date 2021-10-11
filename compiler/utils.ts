@@ -96,6 +96,14 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             }
             walkParseTree(nextPayload, ast.value, fn);
         } break;
+        case "test-expr-declaration": {
+            walkParseTree(nextPayload, ast.name, fn);
+            walkParseTree(nextPayload, ast.expr, fn);
+        } break;
+        case "test-block-declaration": {
+            walkParseTree(nextPayload, ast.name, fn);
+            walkParseTree(nextPayload, ast.block, fn);
+        } break;
         case "proc":
         case "func": {
             walkParseTree(nextPayload, ast.type, fn);
@@ -313,6 +321,9 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
 export function sOrNone(num: number): string {
     return num > 1 ? 's' : '';
 }
+export function esOrNone(num: number): string {
+    return num > 1 ? 'es' : '';
+}
 export function wasOrWere(num: number): string {
     return num > 1 ? 'were' : 'was';
 }
@@ -321,4 +332,14 @@ export async function on<T>(iter: AsyncIterable<T>, cb: (val: T) => void) {
     for await (const val of iter) {
         cb(val)
     }
+}
+
+export async function all<T>(iter: AsyncIterable<T>): Promise<T[]> {
+    const results: T[] = [];
+
+    for await (const val of iter) {
+        results.push(val)
+    }
+
+    return results
 }

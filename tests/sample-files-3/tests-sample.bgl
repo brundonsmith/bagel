@@ -1,0 +1,10 @@
+
+func foo(x: number): number => 1234 + x
+
+test expr 'Two plus two' = 2 == 2
+
+test expr 'Two equals three' = (2 + 2) == 3
+
+test block 'Foo bar' {
+    js# throw Error() #js
+}

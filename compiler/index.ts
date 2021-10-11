@@ -1,4 +1,4 @@
-import { path, walk } from "./deps.ts";
+import { Colors, path, walk } from "./deps.ts";
 
 import { canonicalModuleName, getParentsMap, scopescan } from "./3_checking/scopescan.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
@@ -6,7 +6,7 @@ import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { printError, BagelError } from "./errors.ts";
-import { given, on } from "./utils.ts";
+import { all, esOrNone, given, on, sOrNone } from "./utils.ts";
 import { Module } from "./_model/ast.ts";
 
 import { observable, action, autorun, configure } from "https://jspm.dev/mobx"
@@ -26,9 +26,9 @@ configure({
     const watch = Deno.args.includes("--watch");
 
     switch (command) {
-        case "build": buildMobX({ entry: Deno.args[1], bundle, watch, emit: true }); break;
-        case "check": buildMobX({ entry: Deno.args[1], bundle, watch, emit: false }); break;
-        case "test": throw Error("Unimplemented!"); break; // test(Deno.args[1]); break;
+        case "build": build({ entry: Deno.args[1], bundle, watch, emit: true }); break;
+        case "check": build({ entry: Deno.args[1], bundle, watch, emit: false }); break;
+        case "test": test(); break; // test(Deno.args[1]); break;
         case "run": throw Error("Unimplemented!"); break;
         case "format": throw Error("Unimplemented!"); break;
     }
@@ -57,8 +57,8 @@ function bagelFileToJsBundleFile(module: string): string {
     return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + ".bundle.js")
 }
 
-const IMPORTED_ITEMS = ['observable', 'computed', 'reactionUntil', 'configure', 
-'h', 'render', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan'
+const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed','configure', //'h', 'render',
+'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan'
 ].map(s => `${s} as ${HIDDEN_IDENTIFIER_PREFIX}${s}`).join(', ')
 
 const LIB_IMPORTS = `
@@ -72,7 +72,7 @@ ___configure({
 });
 `
 
-async function buildMobX({ entry, bundle, watch, emit }: { entry: string, bundle?: boolean, watch?: boolean, emit: boolean }) {
+async function build({ entry, bundle, watch, emit, includeTests }: { entry: string, bundle?: boolean, watch?: boolean, includeTests?: boolean, emit: boolean }) {
     if (!entry) throw Error("Bagel: No file or directory provided")
     const entryFileOrDir = path.resolve(Deno.cwd(), entry);
     const singleEntry = !(await Deno.stat(entryFileOrDir)).isDirectory
@@ -109,7 +109,7 @@ async function buildMobX({ entry, bundle, watch, emit }: { entry: string, bundle
     }
     const typeerrors: (module: string) => (ast: Module) => BagelError[] = createTransformer((module: string) => createTransformer((ast: Module) => _typeerrors(module, ast)));
 
-    const _compiled = (module: string, ast: Module): string => LIB_IMPORTS + compile(parentsMap(ast), scopesMap(module)(ast), ast)
+    const _compiled = (module: string, ast: Module): string => LIB_IMPORTS + compile(parentsMap(ast), scopesMap(module)(ast), ast, includeTests)
     const compiled: (module: string) => (ast: Module) => string = createTransformer((module: string) => createTransformer((ast: Module) => _compiled(module, ast)));
 
     // add imported modules to set
@@ -122,7 +122,7 @@ async function buildMobX({ entry, bundle, watch, emit }: { entry: string, bundle
                 for (const decl of ast.declarations) {
                     if (decl.kind === "import-declaration") {
                         // console.log({ decl })
-                        const importedModule = canonicalModuleName(module, decl.path)
+                        const importedModule = canonicalModuleName(module, decl.path.value)
 
                         if (!modules.has(importedModule)) {
                             modules.add(importedModule)
@@ -201,24 +201,109 @@ async function bundleOutput(entryFile: string) {
     console.log('done')
 }
 
-// function test(filePattern?: string) {
-//     const filesToTest = walk(Deno.cwd(), {
-//         match: given(filePattern, pattern => [ new RegExp(pattern) ]),
-//         exts: ['.bgl']
+function test() {
+    build({ entry: Deno.cwd(), emit: true, includeTests: true })
+
+    setTimeout(async () => {
+        const thisModulePath = path.dirname(import.meta.url).replace(/^file:\/\/\//i, '')
+
+        const filesToTest = await all(walk(Deno.cwd(), {
+            // match: given(filePattern, pattern => [ new RegExp(pattern) ]),
+            exts: ['.bgl']
+        }))
+    
+        const allTests: { [key: string]: { name: string, passed: boolean }[] } = {}
+
+        for (const file of filesToTest) {
+            if (file.isFile) {
+                const moduleDir = path.dirname(file.path).replaceAll('\\', '/')
+                const moduleName = path.basename(file.path) + '.ts'
+                const modulePath = path.relative(thisModulePath, moduleDir).replaceAll('\\', '/') + '/' + moduleName
+
+                const { tests } = await import(modulePath)
+                
+                if (tests.testExprs.length > 0 || tests.testBlocks.length > 0) {
+                    allTests[modulePath] = []
+                }
+
+                for (const test of tests.testExprs) {
+                    if (test.expr === false) {
+                        allTests[modulePath].push({ name: test.name, passed: false })
+                    } else {
+                        allTests[modulePath].push({ name: test.name, passed: true })
+                    }
+                }
+
+                for (const test of tests.testBlocks) {
+                    try {
+                        test.block()
+                        allTests[modulePath].push({ name: test.name, passed: true })
+                    } catch {
+                        allTests[modulePath].push({ name: test.name, passed: false })
+                    }
+                }
+            }
+        }
+
+        const totalModules = Object.keys(allTests).length
+        const modulesWithFailures = Object.keys(allTests).filter(module => allTests[module].some(m => !m.passed)).length
+        const totalSuccesses = Object.keys(allTests).map(module => allTests[module].filter(m => m.passed)).flat().length
+        const totalFailures = Object.keys(allTests).map(module => allTests[module].filter(m => !m.passed)).flat().length
+        const totalTests = totalSuccesses + totalFailures
+
+        for (const module of Object.keys(allTests)) {
+            console.log('\nIn ' + module)
+            for (const test of allTests[module]) {
+                if (test.passed) {
+                    console.log('    ' + Colors.green('[Passed]') + ' ' + test.name)
+                } else {
+                    console.log('    ' + Colors.red('[Failed]') + ' ' + test.name)
+                }
+            }
+        }
+
+        console.log(`\nFound ${totalTests} test${sOrNone(totalTests)} across ${totalModules} module${sOrNone(totalModules)}; ${Colors.green(String(totalSuccesses) + ' success' + esOrNone(totalSuccesses))}, ${Colors.red(String(totalFailures) + ' failure' + sOrNone(totalFailures))}`)
+        Deno.exit(modulesWithFailures > 0 ? 1 : 0)
+    }, 1000)
+}
+
+// testInWorker(file.path)
+//     .then(failed => {
+//         for (const name of failed) {
+//             console.error(name)
+//         }
 //     })
 
-//     for await (const file of filesToTest) {
-//         if (file.isFile) {
-//             (async function() {
-//                 const module = (await build({ entry: file.path, emit: true })) as Module
-//                 const tests = module.declarations
-//                     // .filter(decl => decl.kind === "test-declaration")
-//                     // .map(decl => decl.name.name)
+// function testInWorker(fileToTest: string): Promise<string[]> {
+//     const code = `
+//         // import { tests } from '${fileToTest.replace(/^[a-z]+:/i, '').replaceAll('\\', '/')}.ts';
+//         import { tests } from '../tests/sample-files-3/tests-sample.bgl.ts';
 
-//                 for (const test of tests) {
-                    
-//                 }
-//             })()
+//         const failed = [];
+
+//         for (const test of tests.testExprs) {
+//             if (test.expr === false) {
+//                 failed.push(test.name)
+//             }
 //         }
-//     }
+
+//         for (const test of tests.testBlocks) {
+//             try {
+//                 test.block()
+//             } catch {
+//                 failed.push(test.name)
+//             }
+//         }
+
+//         postMessage(JSON.stringify(failed));
+//     `
+//     console.log(code)
+
+//     const worker = new Worker(`data:text/javascript;base64,${btoa(code)}`, { type: "module" });
+
+//     return new Promise(res => {
+//         worker.onmessage = function (event) {
+//             res(JSON.parse(event.data))
+//         }
+//     })
 // }

@@ -1,4 +1,5 @@
 import { Debug } from "./ast.ts";
+import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
 import { ExactStringLiteral, Expression, Func, JavascriptEscape, Proc } from "./expressions.ts";
 import { TypeExpression } from "./type-expressions.ts";
 
@@ -10,6 +11,8 @@ export type Declaration =
     | FuncDeclaration
     | ConstDeclaration
     | ClassDeclaration
+    | TestExprDeclaration
+    | TestBlockDeclaration
     | Debug
 
 export type ImportDeclaration = SourceInfo & {
@@ -91,6 +94,18 @@ export type ClassProcedure = SourceInfo & {
 
 export function memberDeclaredType(m: ClassMember): TypeExpression|undefined {
     return m.kind === "class-property" ? m.type : m.value.type
+}
+
+export type TestExprDeclaration = SourceInfo & {
+    kind: "test-expr-declaration",
+    name: ExactStringLiteral,
+    expr: Expression,
+}
+
+export type TestBlockDeclaration = SourceInfo & {
+    kind: "test-block-declaration",
+    name: ExactStringLiteral,
+    block: Block,
 }
 
 // TODO: ClassReaction

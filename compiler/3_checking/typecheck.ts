@@ -13,15 +13,20 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
 
         switch(ast.kind) {
             case "const-declaration": {
-                // console.log('-----------------------------checking const decl----------------------------')
                 const valueType = inferType(reportError, parents, scopes, ast.value);
 
                 if (ast.type != null && !subsumes(scope, ast.type, valueType)) {
                     reportError(assignmentError(ast.value, ast.type, valueType));
                 }
             } break;
+            case "test-expr-declaration": {
+                const valueType = inferType(reportError, parents, scopes, ast.expr);
+
+                if (!subsumes(scope, BOOLEAN_TYPE, valueType)) {
+                    reportError(assignmentError(ast.expr, BOOLEAN_TYPE, valueType));
+                }
+            } break;
             case "func": {
-                // console.log('-----------------------------checking func----------------------------')
                 const bodyType = inferType(reportError, parents, scopes, ast.body);
 
                 for (const c of ast.consts) {
@@ -82,8 +87,8 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 const baseType = inferType(reportError, parents, scopes, ast.subject);
                 const indexerType = inferType(reportError, parents, scopes, ast.indexer);
                 
-                if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "string-literal" && indexerType.value.segments.length === 1) {
-                    const key = indexerType.value.segments[0];
+                if (baseType.kind === "object-type" && indexerType.kind === "literal-type") {
+                    const key = indexerType.value.value;
                     const valueType = baseType.entries.find(entry => entry.name.name === key)?.type;
                     if (valueType == null) {
                         reportError(miscError(ast.indexer, `Property '${key}' doesn't exist on type '${displayForm(baseType)}'`));
@@ -225,7 +230,7 @@ export function subsumes(scope: Scope, destination: TypeExpression, value: TypeE
         return true;
     } else if(resolvedDestination.kind === "number-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "number-literal") {
         return true;
-    } else if(resolvedDestination.kind === "string-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "string-literal") {
+    } else if(resolvedDestination.kind === "string-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "exact-string-literal") {
         return true;
     } else if(resolvedDestination.kind === "boolean-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "boolean-literal") {
         return true;
@@ -279,9 +284,7 @@ export function displayForm(typeExpression: TypeExpression): string {
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;
         case "nil-type": return `nil`;
-        case "literal-type": return JSON.stringify(typeExpression.value.kind === "string-literal" 
-                                        ? typeExpression.value.segments.join('') 
-                                        : typeExpression.value.value).replaceAll('"', "'");
+        case "literal-type": return JSON.stringify(typeExpression.value.value).replaceAll('"', "'");
         case "nominal-type": return typeExpression.name;
         case "iterator-type": return `Iterator<${displayForm(typeExpression.itemType)}>`;
         case "plan-type": return `Plan<${displayForm(typeExpression.resultType)}>`;

@@ -3,7 +3,7 @@ import { path } from "../deps.ts";
 import { AST, Module } from "../_model/ast.ts";
 import { Block, getScopeFor, MutableScope, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
 import { ClassDeclaration, ConstDeclaration, Declaration } from "../_model/declarations.ts";
-import { Func, Proc, Expression, StringLiteral, Invocation, InlineConst } from "../_model/expressions.ts";
+import { Func, Proc, Expression, Invocation, InlineConst } from "../_model/expressions.ts";
 import { ForLoop, LetDeclaration } from "../_model/statements.ts";
 import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { walkParseTree } from "../utils.ts";
@@ -297,13 +297,21 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
 }
 
 function declExported(declaration: Declaration): boolean|undefined {
-    if (declaration.kind !== "import-declaration" && declaration.kind !== "javascript-escape" && declaration.kind !== "debug") {
+    if (declaration.kind !== "import-declaration" && 
+        declaration.kind !== "javascript-escape" && 
+        declaration.kind !== "debug" &&
+        declaration.kind !== "test-expr-declaration" &&
+        declaration.kind !== "test-block-declaration") {
         return declaration.exported;
     }
 }
 
 function declName(declaration: Declaration): string|undefined {
-    if (declaration.kind !== "import-declaration" && declaration.kind !== "javascript-escape" && declaration.kind !== "debug") {
+    if (declaration.kind !== "import-declaration" && 
+        declaration.kind !== "javascript-escape" && 
+        declaration.kind !== "debug" &&
+        declaration.kind !== "test-expr-declaration" &&
+        declaration.kind !== "test-block-declaration") {
         return declaration.name.name;
     }
 }

@@ -2,7 +2,7 @@ import { log, withoutSourceInfo } from "../debugging.ts";
 import { BagelError, isError } from "../errors.ts";
 import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
-import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TypeDeclaration } from "../_model/declarations.ts";
+import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute } from "../_model/type-expressions.ts";
@@ -61,6 +61,8 @@ const declaration: ParseFunction<Declaration> = (code, index) =>
     ?? funcDeclaration(code, index)
     ?? constDeclaration(code, index)
     ?? classDeclaration(code, index)
+    ?? testExprDeclaration(code, index)
+    ?? testBlockDeclaration(code, index)
     ?? javascriptEscape(code, index)
 
 const importDeclaration: ParseFunction<ImportDeclaration> = (code, startIndex) =>
@@ -645,6 +647,46 @@ const _accessModifier: ParseFunction<'private'|'public'> = (code, startIndex) =>
         parsed: "public",
         newIndex: index
     }))
+
+const testExprDeclaration: ParseFunction<TestExprDeclaration> = (code, startIndex) =>
+    given(consume(code, startIndex, 'test'), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(consume(code, index, 'expr'), index =>
+    given(consumeWhitespace(code, index), index => 
+    expec(exactStringLiteral(code, index), err(code, index, 'Test name'), ({ parsed: name, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, '='), err(code, index, '"="'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(expression(code, index), err(code, index, 'Test expression'), ({ parsed: expr, newIndex: index }) => ({
+        parsed: {
+            kind: 'test-expr-declaration',
+            name,
+            expr,
+            code,
+            startIndex,
+            endIndex: index
+        },
+        newIndex: index
+    }))))))))))
+
+const testBlockDeclaration: ParseFunction<TestBlockDeclaration> = (code, startIndex) => 
+    given(consume(code, startIndex, 'test'), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(consume(code, index, 'block'), index =>
+    given(consumeWhitespace(code, index), index => 
+    expec(exactStringLiteral(code, index), err(code, index, 'Test name'), ({ parsed: name, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(parseBlock(code, index), err(code, index, 'Test block'), ({ parsed: block, newIndex: index }) => ({
+        parsed: {
+            kind: 'test-block-declaration',
+            name,
+            block,
+            code,
+            startIndex,
+            endIndex: index
+        },
+        newIndex: index
+    }))))))))
 
 const proc: ParseFunction<Proc> = (code, startIndex) =>
     given(consume(code, startIndex, "("), index =>

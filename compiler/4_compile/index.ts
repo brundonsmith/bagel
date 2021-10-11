@@ -1,16 +1,40 @@
 import { given } from "../utils.ts";
 import { Module, AST } from "../_model/ast.ts";
 import { getScopeFor, ParentsMap, PlainIdentifier, ScopesMap } from "../_model/common.ts";
-import { ClassProperty } from "../_model/declarations.ts";
+import { ClassProperty, TestExprDeclaration, TestBlockDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
 import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
-export function compile(parents: ParentsMap, scopes: ScopesMap, module: Module): string {
+export function compile(parents: ParentsMap, scopes: ScopesMap, module: Module, includeTests?: boolean): string {
     const hasMain = module.declarations.some(decl => decl.kind === "proc-declaration" && decl.name.name === "main")
-    return module.declarations
+    const runtimeCode = module.declarations
+        .filter(decl => decl.kind !== 'test-expr-declaration' && decl.kind !== 'test-block-declaration')
         .map(decl => compileOne(parents, scopes, decl))
         .join("\n\n") + (hasMain ? "\nsetTimeout(main, 0);\n" : "");
+
+    if (includeTests) {
+        return runtimeCode + `\n export const tests = {
+            testExprs: [${
+                module.declarations
+                    .filter(decl => decl.kind === "test-expr-declaration")
+                    // @ts-ignore
+                    .map((decl: TestExprDeclaration) => 
+                        `{ name: '${decl.name.value}', expr: ${compileOne(parents, scopes, decl.expr)} }`)
+                    .join(',\n')
+            }],
+            testBlocks: [${
+                module.declarations
+                    .filter(decl => decl.kind === "test-block-declaration")
+                    // @ts-ignore
+                    .map((decl: TestBlockDeclaration) => 
+                        `{ name: '${decl.name.value}', block: () => ${compileOne(parents, scopes, decl.block)} }`)
+                    .join(',\n')
+            }]
+        }`
+    } else {
+        return runtimeCode
+    }
 }
 
 function compileOne(parents: ParentsMap, scopes: ScopesMap, ast: AST): string {
@@ -61,8 +85,8 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, ast: AST): string {
                                             typeof segment === "string"
                                                 ? segment
                                                 : '${' + compileOne(parents, scopes, segment) + '}').join("")}\``;
-        case "exact-string-literal": return `'${ast.value}'`;
-        case "number-literal":  return JSON.stringify(ast.value);
+        case "exact-string-literal":
+        case "number-literal":
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
