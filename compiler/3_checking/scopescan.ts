@@ -3,12 +3,13 @@ import { path } from "../deps.ts";
 import { AST, Module } from "../_model/ast.ts";
 import { Block, getScopeFor, MutableScope, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
 import { ClassDeclaration, ConstDeclaration, Declaration } from "../_model/declarations.ts";
-import { Func, Proc, Expression, Invocation, InlineConst } from "../_model/expressions.ts";
+import { Func, Proc, Expression, Invocation, InlineConst, IfElseExpression, Case, LocalIdentifier, StringLiteral, ExactStringLiteral } from "../_model/expressions.ts";
 import { ForLoop, LetDeclaration } from "../_model/statements.ts";
-import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ANY_TYPE, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { walkParseTree } from "../utils.ts";
 import { alreadyDeclared, BagelError, cannotFindExport, cannotFindModule, miscError } from "../errors.ts";
 import { inferType } from "./typeinfer.ts";
+import { display } from "../debugging.ts";
 
 
 export function scopescan(reportError: (error: BagelError) => void, parents: ParentsMap, getModule: (module: string) => Module|undefined, ast: AST, module: string): ScopesMap {
@@ -124,7 +125,7 @@ export function getParentsMap(ast: AST): ParentsMap {
     return parents
 }
 
-export type ScopeOwner = Module|Func|Proc|Block|ForLoop|ClassDeclaration|Invocation|ConstDeclaration|InlineConst|LetDeclaration;
+export type ScopeOwner = Module|Func|Proc|Block|ForLoop|ClassDeclaration|Invocation|ConstDeclaration|InlineConst|LetDeclaration|Case;
 
 function isScopeOwner(ast: AST): ast is ScopeOwner {
     return ast.kind === "module" 
@@ -137,6 +138,7 @@ function isScopeOwner(ast: AST): ast is ScopeOwner {
         || ast.kind === "const-declaration"
         || ast.kind === "inline-const"
         || ast.kind === "let-declaration"
+        || ast.kind === "case"
 }
 
 export function scopeFrom(reportError: (error: BagelError) => void, getModule: (module: string) => Module|undefined, parents: ParentsMap, scopes: ScopesMap, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
@@ -291,9 +293,93 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                 initialValue: ast.value
             };
             break;
+        case "case": {
+
+            // Type refinement
+            const parent = parents.get(ast)
+            if (parent?.kind === "if-else-expression") {
+                if (ast.condition.kind === "binary-operator" && 
+                    ast.condition.operator.op === "!=" && 
+                    ast.condition.args.some(a => a.kind === "local-identifier") && 
+                    ast.condition.args.some(a => a.kind === 'nil-literal')) {
+                    
+                    const ident = ast.condition.args.find(a => a.kind === "local-identifier") as LocalIdentifier
+
+                    newScope.values[ident.name] = {
+                        ...newScope.values[ident.name],
+                        refinements: [
+                            ...(newScope.values[ident.name]?.refinements ?? []),
+                            { kind: "subtraction", type: NIL_TYPE }
+                        ]
+                    }
+                }
+
+                if (ast.condition.kind === "binary-operator" && 
+                    ast.condition.operator.op === "==" && 
+                    ast.condition.args.some(arg => 
+                        arg.kind === "invocation" &&
+                        arg.subject.kind === "local-identifier" &&
+                        arg.subject.name === "typeof") &&
+                    ast.condition.args.some(arg =>
+                        arg.kind === "string-literal" &&
+                        arg.segments.length === 1 &&
+                        typeof arg.segments[0] === 'string')) {
+                    
+                    const ident = (ast.condition.args.find(a => a.kind === "invocation") as Invocation).args[0] as LocalIdentifier
+                    const typeofStr = (ast.condition.args.find(a => a.kind === "string-literal") as StringLiteral).segments[0] as string
+
+                    const refinedType = typeFromTypeof(typeofStr)
+
+                    newScope.values[ident.name] = {
+                        ...newScope.values[ident.name],
+                        refinements: refinedType ? [
+                            ...(newScope.values[ident.name]?.refinements ?? []),
+                            { kind: "narrowing", type: refinedType }
+                        ] : newScope.values[ident.name]?.refinements
+                    }
+                }
+            } else if (parent?.kind === "switch-expression") {
+                if (parent.value.kind === "invocation" &&
+                    parent.value.subject.kind === "local-identifier" &&
+                    parent.value.subject.name === "typeof" &&
+                    parent.value.args[0].kind === "local-identifier" &&
+                    ast.condition.kind === "string-literal" &&
+                    ast.condition.segments.length === 1 &&
+                    typeof ast.condition.segments[0] === 'string') {
+                    
+                    const ident = parent.value.args[0]
+                    const typeofStr = ast.condition.segments[0]
+
+                    const refinedType = typeFromTypeof(typeofStr)
+
+                    newScope.values[ident.name] = {
+                        ...newScope.values[ident.name],
+                        refinements: refinedType ? [
+                            ...(newScope.values[ident.name]?.refinements ?? []),
+                            { kind: "narrowing", type: refinedType }
+                        ] : newScope.values[ident.name]?.refinements
+                    }
+                }
+            }
+        } break;
     }
 
     return newScope
+}
+
+function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
+    return (
+        typeofStr === "string" ? STRING_TYPE :
+        typeofStr === "number" ? NUMBER_TYPE :
+        typeofStr === "boolean" ? BOOLEAN_TYPE :
+        typeofStr === "nil" ? NIL_TYPE :
+        typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "object" ? { kind: "indexer-type", keyType: ANY_TYPE, valueType: ANY_TYPE, code: undefined, startIndex: undefined, endIndex: undefined } :
+        // TODO
+        // type.value === "set" ?
+        // type.value === "class-instance" ?
+        undefined
+    )
 }
 
 function declExported(declaration: Declaration): boolean|undefined {

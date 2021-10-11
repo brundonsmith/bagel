@@ -53,7 +53,12 @@ export type DeclarationDescriptor = {
     readonly mutability: "all"|"properties-only"|"none",
     readonly declaredType?: TypeExpression,
     readonly initialValue?: Expression,
+    readonly refinements?: readonly Refinement[]
 }
+
+export type Refinement =
+    | { kind: "subtraction", type: TypeExpression }
+    | { kind: "narrowing", type: TypeExpression }
 
 export function getScopeFor(parentsMap: ParentsMap, scopesMap: ScopesMap, ast: AST): Scope {
     let current: AST|undefined = ast
@@ -67,7 +72,17 @@ export function getScopeFor(parentsMap: ParentsMap, scopesMap: ScopesMap, ast: A
         }
     }
 
-    throw Error("No scope found for: " + display(ast));
+    if (ast.kind === "local-identifier") {
+        throw Error("Failed to find a Scope in which to resolve identifier '" + ast.name + "'")
+    }
+
+    return EMPTY_SCOPE
+}
+
+const EMPTY_SCOPE: Scope = {
+    types: {},
+    values: {},
+    classes: {}
 }
 
 export type PlainIdentifier = SourceInfo & {
@@ -81,7 +96,7 @@ export type Block = SourceInfo & {
 }
 
 export const KEYWORDS = [ "func", "proc", "if", "else", "switch", "case",
-"type", "typeof", "class", "let", "const", "for", "while", 
+"type", "class", "let", "const", "for", "while", 
 "of", "nil", "public", "visible", "private", "reaction", 
 "triggers", "until", "true", "false", "import", "export", "from", "as", "test",
 "expr", "block" ] as const;

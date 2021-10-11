@@ -23,6 +23,7 @@ export type TypeExpression =
     | IteratorType
     | PlanType
     | UnknownType
+    | AnyType
     | JavascriptEscapeType
 
 export type UnionType = SourceInfo & {
@@ -134,6 +135,11 @@ export type UnknownType = SourceInfo & {
     readonly kind: "unknown-type",
 }
 
+// Internal use only!
+export type AnyType = SourceInfo & {
+    readonly kind: "any-type"
+}
+
 export type JavascriptEscapeType = SourceInfo & {
     readonly kind: "javascript-escape-type",
 }
@@ -164,6 +170,12 @@ export const NIL_TYPE: NilType = {
 }
 export const UNKNOWN_TYPE: UnknownType = {
     kind: "unknown-type",
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const ANY_TYPE: AnyType = {
+    kind: "any-type",
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -236,6 +248,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "boolean-type": undefined,
     "nil-type": undefined,
     "unknown-type": undefined,
+    "any-type": undefined,
     "iterator-type": undefined,
     "plan-type": undefined,
     "literal-type": undefined,

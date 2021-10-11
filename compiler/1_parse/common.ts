@@ -13,7 +13,7 @@ export function consume(code: string, index: number, segment: string): number|un
 }
 
 export function parseBinaryOp(code: string, index: number): ParseResult<BinaryOp>|undefined {
-    for (const op of BINARY_OPS) {
+    for (const op of BINARY_OPS.flat()) {
         if (code.substr(index, op.length) === op) {
             return {
                 parsed: op,
@@ -107,7 +107,7 @@ export function isSymbolic(ch: string, index: number): boolean {
 }
 
 export function isBinaryOp(str: string): str is BinaryOp {
-    return (BINARY_OPS as readonly string[]).includes(str);
+    return (BINARY_OPS.flat() as readonly string[]).includes(str);
 }
 
 export type ParseResult<T> = { parsed: T, newIndex: number };

@@ -5,7 +5,7 @@ import { deepEquals, given } from "../utils.ts";
 import { subsumes } from "./typecheck.ts";
 import { ClassMember, memberDeclaredType } from "../_model/declarations.ts";
 import { BagelError } from "../errors.ts";
-import { withoutSourceInfo } from "../debugging.ts";
+import { display, withoutSourceInfo } from "../debugging.ts";
 
 export function inferType(
     reportError: (error: BagelError) => void, 
@@ -152,9 +152,23 @@ function inferTypeInner(
         case "local-identifier": {
             const valueDescriptor = getScopeFor(parents, scopes, ast).values[ast.name]
 
-            return valueDescriptor?.declaredType 
+            const baseType = valueDescriptor?.declaredType 
                 ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, parents, scopes, initialValue, preserveGenerics))
                 ?? UNKNOWN_TYPE
+
+            let refinedType = baseType
+            for (const refinement of valueDescriptor?.refinements ?? []) {
+                switch (refinement.kind) {
+                    case "subtraction": {
+                        refinedType = subtract(scope, refinedType, refinement.type)
+                    } break;
+                    case "narrowing": {
+                        refinedType = narrow(scope, refinedType, refinement.type)
+                    } break;
+                }
+            }
+
+            return refinedType
         }
         case "element-tag": {
             return {
@@ -378,6 +392,28 @@ function distillUnion(parents: ParentsMap, scopes: ScopesMap, type: TypeExpressi
         }
     } else {
         return type;
+    }
+}
+
+function subtract(scope: Scope, type: TypeExpression, without: TypeExpression): TypeExpression {
+    if (type.kind === "union-type") {
+        return {
+            ...type,
+            members: type.members.filter(member => !subsumes(scope, without, member))
+        }
+    } else { // TODO: There's probably more we can do here
+        return type
+    }
+}
+
+function narrow(scope: Scope, type: TypeExpression, fit: TypeExpression): TypeExpression {
+    if (type.kind === "union-type") {
+        return {
+            ...type,
+            members: type.members.filter(member => subsumes(scope, fit, member))
+        }
+    } else { // TODO: There's probably more we can do here
+        return type
     }
 }
 

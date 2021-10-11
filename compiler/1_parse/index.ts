@@ -1,9 +1,10 @@
 import { log, withoutSourceInfo } from "../debugging.ts";
 import { BagelError, isError } from "../errors.ts";
+import { memoize } from "../utils.ts";
 import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
@@ -807,15 +808,15 @@ const assignment: ParseFunction<Assignment> = (code, startIndex) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => 
         target.kind === "local-identifier" || target.kind === "property-accessor" ? {
-        parsed: {
-            kind: "assignment",
-            code,
-            startIndex,
-            endIndex: index,
-            target,
-            value,
-        },
-        newIndex: index,
+            parsed: {
+                kind: "assignment",
+                code,
+                startIndex,
+                endIndex: index,
+                target,
+                value,
+            },
+            newIndex: index,
         } : undefined
     )))))))
 
@@ -1130,7 +1131,7 @@ const _indexerExpression: ParseFunction<Expression> = (code, index) =>
 
 const ifElseExpression: ParseFunction<IfElseExpression> = (code, startIndex) =>
     given(consume(code, startIndex, "if"), index =>
-    given(parseSeries(code, index, _conditionAndOutcomeExpression, 'else if', { trailingDelimiter: "forbidden" }), ({ parsed: cases, newIndex: index }) => {
+    given(parseSeries(code, index, _case, 'else if', { trailingDelimiter: "forbidden" }), ({ parsed: cases, newIndex: index }) => {
         const elseResultResult = 
             given(consumeWhitespace(code, index), index =>
             given(consume(code, index, "else"), index => 
@@ -1169,7 +1170,7 @@ const ifElseExpression: ParseFunction<IfElseExpression> = (code, startIndex) =>
         }
     }))
 
-const _conditionAndOutcomeExpression: ParseFunction<{ readonly condition: Expression, readonly outcome: Expression }> = (code, startIndex) =>
+const _case: ParseFunction<Case> = (code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
     given(expression(code, index), ({ parsed: condition, newIndex: index }) =>
@@ -1182,8 +1183,12 @@ const _conditionAndOutcomeExpression: ParseFunction<{ readonly condition: Expres
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
         parsed: {
+            kind: "case",
             condition,
-            outcome
+            outcome,
+            code,
+            startIndex,
+            endIndex: index
         },
         newIndex: index
     }))))))))))))
@@ -1216,7 +1221,7 @@ const switchExpression: ParseFunction<SwitchExpression> = (code, startIndex) =>
         newIndex: index
     }))))))))))))))))
 
-const _switchCase: ParseFunction<{ condition: Expression, outcome: Expression }> = (code, startIndex) =>
+const _switchCase: ParseFunction<Case> = (code, startIndex) =>
     given(consume(code, startIndex, 'case'), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     expec(expression(code, index), err(code, index, 'Case expression'), ({ parsed: condition, newIndex: index }) =>
@@ -1224,7 +1229,14 @@ const _switchCase: ParseFunction<{ condition: Expression, outcome: Expression }>
     expec(consume(code, index, ':'), err(code, index, '":"'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(code, index), err(code, index, 'Case result'), ({ parsed: outcome, newIndex: index }) => ({
-        parsed: { condition, outcome },
+        parsed: {
+            kind: "case",
+            condition,
+            outcome,
+            code,
+            startIndex,
+            endIndex: index
+        },
         newIndex: index
     }))))))))
 
@@ -1647,7 +1659,7 @@ const NEXT_TIER_FOR: Map<ParseFunction<Expression>, number> = (() => {
 const parseStartingFromTier = (tier: number): ParseFunction<Expression> => (code, index) => {
     for (let i = tier; i < EXPRESSION_PRECEDENCE_TIERS.length; i++) {
         for (const fn of EXPRESSION_PRECEDENCE_TIERS[i]) {
-            const result = fn(code, index);
+            const result = memo.cachedOrParse(fn)(code, index);
 
             if (result != null) {
                 return result;

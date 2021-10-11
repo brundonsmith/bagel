@@ -41,7 +41,7 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, ast: AST): string {
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(parents, scopes, name) + (alias ? ` as ${compileOne(parents, scopes, alias)}` : ``)
-        ).join(", ")} } from "${compileOne(parents, scopes, ast.path)}.bgl.ts";`;
+        ).join(", ")} } from "${ast.path.value}.bgl.ts";`;
         case "type-declaration":  return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileOne(parents, scopes, ast.type)};`;
         case "proc-declaration":
         case "func-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(parents, scopes, ast.value) + ';';

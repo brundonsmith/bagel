@@ -1,5 +1,5 @@
 import { ClassMember, Declaration } from "./declarations.ts";
-import { Expression, InlineConst, Operator } from "./expressions.ts";
+import { Case, Expression, InlineConst, Operator } from "./expressions.ts";
 import { Statement } from "./statements.ts";
 import { Attribute, TypeExpression } from "./type-expressions.ts";
 import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
@@ -17,6 +17,7 @@ export type AST =
     | Block
     | Operator
     | Debug
+    | Case
 
 export type Module = SourceInfo & {
     readonly kind: "module",

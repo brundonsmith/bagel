@@ -222,7 +222,9 @@ export function subsumes(scope: Scope, destination: TypeExpression, value: TypeE
     const resolvedDestination = resolve(scope, destination)
     const resolvedValue = resolve(scope, value)
 
-    if (resolvedDestination.kind === "unknown-type") {
+    if (resolvedValue.kind === "any-type" || resolvedDestination.kind === "any-type") {
+        return true;
+    } else if (resolvedDestination.kind === "unknown-type") {
         return true;
     } else if(resolvedValue.kind === "unknown-type") {
         return false;
@@ -289,6 +291,7 @@ export function displayForm(typeExpression: TypeExpression): string {
         case "iterator-type": return `Iterator<${displayForm(typeExpression.itemType)}>`;
         case "plan-type": return `Plan<${displayForm(typeExpression.resultType)}>`;
         case "unknown-type": return "unknown";
+        case "any-type": return "any";
         case "element-type": return `<element tag>`
         // case "element-type": return `<${typeExpression.tagName}>`;
         case "javascript-escape-type": return "<js escape>";

@@ -320,6 +320,31 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Basic type refinement",
+  fn() {
+    testTypecheck(
+      `
+      const a: number|nil = 12
+      const b = if (a != nil) { a + 12 }`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Basic type refinement control",
+  fn() {
+    testTypecheck(
+      `
+      const a: number|nil = 12
+      const b = a + 12`,
+      true,
+    );
+  },
+});
+
+
 // TODO: Invocation arguments
 // TODO: Reactions
 // TODO: Classes

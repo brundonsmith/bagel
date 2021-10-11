@@ -76,8 +76,16 @@ export type Operator = SourceInfo & {
     readonly op: BinaryOp,
 }
 
-export const BINARY_OPS = [ "+", "-", "*", "/", "<=", ">=", "<", ">", "==", "!=", "&&", "||", "??" ] as const;
-export type BinaryOp = typeof BINARY_OPS[number];
+export const BINARY_OPS = [
+    ["??"],
+    ["||"],
+    ["&&"],
+    ["==", "!="],
+    ["<=", ">=", "<", ">"],
+    ["+", "-"],
+    ["*", "/"],
+] as const
+export type BinaryOp = typeof BINARY_OPS[number][number];
 
 export type Invocation = SourceInfo & {
     readonly kind: "invocation",
@@ -110,15 +118,21 @@ export type LocalIdentifier = SourceInfo & {
 
 export type IfElseExpression = SourceInfo & {
     readonly kind: "if-else-expression",
-    readonly cases: readonly { readonly condition: Expression, readonly outcome: Expression }[],
+    readonly cases: readonly Case[],
     readonly defaultCase?: Expression
 }
 
 export type SwitchExpression = SourceInfo & {
     readonly kind: "switch-expression",
     readonly value: Expression,
-    readonly cases: readonly { readonly condition: Expression, readonly outcome: Expression }[],
+    readonly cases: readonly Case[],
     readonly defaultCase?: Expression
+}
+
+export type Case = SourceInfo & {
+    readonly kind: "case",
+    readonly condition: Expression,
+    readonly outcome: Expression,
 }
 
 export type BooleanLiteral = SourceInfo & {

@@ -158,12 +158,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             walkParseTree(nextPayload, ast.subject, fn);
             walkParseTree(nextPayload, ast.indexer, fn);
         } break;
-        case "if-else-expression":
-        case "if-else-statement":
-        case "switch-expression": {
-            if (ast.kind === "switch-expression") {
-                walkParseTree(nextPayload, ast.value, fn);
-            }
+        case "if-else-statement": {
             for (const { condition, outcome } of ast.cases) {
                 walkParseTree(nextPayload, condition, fn);
                 walkParseTree(nextPayload, outcome, fn);
@@ -171,6 +166,23 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             if (ast.defaultCase != null) {
                 walkParseTree(nextPayload, ast.defaultCase, fn);
             }
+
+        } break;
+        case "if-else-expression":
+        case "switch-expression": {
+            if (ast.kind === "switch-expression") {
+                walkParseTree(nextPayload, ast.value, fn);
+            }
+            for (const c of ast.cases) {
+                walkParseTree(nextPayload, c, fn);
+            }
+            if (ast.defaultCase != null) {
+                walkParseTree(nextPayload, ast.defaultCase, fn);
+            }
+        } break;
+        case "case": {
+            walkParseTree(nextPayload, ast.condition, fn);
+            walkParseTree(nextPayload, ast.outcome, fn);
         } break;
         case "parenthesized-expression":
         case "debug": {
@@ -311,6 +323,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "boolean-type":
         case "nil-type":
         case "unknown-type":
+        case "any-type":
         case "javascript-escape-type":
         case "operator":
             break;
@@ -345,4 +358,15 @@ export async function all<T>(iter: AsyncIterable<T>): Promise<T[]> {
     }
 
     return results
+}
+
+export function memoize<A, R>(fn: (arg: A) => R): (arg: A) => R {
+    const results = new Map<A, R>()
+    return (arg: A): R => {
+        if (!results.has(arg)) {
+            results.set(arg, fn(arg))
+        }
+
+        return results.get(arg) as R
+    }
 }
