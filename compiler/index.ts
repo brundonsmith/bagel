@@ -31,6 +31,8 @@ configure({
         case "test": test(); break; // test(Deno.args[1]); break;
         case "run": throw Error("Unimplemented!"); break;
         case "format": throw Error("Unimplemented!"); break;
+        default:
+            throw Error(`Must provide a command: build, check, test, run, format`)
     }
 }
 
@@ -118,10 +120,9 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
             const source = modulesSource.get(module)
             if (source) {
                 const ast = parsed(module)(source)
-                // console.log({ ast })
+
                 for (const decl of ast.declarations) {
                     if (decl.kind === "import-declaration") {
-                        // console.log({ decl })
                         const importedModule = canonicalModuleName(module, decl.path.value)
 
                         if (!modules.has(importedModule)) {
@@ -134,19 +135,25 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     })
 
     // print errors as they occur
-    setTimeout(() => {
-        autorun(() => {
-            for (const module of modules) {
-                const source = modulesSource.get(module)
-                if (source) {
-                    const ast = parsed(module)(source)
-                    for (const err of typeerrors(module)(ast)) {
-                        printError(module)(err)
-                    }
+    autorun(() => {
+        let errors = false
+        console.clear()
+
+        for (const module of modules) {
+            const source = modulesSource.get(module)
+            if (source) {
+                const ast = parsed(module)(source)
+                for (const err of typeerrors(module)(ast)) {
+                    errors = true
+                    printError(module)(err)
                 }
             }
-        })
-    }, 1000)
+        }
+
+        if (!errors) {
+            console.log('No errors')
+        }
+    })
 
     // write compiled code to disk
     autorun(() => {
