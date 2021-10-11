@@ -94,24 +94,31 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         }
     })
     
-    const _parsed = (module: string, source: string): Module =>
-        reshape(parse(source, printError(path.basename(module))));
-    const parsed: (module: string) => (source: string) => Module = createTransformer((module: string) => createTransformer((source: string) => _parsed(module, source)));
+    const _parsed = (source: string): [Module, readonly BagelError[]] => {
+        const errors: BagelError[] = []
+        const mod = reshape(parse(source, err => errors.push(err)))
+        return [mod, errors]
+    };
+    const parsed: typeof _parsed = createTransformer(_parsed);
 
-    const _scopesMap = (module: string, ast: Module): ScopesMap =>
-        scopescan(printError(path.basename(module)), parentsMap(ast), module => given(modulesSource.get(module), source => parsed(module)(source)), ast, module);
-    const scopesMap: (module: string) => (ast: Module) => ScopesMap = createTransformer((module: string) => createTransformer((ast: Module) => _scopesMap(module, ast)));
+    const _scopesMap = (module: string, ast: Module): [ScopesMap, readonly BagelError[]] => {
+        const errors: BagelError[] = []
+        const scopes = scopescan(err => errors.push(err), parentsMap(ast), module => given(modulesSource.get(module), source => parsed(source)[0]), ast, module)
+        return [scopes, errors]
+    };
+    const scopesMap: (module: string) => (ast: Module) => [ScopesMap, readonly BagelError[]] = createTransformer((module: string) => createTransformer((ast: Module) => _scopesMap(module, ast)));
 
     const parentsMap: typeof getParentsMap = createTransformer(getParentsMap)
 
     const _typeerrors = (module: string, ast: Module): BagelError[] => {
         const errors: BagelError[] = []
-        typecheck(err => errors.push(err), parentsMap(ast), scopesMap(module)(ast), ast)
-        return errors
+        const [scopes, scopeErrors] = scopesMap(module)(ast)
+        typecheck(err => errors.push(err), parentsMap(ast), scopes, ast)
+        return [...scopeErrors, ...errors]
     }
     const typeerrors: (module: string) => (ast: Module) => BagelError[] = createTransformer((module: string) => createTransformer((ast: Module) => _typeerrors(module, ast)));
 
-    const _compiled = (module: string, ast: Module): string => LIB_IMPORTS + compile(parentsMap(ast), scopesMap(module)(ast), ast, includeTests)
+    const _compiled = (module: string, ast: Module): string => LIB_IMPORTS + compile(parentsMap(ast), scopesMap(module)(ast)[0], ast, includeTests)
     const compiled: (module: string) => (ast: Module) => string = createTransformer((module: string) => createTransformer((ast: Module) => _compiled(module, ast)));
 
     // add imported modules to set
@@ -119,7 +126,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         for (const module of modules) {
             const source = modulesSource.get(module)
             if (source) {
-                const ast = parsed(module)(source)
+                const ast = parsed(source)[0]
 
                 for (const decl of ast.declarations) {
                     if (decl.kind === "import-declaration") {
@@ -145,8 +152,8 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         for (const module of modules) {
             const source = modulesSource.get(module)
             if (source) {
-                const ast = parsed(module)(source)
-                const errors = typeerrors(module)(ast)
+                const [ast, parseErrors] = parsed(source)
+                const errors = [...parseErrors, ...typeerrors(module)(ast)]
                     // .filter((err, _, arr) => 
                     //     err.kind === "bagel-syntax-error" ||
                     //     !arr.some(other =>
@@ -171,7 +178,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
             const source = modulesSource.get(module)
             if (source) {
                 const jsPath = bagelFileToTsFile(module);
-                const js = compiled(module)(parsed(module)(source))
+                const js = compiled(module)(parsed(source)[0])
                 Deno.writeFile(jsPath, new TextEncoder().encode(js));
             }
         }
