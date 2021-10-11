@@ -24,6 +24,16 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Two binary operators",
+  fn() {
+    testTypecheck(
+      `const x: boolean = 2 + 2 == 4`,
+      false
+    )
+  }
+})
+
+Deno.test({
   name: "Basic constant inference",
   fn() {
     testTypecheck(
