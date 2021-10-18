@@ -1,17 +1,17 @@
-import { Colors, path, walk } from "./deps.ts";
+import { Colors, debounce, path, walk } from "./deps.ts";
 
 import { canonicalModuleName, getParentsMap, scopescan } from "./3_checking/scopescan.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
 import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
-import { printError, BagelError } from "./errors.ts";
+import { BagelError, prettyError } from "./errors.ts";
 import { all, esOrNone, given, on, sOrNone } from "./utils.ts";
 import { Module } from "./_model/ast.ts";
 
 import { observable, action, autorun, configure } from "https://jspm.dev/mobx"
 import { createTransformer } from "https://jspm.dev/mobx-utils"
-import { moreSpecificThan, ScopesMap } from "./_model/common.ts";
+import { ScopesMap } from "./_model/common.ts";
 
 configure({
     enforceActions: "never",
@@ -141,35 +141,56 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         }
     })
 
+    const printErrors = debounce((errors: Map<string, BagelError[]>) => {
+        if (watch) {
+            console.clear()
+        }
+
+        let totalErrors = 0;
+
+        if (errors.size === 0) {
+            console.log('No errors')
+        } else {
+            console.log()
+            for (const [module, errs] of errors.entries()) {
+                totalErrors += errs.length;
+
+                for (const err of errs) {
+                    console.log(prettyError(module, err))
+                }
+            }
+
+            console.log(`Found ${totalErrors} error${sOrNone(totalErrors)} across ${errors.size} module${sOrNone(errors.size)}`)
+        }
+        
+    }, 100)
+    
     // print errors as they occur
     autorun(() => {
         if (watch) {
             console.clear()
         }
 
-        let encounteredErrors = false
+        const allErrors: Map<string, BagelError[]> = new Map()
 
         for (const module of modules) {
             const source = modulesSource.get(module)
             if (source) {
                 const [ast, parseErrors] = parsed(source)
                 const errors = [...parseErrors, ...typeerrors(module)(ast)]
-                    // .filter((err, _, arr) => 
-                    //     err.kind === "bagel-syntax-error" ||
-                    //     !arr.some(other =>
-                    //         other !== err && 
-                    //         other.kind !== "bagel-syntax-error" && moreSpecificThan(other.ast ?? {}, err.ast ?? {})))
+                // .filter((err, _, arr) => 
+                //     err.kind === "bagel-syntax-error" ||
+                //     !arr.some(other =>
+                //         other !== err && 
+                //         other.kind !== "bagel-syntax-error" && moreSpecificThan(other.ast ?? {}, err.ast ?? {})))
 
-                for (const err of errors) {
-                    encounteredErrors = true
-                    printError(module)(err)
+                if (errors.length > 0) {
+                    allErrors.set(module, errors)
                 }
             }
         }
 
-        if (!encounteredErrors) {
-            console.log('No errors')
-        }
+        printErrors(allErrors)
     })
 
     // write compiled code to disk
@@ -180,6 +201,11 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
                 const jsPath = bagelFileToTsFile(module);
                 const js = compiled(module)(parsed(source)[0])
                 Deno.writeFile(jsPath, new TextEncoder().encode(js));
+
+                // bundle
+                if (singleEntry && bundle) {
+                    bundleOutput(entryFileOrDir)
+                }
             }
         }
     })
@@ -211,7 +237,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     }
 }
 
-async function bundleOutput(entryFile: string) {
+const bundleOutput = debounce(async (entryFile: string) => {
     const esbuild = await import("https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js")
  
     await esbuild.build({
@@ -222,8 +248,8 @@ async function bundleOutput(entryFile: string) {
         outfile: bagelFileToJsBundleFile(entryFile)
     })
  
-    console.log('done')
-}
+    console.log('Bundle written to ' + bagelFileToJsBundleFile(entryFile))
+}, 100)
 
 function test() {
     build({ entry: Deno.cwd(), emit: true, includeTests: true })

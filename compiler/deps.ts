@@ -1,3 +1,4 @@
 export * as path from "https://deno.land/std@0.107.0/path/mod.ts"
 export { walk } from "https://deno.land/std@0.107.0/fs/mod.ts"
 export * as Colors from "https://deno.land/std@0.107.0/fmt/colors.ts"
+export { debounce } from "https://deno.land/std@0.107.0/async/debounce.ts"

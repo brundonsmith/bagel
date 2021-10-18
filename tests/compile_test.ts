@@ -2,7 +2,7 @@ import { parse } from "../compiler/1_parse/index.ts";
 import { reshape } from "../compiler/2_reshape/index.ts";
 import { getParentsMap, scopescan } from "../compiler/3_checking/scopescan.ts";
 import { compile } from "../compiler/4_compile/index.ts";
-import { printError } from "../compiler/errors.ts";
+import { BagelError, prettyError } from "../compiler/errors.ts";
 
 Deno.test({
   name: "Simple func declaration",
@@ -391,10 +391,14 @@ const module = "module";
 function testCompile(bgl: string, exp: string) {
   let error: string | undefined;
 
-  const ast = reshape(parse(bgl, printError('<test>')));
+  function printError(error: BagelError) {
+    console.log(prettyError('<test>', error))
+  }
+
+  const ast = reshape(parse(bgl, printError));
   // console.log(JSON.stringify(withoutSourceInfo(ast), null, 2))
   const parents = getParentsMap(ast)
-  const scopes = scopescan(printError('<test>'), parents, () => undefined, ast, module);
+  const scopes = scopescan(printError, parents, () => undefined, ast, module);
 
   const compiled = compile(parents, scopes, ast);
 

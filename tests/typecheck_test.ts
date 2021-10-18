@@ -365,7 +365,7 @@ function testTypecheck(code: string, shouldFail: boolean): void {
 
   if (!shouldFail && errors.length > 0) {
     throw `\n${code}\nType check should have succeeded but failed with errors\n` +
-      errors.map(prettyError("foo")).join("\n")
+      errors.map(err => prettyError("<test>", err)).join("\n")
   } else if (shouldFail && errors.length === 0) {
     throw `\n${code}\nType check should have failed but succeeded`
   }

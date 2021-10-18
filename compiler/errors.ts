@@ -117,11 +117,7 @@ export function cannotFindExport(ast: ImportItem, importDeclaration: ImportDecla
     return { kind: "bagel-cannot-find-export-error", ast, importDeclaration }
 }
 
-export const printError = (modulePath: string) => (error: BagelError) => {
-    console.log(prettyError(modulePath)(error))
-}
-
-export const prettyError = (modulePath: string) => (error: BagelError): string => {
+export const prettyError = (modulePath: string, error: BagelError): string => {
     let output = "";
 
     const code = error.kind === 'bagel-syntax-error' ? error.code : error.ast?.kind !== "module" ? error.ast?.code : undefined
