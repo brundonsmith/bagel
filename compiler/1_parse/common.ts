@@ -41,6 +41,8 @@ export function consumeWhitespace(code: string, index: number): number {
                 } else if (next === '*') {
                     inComment = 'block'
                     currentIndex++
+                } else {
+                    return currentIndex
                 }
             } else if (!char.match(/[\s]/)) {
                 return currentIndex
