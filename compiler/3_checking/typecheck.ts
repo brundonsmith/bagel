@@ -108,7 +108,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 if (subjectProperties == null) {
                     reportError(miscError(ast.subject, `Can only use dot operator (".") on objects with known properties`));
                 } else if (!subjectProperties.some(property => property.name.name === ast.property.name)) {
-                    if (subjectType.kind === "class-type") {
+                    if (subjectType.kind === "class-instance-type") {
                         reportError(miscError(ast.property, `Property '${ast.property.name}' does not exist on class '${subjectType.clazz.name.name}'`));
                     } else {
                         reportError(miscError(ast.property, `Property '${ast.property.name}' does not exist on type '${displayForm(subjectType)}'`));
@@ -295,6 +295,6 @@ export function displayForm(typeExpression: TypeExpression): string {
         case "element-type": return `<element tag>`
         // case "element-type": return `<${typeExpression.tagName}>`;
         case "javascript-escape-type": return "<js escape>";
-        case "class-type": return typeExpression.clazz.name.name;
+        case "class-instance-type": return typeExpression.clazz.name.name;
     }
 }

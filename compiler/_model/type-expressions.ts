@@ -17,7 +17,7 @@ export type TypeExpression =
     | NumberType
     | BooleanType
     | NilType
-    | ClassType
+    | ClassInstanceType
     | LiteralType
     | NominalType
     | IteratorType
@@ -110,8 +110,8 @@ export type LiteralType = SourceInfo & {
     readonly value: ExactStringLiteral | NumberLiteral | BooleanLiteral,
 }
 
-export type ClassType = SourceInfo & {
-    readonly kind: "class-type",
+export type ClassInstanceType = SourceInfo & {
+    readonly kind: "class-instance-type",
     readonly clazz: ClassDeclaration
 }
 
@@ -253,7 +253,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "plan-type": undefined,
     "literal-type": undefined,
     "tuple-type": undefined,
-    "class-type": undefined,
+    "class-instance-type": undefined,
     "nominal-type": undefined,
     "javascript-escape-type": undefined,
 }

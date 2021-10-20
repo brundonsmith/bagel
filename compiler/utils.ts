@@ -308,7 +308,7 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         } break;
 
         // atomic
-        case "class-type":
+        case "class-instance-type":
         case "plain-identifier":
         case "range":
         case "local-identifier":

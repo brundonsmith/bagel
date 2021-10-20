@@ -274,7 +274,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
             newScope.values["this"] = {
                 mutability: "properties-only",
                 declaredType: {
-                    kind: "class-type",
+                    kind: "class-instance-type",
                     clazz: ast,
                     code: undefined,
                     startIndex: undefined,
@@ -409,7 +409,7 @@ function declType(declaration: Declaration): TypeExpression|undefined {
         return declaration.type;
     } else if (declaration.kind === "class-declaration") {
         return {
-            kind: "class-type",
+            kind: "class-instance-type",
             clazz: declaration,
             code: declaration.code,
             startIndex: declaration.startIndex,

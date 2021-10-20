@@ -222,7 +222,7 @@ function inferTypeInner(
             };
         }
         case "class-construction": return {
-            kind: "class-type",
+            kind: "class-instance-type",
             clazz: getScopeFor(parents, scopes, ast).classes[ast.clazz.name],
             code: ast.clazz.code,
             startIndex: ast.clazz.startIndex,
@@ -254,7 +254,7 @@ export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: Typ
             }
         } else if (resolutionScope.classes[type.name.name]) {
             return {
-                kind: "class-type",
+                kind: "class-instance-type",
                 clazz: resolutionScope.classes[type.name.name],
                 code: type.code,
                 startIndex: type.startIndex,
@@ -279,21 +279,15 @@ export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: Typ
             ({ ...rest, type: resolve(contextOrScope, type, preserveGenerics) }))
 
         return {
-            kind: "object-type",
+            ...type,
             entries,
-            code: type.code,
-            startIndex: type.startIndex,
-            endIndex: type.endIndex,
         }
     } else if(type.kind === "array-type") {
         const element = resolve(contextOrScope, type.element, preserveGenerics)
 
         return {
-            kind: "array-type",
+            ...type,
             element,
-            code: type.code,
-            startIndex: type.startIndex,
-            endIndex: type.endIndex,
         };
     } else if(type.kind === "func-type") {
         return {
@@ -494,7 +488,7 @@ export function propertiesOf(
     switch (type.kind) {
         case "object-type":
             return type.entries
-        case "class-type":
+        case "class-instance-type":
             return type.clazz.members.map(member => ({
                 kind: "attribute",
                 name: member.name,
