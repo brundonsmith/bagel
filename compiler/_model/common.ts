@@ -3,6 +3,8 @@ import { Statement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
 import { ClassDeclaration } from "./declarations.ts";
 import { Expression } from "./expressions.ts";
+import { withoutSourceInfo } from "../debugging.ts";
+import { deepEquals } from "../utils.ts";
 
 export type SourceInfo = {
     readonly code: string|undefined,
@@ -35,12 +37,14 @@ export type Scope = {
     readonly types: {readonly [key: string]: TypeDeclarationDescriptor},
     readonly values: {readonly [key: string]: DeclarationDescriptor},
     readonly classes: {readonly [key: string]: ClassDeclaration},
+    readonly refinements: readonly Refinement[],
 }
 
 export type MutableScope = {
     readonly types: {[key: string]: TypeDeclarationDescriptor},
     readonly values: {[key: string]: DeclarationDescriptor},
     readonly classes: {[key: string]: ClassDeclaration},
+    readonly refinements: Refinement[],
 }
 
 export type TypeDeclarationDescriptor = {
@@ -52,12 +56,15 @@ export type DeclarationDescriptor = {
     readonly mutability: "all"|"contents-only"|"none",
     readonly declaredType?: TypeExpression,
     readonly initialValue?: Expression,
-    readonly refinements?: readonly Refinement[]
 }
 
 export type Refinement =
-    | { kind: "subtraction", type: TypeExpression }
-    | { kind: "narrowing", type: TypeExpression }
+    | { kind: "subtraction", type: TypeExpression, targetExpression: Expression }
+    | { kind: "narrowing",   type: TypeExpression, targetExpression: Expression }
+
+export function equivalent(a: Expression, b: Expression): boolean {
+    return deepEquals(withoutSourceInfo(a), withoutSourceInfo(b))
+}
 
 export function getScopeFor(parentsMap: ParentsMap, scopesMap: ScopesMap, ast: AST): Scope {
     let current: AST|undefined = ast
@@ -81,7 +88,8 @@ export function getScopeFor(parentsMap: ParentsMap, scopesMap: ScopesMap, ast: A
 const EMPTY_SCOPE: Scope = {
     types: {},
     values: {},
-    classes: {}
+    classes: {},
+    refinements: [],
 }
 
 export type PlainIdentifier = SourceInfo & {

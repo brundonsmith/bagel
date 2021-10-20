@@ -30,7 +30,8 @@ export function collapse(scope: Scope): Scope {
     let all: Scope = {
         types: {},
         values: {},
-        classes: {}
+        classes: {},
+        refinements: []
     }
 
     let types = scope.types

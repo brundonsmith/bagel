@@ -374,6 +374,31 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Deep refinement",
+  fn() {
+    testTypecheck(
+      `
+      func foo(x: { bar: number|nil }): number|nil =>
+        if (x.bar != nil) {
+          x.bar - 12
+        }`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Deep refinement control",
+  fn() {
+    testTypecheck(
+      `
+      func foo(x: { bar: number|nil }): number|nil =>
+        x.bar - 12`,
+      true,
+    );
+  },
+});
 
 // TODO: Invocation arguments
 // TODO: Reactions

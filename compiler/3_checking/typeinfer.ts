@@ -14,11 +14,27 @@ export function inferType(
     ast: Expression|ClassMember,
     preserveGenerics?: boolean,
 ): TypeExpression {
+    const baseType = inferTypeInner(reportError, parents, scopes, ast, !!preserveGenerics)
+
+    let refinedType = baseType
+    {
+        const scope = getScopeFor(parents, scopes, ast)
+        for (const refinement of scope.refinements ?? []) {
+            switch (refinement.kind) {
+                case "subtraction": {
+                    refinedType = subtract(scope, refinedType, refinement.type)
+                } break;
+                case "narrowing": {
+                    refinedType = narrow(scope, refinedType, refinement.type)
+                } break;
+            }
+        }
+    }
+
     return resolve([parents, scopes],
         handleSingletonUnion(
             distillUnion(parents, scopes,
-                flattenUnions(
-                    inferTypeInner(reportError, parents, scopes, ast, !!preserveGenerics)))), preserveGenerics);
+                flattenUnions(refinedType))), preserveGenerics);
 }
 
 function inferTypeInner(
@@ -55,7 +71,12 @@ function inferTypeInner(
 
                 if (types == null) {
                     reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
-                    return UNKNOWN_TYPE
+
+                    if (BINARY_OPERATOR_TYPES[op.op].length === 1) {
+                        return BINARY_OPERATOR_TYPES[op.op][0].output
+                    } else {
+                        return UNKNOWN_TYPE
+                    }
                 }
 
                 leftType = types.output;
@@ -157,23 +178,9 @@ function inferTypeInner(
         case "local-identifier": {
             const valueDescriptor = getScopeFor(parents, scopes, ast).values[ast.name]
 
-            const baseType = valueDescriptor?.declaredType 
+            return valueDescriptor?.declaredType 
                 ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, parents, scopes, initialValue, preserveGenerics))
                 ?? UNKNOWN_TYPE
-
-            let refinedType = baseType
-            for (const refinement of valueDescriptor?.refinements ?? []) {
-                switch (refinement.kind) {
-                    case "subtraction": {
-                        refinedType = subtract(scope, refinedType, refinement.type)
-                    } break;
-                    case "narrowing": {
-                        refinedType = narrow(scope, refinedType, refinement.type)
-                    } break;
-                }
-            }
-
-            return refinedType
         }
         case "element-tag": {
             return {

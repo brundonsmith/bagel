@@ -140,10 +140,10 @@ function isScopeOwner(ast: AST): ast is ScopeOwner {
         || ast.kind === "case"
 }
 
-export function scopeFrom(reportError: (error: BagelError) => void, getModule: (module: string) => Module|undefined, parents: ParentsMap, scopes: ScopesMap, ast: ScopeOwner, module: string, parentScope?: Scope): Scope {
-    const newScope: MutableScope = parentScope != null 
-        ? extendScope(parentScope) 
-        : { types: {}, values: {}, classes: {} };
+export function scopeFrom(reportError: (error: BagelError) => void, getModule: (module: string) => Module|undefined, parents: ParentsMap, scopes: ScopesMap, ast: ScopeOwner, module: string, parentScope?: Scope): MutableScope {
+    const newScope = parentScope != null 
+        ? extendScope(parentScope) as MutableScope
+        : { types: {}, values: {}, classes: {}, refinements: [] };
 
     switch (ast.kind) {
         case "module":
@@ -298,44 +298,33 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
             const parent = parents.get(ast)
             if (parent?.kind === "if-else-expression") {
                 if (ast.condition.kind === "binary-operator" && ast.condition.ops[0][0].op === "!=") {
-                    const ident = 
-                        (ast.condition.base.kind === "local-identifier" && ast.condition.ops[0][1].kind === 'nil-literal') ? ast.condition.base :
-                        (ast.condition.base.kind === "nil-literal" && ast.condition.ops[0][1].kind === 'local-identifier') ? ast.condition.ops[0][1] :
+                    const targetExpression = 
+                        ast.condition.ops[0][1].kind === 'nil-literal' ? ast.condition.base :
+                        ast.condition.base.kind === "nil-literal" ? ast.condition.ops[0][1] :
                         undefined;
 
-                    if (ident != null) {
-                        newScope.values[ident.name] = {
-                            ...newScope.values[ident.name],
-                            refinements: [
-                                ...(newScope.values[ident.name]?.refinements ?? []),
-                                { kind: "subtraction", type: NIL_TYPE }
-                            ]
-                        }
+                    if (targetExpression != null) {
+                        newScope.refinements.push({ kind: "subtraction", type: NIL_TYPE, targetExpression })
                     }
                 }
 
                 if (ast.condition.kind === "binary-operator" && ast.condition.ops[0][0].op === "==") {
                     const bits = (
                         ast.condition.base.kind === "invocation" && ast.condition.base.subject.kind === "local-identifier" && ast.condition.base.subject.name === "typeof" 
-                        && ast.condition.ops[0][1].kind === "string-literal" && typeof ast.condition.ops[0][1].segments[0] === "string" ? [ast.condition.base.subject, ast.condition.ops[0][1].segments[0]] as const :
+                        && ast.condition.ops[0][1].kind === "string-literal" && typeof ast.condition.ops[0][1].segments[0] === "string" ? [ast.condition.base.args[0], ast.condition.ops[0][1].segments[0]] as const :
                         ast.condition.base.kind === "string-literal" && typeof ast.condition.base.segments[0] === "string"
-                        && ast.condition.ops[0][1].kind === "invocation" && ast.condition.ops[0][1].subject.kind === "local-identifier" && ast.condition.ops[0][1].subject.name === "typeof" ? [ast.condition.ops[0][1].subject, ast.condition.base.segments[0]] as const :
+                        && ast.condition.ops[0][1].kind === "invocation" && ast.condition.ops[0][1].subject.kind === "local-identifier" && ast.condition.ops[0][1].subject.name === "typeof" ? [ast.condition.ops[0][1].args[0], ast.condition.base.segments[0]] as const :
                         undefined
                     )
                     
                     if (bits) {
-                        const [ident, typeofStr] = bits
+                        const [targetExpression, typeofStr] = bits
     
                         const refinedType = typeFromTypeof(typeofStr)
-    
-                        newScope.values[ident.name] = {
-                            ...newScope.values[ident.name],
-                            refinements: refinedType ? [
-                                ...(newScope.values[ident.name]?.refinements ?? []),
-                                { kind: "narrowing", type: refinedType }
-                            ] : newScope.values[ident.name]?.refinements
+                        
+                        if (refinedType) {
+                            newScope.refinements.push({ kind: "narrowing", type: refinedType, targetExpression })
                         }
-
                     }
                     
                 }
@@ -343,22 +332,17 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                 if (parent.value.kind === "invocation" &&
                     parent.value.subject.kind === "local-identifier" &&
                     parent.value.subject.name === "typeof" &&
-                    parent.value.args[0].kind === "local-identifier" &&
                     ast.condition.kind === "string-literal" &&
                     ast.condition.segments.length === 1 &&
                     typeof ast.condition.segments[0] === 'string') {
                     
-                    const ident = parent.value.args[0]
+                    const targetExpression = parent.value.args[0]
                     const typeofStr = ast.condition.segments[0]
 
                     const refinedType = typeFromTypeof(typeofStr)
 
-                    newScope.values[ident.name] = {
-                        ...newScope.values[ident.name],
-                        refinements: refinedType ? [
-                            ...(newScope.values[ident.name]?.refinements ?? []),
-                            { kind: "narrowing", type: refinedType }
-                        ] : newScope.values[ident.name]?.refinements
+                    if (refinedType) {
+                        newScope.refinements.push({ kind: "narrowing", type: refinedType, targetExpression })
                     }
                 }
             }
@@ -425,11 +409,12 @@ function declValue(declaration: Declaration): Expression|undefined {
     }
 }
 
-export function extendScope(scope: Scope): Scope {
+function extendScope(scope: Scope): Scope {
     return {
         types: Object.create(scope.types),
         values: Object.create(scope.values),
         classes: scope.classes, // classes can't be created in lower scopes, so we don't need to worry about hierarchy
+        refinements: [...scope.refinements],
     }
 }
 
