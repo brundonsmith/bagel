@@ -19,7 +19,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = a < b`,
-      `const x = a < b;`,
+      `const x = (a < b);`,
     );
   },
 });
@@ -33,8 +33,8 @@ Deno.test({
         const ten = 5 * double,
         ten`,
       `const uid = (n: number) => {
-        const double = 2 * n;
-        const ten = 5 * double;
+        const double = (2 * n);
+        const ten = (5 * double);
         return ten;
       };`,
     );
@@ -125,7 +125,7 @@ Deno.test({
             } else {
                 3
             }`,
-      `const merge = () => (arr1.length <= 0 ? 2 : 3);`,
+      `const merge = () => ((arr1.length <= 0) ? 2 : 3);`,
     );
   },
 });
@@ -142,7 +142,7 @@ Deno.test({
             } else {
               4
             }`,
-      `const merge = () => (arr1.length <= 0 ? 2 : arr1.length <= 1 ? 3 : 4);`,
+      `const merge = () => ((arr1.length <= 0) ? 2 : (arr1.length <= 1) ? 3 : 4);`,
     );
   },
 });
@@ -256,10 +256,10 @@ Deno.test({
 
             for (const item of items) {
                 if (item.foo) {
-                    ___locals["count"] = ___locals["count"] + 1;
+                    ___locals["count"] = (___locals["count"] + 1);
                 };
                 
-                if (___locals["count"] > 12) {
+                if ((___locals["count"] > 12)) {
                     console.log(a);
                 } else {
                     console.log(undefined);
@@ -315,7 +315,7 @@ Deno.test({
                 |> map((n) => n * 2) 
                 |> filter((n) => n < 10)`,
       `const myFunc = (a, b) =>
-            filter((n) => n < 10)(map((n) => n * 2)(___range(0)(10)));`,
+            filter((n) => (n < 10))(map((n) => (n * 2))(___range(0)(10)));`,
     );
   },
 });
