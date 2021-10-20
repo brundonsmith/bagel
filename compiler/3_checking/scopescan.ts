@@ -78,7 +78,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: Par
                 // add loop element to scope
                 const iteratorType = inferType(reportError, parents, scopesMap, ast.iterator)
                 scope.values[ast.itemIdentifier.name] = {
-                    mutability: "properties-only",
+                    mutability: "contents-only",
                     declaredType: iteratorType.kind === "iterator-type" ? iteratorType.itemType : undefined,
                 }
             } break;
@@ -257,7 +257,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                 }
 
                 newScope.values[arg.name.name] = {
-                    mutability: ast.kind === "func" ? "none" : "properties-only",
+                    mutability: ast.kind === "func" ? "none" : "contents-only",
                     declaredType: arg.type ?? thisArgParentType?.args[i].type,
                 }
             }
@@ -272,7 +272,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
         }
         case "class-declaration":
             newScope.values["this"] = {
-                mutability: "properties-only",
+                mutability: "contents-only",
                 declaredType: {
                     kind: "class-instance-type",
                     clazz: ast,

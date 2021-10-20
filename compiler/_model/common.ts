@@ -3,7 +3,6 @@ import { Statement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
 import { ClassDeclaration } from "./declarations.ts";
 import { Expression } from "./expressions.ts";
-import { display } from "../debugging.ts";
 
 export type SourceInfo = {
     readonly code: string|undefined,
@@ -50,7 +49,7 @@ export type TypeDeclarationDescriptor = {
 }
 
 export type DeclarationDescriptor = {
-    readonly mutability: "all"|"properties-only"|"none",
+    readonly mutability: "all"|"contents-only"|"none",
     readonly declaredType?: TypeExpression,
     readonly initialValue?: Expression,
     readonly refinements?: readonly Refinement[]
