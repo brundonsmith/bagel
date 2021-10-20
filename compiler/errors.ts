@@ -18,8 +18,8 @@ export type BagelError =
 
 export type BagelSyntaxError = {
     kind: "bagel-syntax-error",
-    code: string,
-    index: number,
+    code: string|undefined,
+    index: number|undefined,
     message: string,
     stack: string|undefined,
 }

@@ -41,13 +41,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 }
             } break;
             case "binary-operator": {
-                if (inferType(reportError, parents, scopes, ast).kind === "unknown-type") {
-                    // TODO: Once generics are fully functional, use `type` property here
-                    const leftType = inferType(reportError, parents, scopes, ast.args[0]);
-                    const rightType = inferType(reportError, parents, scopes, ast.args[1]);
-
-                    reportError(miscError(ast.operator, `Operator '${ast.operator.op}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
-                }
+                // This gets checked in typeinfer
             } break;
             case "pipe":
             case "invocation": {

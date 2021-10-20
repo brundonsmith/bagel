@@ -2,10 +2,10 @@ import { getScopeFor, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
 import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given } from "../utils.ts";
-import { subsumes } from "./typecheck.ts";
+import { displayForm, subsumes } from "./typecheck.ts";
 import { ClassMember, memberDeclaredType } from "../_model/declarations.ts";
-import { BagelError } from "../errors.ts";
-import { display, withoutSourceInfo } from "../debugging.ts";
+import { BagelError, miscError } from "../errors.ts";
+import { withoutSourceInfo } from "../debugging.ts";
 
 export function inferType(
     reportError: (error: BagelError) => void, 
@@ -45,18 +45,23 @@ function inferTypeInner(
 
         }
         case "binary-operator": {
-            const leftType = inferType(reportError, parents, scopes, ast.args[0], preserveGenerics);
-            const rightType = inferType(reportError, parents, scopes, ast.args[1], preserveGenerics);
+            let leftType = inferType(reportError, parents, scopes, ast.base, preserveGenerics);
 
-            for (const types of BINARY_OPERATOR_TYPES[ast.operator.op]) {
-                const { left, right, output } = types;
+            for (const [op, expr] of ast.ops) {
+                const rightType = inferType(reportError, parents, scopes, expr, preserveGenerics);
 
-                if (subsumes(scope, left, leftType) && subsumes(scope, right, rightType)) {
-                    return output;
+                const types = BINARY_OPERATOR_TYPES[op.op].find(({ left, right }) =>
+                    subsumes(scope, left, leftType) && subsumes(scope, right, rightType))
+
+                if (types == null) {
+                    reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
+                    return UNKNOWN_TYPE
                 }
+
+                leftType = types.output;
             }
 
-            return UNKNOWN_TYPE;
+            return leftType;
         }
         case "pipe":
         case "invocation": {
@@ -422,14 +427,6 @@ function handleSingletonUnion(type: TypeExpression): TypeExpression {
     }
 }
 
-function unknownFallback(type: TypeExpression, fallback: Expression): TypeExpression|Expression {
-    if (type.kind === "unknown-type") {
-        return fallback;
-    } else {
-        return type;
-    }
-}
-
 const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
     "+": [
         { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE },
@@ -464,7 +461,7 @@ const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right:
     "||": [
         { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
     ],
-    "==": [
+    "==": [ // TODO: Should require left and right to be the same type, even though that type can be anything!
         { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
     ],
     "!=": [

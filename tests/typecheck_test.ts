@@ -24,10 +24,40 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Two binary operators",
+  name: "Binary operators 1",
   fn() {
     testTypecheck(
       `const x: boolean = 2 + 2 == 4`,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Binary operators 2",
+  fn() {
+    testTypecheck(
+      `const x: string = 2 + 'foo' + 'bar'`,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Binary operators 3",
+  fn() {
+    testTypecheck(
+      `const x: string = 2 * 3 + 'foo' + 'bar'`,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Binary operators 4",
+  fn() {
+    testTypecheck(
+      `const x: number = 2 * 3 / 12`,
       false
     )
   }

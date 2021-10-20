@@ -66,8 +66,8 @@ export type Range = SourceInfo & {
 
 export type BinaryOperator = SourceInfo & {
     readonly kind: "binary-operator",
-    readonly operator: Operator,
-    readonly args: readonly [Expression, Expression],
+    readonly base: Expression,
+    readonly ops: readonly [readonly [Operator, Expression], ...readonly [Operator, Expression][]],
     // TODO: Once generics are fully functional, create a `type: FuncType` property
 }
 
@@ -85,7 +85,12 @@ export const BINARY_OPS = [
     ["+", "-"],
     ["*", "/"],
 ] as const
+export const ALL_BINARY_OPS = BINARY_OPS.flat()
 export type BinaryOp = typeof BINARY_OPS[number][number];
+
+export function isBinaryOp(str: string): str is BinaryOp {
+    return (ALL_BINARY_OPS as readonly string[]).includes(str);
+}
 
 export type Invocation = SourceInfo & {
     readonly kind: "invocation",

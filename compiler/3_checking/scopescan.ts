@@ -3,13 +3,12 @@ import { path } from "../deps.ts";
 import { AST, Module } from "../_model/ast.ts";
 import { Block, getScopeFor, MutableScope, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
 import { ClassDeclaration, ConstDeclaration, Declaration } from "../_model/declarations.ts";
-import { Func, Proc, Expression, Invocation, InlineConst, IfElseExpression, Case, LocalIdentifier, StringLiteral, ExactStringLiteral } from "../_model/expressions.ts";
+import { Func, Proc, Expression, Invocation, InlineConst, Case } from "../_model/expressions.ts";
 import { ForLoop, LetDeclaration } from "../_model/statements.ts";
 import { ANY_TYPE, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { walkParseTree } from "../utils.ts";
 import { alreadyDeclared, BagelError, cannotFindExport, cannotFindModule, miscError } from "../errors.ts";
 import { inferType } from "./typeinfer.ts";
-import { display } from "../debugging.ts";
 
 
 export function scopescan(reportError: (error: BagelError) => void, parents: ParentsMap, getModule: (module: string) => Module|undefined, ast: AST, module: string): ScopesMap {
@@ -298,45 +297,47 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
             // Type refinement
             const parent = parents.get(ast)
             if (parent?.kind === "if-else-expression") {
-                if (ast.condition.kind === "binary-operator" && 
-                    ast.condition.operator.op === "!=" && 
-                    ast.condition.args.some(a => a.kind === "local-identifier") && 
-                    ast.condition.args.some(a => a.kind === 'nil-literal')) {
-                    
-                    const ident = ast.condition.args.find(a => a.kind === "local-identifier") as LocalIdentifier
+                if (ast.condition.kind === "binary-operator" && ast.condition.ops[0][0].op === "!=") {
+                    const ident = 
+                        (ast.condition.base.kind === "local-identifier" && ast.condition.ops[0][1].kind === 'nil-literal') ? ast.condition.base :
+                        (ast.condition.base.kind === "nil-literal" && ast.condition.ops[0][1].kind === 'local-identifier') ? ast.condition.ops[0][1] :
+                        undefined;
 
-                    newScope.values[ident.name] = {
-                        ...newScope.values[ident.name],
-                        refinements: [
-                            ...(newScope.values[ident.name]?.refinements ?? []),
-                            { kind: "subtraction", type: NIL_TYPE }
-                        ]
+                    if (ident != null) {
+                        newScope.values[ident.name] = {
+                            ...newScope.values[ident.name],
+                            refinements: [
+                                ...(newScope.values[ident.name]?.refinements ?? []),
+                                { kind: "subtraction", type: NIL_TYPE }
+                            ]
+                        }
                     }
                 }
 
-                if (ast.condition.kind === "binary-operator" && 
-                    ast.condition.operator.op === "==" && 
-                    ast.condition.args.some(arg => 
-                        arg.kind === "invocation" &&
-                        arg.subject.kind === "local-identifier" &&
-                        arg.subject.name === "typeof") &&
-                    ast.condition.args.some(arg =>
-                        arg.kind === "string-literal" &&
-                        arg.segments.length === 1 &&
-                        typeof arg.segments[0] === 'string')) {
+                if (ast.condition.kind === "binary-operator" && ast.condition.ops[0][0].op === "==") {
+                    const bits = (
+                        ast.condition.base.kind === "invocation" && ast.condition.base.subject.kind === "local-identifier" && ast.condition.base.subject.name === "typeof" 
+                        && ast.condition.ops[0][1].kind === "string-literal" && typeof ast.condition.ops[0][1].segments[0] === "string" ? [ast.condition.base.subject, ast.condition.ops[0][1].segments[0]] as const :
+                        ast.condition.base.kind === "string-literal" && typeof ast.condition.base.segments[0] === "string"
+                        && ast.condition.ops[0][1].kind === "invocation" && ast.condition.ops[0][1].subject.kind === "local-identifier" && ast.condition.ops[0][1].subject.name === "typeof" ? [ast.condition.ops[0][1].subject, ast.condition.base.segments[0]] as const :
+                        undefined
+                    )
                     
-                    const ident = (ast.condition.args.find(a => a.kind === "invocation") as Invocation).args[0] as LocalIdentifier
-                    const typeofStr = (ast.condition.args.find(a => a.kind === "string-literal") as StringLiteral).segments[0] as string
+                    if (bits) {
+                        const [ident, typeofStr] = bits
+    
+                        const refinedType = typeFromTypeof(typeofStr)
+    
+                        newScope.values[ident.name] = {
+                            ...newScope.values[ident.name],
+                            refinements: refinedType ? [
+                                ...(newScope.values[ident.name]?.refinements ?? []),
+                                { kind: "narrowing", type: refinedType }
+                            ] : newScope.values[ident.name]?.refinements
+                        }
 
-                    const refinedType = typeFromTypeof(typeofStr)
-
-                    newScope.values[ident.name] = {
-                        ...newScope.values[ident.name],
-                        refinements: refinedType ? [
-                            ...(newScope.values[ident.name]?.refinements ?? []),
-                            { kind: "narrowing", type: refinedType }
-                        ] : newScope.values[ident.name]?.refinements
                     }
+                    
                 }
             } else if (parent?.kind === "switch-expression") {
                 if (parent.value.kind === "invocation" &&

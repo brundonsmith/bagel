@@ -1,6 +1,8 @@
+import { withoutSourceInfo } from "../debugging.ts";
 import { BagelError, isError } from "../errors.ts";
+import { AST } from "../_model/ast.ts";
 import { KEYWORDS, PlainIdentifier } from "../_model/common.ts";
-import { BinaryOp, BINARY_OPS, Expression } from "../_model/expressions.ts";
+import { Expression } from "../_model/expressions.ts";
 
 export function consume(code: string, index: number, segment: string): number|undefined {
     for (let i = 0; i < segment.length; i++) {
@@ -10,19 +12,6 @@ export function consume(code: string, index: number, segment: string): number|un
     }
 
     return index + segment.length;
-}
-
-export function parseBinaryOp(code: string, index: number): ParseResult<BinaryOp>|undefined {
-    for (const op of BINARY_OPS.flat()) {
-        if (code.substr(index, op.length) === op) {
-            return {
-                parsed: op,
-                newIndex: index + op.length,
-            };
-        }
-    }
-
-    return undefined;
 }
 
 export function consumeWhitespace(code: string, index: number): number {
@@ -108,25 +97,35 @@ export function isSymbolic(ch: string, index: number): boolean {
     return ch != null && (isAlpha(ch) || ch === "_" || (index > 0 && (isNumeric(ch) || ch === "$")));
 }
 
-export function isBinaryOp(str: string): str is BinaryOp {
-    return (BINARY_OPS.flat() as readonly string[]).includes(str);
-}
-
 export type ParseResult<T> = { parsed: T, newIndex: number };
 
-export function parseSeries<T>(code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string, options: Partial<SeriesOptions> = {}): ParseResult<T[]>|BagelError {
+export function parseSeries<T, D extends AST>(code: string, index: number, itemParseFn: ParseFunction<T>, delimiter:  ParseFunction<D>,        options?: Partial<SeriesOptions>):      ParseResult<(T|D)[]>|BagelError;
+export function parseSeries<T>(   code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string,                  options?: Partial<SeriesOptions>):      ParseResult<T[]>|BagelError;
+export function parseSeries<T, D extends AST>(code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string|ParseFunction<D>, options:  Partial<SeriesOptions> = {}): ParseResult<(T|D)[]>|BagelError {
+    const delimiterFn: ParseFunction<D|undefined>|undefined = (
+        typeof delimiter === "function" ? delimiter : 
+        typeof delimiter === "string" ? ((code, index) => given(consume(code, index, delimiter), newIndex => ({ parsed: undefined, newIndex })))
+        : undefined
+    )
     const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], newIndex: index };
 
     const { leadingDelimiter, trailingDelimiter, whitespace } = { ...DEFAULT_SERIES_OPTIONS, ...options };
-    const parsed: T[] = [];
+    const parsed: (T|D)[] = [];
 
-    if (delimiter != null && (leadingDelimiter === "required" || leadingDelimiter === "optional")) {
-        const indexAfterLeadingDelimiter = consume(code, index, delimiter);
+    if (delimiterFn != null && (leadingDelimiter === "required" || leadingDelimiter === "optional")) {
+        const res = delimiterFn(code, index);
 
-        if (leadingDelimiter === "required" && indexAfterLeadingDelimiter == null) {
+        if (isError(res)) {
+            return res
+        }
+
+        if (leadingDelimiter === "required" && res == null) {
             return EMPTY_RESULT;
-        } else if (indexAfterLeadingDelimiter != null) {
-            index = indexAfterLeadingDelimiter;
+        } else if (res != null) {
+            index = res.newIndex;
+            if (res.parsed) {
+                parsed.push(res.parsed)
+            }
         }
     }
 
@@ -148,14 +147,23 @@ export function parseSeries<T>(code: string, index: number, itemParseFn: ParseFu
 
         if (whitespace === "optional") index = consumeWhitespace(code, index);
 
-        if (delimiter != null) {
-            given(consume(code, index, delimiter), newIndex => {
+        if (delimiterFn != null) {
+            const res = delimiterFn(code, index)
+
+            if (isError(res)) {
+                return res
+            }
+
+            if (res != null) {
                 foundDelimiter = true;
-                index = newIndex;
+                index = res.newIndex;
+                if (res.parsed) {
+                    parsed.push(res.parsed)
+                }
                 if (whitespace === "optional") index = consumeWhitespace(code, index);
                 
                 itemResult = itemParseFn(code, index);
-            });
+            }
         } else {
             itemResult = itemParseFn(code, index);
         }
@@ -216,7 +224,7 @@ export function expec<T, R>(val: T|BagelError|undefined, err: BagelError, fn: (v
     }
 }
 
-export function err(code: string, index: number, expected: string): BagelError {
+export function err(code: string|undefined, index: number|undefined, expected: string): BagelError {
     return { kind: "bagel-syntax-error", code, index, message: `${expected} expected`, stack: undefined };
 }
 

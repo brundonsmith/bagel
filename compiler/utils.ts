@@ -123,14 +123,9 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             }
             walkParseTree(nextPayload, ast.value, fn);
             break;
-        case "binary-operator":
         case "pipe":
         case "invocation": {
-            if (ast.kind !== "binary-operator") {
-                walkParseTree(nextPayload, ast.subject, fn);
-            } else {
-                walkParseTree(nextPayload, ast.operator, fn)
-            }
+            walkParseTree(nextPayload, ast.subject, fn);
 
             if (ast.kind === "invocation" && ast.typeArgs) {
                 for (const arg of ast.typeArgs) {
@@ -140,6 +135,13 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
 
             for (const arg of ast.args) {
                 walkParseTree(nextPayload, arg, fn);
+            }
+        } break;
+        case "binary-operator": {
+            walkParseTree(nextPayload, ast.base, fn);
+            for (const [op, expr] of ast.ops) {
+                walkParseTree(nextPayload, op, fn)
+                walkParseTree(nextPayload, expr, fn)
             }
         } break;
         case "element-tag": {
@@ -368,5 +370,20 @@ export function memoize<A, R>(fn: (arg: A) => R): (arg: A) => R {
         }
 
         return results.get(arg) as R
+    }
+}
+
+export function memoize2<A1, A2, R>(fn: (arg1: A1, arg2: A2) => R): (arg1: A1, arg2: A2) => R {
+    const results = new Map<A1, Map<A2, R>>()
+    return (arg1: A1, arg2: A2): R => {
+        if (!results.has(arg1)) {
+            const arg1Map = new Map()
+            results.set(arg1, arg1Map)
+        }
+        if (!results.get(arg1)?.has(arg2)) {
+            results.get(arg1)?.set(arg2, fn(arg1, arg2))
+        }
+
+        return results.get(arg1)?.get(arg2) as R
     }
 }

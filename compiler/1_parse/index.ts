@@ -1,13 +1,13 @@
 import { log, withoutSourceInfo } from "../debugging.ts";
 import { BagelError, isError } from "../errors.ts";
-import { memoize } from "../utils.ts";
+import { memoize, memoize2 } from "../utils.ts";
 import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, BinaryOp, ALL_BINARY_OPS, Operator, BINARY_OPS } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute } from "../_model/type-expressions.ts";
-import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, parseBinaryOp, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
+import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 
 export function parse(code: string, reportError: (error: BagelError) => void): Module {
@@ -1081,29 +1081,85 @@ const pipe: ParseFunction<Pipe> = (code, startIndex) =>
             }
             : undefined)
 
-const binaryOperator: ParseFunction<BinaryOperator> = (code, startIndex) => 
-    given(parseBeneath(code, startIndex, binaryOperator), ({ parsed: left, newIndex: index }) => 
-    given(consumeWhitespace(code, index), opStartIndex =>
-    given(parseBinaryOp(code, opStartIndex), ({ parsed: op, newIndex: opEndIndex }) =>
-    given(consumeWhitespace(code, opEndIndex), index =>
-    expec(expression(code, index), err(code, index, "Right operand"), ({ parsed: right, newIndex: index }) => ({
-        parsed: {
-            kind: "binary-operator",
-            operator: {
-                kind: "operator",
-                op,
-                code,
-                startIndex: opStartIndex,
-                endIndex: opEndIndex
-            },
-            args: [left, right],
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        newIndex: index,
-    }))))))
+const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => memoize2((code, startIndex) => 
+    given(parseSeries(code, startIndex, 
+        beneath(binaryOperator(tier)), 
+        _binaryOperatorSymbol(tier), 
+        { leadingDelimiter: "forbidden", trailingDelimiter: "forbidden" }
+    ), ({ parsed: segments, newIndex: index }) => 
+        segments.length >= 3 ? 
+            given(_segmentsToOps(segments), ({ base, ops }) => ({
+                parsed: {
+                    kind: "binary-operator",
+                    base,
+                    ops,
+                    code,
+                    startIndex,
+                    endIndex: index,
+                },
+                newIndex: index,
+            }))
+        : undefined
+    )))
 
+const _segmentsToOps = (segments: (Operator|Expression)[]): BagelError | { base: Expression, ops: readonly [readonly [Operator, Expression], ...readonly [Operator, Expression][]] } => {
+    const [base, firstOp, firstExpr] = segments
+
+    if (base.kind === "operator") {
+        return err(base.code, base.startIndex, "Expression")
+    }
+
+    if (firstOp.kind !== "operator") {
+        return err(firstOp.code, firstOp.startIndex, "Operator")
+    }
+
+    if (firstExpr.kind === "operator") {
+        return err(firstExpr.code, firstExpr.startIndex, "Expression")
+    }
+
+    const ops: [readonly [Operator, Expression], ...readonly [Operator, Expression][]] = [[firstOp, firstExpr] as const]
+
+    for (let i = 3; i < segments.length; i += 2) {
+        const op = segments[i]
+        const expr = segments[i+1]
+
+        if (op.kind !== "operator") {
+            return err(op.code, op.startIndex, "Operator")
+        }
+        if (expr.kind === "operator") {
+            return err(expr.code, expr.startIndex, "Expression")
+        }
+
+        ops.push([
+            op,
+            expr
+        ])
+    }
+
+    return { base, ops }
+}
+
+const _binaryOperatorSymbol = memoize((tier: number): ParseFunction<Operator> => (code, startIndex) => {
+    for (const op of BINARY_OPS[tier]) {
+        if (code.substr(startIndex, op.length) === op) {
+            const endIndex = startIndex + op.length
+
+            return {
+                parsed: {
+                    kind: "operator",
+                    op,
+                    code,
+                    startIndex,
+                    endIndex,
+                },
+                newIndex: endIndex,
+            };
+        }
+    }
+
+    return undefined;
+})
+    
 const indexer: ParseFunction<Indexer> = (code, startIndex) =>
     given(parseBeneath(code, startIndex, indexer), ({ parsed: base, newIndex: index }) =>
     given(parseSeries(code, index, _indexerExpression), ({ parsed: indexers, newIndex: index }) => 
@@ -1635,7 +1691,14 @@ const debug: ParseFunction<Debug> = (code, startIndex) =>
 
 const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
     [ javascriptEscape, pipe, classConstruction, elementTag ],
-    [ func, proc, range, binaryOperator ],
+    [ func, proc, range ],
+    [ binaryOperator(0) ],
+    [ binaryOperator(1) ],
+    [ binaryOperator(2) ],
+    [ binaryOperator(3) ],
+    [ binaryOperator(4) ],
+    [ binaryOperator(5) ],
+    [ binaryOperator(6) ],
     [ indexer ],
     [ invocationAccessorChain ],
     [ parenthesized ],
@@ -1671,4 +1734,7 @@ const parseStartingFromTier = (tier: number): ParseFunction<Expression> => (code
 }
 
 const parseBeneath = (code: string, index: number, fn: ParseFunction<Expression>) =>
+    beneath(fn)(code, index)
+
+const beneath = (fn: ParseFunction<Expression>): ParseFunction<Expression> => (code: string, index: number) =>
     parseStartingFromTier(NEXT_TIER_FOR.get(fn) as number)(code, index)
