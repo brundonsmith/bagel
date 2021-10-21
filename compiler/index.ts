@@ -83,7 +83,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     const modules: Set<string> = observable(new Set<string>(allFiles.filter(f => f.match(/\.bgl$/i))));
     const modulesSource: Map<string, string> = observable(new Map())
 
-    fs.ensureDir(cacheDir)
+    fs.ensureDir(cacheDir())
 
     // Load modules from disk or web
     autorun(async () => {

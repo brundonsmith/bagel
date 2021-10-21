@@ -390,13 +390,15 @@ export function memoize2<A1, A2, R>(fn: (arg1: A1, arg2: A2) => R): (arg1: A1, a
 }
 
 
+export const cacheDir = () => {
 const tempDir = os.tempDir()
 if (tempDir == null) {
     throw Error("Unable to determine temporary directory")
 }
 
-export const cacheDir = path.resolve(tempDir, 'bagel', 'cache')
+    return path.resolve(tempDir, 'bagel', 'cache')
+}
 
 export function cachedModulePath(module: string): string {
-    return path.resolve(cacheDir, encodeURIComponent(module))
+    return path.resolve(cacheDir(), encodeURIComponent(module))
 }
