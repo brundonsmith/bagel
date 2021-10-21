@@ -65,14 +65,14 @@ const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed','configure',
 
 const LIB_IMPORTS = `
 import { ${IMPORTED_ITEMS} } from "../../lib/src/core.ts";
-
+`
+const MOBX_CONFIGURE = `
 ___configure({
     enforceActions: "never",
     computedRequiresReaction: false,
     reactionRequiresObservable: false,
     observableRequiresReaction: false,
-});
-`
+});`
 
 async function build({ entry, bundle, watch, emit, includeTests }: { entry: string, bundle?: boolean, watch?: boolean, includeTests?: boolean, emit: boolean }) {
     if (!entry) throw Error("Bagel: No file or directory provided")
@@ -135,7 +135,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     }
     const typeerrors: (module: string) => (ast: Module) => BagelError[] = createTransformer((module: string) => createTransformer((ast: Module) => _typeerrors(module, ast)));
 
-    const _compiled = (module: string, ast: Module): string => LIB_IMPORTS + compile(parentsMap(ast), scopesMap(module)(ast)[0], ast, module, includeTests)
+    const _compiled = (module: string, ast: Module): string => LIB_IMPORTS + (ast.hasMain ? MOBX_CONFIGURE : '') + compile(parentsMap(ast), scopesMap(module)(ast)[0], ast, module, includeTests)
     const compiled: (module: string) => (ast: Module) => string = createTransformer((module: string) => createTransformer((ast: Module) => _compiled(module, ast)));
 
     // add imported modules to set

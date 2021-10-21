@@ -21,6 +21,7 @@ export type AST =
 
 export type Module = SourceInfo & {
     readonly kind: "module",
+    readonly hasMain: boolean,
     readonly declarations: readonly Declaration[],
 }
 

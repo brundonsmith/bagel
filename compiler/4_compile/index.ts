@@ -9,11 +9,10 @@ import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
 export function compile(parents: ParentsMap, scopes: ScopesMap, module: Module, modulePath: string, includeTests?: boolean): string {
-    const hasMain = module.declarations.some(decl => decl.kind === "proc-declaration" && decl.name.name === "main")
     const runtimeCode = module.declarations
         .filter(decl => decl.kind !== 'test-expr-declaration' && decl.kind !== 'test-block-declaration')
         .map(decl => compileOne(parents, scopes, modulePath, decl))
-        .join("\n\n") + (hasMain ? "\nsetTimeout(main, 0);\n" : "");
+        .join("\n\n") + (module.hasMain ? "\nsetTimeout(main, 0);\n" : "");
 
     if (includeTests) {
         return runtimeCode + `\n export const tests = {

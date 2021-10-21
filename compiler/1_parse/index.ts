@@ -47,6 +47,7 @@ export function parse(code: string, reportError: (error: BagelError) => void): M
 
     return {
         kind: "module",
+        hasMain: declarations.some(decl => decl.kind === "proc-declaration" && decl.name.name === "main"),
         declarations,
         code,
         startIndex: 0,
