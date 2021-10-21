@@ -1,4 +1,4 @@
-import { os,path } from "./deps.ts";
+import { os, path } from "./deps.ts";
 import { AST } from "./_model/ast.ts";
 
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
@@ -277,6 +277,9 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
             }
         } break;
         case "object-type": {
+            for (const spread of ast.spreads) {
+                walkParseTree(nextPayload, spread, fn)
+            }
             for (const attribute of ast.entries) {
                 walkParseTree(nextPayload, attribute, fn)
             }
@@ -391,11 +394,11 @@ export function memoize2<A1, A2, R>(fn: (arg1: A1, arg2: A2) => R): (arg1: A1, a
 
 
 export const cacheDir = () => {
-const tempDir = os.tempDir()
-if (tempDir == null) {
-    throw Error("Unable to determine temporary directory")
-}
-
+    const tempDir = os.tempDir()
+    if (tempDir == null) {
+        throw Error("Unable to determine temporary directory")
+    }
+    
     return path.resolve(tempDir, 'bagel', 'cache')
 }
 

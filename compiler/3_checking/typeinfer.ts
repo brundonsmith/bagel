@@ -1,6 +1,6 @@
 import { getScopeFor, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
-import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, ObjectType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given } from "../utils.ts";
 import { displayForm, subsumes } from "./typecheck.ts";
 import { ClassMember, memberDeclaredType } from "../_model/declarations.ts";
@@ -22,10 +22,10 @@ export function inferType(
         for (const refinement of scope.refinements ?? []) {
             switch (refinement.kind) {
                 case "subtraction": {
-                    refinedType = subtract(scope, refinedType, refinement.type)
+                    refinedType = subtract(parents, scopes, refinedType, refinement.type)
                 } break;
                 case "narrowing": {
-                    refinedType = narrow(scope, refinedType, refinement.type)
+                    refinedType = narrow(parents, scopes, refinedType, refinement.type)
                 } break;
             }
         }
@@ -67,7 +67,7 @@ function inferTypeInner(
                 const rightType = inferType(reportError, parents, scopes, expr, preserveGenerics);
 
                 const types = BINARY_OPERATOR_TYPES[op.op].find(({ left, right }) =>
-                    subsumes(scope, left, leftType) && subsumes(scope, right, rightType))
+                    subsumes(parents, scopes, left, leftType) && subsumes(parents, scopes, right, rightType))
 
                 if (types == null) {
                     reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
@@ -101,11 +101,11 @@ function inferTypeInner(
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "exact-string-literal") {
                 const key = indexerType.value.value;
-                const valueType = baseType.entries.find(entry => entry.name.name === key)?.type;
+                const valueType = propertiesOf(reportError, parents, scopes, baseType)?.find(entry => entry.name.name === key)?.type;
 
                 return valueType ?? UNKNOWN_TYPE;
             } else if (baseType.kind === "indexer-type") {
-                if (!subsumes(scope, baseType.keyType, indexerType)) {
+                if (!subsumes(parents, scopes, baseType.keyType, indexerType)) {
                     return UNKNOWN_TYPE;
                 } else {
                     return {
@@ -137,7 +137,7 @@ function inferTypeInner(
                 endIndex: undefined,
             };
 
-            if (!subsumes(scope, unionType, valueType)) {
+            if (!subsumes(parents, scopes, unionType, valueType)) {
                 return {
                     ...unionType,
                     members: [
@@ -204,6 +204,7 @@ function inferTypeInner(
 
             return {
                 kind: "object-type",
+                spreads: [],
                 entries,
                 code: undefined,
                 startIndex: undefined,
@@ -382,7 +383,7 @@ function distillUnion(parents: ParentsMap, scopes: ScopesMap, type: TypeExpressi
                     const a = type.members[i];
                     const b = type.members[j];
 
-                    if (subsumes(getScopeFor(parents, scopes, type), b, a) && !indicesToDrop.has(j)) {
+                    if (subsumes(parents, scopes, b, a) && !indicesToDrop.has(j)) {
                         indicesToDrop.add(i);
                     }
                 }
@@ -401,22 +402,22 @@ function distillUnion(parents: ParentsMap, scopes: ScopesMap, type: TypeExpressi
     }
 }
 
-function subtract(scope: Scope, type: TypeExpression, without: TypeExpression): TypeExpression {
+function subtract(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression, without: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         return {
             ...type,
-            members: type.members.filter(member => !subsumes(scope, without, member))
+            members: type.members.filter(member => !subsumes(parents, scopes, without, member))
         }
     } else { // TODO: There's probably more we can do here
         return type
     }
 }
 
-function narrow(scope: Scope, type: TypeExpression, fit: TypeExpression): TypeExpression {
+function narrow(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression, fit: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         return {
             ...type,
-            members: type.members.filter(member => subsumes(scope, fit, member))
+            members: type.members.filter(member => subsumes(parents, scopes, fit, member))
         }
     } else { // TODO: There's probably more we can do here
         return type
@@ -490,8 +491,21 @@ export function propertiesOf(
     type: TypeExpression
 ): readonly Attribute[] | undefined {
     switch (type.kind) {
-        case "object-type":
-            return type.entries
+        case "object-type": {
+            const attrs = [...type.entries]
+
+            for (const spread of type.spreads) {
+                const resolved = resolve([parents, scopes], spread, true)
+        
+                if (resolved.kind !== "object-type") {
+                    reportError(miscError(spread, `${displayForm(resolved)} is not an object type; can only spread object types into object types`))
+                } else {
+                    attrs.push(...(propertiesOf(reportError, parents, scopes, resolved) ?? []))
+                }
+            }
+
+            return attrs
+        }
         case "class-instance-type":
             return type.clazz.members.map(member => ({
                 kind: "attribute",

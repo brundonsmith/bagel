@@ -400,6 +400,51 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Object type spread 1",
+  fn() {
+    testTypecheck(
+      `
+      type Base = {
+        foo: number
+      }
+      
+      type Other = {
+        ...Base,
+        bar: string
+      }
+      
+      const thing: Other = {
+        foo: 12,
+        bar: 'fgsdg'
+      }`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Object type spread 2",
+  fn() {
+    testTypecheck(
+      `
+      type Base = {
+        foo: number
+      }
+      
+      type Other = {
+        ...Base,
+        bar: string
+      }
+      
+      const thing: Other = {
+        bar: 'fgsdg'
+      }`,
+      true,
+    );
+  },
+});
+
 // TODO: Invocation arguments
 // TODO: Reactions
 // TODO: Classes

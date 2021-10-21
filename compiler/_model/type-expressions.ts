@@ -57,6 +57,7 @@ export type ElementType = SourceInfo & {
 
 export type ObjectType = SourceInfo & {
     readonly kind: "object-type",
+    readonly spreads: readonly NamedType[],
     readonly entries: readonly Attribute[],
 }
 

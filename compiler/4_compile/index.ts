@@ -107,9 +107,14 @@ ${given(ast.until, until => compileOne(parents, scopes, module, until))})`;
         case "proc-type": return `(${compileArgs(parents, scopes, module, ast.args)}) => void`;
         case "func-type": return `(${compileArgs(parents, scopes, module, ast.args)}) => ${compileOne(parents, scopes, module, ast.returnType ?? UNKNOWN_TYPE)}`;
         case "element-type": return `unknown`;
-        case "object-type": return `{${ast.entries
-            .map(({ name, type }) => `${name.name}: ${compileOne(parents, scopes, module, type)}`)
-            .join(", ")}}`;
+        case "object-type": return `{${
+            ast.spreads
+            .map(s => '...' + compileOne(parents, scopes, module, s))
+            .concat(
+                ast.entries
+                .map(({ name, type }) => `${name.name}: ${compileOne(parents, scopes, module, type)}`)
+            )
+            .join(', ')}}`;
         case "indexer-type": return `{[key: ${compileOne(parents, scopes, module, ast.keyType)}]: ${compileOne(parents, scopes, module, ast.valueType)}}`;
         case "array-type": return `${compileOne(parents, scopes, module, ast.element)}[]`;
         case "tuple-type": return `[${ast.members.map(m => compileOne(parents, scopes, module, m)).join(", ")}]`;

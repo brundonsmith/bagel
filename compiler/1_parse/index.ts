@@ -191,18 +191,28 @@ const namedType: ParseFunction<NamedType> = (code, startIndex) =>
 const objectType: ParseFunction<ObjectType> = (code, startIndex) =>
     given(consume(code, startIndex, "{"), index =>
     given(consumeWhitespace(code, index), index =>
-    given(parseSeries(code, index, _objectTypeEntry, ","), ({ parsed: entries, newIndex: index }) =>
+    given(parseSeries(code, index, _spreadOrEntry, ","), ({ parsed: entries, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
         parsed: {
             kind: "object-type",
-            entries,
+            spreads: entries.filter((e): e is NamedType => e.kind === "named-type"),
+            entries: entries.filter((e): e is Attribute => e.kind === "attribute"),
             code,
             startIndex,
             endIndex: index,
         },
         newIndex: index,
     }))))))
+
+const _spreadOrEntry: ParseFunction<NamedType|Attribute> = (code, index) => 
+    _objectTypeEntry(code, index) ?? _objectTypeSpread(code, index)
+
+const _objectTypeSpread: ParseFunction<NamedType> = (code, startIndex) =>
+    given(consume(code, startIndex, '...'), index =>
+    expec(namedType(code, index), err(code,  index, 'Named type'), ({ parsed, newIndex }) => ({
+        parsed, newIndex
+    })))
 
 const _objectTypeEntry: ParseFunction<Attribute> = (code, startIndex) =>
     given(plainIdentifier(code, startIndex), ({ parsed: name, newIndex: index }) =>
