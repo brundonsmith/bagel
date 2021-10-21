@@ -63,7 +63,7 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, module: string, ast:
         case "proc": return compileProc(parents, scopes, module, ast);
         case "func": return compileFunc(parents, scopes, module, ast);
         case "pipe":
-        case "invocation": return `${compileOne(parents, scopes, module, ast.subject)}${ast.kind === "invocation" && ast.typeArgs && ast.typeArgs.length > 0 ? `<${ast.typeArgs.map(p => compileOne(parents, scopes, module, p)).join(',')}>` : ''}(${ast.args.map(arg => compileOne(parents, scopes, module, arg)).join(', ')})`;
+        case "invocation": return `${compileOne(parents, scopes, module, ast.subject)}${ast.kind === "invocation" && ast.typeArgs.length > 0 ? `<${ast.typeArgs.map(p => compileOne(parents, scopes, module, p)).join(',')}>` : ''}(${ast.args.map(arg => compileOne(parents, scopes, module, arg)).join(', ')})`;
         case "binary-operator": return `(${compileOne(parents, scopes, module, ast.base)} ${ast.ops.map(([op, expr]) => compileOne(parents, scopes, module, op) + ' ' + compileOne(parents, scopes, module, expr)).join(' ')})`;
         case "operator": return ast.op;
         case "if-else-expression":

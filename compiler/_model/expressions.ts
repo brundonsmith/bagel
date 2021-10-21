@@ -96,7 +96,7 @@ export type Invocation = SourceInfo & {
     readonly kind: "invocation",
     readonly subject: Expression,
     readonly args: readonly Expression[],
-    readonly typeArgs?: readonly TypeExpression[],
+    readonly typeArgs: readonly TypeExpression[],
 }
 
 export type Indexer = SourceInfo & {

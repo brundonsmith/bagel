@@ -4,7 +4,7 @@ import { memoize, memoize2 } from "../utils.ts";
 import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, BinaryOp, ALL_BINARY_OPS, Operator, BINARY_OPS } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
@@ -1389,7 +1389,7 @@ const _oneGetToInvocationOrAccess = (subject: Expression, get: InvocationArgs|Pr
     }
 }
     
-type InvocationArgs = SourceInfo & { kind: "invocation-args", exprs: Expression[], typeArgs?: TypeExpression[] }
+type InvocationArgs = SourceInfo & { kind: "invocation-args", exprs: Expression[], typeArgs: TypeExpression[] }
 
 const _invocationArgs: ParseFunction<InvocationArgs> = (code, startIndex) =>
     given(parseOptional(code, startIndex, (code, index) =>
@@ -1401,8 +1401,15 @@ const _invocationArgs: ParseFunction<InvocationArgs> = (code, startIndex) =>
     given(consume(code, indexAfterTypeArgs ?? startIndex, "("), index => 
     given(parseSeries(code, index, expression, ","), ({ parsed: exprs, newIndex: index }) =>
     expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
-        parsed: { kind: "invocation-args", exprs, typeArgs, code, startIndex, endIndex: index },
-                newIndex: index
+        parsed: {
+            kind: "invocation-args",
+            exprs,
+            typeArgs: typeArgs ?? [],
+            code,
+            startIndex,
+            endIndex: index
+        },
+        newIndex: index
     })))))
 
 type PropertyAccess = SourceInfo & { kind: "property-access", property: PlainIdentifier }

@@ -89,8 +89,8 @@ export function scopescan(reportError: (error: BagelError) => void, parents: Par
                 const subjectType = inferType(reportError, parents, scopesMap, ast.subject);
                 if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
                     if (subjectType.typeParams.length > 0) {
-                        if (subjectType.typeParams.length !== ast.typeArgs?.length) {
-                            reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs?.length ?? 0}`))
+                        if (subjectType.typeParams.length !== ast.typeArgs.length) {
+                            reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
                         }
 
                         for (let i = 0; i < subjectType.typeParams.length; i++) {
