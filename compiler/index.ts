@@ -1,12 +1,12 @@
-import { Colors, debounce, path, walk } from "./deps.ts";
+import { Colors, debounce, path, fs } from "./deps.ts";
 
-import { canonicalModuleName, getParentsMap, scopescan } from "./3_checking/scopescan.ts";
+import { canonicalModuleName, getParentsMap, pathIsRemote, scopescan } from "./3_checking/scopescan.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
 import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { BagelError, prettyError } from "./errors.ts";
-import { all, esOrNone, given, on, sOrNone } from "./utils.ts";
+import { all, cacheDir, cachedModulePath, esOrNone, given, on, sOrNone } from "./utils.ts";
 import { Module } from "./_model/ast.ts";
 
 import { observable, action, autorun, configure } from "https://jspm.dev/mobx"
@@ -83,13 +83,30 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     const modules: Set<string> = observable(new Set<string>(allFiles.filter(f => f.match(/\.bgl$/i))));
     const modulesSource: Map<string, string> = observable(new Map())
 
-    // HACK
-    autorun(() => {
+    fs.ensureDir(cacheDir)
+
+    // Load modules from disk or web
+    autorun(async () => {
         for (const module of modules) {
             if (modulesSource.get(module) == null) {
-                Deno.readTextFile(module).then(action((source: string) => {
+                if (pathIsRemote(module)) {
+                    const path = cachedModulePath(module)
+                    if (await fs.exists(path)) {
+                        const source = await Deno.readTextFile(path)
+                        modulesSource.set(module, source)
+                    } else {
+                        const res = await fetch(module)
+    
+                        if (res.status === 200) {
+                            const source = await res.text()
+                            await Deno.writeTextFile(path, source)
+                            modulesSource.set(module, source)
+                        }
+                    }
+                } else {
+                    const source = await Deno.readTextFile(module)
                     modulesSource.set(module, source)
-                }))
+                }
             }
         }
     })
@@ -118,7 +135,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     }
     const typeerrors: (module: string) => (ast: Module) => BagelError[] = createTransformer((module: string) => createTransformer((ast: Module) => _typeerrors(module, ast)));
 
-    const _compiled = (module: string, ast: Module): string => LIB_IMPORTS + compile(parentsMap(ast), scopesMap(module)(ast)[0], ast, includeTests)
+    const _compiled = (module: string, ast: Module): string => LIB_IMPORTS + compile(parentsMap(ast), scopesMap(module)(ast)[0], ast, module, includeTests)
     const compiled: (module: string) => (ast: Module) => string = createTransformer((module: string) => createTransformer((ast: Module) => _compiled(module, ast)));
 
     // add imported modules to set
@@ -198,8 +215,13 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         for (const module of modules) {
             const source = modulesSource.get(module)
             if (source) {
-                const jsPath = bagelFileToTsFile(module);
+                const jsPath = pathIsRemote(module)
+                    ? cachedModulePath(module) + '.ts'
+                    : bagelFileToTsFile(module)
+
+               
                 const js = compiled(module)(parsed(source)[0])
+
                 Deno.writeFile(jsPath, new TextEncoder().encode(js));
 
                 // bundle
@@ -257,7 +279,7 @@ function test() {
     setTimeout(async () => {
         const thisModulePath = path.dirname(import.meta.url).replace(/^file:\/\/\//i, '')
 
-        const filesToTest = await all(walk(Deno.cwd(), {
+        const filesToTest = await all(fs.walk(Deno.cwd(), {
             // match: given(filePattern, pattern => [ new RegExp(pattern) ]),
             exts: ['.bgl']
         }))

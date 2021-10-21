@@ -400,7 +400,7 @@ function testCompile(bgl: string, exp: string) {
   const parents = getParentsMap(ast)
   const scopes = scopescan(printError, parents, () => undefined, ast, module);
 
-  const compiled = compile(parents, scopes, ast);
+  const compiled = compile(parents, scopes, ast, '<test>');
 
   if (error) {
     throw error

@@ -1,3 +1,4 @@
+import { os,path } from "./deps.ts";
 import { AST } from "./_model/ast.ts";
 
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
@@ -386,4 +387,16 @@ export function memoize2<A1, A2, R>(fn: (arg1: A1, arg2: A2) => R): (arg1: A1, a
 
         return results.get(arg1)?.get(arg2) as R
     }
+}
+
+
+const tempDir = os.tempDir()
+if (tempDir == null) {
+    throw Error("Unable to determine temporary directory")
+}
+
+export const cacheDir = path.resolve(tempDir, 'bagel', 'cache')
+
+export function cachedModulePath(module: string): string {
+    return path.resolve(cacheDir, encodeURIComponent(module))
 }

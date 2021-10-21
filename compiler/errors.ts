@@ -87,7 +87,7 @@ export function errorMessage(error: BagelError): string {
         case "bagel-misc-type-error":
             return error.message;
         case "bagel-cannot-find-module-error":
-            return `Failed to resolve module "${error.ast.path.value}"`
+            return `Failed to resolve module '${error.ast.path.value}'`
         case "bagel-cannot-find-export-error":
             return `Module "${error.importDeclaration.path.value}" has no export named ${error.ast.name.name}`
     }

@@ -419,6 +419,14 @@ function extendScope(scope: Scope): Scope {
 }
 
 export function canonicalModuleName(importerModule: string, importPath: string) {
-    const moduleDir = path.dirname(importerModule);
-    return path.resolve(moduleDir, importPath) + ".bgl"
+    if (pathIsRemote(importPath)) {
+        return importPath
+    } else {
+        const moduleDir = path.dirname(importerModule);
+        return path.resolve(moduleDir, importPath) + ".bgl"
+    }
+}
+
+export function pathIsRemote(path: string): boolean {
+    return path.match(/^https?:\/\//) != null
 }
