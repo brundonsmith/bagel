@@ -445,6 +445,42 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Optional chain success",
+  fn() {
+    testTypecheck(
+      `
+      type Obj = {
+        foo: nil | {
+          bar: number
+        }
+      }
+      
+      func fn(obj: Obj): number|nil =>
+        obj.foo?.bar`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Optional chain failure",
+  fn() {
+    testTypecheck(
+      `
+      type Obj = {
+        foo: nil | {
+          bar: number
+        }
+      }
+      
+      func fn(obj: Obj): number|nil =>
+        obj.foo.bar`,
+      true,
+    );
+  },
+});
+
 // TODO: Invocation arguments
 // TODO: Reactions
 // TODO: Classes

@@ -1,9 +1,10 @@
 import { Module } from "../_model/ast.ts";
-import { BOOLEAN_TYPE, FuncType, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, FuncType, NIL_TYPE, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
-import { propertiesOf, inferType, resolve } from "./typeinfer.ts";
+import { propertiesOf, inferType, resolve, subtract } from "./typeinfer.ts";
 import { getScopeFor, ParentsMap, ScopesMap } from "../_model/common.ts";
+import { display } from "../debugging.ts";
 
 
 export function typecheck(reportError: (error: BagelError) => void, parents: ParentsMap, scopes: ScopesMap, ast: Module) {
@@ -110,7 +111,9 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
             } break;
             case "property-accessor": {
                 const subjectType = inferType(reportError, parents, scopes, ast.subject);
-                const subjectProperties = propertiesOf(reportError, parents, scopes, subjectType)
+                const subjectProperties = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
+                    ? propertiesOf(reportError, parents, scopes, subtract(parents, scopes, subjectType, NIL_TYPE))
+                    : propertiesOf(reportError, parents, scopes, subjectType)
 
                 if (subjectProperties == null) {
                     reportError(miscError(ast.subject, `Can only use dot operator (".") on objects with known properties`));

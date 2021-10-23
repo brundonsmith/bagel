@@ -206,17 +206,8 @@ export function parseOptional<T>(code: string, index: number, parseFn: ParseFunc
     }
 }
 
-export const parseKeyword = <K extends string>(keyword: K): ParseFunction<K> => (code, index) => {
-    const indexAfter = given(consume(code, index, keyword), index => consumeWhitespaceRequired(code, index))
-
-    if (indexAfter == null || isError(indexAfter)) {
-        return indexAfter
-    }
-
-    return {
-        parsed: keyword,
-        newIndex: indexAfter
-    }
+export const parseExact = <K extends string>(str: K): ParseFunction<K> => (code, index) => {
+    return given(consume(code, index, str), index => ({ parsed: str, newIndex: index }))
 }
 
 

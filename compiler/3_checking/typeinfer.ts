@@ -1,6 +1,6 @@
 import { getScopeFor, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
-import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, ObjectType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given } from "../utils.ts";
 import { displayForm, subsumes } from "./typecheck.ts";
 import { ClassMember, memberDeclaredType } from "../_model/declarations.ts";
@@ -32,9 +32,7 @@ export function inferType(
     }
 
     return resolve([parents, scopes],
-        handleSingletonUnion(
-            distillUnion(parents, scopes,
-                flattenUnions(refinedType))), preserveGenerics);
+        simplify(parents, scopes, refinedType), preserveGenerics);
 }
 
 function inferTypeInner(
@@ -171,7 +169,20 @@ function inferTypeInner(
             return inferType(reportError, parents, scopes, ast.inner, preserveGenerics);
         case "property-accessor": {
             const subjectType = inferType(reportError, parents, scopes, ast.subject, preserveGenerics);
-            const propertyType = propertiesOf(reportError, parents, scopes, subjectType)?.find(entry => entry.name.name === ast.property.name)?.type
+            const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
+                ? subtract(parents, scopes, subjectType, NIL_TYPE)
+                : subjectType;
+            const propertyType = propertiesOf(reportError, parents, scopes, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)?.type
+
+            if (ast.optional && propertyType) {
+                return {
+                    kind: "union-type",
+                    members: [propertyType, NIL_TYPE],
+                    code: undefined,
+                    startIndex: undefined,
+                    endIndex: undefined
+                }
+            }
 
             return propertyType ?? UNKNOWN_TYPE
         }
@@ -343,6 +354,12 @@ export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: Typ
     return type;
 }
 
+export function simplify(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression): TypeExpression {
+    return handleSingletonUnion(
+        distillUnion(parents, scopes,
+            flattenUnions(type)));
+}
+
 /**
  * Nested unions can be flattened
  */
@@ -402,12 +419,23 @@ function distillUnion(parents: ParentsMap, scopes: ScopesMap, type: TypeExpressi
     }
 }
 
-function subtract(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression, without: TypeExpression): TypeExpression {
+/**
+ * If union only has one member, putting it in a union-type is redundant
+ */
+ function handleSingletonUnion(type: TypeExpression): TypeExpression {
+    if (type.kind === "union-type" && type.members.length === 1) {
+        return type.members[0];
+    } else {
+        return type;
+    }
+}
+
+export function subtract(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression, without: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
-        return {
+        return simplify(parents, scopes, {
             ...type,
             members: type.members.filter(member => !subsumes(parents, scopes, without, member))
-        }
+        })
     } else { // TODO: There's probably more we can do here
         return type
     }
@@ -415,23 +443,12 @@ function subtract(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression, 
 
 function narrow(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression, fit: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
-        return {
+        return simplify(parents, scopes, {
             ...type,
             members: type.members.filter(member => subsumes(parents, scopes, fit, member))
-        }
+        })
     } else { // TODO: There's probably more we can do here
         return type
-    }
-}
-
-/**
- * If union only has one member, putting it in a union-type is redundant
- */
-function handleSingletonUnion(type: TypeExpression): TypeExpression {
-    if (type.kind === "union-type" && type.members.length === 1) {
-        return type.members[0];
-    } else {
-        return type;
     }
 }
 

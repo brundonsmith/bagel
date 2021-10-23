@@ -109,6 +109,7 @@ export type PropertyAccessor = SourceInfo & {
     readonly kind: "property-accessor",
     readonly subject: Expression,
     readonly property: PlainIdentifier,
+    readonly optional: boolean,
 }
 
 export type ParenthesizedExpression = SourceInfo & {
