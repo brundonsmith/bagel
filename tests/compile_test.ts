@@ -15,6 +15,17 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Func declaration with memo",
+  fn() {
+    testCompile(
+      `func memo uid() => '12345'`,
+      `const ___uid = ___computed(() => \`12345\`);
+            const uid = () => ___uid();`,
+    );
+  },
+});
+
+Deno.test({
   name: "Binary operator",
   fn() {
     testCompile(

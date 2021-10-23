@@ -429,100 +429,100 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (code, startIndex) =>
     given(parseOptional(code, startIndex, (code, index) =>
         given(parseExact("export")(code, index), ({ parsed: exported, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
-        given(consume(code, indexAfterExport ?? startIndex, "proc"), index =>
-        given(consumeWhitespaceRequired(code, index), index =>
-        given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
-        given(consumeWhitespace(code, index), index =>
-        expec(proc(code, index), err(code, index, 'Procedure'), ({ parsed: proc, newIndex: index }) => ({
-            parsed: {
-                kind: "proc-declaration",
-                name,
-                code,
-                startIndex,
-                endIndex: index,
-                value: proc,
-                exported: exported != null,
-            },
-            newIndex: index,
-        })))))))
+    given(consume(code, indexAfterExport ?? startIndex, "proc"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(proc(code, index), err(code, index, 'Procedure'), ({ parsed: proc, newIndex: index }) => ({
+        parsed: {
+            kind: "proc-declaration",
+            name,
+            code,
+            startIndex,
+            endIndex: index,
+            value: proc,
+            exported: exported != null,
+        },
+        newIndex: index,
+    })))))))
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = (code, startIndex) => 
     given(parseOptional(code, startIndex, (code, index) =>
         given(parseExact("export")(code, index), ({ parsed: exported, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
-        given(consume(code, indexAfterExport ?? startIndex, "func"), index =>
-        given(consumeWhitespaceRequired(code, index), index =>
-    given(parseOptional(code, startIndex, (code, index) =>
+    given(consume(code, indexAfterExport ?? startIndex, "func"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(parseOptional(code, index, (code, index) =>
         given(parseExact("memo")(code, index), ({ parsed: memo, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: memo, newIndex: index })))), ({ parsed: memo, newIndex: indexAfterMemo }) =>
-        given(plainIdentifier(code, indexAfterMemo ?? index), ({ parsed: name, newIndex: index }) =>
-        given(consumeWhitespace(code, index), index =>
-        expec(func(code, index), err(code, index, 'Function'), ({ parsed: func, newIndex: index }) => ({
-            parsed: {
-                kind: "func-declaration",
-                name,
-                memo: memo != null,
-                code,
-                startIndex,
-                endIndex: index,
-                value: func,
-                exported: exported != null,
-            },
-            newIndex: index,
-        }))))))))
+    given(plainIdentifier(code, indexAfterMemo ?? index), ({ parsed: name, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(func(code, index), err(code, index, 'Function'), ({ parsed: func, newIndex: index }) => ({
+        parsed: {
+            kind: "func-declaration",
+            name,
+            memo: memo != null,
+            code,
+            startIndex,
+            endIndex: index,
+            value: func,
+            exported: exported != null,
+        },
+        newIndex: index,
+    }))))))))
 
 const constDeclaration: ParseFunction<ConstDeclaration> = (code, startIndex) =>
     given(parseOptional(code, startIndex, (code, index) =>
         given(parseExact("export")(code, index), ({ parsed: exported, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
-        given(consume(code, indexAfterExport ?? startIndex, "const"), index =>
-        given(consumeWhitespaceRequired(code, index), index =>
-        given(plainIdentifier(code, index), ({ parsed: name, newIndex: index}) =>
-        given(consumeWhitespace(code, index), index =>
-        given(parseOptional(code, index, (code, index) =>
-            given(consume(code, index, ":"), index =>
-            given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: type, newIndex }) =>
-        given(consumeWhitespace(code, newIndex ?? index), index =>
-        expec(consume(code, index, "="), err(code, index, '"="'), index =>
-        given(consumeWhitespace(code, index), index =>
-        expec(expression(code, index), err(code, index, 'Expression'), ({ parsed: value, newIndex: index }) => ({
-                parsed: {
-                    kind: "const-declaration",
-                    code,
-                    startIndex,
-                    endIndex: index,
-                    name,
-                    type,
-                    value,
-                    exported: exported != null,
-                },
-                newIndex: index,
-        })))))))))))
+    given(consume(code, indexAfterExport ?? startIndex, "const"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index}) =>
+    given(consumeWhitespace(code, index), index =>
+    given(parseOptional(code, index, (code, index) =>
+        given(consume(code, index, ":"), index =>
+        given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: type, newIndex }) =>
+    given(consumeWhitespace(code, newIndex ?? index), index =>
+    expec(consume(code, index, "="), err(code, index, '"="'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(expression(code, index), err(code, index, 'Expression'), ({ parsed: value, newIndex: index }) => ({
+            parsed: {
+                kind: "const-declaration",
+                code,
+                startIndex,
+                endIndex: index,
+                name,
+                type,
+                value,
+                exported: exported != null,
+            },
+            newIndex: index,
+    })))))))))))
 
 const classDeclaration: ParseFunction<ClassDeclaration> = (code, startIndex) =>
     given(parseOptional(code, startIndex, (code, index) =>
         given(parseExact("export")(code, index), ({ parsed: exported, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
-        given(consume(code, indexAfterExport ?? startIndex, "class"), index =>
-        given(consumeWhitespaceRequired(code, index), index =>
-        expec(plainIdentifier(code, index), err(code, index, "Class name"), ({ parsed: name, newIndex: index }) =>
-        given(consumeWhitespace(code, index), index =>
-        expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
-        given(parseSeries(code, index, classMember), ({ parsed: members, newIndex: index }) =>
-        given(consumeWhitespace(code, index), index =>
-        expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
-            parsed: {
-                kind: "class-declaration",
-                code,
-                startIndex,
-                endIndex: index,
-                name,
-                typeParams: [],
-                members,
-                exported: exported != null
-            },
-            newIndex: index
-        }))))))))))
+    given(consume(code, indexAfterExport ?? startIndex, "class"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(plainIdentifier(code, index), err(code, index, "Class name"), ({ parsed: name, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
+    given(parseSeries(code, index, classMember), ({ parsed: members, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
+        parsed: {
+            kind: "class-declaration",
+            code,
+            startIndex,
+            endIndex: index,
+            name,
+            typeParams: [],
+            members,
+            exported: exported != null
+        },
+        newIndex: index
+    }))))))))))
 
 const classMember: ParseFunction<ClassMember> = (code, startIndex) =>
     classProperty(code, startIndex)
