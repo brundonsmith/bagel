@@ -45,12 +45,12 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, module: string, ast:
         ).join(", ")} } from "${pathIsRemote(ast.path.value) ? (path.relative(path.dirname(module), cachedModulePath(ast.path.value)).replaceAll(/\\/g, '/') + '.ts') : (ast.path.value + '.bgl.ts')}";`;
         case "type-declaration":  return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileOne(parents, scopes, module, ast.type)};`;
         case "proc-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(parents, scopes, module, ast.value) + ';';
-        case "func-declaration":  return compileFuncDeclaration(parents, scopes, module, ast, 'const')
+        case "func-declaration":  return compileFuncDeclaration(parents, scopes, module, ast)
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(parents, scopes, module, ast.name)}${ast.type ? `: ${compileOne(parents, scopes, module, ast.type)}` : ''} = ${compileOne(parents, scopes, module, ast.value)};`;
         case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(parents, scopes, module, ast.name)} {\n${ast.members.map(m => compileOne(parents, scopes, module, m)).join('\n')}\n}`;
         case "class-property": return  compileClassProperty(parents, scopes, module, ast)
         case "class-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${compileOne(parents, scopes, module, ast.value)}`
-        case "class-function": return  '    ' + compileFuncDeclaration(parents, scopes, module, ast, ast.access + ' readonly')
+        case "class-function": return  '    ' + compileFuncDeclaration(parents, scopes, module, ast)
         case "let-declaration": return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(parents, scopes, module, ast.value)}`;
         case "assignment": return `${compileOne(parents, scopes, module, ast.target)} = ${compileOne(parents, scopes, module, ast.value)}`;
         case "if-else-statement": return 'if ' + ast.cases
@@ -159,21 +159,29 @@ function compileProc(parents: ParentsMap, scopes: ScopesMap, module: string, pro
 }`;
 }
 
-const compileFuncDeclaration = (parents: ParentsMap, scopes: ScopesMap, module: string, decl: FuncDeclaration|ClassFunction, prefix: string): string => {
+const compileFuncDeclaration = (parents: ParentsMap, scopes: ScopesMap, module: string, decl: FuncDeclaration|ClassFunction): string => {
     const signature = compileFuncSignature(parents, scopes, module, decl.value)
     const body = compileFuncBody(parents, scopes, module, decl.value)
+    
+    const prefix = decl.kind === "func-declaration" 
+        ? (decl.exported ? `export ` : ``) + 'const' 
+        : (decl.access + ' readonly')
 
     if (decl.memo) {
+        const memoizerPrefix = decl.kind === "func-declaration" 
+            ? 'const' 
+            : 'private readonly'
+
         const memoizer = decl.value.type.args.length === 0 
-            ? `${prefix} ${INT}${decl.name.name} = ${INT}computed(() => ${body});\n`
-            : `${prefix} ${INT}${decl.name.name} = ${decl.value.type.args.map(arg => 
+            ? `${memoizerPrefix} ${INT}${decl.name.name} = ${INT}computed(() => ${body});\n`
+            : `${memoizerPrefix} ${INT}${decl.name.name} = ${decl.value.type.args.map(arg => 
                 `${INT}createTransformer((${compileOneArg(parents, scopes, module, arg)}) => `).join('')}\n` +
                 `${body}\n` +
                 new Array(decl.value.type.args.length).fill(')').join('') + ';\n';
                 
-        return memoizer + (decl.kind === "func-declaration" && decl.exported ? `export ` : ``) + `${prefix} ${decl.name.name} = ` + signature + ` => ${INT}${decl.name.name}${decl.value.type.args.map(a => `(${a.name.name})`).join('')};`;
+        return memoizer + `${prefix} ${decl.name.name} = ` + signature + ` => ${decl.kind === "class-function" ? 'this.' : ''}${INT}${decl.name.name}${decl.value.type.args.map(a => `(${a.name.name})`).join('') || '()'};`;
     } else {
-        return (decl.kind === "func-declaration" && decl.exported ? `export ` : ``) + `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
+        return `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
     }
 }
 
