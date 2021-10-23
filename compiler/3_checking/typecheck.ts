@@ -19,6 +19,11 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                     reportError(assignmentError(ast.value, ast.type, valueType));
                 }
             } break;
+            case "func-declaration": {
+                if (ast.value.type.args.length === 0) {
+                    reportError(miscError(ast, "Top-level function declarations aren't allowed to take zero arguments, because the result will always be the same. Consider making this a constant."))
+                }
+            } break;
             case "test-expr-declaration": {
                 const valueType = inferType(reportError, parents, scopes, ast.expr);
 
