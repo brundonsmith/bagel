@@ -18,6 +18,14 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 if (ast.type != null && !subsumes(parents, scopes,  ast.type, valueType)) {
                     reportError(assignmentError(ast.value, ast.type, valueType));
                 }
+
+                if (ast.value.kind === "func") {
+                    const maxPreviewLength = 8
+                    const fn = display(ast.value)
+                    const sample = fn.substr(0, maxPreviewLength)
+                    const truncated = fn.length > maxPreviewLength
+                    reportError(miscError(ast, `Top-level const functions should be actual func declarations: func ${ast.name.name}${sample}${truncated ? '...' : ''}`))
+                }
             } break;
             case "func-declaration": {
                 if (ast.value.type.args.length === 0) {
