@@ -43,6 +43,7 @@ export type ProcDeclaration = SourceInfo & {
 
 export type FuncDeclaration = SourceInfo & {
     readonly kind: "func-declaration",
+    readonly memo: boolean,
     readonly name: PlainIdentifier,
     readonly value: Func,
     readonly exported: boolean,
@@ -80,6 +81,7 @@ export type ClassProperty = SourceInfo & {
 
 export type ClassFunction = SourceInfo & {
     readonly kind: "class-function",
+    readonly memo: boolean,
     readonly name: PlainIdentifier,
     readonly value: Func,
     readonly access: 'private'|'public',

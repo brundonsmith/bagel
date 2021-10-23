@@ -2,7 +2,7 @@ import { Colors, debounce, path, fs } from "./deps.ts";
 
 import { canonicalModuleName, getParentsMap, pathIsRemote, scopescan } from "./3_checking/scopescan.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
-import { compile, HIDDEN_IDENTIFIER_PREFIX } from "./4_compile/index.ts";
+import { compile, INT } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { BagelError, prettyError } from "./errors.ts";
@@ -60,8 +60,8 @@ function bagelFileToJsBundleFile(module: string): string {
 }
 
 const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed','configure', //'h', 'render',
-'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan'
-].map(s => `${s} as ${HIDDEN_IDENTIFIER_PREFIX}${s}`).join(', ')
+'createTransformer', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan'
+].map(s => `${s} as ${INT}${s}`).join(', ')
 
 const LIB_IMPORTS = `
 import { ${IMPORTED_ITEMS} } from "../../lib/src/core.ts";

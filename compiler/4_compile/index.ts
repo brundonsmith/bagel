@@ -3,7 +3,7 @@ import { path } from "../deps.ts";
 import { cachedModulePath, given } from "../utils.ts";
 import { Module, AST } from "../_model/ast.ts";
 import { getScopeFor, ParentsMap, PlainIdentifier, ScopesMap } from "../_model/common.ts";
-import { ClassProperty, TestExprDeclaration, TestBlockDeclaration } from "../_model/declarations.ts";
+import { ClassProperty, TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ClassFunction } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
 import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
@@ -44,13 +44,13 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, module: string, ast:
             compileOne(parents, scopes, module, name) + (alias ? ` as ${compileOne(parents, scopes, module, alias)}` : ``)
         ).join(", ")} } from "${pathIsRemote(ast.path.value) ? (path.relative(path.dirname(module), cachedModulePath(ast.path.value)).replaceAll(/\\/g, '/') + '.ts') : (ast.path.value + '.bgl.ts')}";`;
         case "type-declaration":  return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileOne(parents, scopes, module, ast.type)};`;
-        case "proc-declaration":
-        case "func-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(parents, scopes, module, ast.value) + ';';
+        case "proc-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(parents, scopes, module, ast.value) + ';';
+        case "func-declaration":  return compileFuncDeclaration(parents, scopes, module, ast, 'const')
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(parents, scopes, module, ast.name)}${ast.type ? `: ${compileOne(parents, scopes, module, ast.type)}` : ''} = ${compileOne(parents, scopes, module, ast.value)};`;
         case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(parents, scopes, module, ast.name)} {\n${ast.members.map(m => compileOne(parents, scopes, module, m)).join('\n')}\n}`;
         case "class-property": return  compileClassProperty(parents, scopes, module, ast)
-        case "class-function":
         case "class-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${compileOne(parents, scopes, module, ast.value)}`
+        case "class-function": return  '    ' + compileFuncDeclaration(parents, scopes, module, ast, ast.access + ' readonly')
         case "let-declaration": return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(parents, scopes, module, ast.value)}`;
         case "assignment": return `${compileOne(parents, scopes, module, ast.target)} = ${compileOne(parents, scopes, module, ast.value)}`;
         case "if-else-statement": return 'if ' + ast.cases
@@ -75,7 +75,7 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, module: string, ast:
                 + ` ? ${compileOne(parents, scopes, module, outcome)} : `)
             .join('\n')
         + (ast.defaultCase ? compileOne(parents, scopes, module, ast.defaultCase) : NIL) + ')'
-        case "range": return `${HIDDEN_IDENTIFIER_PREFIX}range(${ast.start})(${ast.end})`;
+        case "range": return `${INT}range(${ast.start})(${ast.end})`;
         case "parenthesized-expression": return `(${compileOne(parents, scopes, module, ast.inner)})`;
         case "debug": return compileOne(parents, scopes, module, ast.inner);
         case "property-accessor": return `${compileOne(parents, scopes, module, ast.subject)}.${compileOne(parents, scopes, module, ast.property)}`;
@@ -92,14 +92,14 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, module: string, ast:
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
-        case "reaction": return `${HIDDEN_IDENTIFIER_PREFIX}reactionUntil(
+        case "reaction": return `${INT}reactionUntil(
 ${compileOne(parents, scopes, module, ast.data)},
 ${compileOne(parents, scopes, module, ast.effect)},
 ${given(ast.until, until => compileOne(parents, scopes, module, until))})`;
-        case "computation": return `const ${ast.name.name} = ${HIDDEN_IDENTIFIER_PREFIX}computed(() => ${compileOne(parents, scopes, module, ast.expression)})`;
+        case "computation": return `const ${ast.name.name} = ${INT}computed(() => ${compileOne(parents, scopes, module, ast.expression)})`;
         case "indexer": return `${compileOne(parents, scopes, module, ast.subject)}[${compileOne(parents, scopes, module, ast.indexer)}]`;
         case "block": return `{ ${ast.statements.map(s => compileOne(parents, scopes, module, s)).join("; ")}; }`;
-        case "element-tag": return `${HIDDEN_IDENTIFIER_PREFIX}h('${ast.tagName.name}',{${
+        case "element-tag": return `${INT}h('${ast.tagName.name}',{${
             objectEntries(parents, scopes, module, (ast.attributes as [PlainIdentifier, Expression|Expression[]][]))}}, ${ast.children.map(c => compileOne(parents, scopes, module, c)).join(', ')})`;
         case "class-construction": return `new ${ast.clazz.name}()`;
         case "union-type": return ast.members.map(m => compileOne(parents, scopes, module, m)).join(" | ");
@@ -118,8 +118,8 @@ ${given(ast.until, until => compileOne(parents, scopes, module, until))})`;
         case "indexer-type": return `{[key: ${compileOne(parents, scopes, module, ast.keyType)}]: ${compileOne(parents, scopes, module, ast.valueType)}}`;
         case "array-type": return `${compileOne(parents, scopes, module, ast.element)}[]`;
         case "tuple-type": return `[${ast.members.map(m => compileOne(parents, scopes, module, m)).join(", ")}]`;
-        case "iterator-type": return `${HIDDEN_IDENTIFIER_PREFIX}Iter<${compileOne(parents, scopes, module, ast.itemType)}>`;
-        case "plan-type": return `${HIDDEN_IDENTIFIER_PREFIX}Plan<${compileOne(parents, scopes, module, ast.resultType)}>`;
+        case "iterator-type": return `${INT}Iter<${compileOne(parents, scopes, module, ast.itemType)}>`;
+        case "plan-type": return `${INT}Plan<${compileOne(parents, scopes, module, ast.resultType)}>`;
         case "literal-type": return `${compileOne(parents, scopes, module, ast.value)}`;
         case "string-type": return `string`;
         case "number-type": return `number`;
@@ -140,11 +140,10 @@ function objectEntries(parents: ParentsMap, scopes: ScopesMap, module: string, e
 }
 
 // TODO: Forbid this in user-defined identifers
-export const HIDDEN_IDENTIFIER_PREFIX = `___`;
+export const INT = `___`;
 
 const NIL = `undefined`;
-const LOCALS_OBJ = HIDDEN_IDENTIFIER_PREFIX + "locals";
-// const SENTINEL_OBJ = HIDDEN_IDENTIFIER_PREFIX + "sentinel";
+const LOCALS_OBJ = INT + "locals";
 
 function compileProc(parents: ParentsMap, scopes: ScopesMap, module: string, proc: Proc): string {
     const mutableLocals = Object.entries(getScopeFor(parents, scopes, proc.body).values)
@@ -153,26 +152,53 @@ function compileProc(parents: ParentsMap, scopes: ScopesMap, module: string, pro
     return (proc.type.typeParams.length > 0 ? `<${proc.type.typeParams.map(p => p.name).join(',')}>` : '')
         + `(${compileArgs(parents, scopes, module, proc.type.args)}): void => {
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
-`    const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileOne(parents, scopes, module, e[1].declaredType ?? UNKNOWN_TYPE)}`).join(",")}} = ${HIDDEN_IDENTIFIER_PREFIX}observable({});
+`    const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileOne(parents, scopes, module, e[1].declaredType ?? UNKNOWN_TYPE)}`).join(",")}} = ${INT}observable({});
     
 `
     : ``}${proc.body.statements.map(s => compileOne(parents, scopes, module, s) + ';').join("\n")}
 }`;
 }
-// TODO: dispose of reactions somehow... at some point...
+
+const compileFuncDeclaration = (parents: ParentsMap, scopes: ScopesMap, module: string, decl: FuncDeclaration|ClassFunction, prefix: string): string => {
+    const signature = compileFuncSignature(parents, scopes, module, decl.value)
+    const body = compileFuncBody(parents, scopes, module, decl.value)
+
+    if (decl.memo) {
+        const memoizer = decl.value.type.args.length === 0 
+            ? `${prefix} ${INT}${decl.name.name} = ${INT}computed(() => ${body});\n`
+            : `${prefix} ${INT}${decl.name.name} = ${decl.value.type.args.map(arg => 
+                `${INT}createTransformer((${compileOneArg(parents, scopes, module, arg)}) => `).join('')}\n` +
+                `${body}\n` +
+                new Array(decl.value.type.args.length).fill(')').join('') + ';\n';
+                
+        return memoizer + (decl.kind === "func-declaration" && decl.exported ? `export ` : ``) + `${prefix} ${decl.name.name} = ` + signature + ` => ${INT}${decl.name.name}${decl.value.type.args.map(a => `(${a.name.name})`).join('')};`;
+    } else {
+        return (decl.kind === "func-declaration" && decl.exported ? `export ` : ``) + `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
+    }
+}
 
 const compileFunc = (parents: ParentsMap, scopes: ScopesMap, module: string, func: Func): string => {
-    const signature = (func.type.typeParams.length > 0 ? `<${func.type.typeParams.map(p => p.name).join(',')}>` : '')
-        + `(${compileArgs(parents, scopes, module, func.type.args)})${func.type.returnType != null ? `: ${compileOne(parents, scopes, module, func.type.returnType)}` : ''} => `;
-    const body = compileOne(parents, scopes, module, func.body);
+    const signature = compileFuncSignature(parents, scopes, module, func)
+    const body = compileFuncBody(parents, scopes, module, func)
 
-    if (func.consts.length > 0) {
-        const consts = func.consts.map(c => `    const ${c.name.name}${c.type ? ': ' + compileOne(parents, scopes, module, c.type) : ""} = ${compileOne(parents, scopes, module, c.value)};\n`).join('')
+    return signature + ' => ' + body
+}
 
-        return `${signature} {\n${consts}\n    return ${body};\n}`
-    } else {
-        return signature + body
-    }
+const compileFuncSignature = (parents: ParentsMap, scopes: ScopesMap, module: string, func: Func): string => {
+    return (func.type.typeParams.length > 0 ? `<${func.type.typeParams.map(p => p.name).join(',')}>` : '')
+        + `(${compileArgs(parents, scopes, module, func.type.args)})${func.type.returnType != null ? `: ${compileOne(parents, scopes, module, func.type.returnType)}` : ''}`;
+}
+
+const compileFuncBody = (parents: ParentsMap, scopes: ScopesMap, module: string, func: Func): string => {
+    const bodyExpr = compileOne(parents, scopes, module, func.body);
+
+    return func.consts.length === 0
+        ? bodyExpr
+        : ' {\n' + 
+            func.consts
+                .map(c => `    const ${c.name.name}${c.type ? ': ' + compileOne(parents, scopes, module, c.type) : ""} = ${compileOne(parents, scopes, module, c.value)};\n`)
+                .join('') +
+            `\n    return ${bodyExpr};\n}`
 }
 
 function compileClassProperty(parents: ParentsMap, scopes: ScopesMap, module: string, ast: ClassProperty): string {
@@ -192,5 +218,9 @@ function compileClassProperty(parents: ParentsMap, scopes: ScopesMap, module: st
 }
 
 function compileArgs(parents: ParentsMap, scopes: ScopesMap, module: string, args: readonly { readonly name: PlainIdentifier, readonly type?: TypeExpression}[]): string {
-    return args.map(arg => arg.name.name + (arg.type ? `: ${compileOne(parents, scopes, module, arg.type)}` : '')).join(', ')
+    return args.map(arg => compileOneArg(parents, scopes, module, arg)).join(', ')
+}
+
+function compileOneArg(parents: ParentsMap, scopes: ScopesMap, module: string, arg: { readonly name: PlainIdentifier, readonly type?: TypeExpression}): string {
+    return arg.name.name + (arg.type ? `: ${compileOne(parents, scopes, module, arg.type)}` : '')
 }

@@ -206,6 +206,20 @@ export function parseOptional<T>(code: string, index: number, parseFn: ParseFunc
     }
 }
 
+export const parseKeyword = <K extends string>(keyword: K): ParseFunction<K> => (code, index) => {
+    const indexAfter = given(consume(code, index, keyword), index => consumeWhitespaceRequired(code, index))
+
+    if (indexAfter == null || isError(indexAfter)) {
+        return indexAfter
+    }
+
+    return {
+        parsed: keyword,
+        newIndex: indexAfter
+    }
+}
+
+
 export function given<T, R>(val: T|BagelError|undefined, fn: (val: T) => R): R|BagelError|undefined {
     if (val != null && !(isError(val))) {
         return fn(val);
