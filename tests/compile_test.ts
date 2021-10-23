@@ -399,27 +399,27 @@ Deno.test({
 });
 
 const module = "module";
-function testCompile(bgl: string, exp: string) {
-  let error: string | undefined;
-
-  function printError(error: BagelError) {
-    console.log(prettyError('<test>', error))
+function testCompile(code: string, exp: string) {
+  const errors: BagelError[] = [];
+  function reportError(err: BagelError) {
+    errors.push(err);
   }
 
-  const ast = reshape(parse(bgl, printError));
+  const ast = reshape(parse(code, reportError));
   // console.log(JSON.stringify(withoutSourceInfo(ast), null, 2))
   const parents = getParentsMap(ast)
-  const scopes = scopescan(printError, parents, () => undefined, ast, module);
+  const scopes = scopescan(reportError, parents, () => undefined, ast, module);
 
   const compiled = compile(parents, scopes, ast, '<test>');
 
-  if (error) {
-    throw error
+  if (errors.length > 0) {
+    throw `\n${code}\nFailed to parse:\n` +
+      errors.map(err => prettyError("<test>", err)).join("\n")
   }
 
   if (normalize(compiled) !== normalize(exp)) {
     throw `Compiler output did not match expected:
-    bagel:    ${bgl}
+    bagel:    ${code}
     expected: ${exp}
     received: ${compiled}`;
   }
