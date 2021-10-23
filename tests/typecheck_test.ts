@@ -77,7 +77,7 @@ Deno.test({
   name: "Basic function return",
   fn() {
     testTypecheck(
-      `func fn(): string => 'foo'`,
+      `func fn(_: string): string => 'foo'`,
       false,
     );
   },
@@ -97,7 +97,7 @@ Deno.test({
   name: "Basic function return inference",
   fn() {
     testTypecheck(
-      `func fn() => 'foo'\nconst y: string = fn()`,
+      `func fn(_: string) => 'foo'\nconst y: string = fn('z')`,
       false,
     );
   },
@@ -107,7 +107,7 @@ Deno.test({
   name: "Basic function return inference mismatch",
   fn() {
     testTypecheck(
-      `func fn() => 'foo'\nconst y: number = fn()`,
+      `func fn(_: string) => 'foo'\nconst y: number = fn('z')`,
       true,
     );
   },
@@ -275,7 +275,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      func foo() =>
+      func foo(_: number) =>
         const a = b + 2,
         const b = 12,
         2 * a`,
@@ -289,7 +289,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      func foo() =>
+      func foo(_: number) =>
         const b = 12,
         const a = b + 2,
         2 * a`,
