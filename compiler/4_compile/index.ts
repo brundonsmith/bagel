@@ -5,7 +5,7 @@ import { Module, AST } from "../_model/ast.ts";
 import { getScopeFor, ParentsMap, PlainIdentifier, ScopesMap } from "../_model/common.ts";
 import { ClassProperty, TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ClassFunction } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
-import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { Arg, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
 export function compile(parents: ParentsMap, scopes: ScopesMap, module: Module, modulePath: string, includeTests?: boolean): string {
@@ -225,10 +225,10 @@ function compileClassProperty(parents: ParentsMap, scopes: ScopesMap, module: st
     }
 }
 
-function compileArgs(parents: ParentsMap, scopes: ScopesMap, module: string, args: readonly { readonly name: PlainIdentifier, readonly type?: TypeExpression}[]): string {
+function compileArgs(parents: ParentsMap, scopes: ScopesMap, module: string, args: readonly Arg[]): string {
     return args.map(arg => compileOneArg(parents, scopes, module, arg)).join(', ')
 }
 
-function compileOneArg(parents: ParentsMap, scopes: ScopesMap, module: string, arg: { readonly name: PlainIdentifier, readonly type?: TypeExpression}): string {
+function compileOneArg(parents: ParentsMap, scopes: ScopesMap, module: string, arg: Arg): string {
     return arg.name.name + (arg.type ? `: ${compileOne(parents, scopes, module, arg.type)}` : '')
 }

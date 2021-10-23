@@ -39,15 +39,17 @@ export type NamedType = SourceInfo & {
 export type ProcType = SourceInfo & {
     readonly kind: "proc-type",
     readonly typeParams: readonly PlainIdentifier[],
-    readonly args: readonly { readonly name: PlainIdentifier, readonly type?: TypeExpression}[],
+    readonly args: readonly Arg[],
 }
 
 export type FuncType = SourceInfo & {
     readonly kind: "func-type",
     readonly typeParams: PlainIdentifier[],
-    readonly args: readonly { readonly name: PlainIdentifier, readonly type?: TypeExpression}[],
+    readonly args: readonly Arg[],
     readonly returnType?: TypeExpression,
 }
+
+export type Arg = { readonly name: PlainIdentifier, readonly type?: TypeExpression }
 
 export type ElementType = SourceInfo & {
     readonly kind: "element-type",

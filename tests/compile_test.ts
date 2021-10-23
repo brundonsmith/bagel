@@ -15,6 +15,16 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Abbreviated func",
+  fn() {
+    testCompile(
+      `const fn = a => '12345'`,
+      `const fn = (a) => \`12345\`;`,
+    );
+  },
+});
+
+Deno.test({
   name: "Func declaration with memo",
   fn() {
     testCompile(

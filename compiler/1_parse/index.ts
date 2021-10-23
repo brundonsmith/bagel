@@ -6,7 +6,7 @@ import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
-import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 
@@ -639,9 +639,7 @@ const testBlockDeclaration: ParseFunction<TestBlockDeclaration> = (code, startIn
     }))))))))
 
 const proc: ParseFunction<Proc> = (code, startIndex) =>
-    given(consume(code, startIndex, "("), index =>
-    given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
-    given(consume(code, index, ")"), index =>
+    given(_args(code, startIndex), ({ parsed: args, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseBlock(code, index), ({ parsed: body, newIndex: index }) => ({
         parsed: {
@@ -649,7 +647,7 @@ const proc: ParseFunction<Proc> = (code, startIndex) =>
             type: {
                 kind: "proc-type",
                 typeParams: [], // TODO
-                args: args,
+                args,
                 code,
                 startIndex,
                 endIndex: index
@@ -660,7 +658,7 @@ const proc: ParseFunction<Proc> = (code, startIndex) =>
             endIndex: index
         },
         newIndex: index,
-    }))))))
+    }))))
 
 const statement: ParseFunction<Statement> = (code, startIndex) =>
     reaction(code, startIndex)
@@ -903,9 +901,7 @@ const func: ParseFunction<Func> = (code, startIndex) =>
         expec(parseSeries(code, index, plainIdentifier, ','), err(code, index, "Type parameters"), ({ parsed: typeParams, newIndex: index }) =>
         given(consumeWhitespace(code, index), index => 
         given(consume(code, index, ">"), index => ({ parsed: typeParams, newIndex: index }))))))), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
-    given(consume(code, indexAfterTypeParams ?? startIndex, "("), index =>
-    given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
-    given(consume(code, index, ")"), index =>
+    given(_args(code, indexAfterTypeParams ?? startIndex), ({ parsed: args, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseOptional(code, index, (code, index) =>
         given(consume(code, index, ":"), index =>
@@ -934,9 +930,28 @@ const func: ParseFunction<Func> = (code, startIndex) =>
             endIndex: index
         },
         newIndex: index,
-    })))))))))))))
+    })))))))))))
 
-const _argumentDeclaration = (code: string, index: number): ParseResult<{ name: PlainIdentifier, type?: TypeExpression }> | BagelError | undefined => 
+const _args: ParseFunction<Arg[]> = (code, index) =>
+    _singleArgument(code, index) ?? _seriesOfArguments(code, index)
+
+const _singleArgument: ParseFunction<Arg[]> = (code, index) =>
+    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) => ({
+        parsed: [
+            { name }
+        ],
+        newIndex: index
+    }))
+
+const _seriesOfArguments: ParseFunction<Arg[]> = (code, index) =>
+    given(consume(code, index, "("), index =>
+    given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
+    given(consume(code, index, ")"), index => ({
+        parsed: args,
+        newIndex: index
+    }))))
+
+const _argumentDeclaration = (code: string, index: number): ParseResult<Arg> | BagelError | undefined => 
     given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index => 
     given(parseOptional(code, index, (code, index) =>
