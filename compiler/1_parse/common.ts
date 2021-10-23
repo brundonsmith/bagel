@@ -1,10 +1,11 @@
 import { withoutSourceInfo } from "../debugging.ts";
 import { BagelError, isError } from "../errors.ts";
+import { memoize2, memoize3 } from "../utils.ts";
 import { AST } from "../_model/ast.ts";
 import { KEYWORDS, PlainIdentifier } from "../_model/common.ts";
 import { Expression } from "../_model/expressions.ts";
 
-export function consume(code: string, index: number, segment: string): number|undefined {
+export const consume = memoize3((code: string, index: number, segment: string): number|undefined => {
     for (let i = 0; i < segment.length; i++) {
         if (code[index + i] !== segment[i]) {
             return undefined;
@@ -12,9 +13,9 @@ export function consume(code: string, index: number, segment: string): number|un
     }
 
     return index + segment.length;
-}
+})
 
-export function consumeWhitespace(code: string, index: number): number {
+export const consumeWhitespace = memoize2((code: string, index: number): number => {
     let currentIndex = index;
     let inComment: 'no'|'line'|'block' = 'no';
 
@@ -47,7 +48,7 @@ export function consumeWhitespace(code: string, index: number): number {
     }
 
     return currentIndex;
-}
+})
 
 export function consumeWhitespaceRequired(code: string, index: number): number|undefined {
     const newIndex = consumeWhitespace(code, index);
@@ -235,47 +236,7 @@ export function err(code: string|undefined, index: number|undefined, expected: s
 
 export type ParseFunction<T> = (code: string, index: number) => ParseResult<T> | BagelError | undefined;
 
-
-export class ParseMemo {
-    private memo = new Map<string, Map<ParseFunction<Expression>, Map<number, ParseResult<Expression>>>>();
-
-    memoize(fn: ParseFunction<Expression>, code: string, index: number, result: ParseResult<Expression>|BagelError|undefined) {
-        if (result != null && !isError(result)) {
-            if (!this.memo.has(code)) {
-                this.memo.set(code, new Map());
-            }
-            if (!this.memo.get(code)?.has(fn)) {
-                this.memo.get(code)?.set(fn, new Map());
-            }
-            
-            this.memo.get(code)?.get(fn)?.set(index, result);
-        }
-    }
-
-    get(fn: ParseFunction<Expression>, code: string, index: number) {
-        return this.memo.get(code)?.get(fn)?.get(index);
-    }
-
-    delete(code: string) {
-        this.memo.delete(code);
-    }
-
-    cachedOrParse<T extends Expression>(fn: ParseFunction<T>): ParseFunction<T> {
-        return (code: string, index: number): ParseResult<T>|BagelError|undefined => {
-            const cached = this.get(fn, code, index);
-
-            if (cached != null) {
-                return cached as ParseResult<T>;
-            } else {
-                const result = fn(code, index);
-                this.memoize(fn, code, index, result);
-                return result;
-            }
-        }
-    }
-}
-
-export const plainIdentifier: ParseFunction<PlainIdentifier> = (code, startIndex) => 
+export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize2((code, startIndex) => 
     given(identifierSegment(code, startIndex), ({ segment: name, newIndex: index }) => ({
         parsed: {
             kind: "plain-identifier",
@@ -285,9 +246,9 @@ export const plainIdentifier: ParseFunction<PlainIdentifier> = (code, startIndex
             name,
         },
         newIndex: index,
-    }))
+    })))
 
-export function identifierSegment(code: string, index: number): { segment: string, newIndex: number} | undefined {
+export const identifierSegment = memoize2((code: string, index: number): { segment: string, newIndex: number} | undefined => {
     const startIndex = index;
 
     while (isSymbolic(code[index], index - startIndex)) {
@@ -305,4 +266,4 @@ export function identifierSegment(code: string, index: number): { segment: strin
     if (index - startIndex > 0) {
         return { segment, newIndex: index };
     }
-}
+})

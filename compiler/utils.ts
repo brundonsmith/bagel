@@ -367,31 +367,112 @@ export async function all<T>(iter: AsyncIterable<T>): Promise<T[]> {
 }
 
 export function memoize<A, R>(fn: (arg: A) => R): (arg: A) => R {
+    if ((fn as any).memoized) {
+        return fn
+    }
+
     const results = new Map<A, R>()
-    return (arg: A): R => {
+
+    const mFn =  (arg: A): R => {
         if (!results.has(arg)) {
             results.set(arg, fn(arg))
         }
 
         return results.get(arg) as R
     }
+
+    mFn.memoized = true
+
+    return mFn
 }
 
 export function memoize2<A1, A2, R>(fn: (arg1: A1, arg2: A2) => R): (arg1: A1, arg2: A2) => R {
-    const results = new Map<A1, Map<A2, R>>()
-    return (arg1: A1, arg2: A2): R => {
-        if (!results.has(arg1)) {
-            const arg1Map = new Map()
-            results.set(arg1, arg1Map)
-        }
-        if (!results.get(arg1)?.has(arg2)) {
-            results.get(arg1)?.set(arg2, fn(arg1, arg2))
+    if ((fn as any).memoized) {
+        return fn
+    }
+
+    const resultsMap = memoize((_1: A1) => new Map<A2, R>())
+
+    const mFn = (arg1: A1, arg2: A2): R => {
+        const results = resultsMap(arg1)
+
+        if (!results.has(arg2)) {
+            results.set(arg2, fn(arg1, arg2))
         }
 
-        return results.get(arg1)?.get(arg2) as R
+        return results.get(arg2) as R
     }
+
+    mFn.memoized = true
+
+    return mFn
 }
 
+export function memoize3<A1, A2, A3, R>(fn: (arg1: A1, arg2: A2, arg3: A3) => R): (arg1: A1, arg2: A2, arg3: A3) => R {
+    if ((fn as any).memoized) {
+        return fn
+    }
+
+    const resultsMap = memoize2((_1: A1, _2: A2) => new Map<A3, R>())
+
+    const mFn = (arg1: A1, arg2: A2, arg3: A3): R => {
+        const results = resultsMap(arg1, arg2)
+
+        if (!results.has(arg3)) {
+            results.set(arg3, fn(arg1, arg2, arg3))
+        }
+
+        return results.get(arg3) as R
+    }
+
+    mFn.memoized = true
+
+    return mFn
+}
+
+export function memoize4<A1, A2, A3, A4, R>(fn: (arg1: A1, arg2: A2, arg3: A3, arg4: A4) => R): (arg1: A1, arg2: A2, arg3: A3, arg4: A4) => R {
+    if ((fn as any).memoized) {
+        return fn
+    }
+
+    const resultsMap = memoize3((_1: A1, _2: A2, _3: A3) => new Map<A4, R>())
+
+    const mFn = (arg1: A1, arg2: A2, arg3: A3, arg4: A4): R => {
+        const results = resultsMap(arg1, arg2, arg3)
+
+        if (!results.has(arg4)) {
+            results.set(arg4, fn(arg1, arg2, arg3, arg4))
+        }
+        
+        return results.get(arg4) as R
+    }
+
+    mFn.memoized = true
+
+    return mFn
+}
+
+export function memoize5<A1, A2, A3, A4, A5, R>(fn: (arg1: A1, arg2: A2, arg3: A3, arg4: A4, arg5: A5) => R): (arg1: A1, arg2: A2, arg3: A3, arg4: A4, arg5: A5) => R {
+    if ((fn as any).memoized) {
+        return fn
+    }
+
+    const resultsMap = memoize4((_1: A1, _2: A2, _3: A3, _4: A4) => new Map<A5, R>())
+
+    const mFn = (arg1: A1, arg2: A2, arg3: A3, arg4: A4, arg5: A5): R => {
+        const results = resultsMap(arg1, arg2, arg3, arg4)
+
+        if (!results.has(arg5)) {
+            results.set(arg5, fn(arg1, arg2, arg3, arg4, arg5))
+        }
+
+        return results.get(arg5) as R
+    }
+
+    mFn.memoized = true
+
+    return mFn
+}
 
 export const cacheDir = () => {
     const tempDir = os.tempDir()

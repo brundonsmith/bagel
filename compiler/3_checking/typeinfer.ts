@@ -1,7 +1,7 @@
 import { getScopeFor, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
 import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, given } from "../utils.ts";
+import { deepEquals, given, memoize5 } from "../utils.ts";
 import { displayForm, subsumes } from "./typecheck.ts";
 import { ClassMember, memberDeclaredType } from "../_model/declarations.ts";
 import { BagelError, miscError } from "../errors.ts";
@@ -35,13 +35,13 @@ export function inferType(
         simplify(parents, scopes, refinedType), preserveGenerics);
 }
 
-function inferTypeInner(
+const inferTypeInner = memoize5((
     reportError: (error: BagelError) => void, 
     parents: ParentsMap,
     scopes: ScopesMap,
     ast: Expression|ClassMember,
     preserveGenerics: boolean,
-): TypeExpression {
+): TypeExpression => {
     const scope = getScopeFor(parents, scopes, ast)
 
     switch(ast.kind) {
@@ -262,7 +262,7 @@ function inferTypeInner(
         case "nil-literal": return NIL_TYPE;
         case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
     }
-}
+})
 
 export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
     if (type.kind === "named-type") {
