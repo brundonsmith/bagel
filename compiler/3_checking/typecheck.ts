@@ -14,9 +14,9 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
 
         switch(ast.kind) {
             case "const-declaration": {
-                const valueType = inferType(reportError, parents, scopes, ast.value);
+                const valueType = inferType(reportError, parents, scopes, ast.value, true);
 
-                if (ast.type != null && !subsumes(parents, scopes,  ast.type, valueType)) {
+                if (ast.type != null && !subsumes(parents, scopes,  ast.type, valueType, true)) {
                     reportError(assignmentError(ast.value, ast.type, valueType));
                 }
 
@@ -34,23 +34,23 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 }
             } break;
             case "test-expr-declaration": {
-                const valueType = inferType(reportError, parents, scopes, ast.expr);
+                const valueType = inferType(reportError, parents, scopes, ast.expr, true);
 
-                if (!subsumes(parents, scopes,  BOOLEAN_TYPE, valueType)) {
+                if (!subsumes(parents, scopes,  BOOLEAN_TYPE, valueType, true)) {
                     reportError(assignmentError(ast.expr, BOOLEAN_TYPE, valueType));
                 }
             } break;
             case "func": {
-                const bodyType = inferType(reportError, parents, scopes, ast.body);
+                const bodyType = inferType(reportError, parents, scopes, ast.body, true);
 
                 for (const c of ast.consts) {
-                    const valueType = inferType(reportError, parents, scopes, c.value)
-                    if (c.type && !subsumes(parents, scopes,  c.type, valueType)) {
+                    const valueType = inferType(reportError, parents, scopes, c.value, true)
+                    if (c.type && !subsumes(parents, scopes,  c.type, valueType, true)) {
                         reportError(assignmentError(c.value, c.type, valueType));
                     }
                 }
 
-                if (ast.type.returnType != null && !subsumes(parents, scopes,  ast.type.returnType, bodyType)) {
+                if (ast.type.returnType != null && !subsumes(parents, scopes,  ast.type.returnType, bodyType, true)) {
                     reportError(assignmentError(ast.body, ast.type.returnType, bodyType));
                 }
             } break;
@@ -59,8 +59,8 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
             } break;
             case "pipe":
             case "invocation": {
-                let subjectType = inferType(reportError, parents, scopes, ast.subject, true);
-                subjectType = resolve(scope, subjectType, false); // resolve generics in invocation scope
+                const scope = getScopeFor(parents, scopes, ast)
+                const subjectType = resolve(scope, inferType(reportError, parents, scopes, ast.subject), true);
 
                 if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {
                     reportError(miscError(ast.subject, "Expression must be a function or procedure to be called"));
@@ -72,9 +72,9 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                         const arg = ast.args[i]
                         const subjectArgType = subjectType.args[i].type ?? UNKNOWN_TYPE
 
-                        const argValueType = inferType(reportError, parents, scopes, arg)
+                        const argValueType = inferType(reportError, parents, scopes, arg, true)
 
-                        if (!subsumes(parents, scopes,  subjectArgType, argValueType)) {
+                        if (!subsumes(parents, scopes,  subjectArgType, argValueType, true)) {
                             reportError(assignmentError(arg, subjectArgType, argValueType));
                         }
                     }
@@ -83,18 +83,18 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
             case "if-else-expression":
             case "if-else-statement":
             case "switch-expression": {
-                const valueType = ast.kind === "if-else-expression" || ast.kind === "if-else-statement" ? BOOLEAN_TYPE : inferType(reportError, parents, scopes, ast.value);
+                const valueType = ast.kind === "if-else-expression" || ast.kind === "if-else-statement" ? BOOLEAN_TYPE : inferType(reportError, parents, scopes, ast.value, true);
 
                 for (const { condition } of ast.cases) {
-                    const conditionType = inferType(reportError, parents, scopes, condition);
-                    if (!subsumes(parents, scopes,  valueType, conditionType)) {
+                    const conditionType = inferType(reportError, parents, scopes, condition, true);
+                    if (!subsumes(parents, scopes,  valueType, conditionType, true)) {
                         reportError(assignmentError(condition, valueType, conditionType));
                     }
                 }
             } break;
             case "indexer": {
-                const baseType = inferType(reportError, parents, scopes, ast.subject);
-                const indexerType = inferType(reportError, parents, scopes, ast.indexer);
+                const baseType = inferType(reportError, parents, scopes, ast.subject, true);
+                const indexerType = inferType(reportError, parents, scopes, ast.indexer, true);
                 
                 if (baseType.kind === "object-type" && indexerType.kind === "literal-type") {
                     const key = indexerType.value.value;
@@ -103,7 +103,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                         reportError(miscError(ast.indexer, `Property '${key}' doesn't exist on type '${displayForm(baseType)}'`));
                     }
                 } else if (baseType.kind === "indexer-type") {
-                    if (!subsumes(parents, scopes,  baseType.keyType, indexerType)) {
+                    if (!subsumes(parents, scopes,  baseType.keyType, indexerType, true)) {
                         reportError(assignmentError(ast.indexer, baseType.keyType, indexerType));
                     }
                 } else {
@@ -111,7 +111,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 }
             } break;
             case "property-accessor": {
-                const subjectType = inferType(reportError, parents, scopes, ast.subject);
+                const subjectType = inferType(reportError, parents, scopes, ast.subject, true);
                 const subjectProperties = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
                     ? propertiesOf(reportError, parents, scopes, subtract(parents, scopes, subjectType, NIL_TYPE))
                     : propertiesOf(reportError, parents, scopes, subjectType)
@@ -135,9 +135,9 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
             case "string-literal": {
                 for (const segment of ast.segments) {
                     if (typeof segment !== "string") {
-                        const segmentType = inferType(reportError, parents, scopes, segment);
+                        const segmentType = inferType(reportError, parents, scopes, segment, true);
 
-                        if (!subsumes(parents, scopes,  STRING_TEMPLATE_INSERT_TYPE, segmentType)) {
+                        if (!subsumes(parents, scopes,  STRING_TEMPLATE_INSERT_TYPE, segmentType, true)) {
                             reportError(assignmentError(segment, STRING_TEMPLATE_INSERT_TYPE, segmentType));
                         }
                     }
@@ -146,14 +146,14 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
 
             // not expressions, but should have their contents checked
             case "reaction": {
-                const dataType = inferType(reportError, parents, scopes, ast.data);
+                const dataType = inferType(reportError, parents, scopes, ast.data, true);
                 if (dataType.kind !== "func-type") {
                     reportError(miscError(ast.data, `Expected function in reaction clause`));
-                } else if (!subsumes(parents, scopes,  REACTION_DATA_TYPE, dataType)) {
+                } else if (!subsumes(parents, scopes,  REACTION_DATA_TYPE, dataType, true)) {
                     reportError(assignmentError(ast.data, REACTION_DATA_TYPE, dataType));
                 }
 
-                const effectType = inferType(reportError, parents, scopes, ast.effect);
+                const effectType = inferType(reportError, parents, scopes, ast.effect, true);
                 const requiredEffectType: ProcType = {
                     kind: 'proc-type',
                     args: [{
@@ -167,15 +167,15 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 };
                 if (effectType.kind !== "proc-type") {
                     reportError(miscError(ast.effect, `Expected procedure in effect clause`));
-                } else if (!subsumes(parents, scopes,  requiredEffectType, effectType)) {
+                } else if (!subsumes(parents, scopes,  requiredEffectType, effectType, true)) {
                     reportError(assignmentError(ast.effect, requiredEffectType, effectType));
                 }
 
                 if (ast.until) {
-                    const untilType = inferType(reportError, parents, scopes, ast.until);
+                    const untilType = inferType(reportError, parents, scopes, ast.until, true);
                     if (untilType.kind !== "func-type") {
                         reportError(miscError(ast.data, `Expected function in until clause`));
-                    } else if (!subsumes(parents, scopes,  REACTION_UNTIL_TYPE, untilType)) {
+                    } else if (!subsumes(parents, scopes,  REACTION_UNTIL_TYPE, untilType, true)) {
                         reportError(assignmentError(ast.data, REACTION_UNTIL_TYPE, untilType));
                     }
                 }
@@ -183,15 +183,15 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 // TODO: This may become generalized later by generics/inverted inference
                 if (effectType.kind !== "proc-type" || effectType.args.length !== 1) {
                     reportError(miscError(ast.data, `Expected procedure taking one argument`));
-                } else if (dataType.kind === "func-type" && effectType.kind === "proc-type" && !subsumes(parents, scopes,  effectType.args[0].type ?? UNKNOWN_TYPE, effectType.args[0].type ?? UNKNOWN_TYPE)) {
+                } else if (dataType.kind === "func-type" && effectType.kind === "proc-type" && !subsumes(parents, scopes,  effectType.args[0].type ?? UNKNOWN_TYPE, effectType.args[0].type ?? UNKNOWN_TYPE, true)) {
                     reportError(assignmentError(effectType.args[0].name, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE));
                 }
             } break;
             case "let-declaration": {
-                const valueType = inferType(reportError, parents, scopes, ast.value);
+                const valueType = inferType(reportError, parents, scopes, ast.value, true);
 
                 if (ast.type != null) {
-                    if (!subsumes(parents, scopes,  ast.type, valueType)) {
+                    if (!subsumes(parents, scopes,  ast.type, valueType, true)) {
                         reportError(assignmentError(ast.value, ast.type, valueType));
                     }
                 }
@@ -204,23 +204,23 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 //    TODO: Have to figure out whether the mutability of any arbitrary base expression
                 // }
 
-                const targetType = inferType(reportError, parents, scopes, ast.target);
-                const valueType = inferType(reportError, parents, scopes, ast.value);
+                const targetType = inferType(reportError, parents, scopes, ast.target, true);
+                const valueType = inferType(reportError, parents, scopes, ast.value, true);
 
-                if (!subsumes(parents, scopes,  targetType, valueType)) {
+                if (!subsumes(parents, scopes,  targetType, valueType, true)) {
                     reportError(assignmentError(ast.value, targetType, valueType));
                 }
             } break;
             case "for-loop": {
                 // TODO: Disallow shadowing? Not sure
 
-                const iteratorType = inferType(reportError, parents, scopes, ast.iterator);
+                const iteratorType = inferType(reportError, parents, scopes, ast.iterator, true);
                 if (iteratorType.kind !== "iterator-type") {
                     reportError(miscError(ast.iterator, `Expected iterator after "of" in for loop`));
                 }
             } break;
             case "while-loop": {
-                const conditionType = inferType(reportError, parents, scopes, ast.condition);
+                const conditionType = inferType(reportError, parents, scopes, ast.condition, true);
                 if (conditionType.kind !== "boolean-type") {
                     reportError(miscError(ast.condition, `Condition for while loop must be boolean`));
                 }
@@ -229,10 +229,10 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
     });
 }
 
-export function subsumes(parents: ParentsMap, scopes: ScopesMap, destination: TypeExpression, value: TypeExpression): boolean {
+export function subsumes(parents: ParentsMap, scopes: ScopesMap, destination: TypeExpression, value: TypeExpression, resolveGenerics?: boolean): boolean {
     // console.log('subsumes?\n', { destination: display(destination), value: display(value) })
-    const resolvedDestination = resolve(getScopeFor(parents, scopes, destination), destination)
-    const resolvedValue = resolve(getScopeFor(parents, scopes, value), value)
+    const resolvedDestination = resolve(getScopeFor(parents, scopes, destination), destination, resolveGenerics)
+    const resolvedValue = resolve(getScopeFor(parents, scopes, value), value, resolveGenerics)
     // console.log('subsumes (resolved)?\n', { resolvedDestination: display(resolvedDestination), resolvedValue: display(resolvedValue) })
 
     if (resolvedValue.kind === "any-type" || resolvedDestination.kind === "any-type") {
@@ -253,10 +253,10 @@ export function subsumes(parents: ParentsMap, scopes: ScopesMap, destination: Ty
         if (resolvedValue.kind === "union-type") {
             return resolvedValue.members.every(valueMember => 
                 resolvedDestination.members.some(destinationMember => 
-                    subsumes(parents, scopes, destinationMember, valueMember)));
+                    subsumes(parents, scopes, destinationMember, valueMember, resolveGenerics)));
         } else {
             return resolvedDestination.members.some(member => 
-                subsumes(parents, scopes, member, resolvedValue));
+                subsumes(parents, scopes, member, resolvedValue, resolveGenerics));
         }
     } else if (resolvedValue.kind === "union-type") {
         return false;
@@ -264,15 +264,15 @@ export function subsumes(parents: ParentsMap, scopes: ScopesMap, destination: Ty
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
             // NOTE: Value and destination are flipped on purpose for args!
-            && resolvedDestination.args.every((_, i) => subsumes(parents, scopes, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))
-            && subsumes(parents, scopes, resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)) {
+            && resolvedDestination.args.every((_, i) => subsumes(parents, scopes, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE, resolveGenerics))
+            && subsumes(parents, scopes, resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE, resolveGenerics)) {
         return true;
     } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" 
             // NOTE: Value and destination are flipped on purpose for args!
-            && resolvedDestination.args.every((_, i) => subsumes(parents, scopes, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))) {
+            && resolvedDestination.args.every((_, i) => subsumes(parents, scopes, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE, resolveGenerics))) {
         return true;
     } else if (resolvedDestination.kind === "array-type" && resolvedValue.kind === "array-type") {
-        return subsumes(parents, scopes, resolvedDestination.element, resolvedValue.element)
+        return subsumes(parents, scopes, resolvedDestination.element, resolvedValue.element, resolveGenerics)
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
         const destinationEntries = propertiesOf(() => {}, parents, scopes, resolvedDestination)
         const valueEntries = propertiesOf(() => {}, parents, scopes, resolvedValue)
@@ -280,12 +280,12 @@ export function subsumes(parents: ParentsMap, scopes: ScopesMap, destination: Ty
         return (
             !!destinationEntries?.every(({ name: key, type: destinationValue }) => 
                 given(valueEntries?.find(e => deepEquals(e.name, key, ["code", "startIndex", "endIndex"]))?.type, value =>
-                    subsumes(parents, scopes,  destinationValue, value)))
+                    subsumes(parents, scopes,  destinationValue, value, resolveGenerics)))
         );
     } else if (resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") {
-        return subsumes(parents, scopes, resolvedDestination.itemType, resolvedValue.itemType);
+        return subsumes(parents, scopes, resolvedDestination.itemType, resolvedValue.itemType, resolveGenerics);
     } else if (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") {
-        return subsumes(parents, scopes, resolvedDestination.resultType, resolvedValue.resultType);
+        return subsumes(parents, scopes, resolvedDestination.resultType, resolvedValue.resultType, resolveGenerics);
     }
 
     return false;

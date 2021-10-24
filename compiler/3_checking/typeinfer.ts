@@ -1,7 +1,7 @@
 import { getScopeFor, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
 import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, given, memoize5 } from "../utils.ts";
+import { deepEquals, given, memoize4 } from "../utils.ts";
 import { displayForm, subsumes } from "./typecheck.ts";
 import { ClassMember, memberDeclaredType } from "../_model/declarations.ts";
 import { BagelError, miscError } from "../errors.ts";
@@ -12,9 +12,9 @@ export function inferType(
     parents: ParentsMap,
     scopes: ScopesMap,
     ast: Expression|ClassMember,
-    preserveGenerics?: boolean,
+    resolveGenerics?: boolean,
 ): TypeExpression {
-    const baseType = inferTypeInner(reportError, parents, scopes, ast, !!preserveGenerics)
+    const baseType = inferTypeInner(reportError, parents, scopes, ast)
 
     let refinedType = baseType
     {
@@ -32,25 +32,22 @@ export function inferType(
     }
 
     return resolve([parents, scopes],
-        simplify(parents, scopes, refinedType), preserveGenerics);
+        simplify(parents, scopes, refinedType), resolveGenerics);
 }
 
-const inferTypeInner = memoize5((
+const inferTypeInner = memoize4((
     reportError: (error: BagelError) => void, 
     parents: ParentsMap,
     scopes: ScopesMap,
     ast: Expression|ClassMember,
-    preserveGenerics: boolean,
 ): TypeExpression => {
-    const scope = getScopeFor(parents, scopes, ast)
-
     switch(ast.kind) {
         case "proc":
             return ast.type
         case "func": {
             // if no return-type is declared, try inferring the type from the inner expression
             const returnType = ast.type.returnType ??
-                inferType(reportError, parents, scopes, ast.body, true)
+                inferType(reportError, parents, scopes, ast.body)
 
             return {
                 ...ast.type,
@@ -59,10 +56,10 @@ const inferTypeInner = memoize5((
 
         }
         case "binary-operator": {
-            let leftType = inferType(reportError, parents, scopes, ast.base, preserveGenerics);
+            let leftType = inferType(reportError, parents, scopes, ast.base);
 
             for (const [op, expr] of ast.ops) {
-                const rightType = inferType(reportError, parents, scopes, expr, preserveGenerics);
+                const rightType = inferType(reportError, parents, scopes, expr);
 
                 const types = BINARY_OPERATOR_TYPES[op.op].find(({ left, right }) =>
                     subsumes(parents, scopes, left, leftType) && subsumes(parents, scopes, right, rightType))
@@ -84,8 +81,8 @@ const inferTypeInner = memoize5((
         }
         case "pipe":
         case "invocation": {
-            let subjectType = inferType(reportError, parents, scopes, ast.subject, true);
-            subjectType = resolve(scope, subjectType, false);
+            const scope = getScopeFor(parents, scopes, ast)
+            const subjectType = resolve(scope, inferType(reportError, parents, scopes, ast.subject));
 
             if (subjectType.kind === "func-type") {
                 return subjectType.returnType ?? UNKNOWN_TYPE;
@@ -94,8 +91,8 @@ const inferTypeInner = memoize5((
             }
         }
         case "indexer": {
-            const baseType = inferType(reportError, parents, scopes, ast.subject, preserveGenerics);
-            const indexerType = inferType(reportError, parents, scopes, ast.indexer, preserveGenerics);
+            const baseType = inferType(reportError, parents, scopes, ast.subject);
+            const indexerType = inferType(reportError, parents, scopes, ast.indexer);
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "exact-string-literal") {
                 const key = indexerType.value.value;
@@ -122,10 +119,10 @@ const inferTypeInner = memoize5((
         }
         case "if-else-expression":
         case "switch-expression": {
-            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, parents, scopes, ast.value, preserveGenerics)
+            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, parents, scopes, ast.value)
 
             const caseTypes = ast.cases.map(({ outcome }) => 
-                inferType(reportError, parents, scopes, outcome, preserveGenerics))
+                inferType(reportError, parents, scopes, outcome))
 
             const unionType: UnionType = {
                 kind: "union-type",
@@ -141,7 +138,7 @@ const inferTypeInner = memoize5((
                     members: [
                         ...unionType.members,
                         ast.defaultCase 
-                            ? inferType(reportError, parents, scopes, ast.defaultCase, preserveGenerics) 
+                            ? inferType(reportError, parents, scopes, ast.defaultCase) 
                             : NIL_TYPE
                     ]
                 }
@@ -152,7 +149,7 @@ const inferTypeInner = memoize5((
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
         case "debug": {
             if (isExpression(ast.inner)) {
-                const type = inferType(reportError, parents, scopes, ast.inner, preserveGenerics)
+                const type = inferType(reportError, parents, scopes, ast.inner)
                 console.log(JSON.stringify({
                     bgl: given(ast.inner.code, code =>
                         given(ast.inner.startIndex, startIndex =>
@@ -166,9 +163,9 @@ const inferTypeInner = memoize5((
             }
         }
         case "parenthesized-expression":
-            return inferType(reportError, parents, scopes, ast.inner, preserveGenerics);
+            return inferType(reportError, parents, scopes, ast.inner);
         case "property-accessor": {
-            const subjectType = inferType(reportError, parents, scopes, ast.subject, preserveGenerics);
+            const subjectType = inferType(reportError, parents, scopes, ast.subject);
             const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
                 ? subtract(parents, scopes, subjectType, NIL_TYPE)
                 : subjectType;
@@ -190,7 +187,7 @@ const inferTypeInner = memoize5((
             const valueDescriptor = getScopeFor(parents, scopes, ast).values[ast.name]
 
             return valueDescriptor?.declaredType 
-                ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, parents, scopes, initialValue, preserveGenerics))
+                ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, parents, scopes, initialValue))
                 ?? UNKNOWN_TYPE
         }
         case "element-tag": {
@@ -207,7 +204,7 @@ const inferTypeInner = memoize5((
             const entries: Attribute[] = ast.entries.map(([name, value]) => ({
                 kind: "attribute",
                 name,
-                type: inferType(reportError, parents, scopes, value, preserveGenerics),
+                type: inferType(reportError, parents, scopes, value),
                 code: undefined,
                 startIndex: undefined,
                 endIndex: undefined,
@@ -223,7 +220,7 @@ const inferTypeInner = memoize5((
             };
         }
         case "array-literal": {
-            const entries = ast.entries.map(entry => inferType(reportError, parents, scopes, entry, preserveGenerics));
+            const entries = ast.entries.map(entry => inferType(reportError, parents, scopes, entry));
 
             // NOTE: This could be slightly better where different element types overlap each other
             const uniqueEntryTypes = entries.filter((el, index, arr) => 
@@ -254,7 +251,7 @@ const inferTypeInner = memoize5((
         };
         case "class-property":
         case "class-function":
-        case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferType(reportError, parents, scopes, ast.value, preserveGenerics);
+        case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferType(reportError, parents, scopes, ast.value);
         case "string-literal": return STRING_TYPE;
         case "exact-string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
@@ -264,15 +261,15 @@ const inferTypeInner = memoize5((
     }
 })
 
-export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: TypeExpression, preserveGenerics?: boolean): TypeExpression {
+export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: TypeExpression, resolveGenerics?: boolean): TypeExpression {
     if (type.kind === "named-type") {
         const resolutionScope = Array.isArray(contextOrScope)
             ? getScopeFor(contextOrScope[0], contextOrScope[1], type)
             : contextOrScope
 
         if (resolutionScope.types[type.name.name]) {
-            if (!resolutionScope.types[type.name.name].isGenericParameter || !preserveGenerics) {
-                return resolve(contextOrScope, resolutionScope.types[type.name.name].type, preserveGenerics)
+            if (!resolutionScope.types[type.name.name].isGenericParameter || resolveGenerics) {
+                return resolve(contextOrScope, resolutionScope.types[type.name.name].type, resolveGenerics)
             } else {
                 return type
             }
@@ -286,7 +283,7 @@ export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: Typ
             }
         }
     } else if(type.kind === "union-type") {
-        const memberTypes = type.members.map(member => resolve(contextOrScope, member, preserveGenerics));
+        const memberTypes = type.members.map(member => resolve(contextOrScope, member, resolveGenerics));
         if (memberTypes.some(member => member == null)) {
             return UNKNOWN_TYPE;
         } else {
@@ -300,14 +297,14 @@ export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: Typ
         }
     } else if(type.kind === "object-type") {
         const entries = type.entries.map(({ type, ...rest }) => 
-            ({ ...rest, type: resolve(contextOrScope, type, preserveGenerics) }))
+            ({ ...rest, type: resolve(contextOrScope, type, resolveGenerics) }))
 
         return {
             ...type,
             entries,
         }
     } else if(type.kind === "array-type") {
-        const element = resolve(contextOrScope, type.element, preserveGenerics)
+        const element = resolve(contextOrScope, type.element, resolveGenerics)
 
         return {
             ...type,
@@ -317,8 +314,8 @@ export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: Typ
         return {
             kind: "func-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, preserveGenerics)) })),
-            returnType: given(type.returnType, returnType => resolve(contextOrScope, returnType, preserveGenerics)),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, resolveGenerics)) })),
+            returnType: given(type.returnType, returnType => resolve(contextOrScope, returnType, resolveGenerics)),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -327,7 +324,7 @@ export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: Typ
         return {
             kind: "proc-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, preserveGenerics)) })),
+            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, resolveGenerics)) })),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -335,7 +332,7 @@ export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: Typ
     } else if(type.kind === "iterator-type") {
         return {
             kind: "iterator-type",
-            itemType: resolve(contextOrScope, type.itemType, preserveGenerics),
+            itemType: resolve(contextOrScope, type.itemType, resolveGenerics),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -343,7 +340,7 @@ export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: Typ
     } else if(type.kind === "plan-type") {
         return {
             kind: "plan-type",
-            resultType: resolve(contextOrScope, type.resultType, preserveGenerics),
+            resultType: resolve(contextOrScope, type.resultType, resolveGenerics),
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -512,7 +509,7 @@ export function propertiesOf(
             const attrs = [...type.entries]
 
             for (const spread of type.spreads) {
-                const resolved = resolve([parents, scopes], spread, true)
+                const resolved = resolve([parents, scopes], spread)
         
                 if (resolved.kind !== "object-type") {
                     reportError(miscError(spread, `${displayForm(resolved)} is not an object type; can only spread object types into object types`))
@@ -527,7 +524,7 @@ export function propertiesOf(
             return type.clazz.members.map(member => ({
                 kind: "attribute",
                 name: member.name,
-                type: memberDeclaredType(member) ?? inferType(reportError, parents, scopes, member.value, true),
+                type: memberDeclaredType(member) ?? inferType(reportError, parents, scopes, member.value),
                 code: undefined, startIndex: undefined, endIndex: undefined
             }))
         case "iterator-type": {

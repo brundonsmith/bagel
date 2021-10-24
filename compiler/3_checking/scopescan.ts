@@ -84,8 +84,6 @@ export function scopescan(reportError: (error: BagelError) => void, parents: Par
             case "invocation": {
     
                 // bind type-args for this invocation
-                // console.log('------------------------------------')
-                // console.log(ast.subject)
                 const subjectType = inferType(reportError, parents, scopesMap, ast.subject);
                 if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
                     if (subjectType.typeParams.length > 0) {
