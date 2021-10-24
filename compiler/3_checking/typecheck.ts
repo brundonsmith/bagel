@@ -59,7 +59,8 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
             } break;
             case "pipe":
             case "invocation": {
-                const subjectType = inferType(reportError, parents, scopes, ast.subject);
+                let subjectType = inferType(reportError, parents, scopes, ast.subject, true);
+                subjectType = resolve(scope, subjectType, false); // resolve generics in invocation scope
 
                 if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {
                     reportError(miscError(ast.subject, "Expression must be a function or procedure to be called"));
@@ -229,8 +230,10 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
 }
 
 export function subsumes(parents: ParentsMap, scopes: ScopesMap, destination: TypeExpression, value: TypeExpression): boolean {
+    // console.log('subsumes?\n', { destination: display(destination), value: display(value) })
     const resolvedDestination = resolve(getScopeFor(parents, scopes, destination), destination)
     const resolvedValue = resolve(getScopeFor(parents, scopes, value), value)
+    // console.log('subsumes (resolved)?\n', { resolvedDestination: display(resolvedDestination), resolvedValue: display(resolvedValue) })
 
     if (resolvedValue.kind === "any-type" || resolvedDestination.kind === "any-type") {
         return true;
