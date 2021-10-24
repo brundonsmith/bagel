@@ -1,5 +1,5 @@
 import { displayForm } from "./3_checking/typecheck.ts";
-import { walkParseTree } from "./utils.ts";
+import { given, walkParseTree } from "./utils.ts";
 import { AST } from "./_model/ast.ts";
 import { Scope } from "./_model/common.ts";
 import { isTypeExpression } from "./_model/type-expressions.ts";
@@ -26,7 +26,7 @@ export function withoutSourceInfo(ast: AST) {
     return clone
 }
 
-export function collapse(scope: Scope): Scope {
+export function displayScope(scope: Scope) {
     let all: Scope = {
         types: {},
         values: {},
@@ -52,7 +52,11 @@ export function collapse(scope: Scope): Scope {
         classes = Object.getPrototypeOf(classes)
     }
 
-    return all
+    return {
+        types: Object.fromEntries(Object.entries(all.types).map(([key, value]) => [key, { ...value, type: display(value.type) }])),
+        values: Object.fromEntries(Object.entries(all.values).map(([key, value]) => [key, { ...value, declaredType: given(value.declaredType, display), initialValue: given(value.initialValue, display) }])),
+        classes: Object.fromEntries(Object.entries(all.classes).map(([key, value]) => [key, display(value)])),
+    }
 }
 
 export function display(ast: AST): string {
