@@ -1,5 +1,5 @@
 import { Module } from "../_model/ast.ts";
-import { BOOLEAN_TYPE, FuncType, NIL_TYPE, ProcType, REACTION_DATA_TYPE, REACTION_UNTIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, NIL_TYPE, REACTION_VIEW_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
 import { propertiesOf, inferType, resolve, subtract } from "./typeinfer.ts";
@@ -14,12 +14,14 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
 
         switch(ast.kind) {
             case "const-declaration": {
-                const valueType = inferType(reportError, parents, scopes, ast.value, true);
 
+                // make sure value fits declared type, if there is one
+                const valueType = inferType(reportError, parents, scopes, ast.value, true);
                 if (ast.type != null && !subsumes(parents, scopes,  ast.type, valueType, true)) {
                     reportError(assignmentError(ast.value, ast.type, valueType));
                 }
 
+                // forbid top-level const from being a func (should be a real func declaration) TODO: procs too
                 if (ast.value.kind === "func") {
                     const maxPreviewLength = 8
                     const fn = display(ast.value)
@@ -29,20 +31,22 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 }
             } break;
             case "func-declaration": {
+                // forbid top-level funcs with no arguments
                 if (ast.value.type.args.length === 0 && ast.value.body.kind !== "javascript-escape") {
                     reportError(miscError(ast, "Top-level function declarations aren't allowed to take zero arguments, because the result will always be the same. Consider making this a constant."))
                 }
             } break;
             case "test-expr-declaration": {
-                const valueType = inferType(reportError, parents, scopes, ast.expr, true);
 
+                // make sure test value is a boolean
+                const valueType = inferType(reportError, parents, scopes, ast.expr, true);
                 if (!subsumes(parents, scopes,  BOOLEAN_TYPE, valueType, true)) {
                     reportError(assignmentError(ast.expr, BOOLEAN_TYPE, valueType));
                 }
             } break;
             case "func": {
-                const bodyType = inferType(reportError, parents, scopes, ast.body, true);
 
+                // make sure each const fits its declared type, if there is one
                 for (const c of ast.consts) {
                     const valueType = inferType(reportError, parents, scopes, c.value, true)
                     if (c.type && !subsumes(parents, scopes,  c.type, valueType, true)) {
@@ -50,6 +54,8 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                     }
                 }
 
+                // make sure body expression fits declared return type, if there is one
+                const bodyType = inferType(reportError, parents, scopes, ast.body, true);
                 if (ast.type.returnType != null && !subsumes(parents, scopes,  ast.type.returnType, bodyType, true)) {
                     reportError(assignmentError(ast.body, ast.type.returnType, bodyType));
                 }
@@ -62,12 +68,12 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 const scope = getScopeFor(parents, scopes, ast)
                 const subjectType = resolve(scope, inferType(reportError, parents, scopes, ast.subject), true);
 
-                if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {
+                if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {  // check that subject is callable
                     reportError(miscError(ast.subject, "Expression must be a function or procedure to be called"));
-                } else if (subjectType.args.length !== ast.args.length) {
+                } else if (subjectType.args.length !== ast.args.length) {  // check that the right number of arguments are passed
                     const functionOrProcedure = subjectType.kind === "func-type" ? "Function" : "Procedure"
                     reportError(miscError(ast, `${functionOrProcedure} expected ${subjectType.args.length} arguments but got ${ast.args.length}`));
-                } else {
+                } else {  // check that each argument matches the expected type
                     for (let i = 0; i < ast.args.length; i++) {
                         const arg = ast.args[i]
                         const subjectArgType = subjectType.args[i].type ?? UNKNOWN_TYPE
