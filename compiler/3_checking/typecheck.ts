@@ -29,7 +29,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
                 }
             } break;
             case "func-declaration": {
-                if (ast.value.type.args.length === 0) {
+                if (ast.value.type.args.length === 0 && ast.value.body.kind !== "javascript-escape") {
                     reportError(miscError(ast, "Top-level function declarations aren't allowed to take zero arguments, because the result will always be the same. Consider making this a constant."))
                 }
             } break;
