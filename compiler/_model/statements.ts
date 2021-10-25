@@ -47,8 +47,7 @@ export type Assignment = SourceInfo & {
 
 export type Reaction = SourceInfo & {
     readonly kind: "reaction",
-    readonly data: Expression,
-    readonly effect: Expression,
+    readonly view: Expression,
     readonly until: Expression|undefined,
 }
 

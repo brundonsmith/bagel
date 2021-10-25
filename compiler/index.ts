@@ -59,7 +59,7 @@ function bagelFileToJsBundleFile(module: string): string {
     return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + ".bundle.js")
 }
 
-const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed','configure', //'h', 'render',
+const IMPORTED_ITEMS = [ 'autorunUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h', 'render',
 'createTransformer', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan'
 ].map(s => `${s} as ${INT}${s}`).join(', ')
 
@@ -67,7 +67,7 @@ const LIB_IMPORTS = `
 import { ${IMPORTED_ITEMS} } from "../../lib/src/core.ts";
 `
 const MOBX_CONFIGURE = `
-___configure({
+${INT}configure({
     enforceActions: "never",
     computedRequiresReaction: false,
     reactionRequiresObservable: false,
@@ -260,6 +260,17 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
 }
 
 const bundleOutput = debounce(async (entryFile: string) => {
+    const bundleFile = bagelFileToJsBundleFile(entryFile)
+
+    // const result = await Deno.emit(windowsPathToModulePath(bagelFileToTsFile(entryFile)), {
+    //     bundle: "classic",
+    // });
+    // const code = result.files['deno:///bundle.js']
+    
+    // // await Promise.all(Object.entries(result.files).map(([name, code]) => 
+    // //     Deno.writeTextFile(name, code)))
+    // await Deno.writeTextFile(bundleFile, code)
+
     const esbuild = await import("https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js")
  
     await esbuild.build({
@@ -267,17 +278,18 @@ const bundleOutput = debounce(async (entryFile: string) => {
         bundle: true,
         minify: true,
         entryPoints: [ bagelFileToTsFile(entryFile) ],
-        outfile: bagelFileToJsBundleFile(entryFile)
+        outfile: bundleFile
     })
  
-    console.log('Bundle written to ' + bagelFileToJsBundleFile(entryFile))
+    
+    console.log('Bundle written to ' + bundleFile)
 }, 100)
 
 function test() {
     build({ entry: Deno.cwd(), emit: true, includeTests: true })
 
     setTimeout(async () => {
-        const thisModulePath = path.dirname(import.meta.url).replace(/^file:\/\/\//i, '')
+        const thisModulePath = windowsPathToModulePath(path.dirname(import.meta.url))
 
         const filesToTest = await all(fs.walk(Deno.cwd(), {
             // match: given(filePattern, pattern => [ new RegExp(pattern) ]),
@@ -288,9 +300,9 @@ function test() {
 
         for (const file of filesToTest) {
             if (file.isFile) {
-                const moduleDir = path.dirname(file.path).replaceAll('\\', '/')
+                const moduleDir = windowsPathToModulePath(path.dirname(file.path))
                 const moduleName = path.basename(file.path)
-                const modulePath = path.relative(thisModulePath, moduleDir).replaceAll('\\', '/') + '/' + moduleName
+                const modulePath = windowsPathToModulePath(path.relative(thisModulePath, moduleDir)) + '/' + moduleName
 
                 const { tests } = await import(modulePath + '.ts')
                 
@@ -334,6 +346,10 @@ function test() {
         console.log(`\nFound ${totalTests} test${sOrNone(totalTests)} across ${totalModules} module${sOrNone(totalModules)}; ${Colors.green(String(totalSuccesses) + ' success' + esOrNone(totalSuccesses))}, ${Colors.red(String(totalFailures) + ' failure' + sOrNone(totalFailures))}`)
         Deno.exit(modulesWithFailures > 0 ? 1 : 0)
     }, 1000)
+}
+
+function windowsPathToModulePath(str: string) {
+    return str.replaceAll('\\', '/').replace(/^C:/, '/').replace(/^file:\/\/\//i, '')
 }
 
 // testInWorker(file.path)

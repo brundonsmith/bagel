@@ -672,13 +672,9 @@ const statement: ParseFunction<Statement> = (code, startIndex) =>
     ?? procCall(code, startIndex)
 
 const reaction: ParseFunction<Reaction> = (code, startIndex) =>
-    given(consume(code, startIndex, "reaction"), index =>
+    given(consume(code, startIndex, "autorun"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
-    expec(expression(code, index), err(code, index, "Data function"), ({ parsed: data, newIndex: index }) =>
-    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
-    expec(consume(code, index, "triggers"), err(code, index, '"triggers" clause'), index =>
-    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
-    expec(expression(code, index), err(code, index, "Side-effect procedure"), ({ parsed: effect, newIndex: index }) => 
+    expec(expression(code, index), err(code, index, "Side-effect procedure"), ({ parsed: view, newIndex: index }) => 
     given(consumeWhitespaceRequired(code, index), index =>
     expec(
         given(consume(code, index, "until"), index =>
@@ -692,12 +688,11 @@ const reaction: ParseFunction<Reaction> = (code, startIndex) =>
             code,
             startIndex,
             endIndex: index,
-            data,
-            effect,
+            view,
             until: typeof lifetimeResult === 'number' ? undefined : lifetimeResult.parsed
         },
         newIndex: index,
-    }))))))))))))
+    }))))))))
 
 const computation: ParseFunction<Computation> = (code, startIndex) =>
     given(consume(code, startIndex, "computation"), index =>

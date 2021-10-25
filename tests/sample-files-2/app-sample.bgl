@@ -1,26 +1,32 @@
 
-func Counter(increment: (){}, decrement: (){}, count: number) =>
-    <div>
-        <h1>
-            {'Counter is ${count}'}
-        </h1>
-        <button onClick={increment}>{'+'}</button>
-        <button onClick={decrement}>{'-'}</button>
-    </div>
+class Counter {
+    count: number = 0
+
+    public func memo render() =>
+        <div>
+            <button onClick={this.decrement}>{'-'}</button>
+            <span>{this.count}</span>
+            <button onClick={this.increment}>{'+'}</button>
+        </div>
+
+    proc decrement() {
+        this.count = this.count - 1;
+    }
+
+    proc increment() {
+        this.count = this.count + 1;
+    }
+}
 
 proc main() {
-    let count = 0;
-
-    let increment = () {
-       count = count + 1;
-    };
-    let decrement = () {
-       count = count - 1;
-    };
-
-    reaction () => count
-    triggers (count) {
-        ___render(Counter(increment, decrement, count), document.body);
+    let counter = new Counter();
+    let n = Math.random();
+    
+    autorun () {
+        ___render(<div>
+            <button onClick={() { n = Math.random(); }}>{'Rnd'}</button> {n}<br></br>
+            {counter.render()}
+        </div>, document.body);
     }
     forever;
 }

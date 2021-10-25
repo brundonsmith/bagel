@@ -227,10 +227,9 @@ export const REACTION_EFFECT_TYPE: TypeExpression = {
     startIndex: undefined,
     endIndex: undefined,
 }
-export const REACTION_UNTIL_TYPE: TypeExpression = {
-    kind: "func-type",
+export const REACTION_VIEW_TYPE: TypeExpression = {
+    kind: 'proc-type',
     args: [],
-    returnType: BOOLEAN_TYPE,
     typeParams: [],
     code: undefined,
     startIndex: undefined,

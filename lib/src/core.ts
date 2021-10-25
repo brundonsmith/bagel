@@ -1,12 +1,19 @@
-import { reaction as mreaction, when, autorun } from "https://jspm.dev/mobx";
+import { reaction as mreaction, when, autorun } from "mobx";
 
 
 // MobX
+import {
+    observable,
+    computed,
+    configure,
+    makeObservable
+} from "mobx"
 export {
     observable,
     computed,
-    configure
-} from "https://jspm.dev/mobx"
+    configure,
+    makeObservable
+}
 
 function reaction<T>(expression: () => T, effect: (arg: T) => void, opts?: unknown | undefined): unknown {
     effect(expression()) // eagerly evaluate
@@ -20,24 +27,27 @@ export function reactionUntil<T>(expression: () => T, effect: (arg: T) => void, 
     }
 }
 
+export function autorunUntil(
+    view: () => unknown,
+    until?: () => boolean,
+    opts: unknown = {}
+): void {
+    const r = autorun(view, opts);
+    if (until) {
+        when(until, r);
+    }
+}
+
 export {
     createTransformer
-} from "https://jspm.dev/mobx-utils"
+} from "mobx-utils"
 
 
 // Preact
-// export {
-//     h,
-// } from "preact"
-// import {
-//     render as prender,
-// } from "preact"
-
-// export function render(a: Parameters<typeof prender>[0]) {
-//     return function (b: Parameters<typeof prender>[1]): ReturnType<typeof prender> {
-//         return prender(a, b)
-//     }
-// }
+export {
+    h,
+    render
+} from "preact"
 
 
 // Custom

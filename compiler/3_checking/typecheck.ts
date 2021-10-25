@@ -146,45 +146,20 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
 
             // not expressions, but should have their contents checked
             case "reaction": {
-                const dataType = inferType(reportError, parents, scopes, ast.data, true);
-                if (dataType.kind !== "func-type") {
-                    reportError(miscError(ast.data, `Expected function in reaction clause`));
-                } else if (!subsumes(parents, scopes,  REACTION_DATA_TYPE, dataType, true)) {
-                    reportError(assignmentError(ast.data, REACTION_DATA_TYPE, dataType));
-                }
+                const viewType = inferType(reportError, parents, scopes, ast.view, true);
 
-                const effectType = inferType(reportError, parents, scopes, ast.effect, true);
-                const requiredEffectType: ProcType = {
-                    kind: 'proc-type',
-                    args: [{
-                        name: { kind: "plain-identifier", name: "_", code: undefined, startIndex: undefined, endIndex: undefined}, 
-                        type: (dataType as FuncType).returnType
-                    }],
-                    typeParams: [],
-                    code: undefined,
-                    startIndex: undefined,
-                    endIndex: undefined,
-                };
-                if (effectType.kind !== "proc-type") {
-                    reportError(miscError(ast.effect, `Expected procedure in effect clause`));
-                } else if (!subsumes(parents, scopes,  requiredEffectType, effectType, true)) {
-                    reportError(assignmentError(ast.effect, requiredEffectType, effectType));
+                if (viewType.kind !== "proc-type") {
+                    reportError(miscError(ast.view, `Expected procedure in effect clause`));
+                } else if (!subsumes(parents, scopes,  REACTION_VIEW_TYPE, viewType, true)) {
+                    reportError(assignmentError(ast.view, REACTION_VIEW_TYPE, viewType));
                 }
 
                 if (ast.until) {
                     const untilType = inferType(reportError, parents, scopes, ast.until, true);
-                    if (untilType.kind !== "func-type") {
-                        reportError(miscError(ast.data, `Expected function in until clause`));
-                    } else if (!subsumes(parents, scopes,  REACTION_UNTIL_TYPE, untilType, true)) {
-                        reportError(assignmentError(ast.data, REACTION_UNTIL_TYPE, untilType));
-                    }
-                }
 
-                // TODO: This may become generalized later by generics/inverted inference
-                if (effectType.kind !== "proc-type" || effectType.args.length !== 1) {
-                    reportError(miscError(ast.data, `Expected procedure taking one argument`));
-                } else if (dataType.kind === "func-type" && effectType.kind === "proc-type" && !subsumes(parents, scopes,  effectType.args[0].type ?? UNKNOWN_TYPE, effectType.args[0].type ?? UNKNOWN_TYPE, true)) {
-                    reportError(assignmentError(effectType.args[0].name, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE));
+                    if (untilType.kind !== "boolean-type") {
+                        reportError(miscError(ast.until, `Expected boolean expression in until clause`));
+                    }
                 }
             } break;
             case "let-declaration": {

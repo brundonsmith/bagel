@@ -3,7 +3,7 @@ import { path } from "../deps.ts";
 import { cachedModulePath, given } from "../utils.ts";
 import { Module, AST } from "../_model/ast.ts";
 import { getScopeFor, ParentsMap, PlainIdentifier, ScopesMap } from "../_model/common.ts";
-import { ClassProperty, TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ClassFunction } from "../_model/declarations.ts";
+import { ClassProperty, TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ClassFunction, ClassDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
 import { Arg, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
@@ -47,7 +47,7 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, module: string, ast:
         case "proc-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(parents, scopes, module, ast.value) + ';';
         case "func-declaration":  return compileFuncDeclaration(parents, scopes, module, ast)
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(parents, scopes, module, ast.name)}${ast.type ? `: ${compileOne(parents, scopes, module, ast.type)}` : ''} = ${compileOne(parents, scopes, module, ast.value)};`;
-        case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(parents, scopes, module, ast.name)} {\n${ast.members.map(m => compileOne(parents, scopes, module, m)).join('\n')}\n}`;
+        case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(parents, scopes, module, ast.name)} {\n\n${compileClassConstructor(ast)}\n\n${ast.members.map(m => compileOne(parents, scopes, module, m)).join('\n')}\n}`;
         case "class-property": return  compileClassProperty(parents, scopes, module, ast)
         case "class-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${compileOne(parents, scopes, module, ast.value)}`
         case "class-function": return  '    ' + compileFuncDeclaration(parents, scopes, module, ast)
@@ -92,9 +92,8 @@ function compileOne(parents: ParentsMap, scopes: ScopesMap, module: string, ast:
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
-        case "reaction": return `${INT}reactionUntil(
-${compileOne(parents, scopes, module, ast.data)},
-${compileOne(parents, scopes, module, ast.effect)},
+        case "reaction": return `${INT}autorunUntil(
+${compileOne(parents, scopes, module, ast.view)},
 ${given(ast.until, until => compileOne(parents, scopes, module, until))})`;
         case "computation": return `const ${ast.name.name} = ${INT}computed(() => ${compileOne(parents, scopes, module, ast.expression)})`;
         case "indexer": return `${compileOne(parents, scopes, module, ast.subject)}[${compileOne(parents, scopes, module, ast.indexer)}]`;
@@ -172,14 +171,18 @@ const compileFuncDeclaration = (parents: ParentsMap, scopes: ScopesMap, module: 
             ? 'const' 
             : 'private readonly'
 
-        const memoizer = decl.value.type.args.length === 0 
+        const memoizer = decl.value.type.args.length === 0
             ? `${memoizerPrefix} ${INT}${decl.name.name} = ${INT}computed(() => ${body});\n`
             : `${memoizerPrefix} ${INT}${decl.name.name} = ${decl.value.type.args.map(arg => 
                 `${INT}createTransformer((${compileOneArg(parents, scopes, module, arg)}) => `).join('')}\n` +
                 `${body}\n` +
                 new Array(decl.value.type.args.length).fill(')').join('') + ';\n';
+
+        const invocationArgs = decl.value.type.args.length === 0
+            ? `.get()`
+            : decl.value.type.args.map(a => `(${a.name.name})`).join('')
                 
-        return memoizer + `${prefix} ${decl.name.name} = ` + signature + ` => ${decl.kind === "class-function" ? 'this.' : ''}${INT}${decl.name.name}${decl.value.type.args.map(a => `(${a.name.name})`).join('') || '()'};`;
+        return memoizer + `${prefix} ${decl.name.name} = ` + signature + ` => ${decl.kind === "class-function" ? 'this.' : ''}${INT}${decl.name.name}${invocationArgs};`;
     } else {
         return `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
     }
@@ -209,16 +212,28 @@ const compileFuncBody = (parents: ParentsMap, scopes: ScopesMap, module: string,
             `\n    return ${bodyExpr};\n}`
 }
 
+
+function compileClassConstructor(clazz: ClassDeclaration): string {
+    return `constructor() {
+        ${INT}makeObservable(this, {
+            ${clazz.members.map(member =>
+                member.kind === "class-property" ?
+                    `${member.access === "visible" ? INT : ''}${member.name.name}: ${INT}observable`
+                : '').filter(s => !!s).join(', ')}
+        });
+    }`
+}
+
 function compileClassProperty(parents: ParentsMap, scopes: ScopesMap, module: string, ast: ClassProperty): string {
     const typeDeclaration = ast.type ? ': ' + compileOne(parents, scopes, module, ast.type) : ''
 
     if (ast.access === "visible") {
-        return `    private _${ast.name.name}${typeDeclaration} = ${compileOne(parents, scopes, module, ast.value)};\n` +
+        return `    private ${INT}${ast.name.name}${typeDeclaration} = ${compileOne(parents, scopes, module, ast.value)};\n` +
                `    public get ${ast.name.name}() {\n` +
-               `        return this._${ast.name.name};\n` +
+               `        return this.${INT}${ast.name.name};\n` +
                `    }\n` +
                `    private set ${ast.name.name}(val${typeDeclaration}) {\n` +
-               `        this._${ast.name.name} = val;\n` +
+               `        this.${INT}${ast.name.name} = val;\n` +
                `    }\n`
     } else {
         return `    ${ast.access} ${ast.name.name}${typeDeclaration} = ${compileOne(parents, scopes, module, ast.value)};`
