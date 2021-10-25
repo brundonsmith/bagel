@@ -18,15 +18,31 @@ class Counter {
     }
 }
 
+from '../../lib/wrappers/random' import { random }
+from '../../lib/wrappers/time' import { millis, seconds, minutes }
+
 proc main() {
     let counter = new Counter();
-    let n = Math.random();
+    let num = 0;
+
+    let roll = () {
+        random((n) {
+            num = n;
+        });
+    };
     
     autorun () {
-        ___render(<div>
-            <button onClick={() { n = Math.random(); }}>{'Rnd'}</button> {n}<br></br>
-            {counter.render()}
-        </div>, document.body);
+        ___render(
+            <div>
+                <button onClick={roll}>{'Rnd'}</button> {num}<br></br>
+                {counter.render()}
+                <div>
+                    {'Millis: ' + millis()}
+                    {'Seconds: ' + seconds()}
+                    {'Minutes: ' + minutes()}
+                </div>
+            </div>
+        );
     }
     forever;
 }

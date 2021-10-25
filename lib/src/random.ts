@@ -1,3 +1,4 @@
-import { plan } from "./core.ts";
 
-export const random = () => plan(() => Math.random())
+export function random(proc: (n: number) => void): void {
+    proc(Math.random())
+}

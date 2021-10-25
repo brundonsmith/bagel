@@ -1,0 +1,8 @@
+
+js#
+import * as time from '../src/time.ts'
+#js
+
+export func millis() => js# time.millis() #js
+export func seconds() => js# time.seconds() #js
+export func minutes() => js# time.minutes() #js

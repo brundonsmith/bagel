@@ -28,9 +28,12 @@ export {
 
 // Preact
 export {
-    h,
-    render
+    h
 } from "preact"
+import { render as prender } from "preact"
+export function render(el: unknown) {
+    prender(el, document.body)
+}
 
 
 // Custom

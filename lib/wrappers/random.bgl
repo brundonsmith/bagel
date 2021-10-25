@@ -1,6 +1,10 @@
 
 js#
-import * as random from '../src/random.ts'
+import * as randomlib from '../src/random.ts'
 #js
 
-export func random(): Plan<number> => js# random() #js
+export proc random(handler: (n: number) {}) {
+    js#
+    randomlib.random(handler);
+    #js
+}
