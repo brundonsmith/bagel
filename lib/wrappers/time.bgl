@@ -6,3 +6,4 @@ import * as time from '../src/time.ts'
 export func millis() => js# time.millis() #js
 export func seconds() => js# time.seconds() #js
 export func minutes() => js# time.minutes() #js
+export func hours() => js# time.hours() #js

@@ -19,7 +19,7 @@ class Counter {
 }
 
 from '../../lib/wrappers/random' import { random }
-from '../../lib/wrappers/time' import { millis, seconds, minutes }
+from '../../lib/wrappers/time' import { millis, seconds, minutes, hours }
 
 proc main() {
     let counter = new Counter();
@@ -37,9 +37,7 @@ proc main() {
                 <button onClick={roll}>{'Rnd'}</button> {num}<br></br>
                 {counter.render()}
                 <div>
-                    {'Millis: ' + millis()}
-                    {'Seconds: ' + seconds()}
-                    {'Minutes: ' + minutes()}
+                    {hours() + ':' + minutes() + ' ' + seconds() + ':' + millis()}
                 </div>
             </div>
         );
