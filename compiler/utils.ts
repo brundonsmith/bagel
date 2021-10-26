@@ -311,9 +311,11 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         case "plan-type": {
             walkParseTree(nextPayload, ast.resultType, fn);
         } break;
+        case "class-instance-type": {
+            walkParseTree(nextPayload, ast.clazz, fn);
+        } break;
 
         // atomic
-        case "class-instance-type":
         case "plain-identifier":
         case "range":
         case "local-identifier":
