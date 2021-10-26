@@ -30,7 +30,7 @@ Deno.test({
     testCompile(
       `func memo uid() => '12345'`,
       `const ___uid = ___computed(() => \`12345\`);
-            const uid = () => ___uid();`,
+            const uid = () => ___uid.get();`,
     );
   },
 });
