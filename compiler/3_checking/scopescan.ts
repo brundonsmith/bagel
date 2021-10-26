@@ -245,7 +245,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                 }
             })()
 
-            // add func/proc argument to scope
+            // add func/proc arguments to scope
             for (let i = 0; i < ast.type.args.length; i++) {
                 const arg = ast.type.args[i]
 
