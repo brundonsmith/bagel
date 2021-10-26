@@ -496,7 +496,7 @@ function testTypecheck(code: string, shouldFail: boolean): void {
   const parsed = parse(code, reportError);
 
   const parents = getParentsMap(parsed)
-  const scopes = scopescan(reportError, parents, () => undefined, parsed, '<test>');
+  const scopes = scopescan(reportError, parents, () => undefined, parsed);
   typecheck(reportError, parents, scopes, parsed);
 
   if (!shouldFail && errors.length > 0) {

@@ -408,7 +408,6 @@ Deno.test({
   },
 });
 
-const module = "module";
 function testCompile(code: string, exp: string) {
   const errors: BagelError[] = [];
   function reportError(err: BagelError) {
@@ -418,7 +417,7 @@ function testCompile(code: string, exp: string) {
   const ast = reshape(parse(code, reportError));
   // console.log(JSON.stringify(withoutSourceInfo(ast), null, 2))
   const parents = getParentsMap(ast)
-  const scopes = scopescan(reportError, parents, () => undefined, ast, module);
+  const scopes = scopescan(reportError, parents, () => undefined, ast);
 
   const compiled = compile(parents, scopes, ast, '<test>');
 

@@ -1,6 +1,6 @@
 import { Colors, debounce, path, fs } from "./deps.ts";
 
-import { canonicalModuleName, getParentsMap, pathIsRemote, scopescan } from "./3_checking/scopescan.ts";
+import { getParentsMap, pathIsRemote, scopescan } from "./3_checking/scopescan.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
 import { compile, INT } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
@@ -9,7 +9,7 @@ import { BagelError, prettyError } from "./errors.ts";
 import { all, cacheDir, cachedModulePath, esOrNone, given, on, sOrNone } from "./utils.ts";
 import { Module } from "./_model/ast.ts";
 
-import { observable, action, autorun, configure } from "https://jspm.dev/mobx"
+import { observable, autorun, configure } from "https://jspm.dev/mobx"
 import { createTransformer } from "https://jspm.dev/mobx-utils"
 import { ScopesMap } from "./_model/common.ts";
 
@@ -120,7 +120,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
 
     const _scopesMap = (module: string, ast: Module): [ScopesMap, readonly BagelError[]] => {
         const errors: BagelError[] = []
-        const scopes = scopescan(err => errors.push(err), parentsMap(ast), module => given(modulesSource.get(module), source => parsed(source)[0]), ast, module)
+        const scopes = scopescan(err => errors.push(err), parentsMap(ast), imported => given(modulesSource.get(canonicalModuleName(module, imported)), source => parsed(source)[0]), ast)
         return [scopes, errors]
     };
     const scopesMap: (module: string) => (ast: Module) => [ScopesMap, readonly BagelError[]] = createTransformer((module: string) => createTransformer((ast: Module) => _scopesMap(module, ast)));
@@ -392,3 +392,11 @@ function windowsPathToModulePath(str: string) {
 //         }
 //     })
 // }
+function canonicalModuleName(importerModule: string, importPath: string) {
+    if (pathIsRemote(importPath)) {
+        return importPath
+    } else {
+        const moduleDir = path.dirname(importerModule);
+        return path.resolve(moduleDir, importPath) + ".bgl"
+    }
+}

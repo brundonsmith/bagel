@@ -11,7 +11,7 @@ import { alreadyDeclared, BagelError, cannotFindExport, cannotFindModule, miscEr
 import { inferType } from "./typeinfer.ts";
 
 
-export function scopescan(reportError: (error: BagelError) => void, parents: ParentsMap, getModule: (module: string) => Module|undefined, ast: AST, module: string): ScopesMap {
+export function scopescan(reportError: (error: BagelError) => void, parents: ParentsMap, getModule: (module: string) => Module|undefined, ast: AST): ScopesMap {
     const scopesMap = new WeakMap<AST, MutableScope>()
     
     walkParseTree<MutableScope|undefined>(undefined, ast, (payload, ast) => {
@@ -20,7 +20,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: Par
         // mark it as this ast's scope
         if (isScopeOwner(ast)) {
             let newScope = scopesMap.get(ast) 
-                ?? scopeFrom(reportError, getModule, parents, scopesMap, ast, module, payload)
+                ?? scopeFrom(reportError, getModule, parents, scopesMap, ast, payload)
 
             switch (ast.kind) {
                 case "module":
@@ -29,7 +29,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: Par
                         // order of evaluation works out
                         if (declaration.kind === "const-declaration") {
                             scopesMap.set(declaration, newScope)
-                            newScope = scopeFrom(reportError, getModule, parents, scopesMap, declaration, module, newScope)
+                            newScope = scopeFrom(reportError, getModule, parents, scopesMap, declaration, newScope)
                         }
                     }
                     break;
@@ -42,7 +42,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: Par
                             }
                             
                             scopesMap.set(c.value, newScope)
-                            newScope = scopeFrom(reportError, getModule, parents, scopesMap, c, module, newScope)
+                            newScope = scopeFrom(reportError, getModule, parents, scopesMap, c, newScope)
                         }
                     }
                     break;
@@ -54,7 +54,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: Par
                             }
 
                             scopesMap.set(statement, newScope)
-                            newScope = scopeFrom(reportError, getModule, parents, scopesMap, statement, module, newScope)
+                            newScope = scopeFrom(reportError, getModule, parents, scopesMap, statement, newScope)
                         }
                     }
                     break;
@@ -138,7 +138,7 @@ function isScopeOwner(ast: AST): ast is ScopeOwner {
         || ast.kind === "case"
 }
 
-export function scopeFrom(reportError: (error: BagelError) => void, getModule: (module: string) => Module|undefined, parents: ParentsMap, scopes: ScopesMap, ast: ScopeOwner, module: string, parentScope?: Scope): MutableScope {
+export function scopeFrom(reportError: (error: BagelError) => void, getModule: (module: string) => Module|undefined, parents: ParentsMap, scopes: ScopesMap, ast: ScopeOwner, parentScope?: Scope): MutableScope {
     const newScope = parentScope != null 
         ? extendScope(parentScope) as MutableScope
         : { types: {}, values: {}, classes: {}, refinements: [] };
@@ -169,7 +169,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                     
                     newScope.classes[declaration.name.name] = declaration;
                 } else if (declaration.kind === "import-declaration") {
-                    const otherModule = getModule(canonicalModuleName(module, declaration.path.value));
+                    const otherModule = getModule(declaration.path.value);
                     
                     if (otherModule == null) {
                         reportError(cannotFindModule(declaration));
@@ -413,15 +413,6 @@ function extendScope(scope: Scope): Scope {
         values: Object.create(scope.values),
         classes: scope.classes, // classes can't be created in lower scopes, so we don't need to worry about hierarchy
         refinements: [...scope.refinements],
-    }
-}
-
-export function canonicalModuleName(importerModule: string, importPath: string) {
-    if (pathIsRemote(importPath)) {
-        return importPath
-    } else {
-        const moduleDir = path.dirname(importerModule);
-        return path.resolve(moduleDir, importPath) + ".bgl"
     }
 }
 
