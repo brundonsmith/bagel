@@ -167,6 +167,7 @@ export type Iter<T> = {
     zip<R>(other: RawIter<R>|Iter<R>): Iter<[T|undefined, R|undefined]>;
 
     array(): T[];
+    set(): Set<T>;
 } & (T extends string ? {
     join(delimiter: string): T extends string ? string : never;
 } : {})
@@ -207,7 +208,11 @@ const CHAINABLE_PROTOTYPE: Omit<Iter<unknown>, typeof INNER_ITER> = {
 
     array() {
         return Array.from((this as Iter<unknown>)[INNER_ITER])
-    }    
+    },
+
+    set() {
+        return new Set((this as Iter<unknown>)[INNER_ITER])
+    },
 }
 
 export function iter<T>(inner: RawIter<T>): Iter<T> {
