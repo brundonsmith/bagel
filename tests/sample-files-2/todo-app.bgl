@@ -18,6 +18,7 @@ class TodoApp {
                 .array()}
 
             <button onClick={this.addItem}>{'Add'}</button>
+            <button onClick={this.clearDone}>{'Clear done'}</button>
         </div>
 
     items: TodoItem[] = []
@@ -34,6 +35,10 @@ class TodoApp {
 
     proc addItem() {
         this.items.push({ text: '', done: false });
+    }
+
+    proc clearDone() {
+        this.items = iter<TodoItem>(this.items).filter(item => item.done == false).array();
     }
 }
 
