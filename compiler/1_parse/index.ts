@@ -6,7 +6,7 @@ import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
-import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 
@@ -156,6 +156,7 @@ const unionType: ParseFunction<UnionType> = (code, startIndex) =>
 
 const atomicType: ParseFunction<TypeExpression> = (code, index) =>
     primitiveType(code, index)
+    ?? elementType(code, index)
     ?? funcType(code, index)
     ?? procType(code, index)
     ?? iteratorType(code, index)
@@ -166,6 +167,17 @@ const atomicType: ParseFunction<TypeExpression> = (code, index) =>
     ?? indexerType(code, index)
     ?? tupleType(code, index)
     ?? unknownType(code, index)
+
+const elementType: ParseFunction<ElementType> = (code, startIndex) =>
+    given(consume(code, startIndex, "Element"), index => ({
+        parsed: {
+            kind: "element-type",
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        newIndex: index,
+    }))
 
 const namedType: ParseFunction<NamedType> = (code, startIndex) =>
     given(plainIdentifier(code, startIndex), ({ parsed: name, newIndex: index }) => ({
