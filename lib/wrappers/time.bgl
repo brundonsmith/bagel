@@ -1,9 +1,26 @@
 
 js#
-import * as time from '../src/time.ts'
+import { time, updateTimeIfNeeded } from '../src/time.ts'
+import { Temporal } from '@js-temporal/polyfill'
 #js
 
-export func millis() => js# time.millis() #js
-export func seconds() => js# time.seconds() #js
-export func minutes() => js# time.minutes() #js
-export func hours() => js# time.hours() #js
+export class Instant {
+    visible millisecond: number = js#undefined#js
+    visible second: number = js#undefined#js
+    visible minute: number = js#undefined#js
+    visible hour: number = js#undefined#js
+}
+
+export class Clock {
+    public func memo now(): Instant => js# {
+        updateTimeIfNeeded();
+
+        return new Temporal.ZonedDateTime(
+            time.now, // epoch nanoseconds
+            Temporal.TimeZone.from('America/Chicago'), // timezone
+            Temporal.Calendar.from('iso8601') // default calendar
+        );
+    } #js
+}
+
+export const clock = new Clock()
