@@ -1,0 +1,40 @@
+
+from '../../lib/wrappers/core' import { iter, logf, logp }
+
+type TodoItem = {
+    text: string,
+    done: boolean
+}
+
+class TodoApp {
+    items: TodoItem[] = []
+
+    public func render() =>
+        <div>
+            {iter<TodoItem>(logf<TodoItem[]>(this.items))
+                .map<Element>(item =>
+                    <div>
+                        <input value={item.text} onChange={(e) { item.text = e.target.value; }}></input>
+                        <input type={'checkbox'} checked={item.done} onChange={(e) { item.done = e.target.checked; }}></input>
+                    </div>)
+                .array()}
+
+            <button onClick={this.addItem}>{'Add'}</button>
+        </div>
+
+    // func memo handleItemTextChange()
+
+    proc addItem() {
+        logp('adding');
+        this.items.push({ text: '', done: false });
+    }
+}
+
+proc main() {
+    let app = new TodoApp();
+
+    autorun () {
+        ___render(app.render());
+    }
+    forever;
+}
