@@ -546,6 +546,23 @@ export function propertiesOf(
 
             return attrs
         }
+        case "array-type":
+            return [
+                {
+                    kind: "attribute",
+                    name: { kind: "plain-identifier", name: "push", code: undefined, startIndex: undefined, endIndex: undefined },
+                    type: {
+                        kind: "proc-type",
+                        typeParams: [],
+                        args: [{
+                            name: { kind: "plain-identifier", name: "el", code: undefined, startIndex: undefined, endIndex: undefined },
+                            type: type.element
+                        }],
+                        code: undefined, startIndex: undefined, endIndex: undefined
+                    },
+                    code: undefined, startIndex: undefined, endIndex: undefined
+                },
+            ]
         case "class-instance-type":
             return type.clazz.members.map(member => ({
                 kind: "attribute",
