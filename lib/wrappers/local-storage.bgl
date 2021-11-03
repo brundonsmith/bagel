@@ -1,0 +1,12 @@
+
+class LocalStorage {
+
+    public func getItem(key: string): string|nil =>
+        js#window.localStorage.getItem(key)#js
+
+    public proc setItem(key: string, value: string) {
+        js#window.localStorage.setItem(key, value)#js
+    }
+}
+
+export const localStorage = new LocalStorage()
