@@ -80,6 +80,7 @@ const inferTypeInner = memoize4((
 
             return leftType;
         }
+        case "negation-operator": return BOOLEAN_TYPE;
         case "pipe":
         case "invocation": {
             const scope = getScopeFor(parents, scopes, ast)

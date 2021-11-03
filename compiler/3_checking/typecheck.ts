@@ -64,6 +64,12 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             case "binary-operator": {
                 // This gets checked in typeinfer
             } break;
+            case "negation-operator": {
+                const baseType = inferType(reportError, parents, scopes, ast.base, true);
+                if (!subsumes(parents, scopes,  BOOLEAN_TYPE, baseType, true)) {
+                    reportError(assignmentError(ast.base, BOOLEAN_TYPE, baseType));
+                }
+            } break;
             case "pipe":
             case "invocation": {
                 const scope = getScopeFor(parents, scopes, ast)

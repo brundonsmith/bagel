@@ -570,6 +570,29 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Negation",
+  fn() {
+    testTypecheck(`
+    const a: boolean = true
+    const b: boolean = false
+    const foo = !(a && b)
+    `
+    , false)
+  }
+})
+
+Deno.test({
+  name: "Negation mismatch",
+  fn() {
+    testTypecheck(`
+    const a: number = 12
+    const foo = !a
+    `
+    , true)
+  }
+})
+
 // TODO: Invocation arguments
 // TODO: Reactions
 // TODO: Classes

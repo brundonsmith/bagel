@@ -145,6 +145,9 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
                 walkParseTree(nextPayload, expr, fn)
             }
         } break;
+        case "negation-operator": {
+            walkParseTree(nextPayload, ast.base, fn)
+        } break;
         case "element-tag": {
             for (const [name, value] of ast.attributes) {
                 walkParseTree(nextPayload, name, fn);

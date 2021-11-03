@@ -64,6 +64,7 @@ function compileOne(parents: AllParents, scopes: AllScopes, module: string, ast:
         case "pipe":
         case "invocation": return `${compileOne(parents, scopes, module, ast.subject)}${ast.kind === "invocation" && ast.typeArgs.length > 0 ? `<${ast.typeArgs.map(p => compileOne(parents, scopes, module, p)).join(',')}>` : ''}(${ast.args.map(arg => compileOne(parents, scopes, module, arg)).join(', ')})`;
         case "binary-operator": return `(${compileOne(parents, scopes, module, ast.base)} ${ast.ops.map(([op, expr]) => compileOne(parents, scopes, module, op) + ' ' + compileOne(parents, scopes, module, expr)).join(' ')})`;
+        case "negation-operator": return `!(${compileOne(parents, scopes, module, ast.base)})`;
         case "operator": return ast.op;
         case "if-else-expression":
         case "switch-expression": return '(' + ast.cases

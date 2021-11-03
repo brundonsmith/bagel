@@ -4,7 +4,7 @@ import { memoize, memoize2 } from "../utils.ts";
 import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator } from "../_model/expressions.ts";
 import { Assignment, Computation, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
@@ -1033,6 +1033,19 @@ const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => 
         : undefined
     )))
 
+const negationOperator: ParseFunction<NegationOperator> = memoize2((code, startIndex) => 
+    given(consume(code, startIndex, "!"), index =>
+    expec(beneath(negationOperator)(code, index), err(code, index, "Boolean expression"), ({ parsed: base, newIndex: index }) => ({
+        parsed: {
+            kind: "negation-operator",
+            base,
+            code,
+            startIndex,
+            endIndex: index
+        },
+        newIndex: index
+    }))))
+
 const _segmentsToOps = (segments: (Operator|Expression)[]): BagelError | { base: Expression, ops: readonly [readonly [Operator, Expression], ...readonly [Operator, Expression][]] } => {
     const [base, firstOp, firstExpr] = segments
 
@@ -1641,6 +1654,7 @@ const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
     [ binaryOperator(4) ],
     [ binaryOperator(5) ],
     [ binaryOperator(6) ],
+    [ negationOperator ],
     [ indexer ],
     [ invocationAccessorChain ],
     [ parenthesized ],

@@ -10,6 +10,7 @@ export type Expression =
     | Proc
     | Range
     | BinaryOperator
+    | NegationOperator
     | Invocation
     | Indexer
     | ParenthesizedExpression
@@ -69,6 +70,11 @@ export type BinaryOperator = SourceInfo & {
     readonly base: Expression,
     readonly ops: readonly [readonly [Operator, Expression], ...readonly [Operator, Expression][]],
     // TODO: Once generics are fully functional, create a `type: FuncType` property
+}
+
+export type NegationOperator = SourceInfo & {
+    readonly kind: "negation-operator",
+    readonly base: Expression,
 }
 
 export type Operator = SourceInfo & {
@@ -192,6 +198,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "func": undefined,
     "pipe": undefined,
     "binary-operator": undefined,
+    "negation-operator": undefined,
     "invocation": undefined,
     "indexer": undefined,
     "if-else-expression": undefined,

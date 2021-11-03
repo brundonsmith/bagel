@@ -409,6 +409,24 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Negation precedence",
+  fn() {
+    testCompile(`
+    const a: boolean = true
+    const b: boolean = true
+
+    const foo = !a && b
+    `,
+    `
+    const a: boolean = true;
+
+    const b: boolean = true;
+    
+    const foo = (!(a) && b);`)
+  }
+})
+
 function testCompile(code: string, exp: string) {
   const errors: BagelError[] = [];
   function reportError(err: BagelError) {
@@ -429,12 +447,12 @@ function testCompile(code: string, exp: string) {
 
   if (normalize(compiled) !== normalize(exp)) {
     throw `Compiler output did not match expected:
-    bagel:    ${code}
-    expected: ${exp}
-    received: ${compiled}`;
+bagel:\n${code}
+expected:\n${exp}
+received:\n${compiled}`;
   }
 }
 
 function normalize(ts: string): string {
-  return ts.replace(/[\s\n]+/gm, " ");
+  return (' ' + ts + ' ').replace(/[\s\n]+/gm, " ");
 }
