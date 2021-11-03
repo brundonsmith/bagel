@@ -115,7 +115,8 @@ export type LiteralType = SourceInfo & {
 
 export type ClassInstanceType = SourceInfo & {
     readonly kind: "class-instance-type",
-    readonly clazz: ClassDeclaration
+    readonly clazz: ClassDeclaration,
+    readonly internal: boolean,
 }
 
 export type NominalType = SourceInfo & {

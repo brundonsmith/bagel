@@ -272,6 +272,7 @@ const inferTypeInner = memoize4((
         case "class-construction": return {
             kind: "class-instance-type",
             clazz: getScopeFor(parents, scopes, ast).classes[ast.clazz.name],
+            internal: false,
             code: ast.clazz.code,
             startIndex: ast.clazz.startIndex,
             endIndex: ast.clazz.endIndex
@@ -304,6 +305,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
             return {
                 kind: "class-instance-type",
                 clazz: resolutionScope.classes[type.name.name],
+                internal: false,
                 code: type.code,
                 startIndex: type.startIndex,
                 endIndex: type.endIndex
@@ -564,13 +566,24 @@ export function propertiesOf(
                     code: undefined, startIndex: undefined, endIndex: undefined
                 },
             ]
-        case "class-instance-type":
-            return type.clazz.members.map(member => ({
+        case "class-instance-type": {
+            const memberToAttribute = (member: ClassMember): Attribute => ({
                 kind: "attribute",
                 name: member.name,
                 type: memberDeclaredType(member) ?? inferType(reportError, parents, scopes, member.value),
                 code: undefined, startIndex: undefined, endIndex: undefined
-            }))
+            })
+
+            if (type.internal) {
+                return type.clazz.members
+                    .map(memberToAttribute)
+            } else {
+                return type.clazz.members
+                    // TODO: Prevent assignment to or mutation of "visible" properties
+                    .filter(member => member.access !== "private")
+                    .map(memberToAttribute)
+            }
+        }
         case "iterator-type": {
             const { code: _, startIndex: _1, endIndex: _2, ...item } = type.itemType
             const itemType = { ...item, code: undefined, startIndex: undefined, endIndex: undefined }

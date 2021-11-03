@@ -284,6 +284,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                 declaredType: {
                     kind: "class-instance-type",
                     clazz: ast,
+                    internal: true,
                     code: undefined,
                     startIndex: undefined,
                     endIndex: undefined
