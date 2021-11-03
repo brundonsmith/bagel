@@ -308,7 +308,7 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
 
 export function displayForm(typeExpression: TypeExpression): string {
     switch (typeExpression.kind) {
-        case "union-type": return typeExpression.members.map(displayForm).join(" | ");
+        case "union-type": return '(' + typeExpression.members.map(displayForm).join(" | ") + ')';
         case "named-type": return typeExpression.name.name;
         case "proc-type": return `${typeExpression.typeParams.length > 0 ? `<${typeExpression.typeParams.map(p => p.name).join(',')}>` : ''}(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) {}`;
         case "func-type": return `${typeExpression.typeParams.length > 0 ? `<${typeExpression.typeParams.map(p => p.name).join(',')}>` : ''}(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) => ${displayForm(typeExpression.returnType ?? UNKNOWN_TYPE)}`;
@@ -326,7 +326,7 @@ export function displayForm(typeExpression: TypeExpression): string {
         case "plan-type": return `Plan<${displayForm(typeExpression.resultType)}>`;
         case "unknown-type": return "unknown";
         case "any-type": return "any";
-        case "element-type": return `<element tag>`
+        case "element-type": return `Element`
         // case "element-type": return `<${typeExpression.tagName}>`;
         case "javascript-escape-type": return "<js escape>";
         case "class-instance-type": return typeExpression.clazz.name.name;
