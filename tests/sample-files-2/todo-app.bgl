@@ -1,5 +1,5 @@
 
-from '../../lib/wrappers/core' import { iter, logf, logp }
+from '../../lib/wrappers/core' import { iter }
 
 type TodoItem = {
     text: string,
@@ -7,25 +7,32 @@ type TodoItem = {
 }
 
 class TodoApp {
-    items: TodoItem[] = []
-
-    public func render() =>
+    public func memo render() =>
         <div>
-            {iter<TodoItem>(logf<TodoItem[]>(this.items))
+            {iter<TodoItem>(this.items)
                 .map<Element>(item =>
                     <div>
-                        <input value={item.text} onChange={(e) { item.text = e.target.value; }}></input>
-                        <input type={'checkbox'} checked={item.done} onChange={(e) { item.done = e.target.checked; }}></input>
+                        <input value={item.text} onChange={this.handleItemTextChange(item)}></input>
+                        <input type={'checkbox'} checked={item.done} onChange={this.handleItemDoneChange(item)}></input>
                     </div>)
                 .array()}
 
             <button onClick={this.addItem}>{'Add'}</button>
         </div>
 
-    // func memo handleItemTextChange()
+    items: TodoItem[] = []
+
+    func memo handleItemTextChange(item: TodoItem) =>
+        (e) {
+            item.text = e.target.value;
+        }
+
+    func memo handleItemDoneChange(item: TodoItem) =>
+        (e) {
+            item.done = e.target.checked;
+        }
 
     proc addItem() {
-        logp('adding');
         this.items.push({ text: '', done: false });
     }
 }
