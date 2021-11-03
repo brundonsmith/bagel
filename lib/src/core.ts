@@ -68,20 +68,16 @@ export function slice<T>(start: number|undefined) {
 
 export type RawIter<T> = Iterable<T>|Generator<T>
 
-function map<T, R>(fn: (el: T) => R) {
-    return function*(iter: RawIter<T>): RawIter<R> {
-        for (const el of iter) {
-            yield fn(el);
-        }
+function* map<T, R>(fn: (el: T) => R, iter: RawIter<T>): RawIter<R> {
+    for (const el of iter) {
+        yield fn(el);
     }
 }
 
-function filter<T>(fn: (el: T) => boolean) {
-    return function*(iter: RawIter<T>): RawIter<T> {
-        for (const el of iter) {
-            if (fn(el)) {
-                yield el;
-            }
+function* filter<T>(fn: (el: T) => boolean, iter: RawIter<T>): RawIter<T> {
+    for (const el of iter) {
+        if (fn(el)) {
+            yield el;
         }
     }
 }
@@ -177,11 +173,11 @@ export type Iter<T> = {
 
 const CHAINABLE_PROTOTYPE: Omit<Iter<unknown>, typeof INNER_ITER> = {
     map(fn) {
-        return iter(map(fn)((this as Iter<unknown>)[INNER_ITER]))
+        return iter(map(fn, (this as Iter<unknown>)[INNER_ITER]))
     },
     
     filter(fn) {
-        return iter(filter(fn)((this as Iter<unknown>)[INNER_ITER]))
+        return iter(filter(fn, (this as Iter<unknown>)[INNER_ITER]))
     },
 
     slice(start, end) {
@@ -214,9 +210,9 @@ const CHAINABLE_PROTOTYPE: Omit<Iter<unknown>, typeof INNER_ITER> = {
     }    
 }
 
-export function iter<T>(iter: RawIter<T>): Iter<T> {
+export function iter<T>(inner: RawIter<T>): Iter<T> {
     const res = Object.create(CHAINABLE_PROTOTYPE)
-    res[INNER_ITER] = iter
+    res[INNER_ITER] = inner
     return res
 }
 
