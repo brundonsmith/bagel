@@ -1255,7 +1255,9 @@ const range: ParseFunction<Range> = (code, startIndex) =>
 
 const parenthesized: ParseFunction<ParenthesizedExpression> = (code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
+    given(consumeWhitespace(code, index), index =>
     given(expression(code, index), ({ parsed: inner, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
         parsed: {
             kind: "parenthesized-expression",
@@ -1265,7 +1267,7 @@ const parenthesized: ParseFunction<ParenthesizedExpression> = (code, startIndex)
             inner,
         },
         newIndex: index,
-    }))))
+    }))))))
 
 const invocationAccessorChain: ParseFunction<Invocation|PropertyAccessor> = (code, index) =>
     given(parseBeneath(code, index, invocationAccessorChain), ({ parsed: subject, newIndex: index }) =>
