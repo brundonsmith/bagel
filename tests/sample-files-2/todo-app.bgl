@@ -1,5 +1,9 @@
 
 from '../../lib/wrappers/core' import { iter }
+from '../../lib/wrappers/local-storage' import { localStorage }
+from '../../lib/wrappers/json' import { parse, stringify }
+
+const lsKey = 'todo-list'
 
 type TodoItem = {
     text: string,
@@ -21,7 +25,13 @@ class TodoApp {
             <button onClick={this.clearDone}>{'Clear done'}</button>
         </div>
 
-    items: TodoItem[] = []
+    visible items: TodoItem[] = (
+        if (localStorage.getItem(lsKey) != nil) {
+            parse(localStorage.getItem(lsKey))
+        } else {
+            []
+        }
+    )
 
     func memo handleItemTextChange(item: TodoItem) =>
         (e) {
@@ -44,6 +54,11 @@ class TodoApp {
 
 proc main() {
     let app = new TodoApp();
+
+    autorun () {
+        localStorage.setItem(lsKey, stringify(app.items, 0));
+    }
+    forever;
 
     autorun () {
         ___render(app.render());
