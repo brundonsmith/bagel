@@ -3,7 +3,7 @@ import { Statement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
 import { ClassDeclaration } from "./declarations.ts";
 import { Expression } from "./expressions.ts";
-import { withoutSourceInfo } from "../debugging.ts";
+import { withoutSourceInfo, display } from "../debugging.ts";
 import { deepEquals } from "../utils.ts";
 
 export type SourceInfo = {
@@ -29,9 +29,39 @@ export function moreSpecificThan(a: Partial<SourceInfo>, b: Partial<SourceInfo>)
     return (a.startIndex as number) >= (b.startIndex as number) && (a.endIndex as number) <= (b.endIndex as number)
 }
 
-export type ParentsMap = Omit<WeakMap<AST, AST>, 'set'|'delete'>
+type ReadonlyWeakMap<K extends {}, V> = Omit<WeakMap<K, V>, 'set'|'delete'>
 
-export type ScopesMap = Omit<WeakMap<AST, Scope>, 'set'|'delete'>
+export type ParentsMap = ReadonlyWeakMap<AST, AST>
+export type AllParents = Set<ParentsMap>
+
+export type ScopesMap = ReadonlyWeakMap<AST, Scope>
+export type AllScopes = Set<ScopesMap>
+
+export function anyHas<K extends {}, V>(all: Set<ReadonlyWeakMap<K, V>>, key: K): boolean {
+    for (const map of all) {
+        if (map.has(key)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+export function anyGet<K extends {}, V>(all: Set<ReadonlyWeakMap<K, V>>, key: K): V | undefined {
+    for (const map of all) {
+        if (map.has(key)) {
+            return map.get(key);
+        }
+    }
+
+    return undefined;
+}
+
+export function and<T>(all: Set<T>, addition: T): Set<T> {
+    const m = new Set(all);
+    m.add(addition);
+    return m;
+}
 
 export type Scope = {
     readonly types: {readonly [key: string]: TypeDeclarationDescriptor},
@@ -66,15 +96,15 @@ export function equivalent(a: Expression, b: Expression): boolean {
     return deepEquals(withoutSourceInfo(a), withoutSourceInfo(b))
 }
 
-export function getScopeFor(parentsMap: ParentsMap, scopesMap: ScopesMap, ast: AST): Scope {
+export function getScopeFor(parents: AllParents, scopes: AllScopes, ast: AST): Scope {
     let current: AST|undefined = ast
 
     while (current != null) {
-        const currentScope = scopesMap.get(current)
+        const currentScope = anyGet(scopes, current)
         if (currentScope) {
             return currentScope
         } else {
-            current = parentsMap.get(current)
+            current = anyGet(parents, current)
         }
     }
 

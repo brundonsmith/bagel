@@ -3,11 +3,12 @@ import { BOOLEAN_TYPE, NIL_TYPE, REACTION_VIEW_TYPE, STRING_TEMPLATE_INSERT_TYPE
 import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
 import { propertiesOf, inferType, resolve, subtract } from "./typeinfer.ts";
-import { getScopeFor, ParentsMap, ScopesMap } from "../_model/common.ts";
+import { AllParents, AllScopes, getScopeFor, ParentsMap, ScopesMap } from "../_model/common.ts";
 import { display } from "../debugging.ts";
+import { extendScope } from "./scopescan.ts";
 
 
-export function typecheck(reportError: (error: BagelError) => void, parents: ParentsMap, scopes: ScopesMap, ast: Module) {
+export function typecheck(reportError: (error: BagelError) => void, parents: AllParents, scopes: AllScopes, ast: Module) {
     walkParseTree<void>(undefined, ast, (_, ast) => {
         // console.log('typechecking ', display(ast))
         const scope = getScopeFor(parents, scopes, ast)
@@ -66,7 +67,32 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
             case "pipe":
             case "invocation": {
                 const scope = getScopeFor(parents, scopes, ast)
-                const subjectType = resolve(scope, inferType(reportError, parents, scopes, ast.subject), true);
+                
+                let subjectType = inferType(reportError, parents, scopes, ast.subject);
+                if (ast.kind === "invocation") {
+                    const scopeWithGenerics = extendScope(scope)
+
+                    // bind type-args for this invocation
+                    if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
+                        if (subjectType.typeParams.length > 0) {
+                            if (subjectType.typeParams.length !== ast.typeArgs.length) {
+                                reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
+                            }
+
+                            for (let i = 0; i < subjectType.typeParams.length; i++) {
+                                const typeParam = subjectType.typeParams[i]
+                                const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
+
+                                scopeWithGenerics.types[typeParam.name] = {
+                                    type: typeArg,
+                                    isGenericParameter: false,
+                                }
+                            }
+                        }
+                    }
+
+                    subjectType = resolve(scopeWithGenerics, subjectType, true);
+                }
 
                 if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {  // check that subject is callable
                     reportError(miscError(ast.subject, "Expression must be a function or procedure to be called"));
@@ -210,7 +236,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: Par
     });
 }
 
-export function subsumes(parents: ParentsMap, scopes: ScopesMap, destination: TypeExpression, value: TypeExpression, resolveGenerics?: boolean): boolean {
+export function subsumes(parents: AllParents, scopes: AllScopes, destination: TypeExpression, value: TypeExpression, resolveGenerics?: boolean): boolean {
     // console.log('subsumes?\n', { destination: display(destination), value: display(value) })
     const resolvedDestination = resolve(getScopeFor(parents, scopes, destination), destination, resolveGenerics)
     const resolvedValue = resolve(getScopeFor(parents, scopes, value), value, resolveGenerics)

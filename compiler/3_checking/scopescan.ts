@@ -1,7 +1,5 @@
-import { path } from "../deps.ts";
-
 import { AST, Module } from "../_model/ast.ts";
-import { Block, getScopeFor, MutableScope, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
+import { AllParents, AllScopes, and, anyGet, Block, getScopeFor, MutableScope, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
 import { ClassDeclaration, ConstDeclaration, Declaration } from "../_model/declarations.ts";
 import { Func, Proc, Expression, Invocation, InlineConst, Case } from "../_model/expressions.ts";
 import { ForLoop, LetDeclaration } from "../_model/statements.ts";
@@ -9,10 +7,13 @@ import { ANY_TYPE, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpress
 import { walkParseTree } from "../utils.ts";
 import { alreadyDeclared, BagelError, cannotFindExport, cannotFindModule, miscError } from "../errors.ts";
 import { inferType } from "./typeinfer.ts";
+import { displayForm } from "./typecheck.ts";
+import { display, displayScope } from "../debugging.ts";
 
 
-export function scopescan(reportError: (error: BagelError) => void, parents: ParentsMap, getModule: (module: string) => Module|undefined, ast: AST): ScopesMap {
+export function scopescan(reportError: (error: BagelError) => void, parents: AllParents, otherScopes: AllScopes, getModule: (module: string) => Module|undefined, ast: AST): ScopesMap {
     const scopesMap = new WeakMap<AST, MutableScope>()
+    const allScopes = and(otherScopes, scopesMap)
     
     walkParseTree<MutableScope|undefined>(undefined, ast, (payload, ast) => {
 
@@ -70,36 +71,46 @@ export function scopescan(reportError: (error: BagelError) => void, parents: Par
     walkParseTree<void>(undefined, ast, (_, ast) => {
 
         // infer
-        const scope = getScopeFor(parents, scopesMap, ast) as MutableScope
+        const scope = getScopeFor(parents, allScopes, ast) as MutableScope
         switch(ast.kind) {
             case "for-loop": {
 
                 // add loop element to scope
-                const iteratorType = inferType(reportError, parents, scopesMap, ast.iterator)
+                const iteratorType = inferType(reportError, parents, allScopes, ast.iterator)
                 scope.values[ast.itemIdentifier.name] = {
                     mutability: "contents-only",
                     declaredType: iteratorType.kind === "iterator-type" ? iteratorType.itemType : undefined,
                 }
             } break;
-            case "invocation": {
+            case "func":
+            case "proc": {
+                
+                // infer callback argument types based on context
+                const thisArgParentType = (() => {
+                    const parent = anyGet(parents, ast)
+                    if (parent?.kind === "invocation") {
+                        // console.log(display(parent.subject))
+                        const parentSubjectType = inferType(reportError, parents, allScopes, parent.subject)
+                        // console.log(displayForm(parentSubjectType))
+                        const thisArgIndex = parent.args.findIndex(a => a === ast)
     
-                // bind type-args for this invocation
-                const subjectType = inferType(reportError, parents, scopesMap, ast.subject);
-                if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
-                    if (subjectType.typeParams.length > 0) {
-                        if (subjectType.typeParams.length !== ast.typeArgs.length) {
-                            reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
-                        }
-
-                        for (let i = 0; i < subjectType.typeParams.length; i++) {
-                            const typeParam = subjectType.typeParams[i]
-                            const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
+                        if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
+                            const thisArgParentType = parentSubjectType.args[thisArgIndex]?.type
     
-                            scope.types[typeParam.name] = {
-                                type: typeArg,
-                                isGenericParameter: false,
+                            if (thisArgParentType && thisArgParentType.kind === ast.type.kind) {
+                                return thisArgParentType;
                             }
                         }
+                    }
+                })()
+    
+                // add func/proc arguments to scope
+                for (let i = 0; i < ast.type.args.length; i++) {
+                    const arg = ast.type.args[i]
+    
+                    scope.values[arg.name.name] = {
+                        ...scope.values[arg.name.name],
+                        declaredType: scope.values[arg.name.name].declaredType ?? thisArgParentType?.args[i].type,
                     }
                 }
             } break;
@@ -138,9 +149,9 @@ function isScopeOwner(ast: AST): ast is ScopeOwner {
         || ast.kind === "case"
 }
 
-export function scopeFrom(reportError: (error: BagelError) => void, getModule: (module: string) => Module|undefined, parents: ParentsMap, scopes: ScopesMap, ast: ScopeOwner, parentScope?: Scope): MutableScope {
+export function scopeFrom(reportError: (error: BagelError) => void, getModule: (module: string) => Module|undefined, parents: AllParents, scopes: ScopesMap, ast: ScopeOwner, parentScope?: Scope): MutableScope {
     const newScope = parentScope != null 
-        ? extendScope(parentScope) as MutableScope
+        ? extendScope(parentScope)
         : { types: {}, values: {}, classes: {}, refinements: [] };
 
     switch (ast.kind) {
@@ -230,9 +241,9 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
 
             // infer callback argument types based on context
             const thisArgParentType = (() => {
-                const parent = parents.get(ast)
+                const parent = anyGet(parents, ast)
                 if (parent?.kind === "invocation") {
-                    const parentSubjectType = inferType(reportError, parents, scopes, parent.subject)
+                    const parentSubjectType = inferType(reportError, parents, and<ScopesMap>(new Set(), scopes), parent.subject)
                     const thisArgIndex = parent.args.findIndex(a => a === ast)
 
                     if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
@@ -293,7 +304,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
         case "case": {
 
             // Type refinement
-            const parent = parents.get(ast)
+            const parent = anyGet(parents, ast)
             if (parent?.kind === "if-else-expression") {
                 if (ast.condition.kind === "binary-operator" && ast.condition.ops[0][0].op === "!=") {
                     const targetExpression = 
@@ -386,18 +397,8 @@ function declName(declaration: Declaration): string|undefined {
 }
 
 function declType(declaration: Declaration): TypeExpression|undefined {
-    if (declaration.kind === "func-declaration" || declaration.kind === "proc-declaration") {
-        return declaration.value.type;
-    } else if (declaration.kind === "const-declaration") {
+    if (declaration.kind === "const-declaration") {
         return declaration.type;
-    } else if (declaration.kind === "class-declaration") {
-        return {
-            kind: "class-instance-type",
-            clazz: declaration,
-            code: declaration.code,
-            startIndex: declaration.startIndex,
-            endIndex: declaration.endIndex
-        }
     }
 }
 
@@ -407,15 +408,11 @@ function declValue(declaration: Declaration): Expression|undefined {
     }
 }
 
-function extendScope(scope: Scope): Scope {
+export function extendScope(scope: Scope): MutableScope {
     return {
         types: Object.create(scope.types),
         values: Object.create(scope.values),
         classes: scope.classes, // classes can't be created in lower scopes, so we don't need to worry about hierarchy
         refinements: [...scope.refinements],
     }
-}
-
-export function pathIsRemote(path: string): boolean {
-    return path.match(/^https?:\/\//) != null
 }

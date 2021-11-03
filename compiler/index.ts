@@ -1,17 +1,18 @@
 import { Colors, debounce, path, fs } from "./deps.ts";
 
-import { getParentsMap, pathIsRemote, scopescan } from "./3_checking/scopescan.ts";
+import { getParentsMap, scopescan } from "./3_checking/scopescan.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
 import { compile, INT } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
-import { BagelError, prettyError } from "./errors.ts";
-import { all, cacheDir, cachedModulePath, esOrNone, given, on, sOrNone } from "./utils.ts";
+import { BagelError, miscError, prettyError } from "./errors.ts";
+import { all, cacheDir, cachedModulePath, esOrNone, given, on, pathIsRemote, sOrNone } from "./utils.ts";
 import { Module } from "./_model/ast.ts";
+import { display } from './debugging.ts'
 
-import { observable, autorun, configure } from "https://jspm.dev/mobx"
+import { observable, autorun, configure, computed } from "https://jspm.dev/mobx"
 import { createTransformer } from "https://jspm.dev/mobx-utils"
-import { ScopesMap } from "./_model/common.ts";
+import { AllParents, AllScopes, ParentsMap, ScopesMap } from "./_model/common.ts";
 
 configure({
     enforceActions: "never",
@@ -118,24 +119,95 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     };
     const parsed: typeof _parsed = createTransformer(_parsed);
 
+    const parentsMap: typeof getParentsMap = createTransformer(getParentsMap)
+
+    const _allParents = computed(() => {
+        const set = new Set<ParentsMap>()
+
+        for (const module of modules) {
+            const source = modulesSource.get(module)
+            
+            if (source) {
+                const ast = parsed(source)
+                set.add(parentsMap(ast[0]))
+            }
+        }
+
+        return set
+    })
+    const allParents = (): AllParents => _allParents.get()
+
     const _scopesMap = (module: string, ast: Module): [ScopesMap, readonly BagelError[]] => {
         const errors: BagelError[] = []
-        const scopes = scopescan(err => errors.push(err), parentsMap(ast), imported => given(modulesSource.get(canonicalModuleName(module, imported)), source => parsed(source)[0]), ast)
-        return [scopes, errors]
+        try {
+            const scopes = scopescan(
+                err => errors.push(err), 
+                allParents(), 
+                new Set(),
+                imported => 
+                    given(modulesSource.get(canonicalModuleName(module, imported)), 
+                        source => parsed(source)[0]), 
+                ast
+            )
+            return [scopes, errors]
+        } catch {
+            return [new WeakMap(), []]
+        }
     };
     const scopesMap: (module: string) => (ast: Module) => [ScopesMap, readonly BagelError[]] = createTransformer((module: string) => createTransformer((ast: Module) => _scopesMap(module, ast)));
 
-    const parentsMap: typeof getParentsMap = createTransformer(getParentsMap)
+    const _allScopes = computed(() => {
+        const set = new Set<ScopesMap>()
 
+        for (const module of modules) {
+            const source = modulesSource.get(module)
+            
+            if (source) {
+                const ast = parsed(source)  
+                set.add(scopesMap(module)(ast[0])[0])
+            }
+        }
+
+        return set
+    })
+    const allScopes = (): AllScopes => _allScopes.get()
+
+    
     const _typeerrors = (module: string, ast: Module): BagelError[] => {
-        const errors: BagelError[] = []
-        const [scopes, scopeErrors] = scopesMap(module)(ast)
-        typecheck(err => errors.push(err), parentsMap(ast), scopes, ast)
-        return [...scopeErrors, ...errors]
+        try {
+            const errors: BagelError[] = []
+            const [_, scopeErrors] = scopesMap(module)(ast)
+            typecheck(
+                err => errors.push(err), 
+                allParents(),
+                allScopes(), 
+                ast
+            )
+            return [...scopeErrors, ...errors]
+        } catch (e) {
+            return [ miscError(ast, e.toString()) ]
+        }
     }
     const typeerrors: (module: string) => (ast: Module) => BagelError[] = createTransformer((module: string) => createTransformer((ast: Module) => _typeerrors(module, ast)));
 
-    const _compiled = (module: string, ast: Module): string => LIB_IMPORTS + (ast.hasMain ? MOBX_CONFIGURE : '') + compile(parentsMap(ast), scopesMap(module)(ast)[0], ast, module, includeTests)
+    const _compiled = (module: string, ast: Module): string => {
+        try {
+            return (
+                LIB_IMPORTS + 
+                (ast.hasMain ? MOBX_CONFIGURE : '') + 
+                compile(
+                    allParents(), 
+                    allScopes(), 
+                    ast, 
+                    module, 
+                    includeTests
+                )
+            )
+        } catch (e) {
+            console.error(e)
+            return '';
+        }
+    }
     const compiled: (module: string) => (ast: Module) => string = createTransformer((module: string) => createTransformer((ast: Module) => _compiled(module, ast)));
 
     // add imported modules to set

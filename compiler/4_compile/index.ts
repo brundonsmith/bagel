@@ -1,14 +1,13 @@
-import { pathIsRemote } from "../3_checking/scopescan.ts";
 import { path } from "../deps.ts";
-import { cachedModulePath, given } from "../utils.ts";
+import { cachedModulePath, given, pathIsRemote } from "../utils.ts";
 import { Module, AST } from "../_model/ast.ts";
-import { getScopeFor, ParentsMap, PlainIdentifier, ScopesMap } from "../_model/common.ts";
+import { AllParents, AllScopes, getScopeFor, PlainIdentifier } from "../_model/common.ts";
 import { ClassProperty, TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ClassFunction, ClassDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
 import { Arg, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
-export function compile(parents: ParentsMap, scopes: ScopesMap, module: Module, modulePath: string, includeTests?: boolean): string {
+export function compile(parents: AllParents, scopes: AllScopes, module: Module, modulePath: string, includeTests?: boolean): string {
     const runtimeCode = module.declarations
         .filter(decl => decl.kind !== 'test-expr-declaration' && decl.kind !== 'test-block-declaration')
         .map(decl => compileOne(parents, scopes, modulePath, decl))
@@ -38,7 +37,7 @@ export function compile(parents: ParentsMap, scopes: ScopesMap, module: Module, 
     }
 }
 
-function compileOne(parents: ParentsMap, scopes: ScopesMap, module: string, ast: AST): string {
+function compileOne(parents: AllParents, scopes: AllScopes, module: string, ast: AST): string {
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(parents, scopes, module, name) + (alias ? ` as ${compileOne(parents, scopes, module, alias)}` : ``)
@@ -132,7 +131,7 @@ ${given(ast.until, until => compileOne(parents, scopes, module, until))})`;
 
 }
 
-function objectEntries(parents: ParentsMap, scopes: ScopesMap, module: string, entries: readonly (readonly [PlainIdentifier, Expression | readonly Expression[]])[]): string {
+function objectEntries(parents: AllParents, scopes: AllScopes, module: string, entries: readonly (readonly [PlainIdentifier, Expression | readonly Expression[]])[]): string {
     return entries
         .map(([ key, value ]) => `${compileOne(parents, scopes, module, key)}: ${Array.isArray(value) ? value.map(c => compileOne(parents, scopes, module, c)) : compileOne(parents, scopes, module, value as Expression)}`)
         .join(", ")
@@ -144,7 +143,7 @@ export const INT = `___`;
 const NIL = `undefined`;
 const LOCALS_OBJ = INT + "locals";
 
-function compileProc(parents: ParentsMap, scopes: ScopesMap, module: string, proc: Proc): string {
+function compileProc(parents: AllParents, scopes: AllScopes, module: string, proc: Proc): string {
     const mutableLocals = Object.entries(getScopeFor(parents, scopes, proc.body).values)
         .filter(e => e[1].mutability === "all");
 
@@ -158,7 +157,7 @@ function compileProc(parents: ParentsMap, scopes: ScopesMap, module: string, pro
 }`;
 }
 
-const compileFuncDeclaration = (parents: ParentsMap, scopes: ScopesMap, module: string, decl: FuncDeclaration|ClassFunction): string => {
+const compileFuncDeclaration = (parents: AllParents, scopes: AllScopes, module: string, decl: FuncDeclaration|ClassFunction): string => {
     const signature = compileFuncSignature(parents, scopes, module, decl.value)
     const body = compileFuncBody(parents, scopes, module, decl.value)
     
@@ -188,19 +187,19 @@ const compileFuncDeclaration = (parents: ParentsMap, scopes: ScopesMap, module: 
     }
 }
 
-const compileFunc = (parents: ParentsMap, scopes: ScopesMap, module: string, func: Func): string => {
+const compileFunc = (parents: AllParents, scopes: AllScopes, module: string, func: Func): string => {
     const signature = compileFuncSignature(parents, scopes, module, func)
     const body = compileFuncBody(parents, scopes, module, func)
 
     return signature + ' => ' + body
 }
 
-const compileFuncSignature = (parents: ParentsMap, scopes: ScopesMap, module: string, func: Func): string => {
+const compileFuncSignature = (parents: AllParents, scopes: AllScopes, module: string, func: Func): string => {
     return (func.type.typeParams.length > 0 ? `<${func.type.typeParams.map(p => p.name).join(',')}>` : '')
         + `(${compileArgs(parents, scopes, module, func.type.args)})${func.type.returnType != null ? `: ${compileOne(parents, scopes, module, func.type.returnType)}` : ''}`;
 }
 
-const compileFuncBody = (parents: ParentsMap, scopes: ScopesMap, module: string, func: Func): string => {
+const compileFuncBody = (parents: AllParents, scopes: AllScopes, module: string, func: Func): string => {
     const bodyExpr = compileOne(parents, scopes, module, func.body);
 
     return func.consts.length === 0
@@ -224,7 +223,7 @@ function compileClassConstructor(clazz: ClassDeclaration): string {
     }`
 }
 
-function compileClassProperty(parents: ParentsMap, scopes: ScopesMap, module: string, ast: ClassProperty): string {
+function compileClassProperty(parents: AllParents, scopes: AllScopes, module: string, ast: ClassProperty): string {
     const typeDeclaration = ast.type ? ': ' + compileOne(parents, scopes, module, ast.type) : ''
 
     if (ast.access === "visible") {
@@ -240,10 +239,10 @@ function compileClassProperty(parents: ParentsMap, scopes: ScopesMap, module: st
     }
 }
 
-function compileArgs(parents: ParentsMap, scopes: ScopesMap, module: string, args: readonly Arg[]): string {
+function compileArgs(parents: AllParents, scopes: AllScopes, module: string, args: readonly Arg[]): string {
     return args.map(arg => compileOneArg(parents, scopes, module, arg)).join(', ')
 }
 
-function compileOneArg(parents: ParentsMap, scopes: ScopesMap, module: string, arg: Arg): string {
+function compileOneArg(parents: AllParents, scopes: AllScopes, module: string, arg: Arg): string {
     return arg.name.name + (arg.type ? `: ${compileOne(parents, scopes, module, arg.type)}` : '')
 }

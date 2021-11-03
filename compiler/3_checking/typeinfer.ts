@@ -1,16 +1,17 @@
-import { getScopeFor, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
+import { AllParents, AllScopes, getScopeFor, MutableScope, Scope } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
 import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, memoize4 } from "../utils.ts";
 import { displayForm, subsumes } from "./typecheck.ts";
 import { ClassMember, memberDeclaredType } from "../_model/declarations.ts";
 import { BagelError, miscError } from "../errors.ts";
-import { withoutSourceInfo } from "../debugging.ts";
+import { displayScope, withoutSourceInfo } from "../debugging.ts";
+import { extendScope } from "./scopescan.ts";
 
 export function inferType(
     reportError: (error: BagelError) => void, 
-    parents: ParentsMap,
-    scopes: ScopesMap,
+    parents: AllParents,
+    scopes: AllScopes,
     ast: Expression|ClassMember,
     resolveGenerics?: boolean,
 ): TypeExpression {
@@ -37,8 +38,8 @@ export function inferType(
 
 const inferTypeInner = memoize4((
     reportError: (error: BagelError) => void, 
-    parents: ParentsMap,
-    scopes: ScopesMap,
+    parents: AllParents,
+    scopes: AllScopes,
     ast: Expression|ClassMember,
 ): TypeExpression => {
     switch(ast.kind) {
@@ -82,7 +83,32 @@ const inferTypeInner = memoize4((
         case "pipe":
         case "invocation": {
             const scope = getScopeFor(parents, scopes, ast)
-            const subjectType = resolve(scope, inferType(reportError, parents, scopes, ast.subject));
+
+            let subjectType = inferType(reportError, parents, scopes, ast.subject);
+            if (ast.kind === "invocation") {
+                const scopeWithGenerics = extendScope(scope)
+
+                // bind type-args for this invocation
+                if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
+                    if (subjectType.typeParams.length > 0) {
+                        if (subjectType.typeParams.length !== ast.typeArgs.length) {
+                            reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
+                        }
+
+                        for (let i = 0; i < subjectType.typeParams.length; i++) {
+                            const typeParam = subjectType.typeParams[i]
+                            const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
+
+                            scopeWithGenerics.types[typeParam.name] = {
+                                type: typeArg,
+                                isGenericParameter: false,
+                            }
+                        }
+                    }
+                }
+
+                subjectType = resolve(scopeWithGenerics, subjectType);
+            }
 
             if (subjectType.kind === "func-type") {
                 return subjectType.returnType ?? UNKNOWN_TYPE;
@@ -261,7 +287,7 @@ const inferTypeInner = memoize4((
     }
 })
 
-export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: TypeExpression, resolveGenerics?: boolean): TypeExpression {
+export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: TypeExpression, resolveGenerics?: boolean): TypeExpression {
     if (type.kind === "named-type") {
         const resolutionScope = Array.isArray(contextOrScope)
             ? getScopeFor(contextOrScope[0], contextOrScope[1], type)
@@ -351,7 +377,7 @@ export function resolve(contextOrScope: [ParentsMap, ScopesMap]|Scope, type: Typ
     return type;
 }
 
-export function simplify(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression): TypeExpression {
+export function simplify(parents: AllParents, scopes: AllScopes, type: TypeExpression): TypeExpression {
     return handleSingletonUnion(
         distillUnion(parents, scopes,
             flattenUnions(type)));
@@ -387,7 +413,7 @@ function flattenUnions(type: TypeExpression): TypeExpression {
 /**
  * Remove redundant members in union type (members subsumed by other members)
  */
-function distillUnion(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression): TypeExpression {
+function distillUnion(parents: AllParents, scopes: AllScopes, type: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         const indicesToDrop = new Set<number>();
 
@@ -427,7 +453,7 @@ function distillUnion(parents: ParentsMap, scopes: ScopesMap, type: TypeExpressi
     }
 }
 
-export function subtract(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression, without: TypeExpression): TypeExpression {
+export function subtract(parents: AllParents, scopes: AllScopes, type: TypeExpression, without: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         return simplify(parents, scopes, {
             ...type,
@@ -438,7 +464,7 @@ export function subtract(parents: ParentsMap, scopes: ScopesMap, type: TypeExpre
     }
 }
 
-function narrow(parents: ParentsMap, scopes: ScopesMap, type: TypeExpression, fit: TypeExpression): TypeExpression {
+function narrow(parents: AllParents, scopes: AllScopes, type: TypeExpression, fit: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         return simplify(parents, scopes, {
             ...type,
@@ -500,8 +526,8 @@ const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right:
 
 export function propertiesOf(
     reportError: (error: BagelError) => void, 
-    parents: ParentsMap,
-    scopes: ScopesMap,
+    parents: AllParents,
+    scopes: AllScopes,
     type: TypeExpression
 ): readonly Attribute[] | undefined {
     switch (type.kind) {

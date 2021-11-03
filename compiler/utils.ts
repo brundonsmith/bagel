@@ -487,3 +487,7 @@ export const cacheDir = () => {
 export function cachedModulePath(module: string): string {
     return path.resolve(cacheDir(), encodeURIComponent(module))
 }
+
+export function pathIsRemote(path: string): boolean {
+    return path.match(/^https?:\/\//) != null
+}

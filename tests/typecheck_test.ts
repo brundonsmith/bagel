@@ -2,6 +2,7 @@ import { getParentsMap, scopescan } from "../compiler/3_checking/scopescan.ts";
 import { typecheck } from "../compiler/3_checking/typecheck.ts";
 import { parse } from "../compiler/1_parse/index.ts";
 import { BagelError,prettyError } from "../compiler/errors.ts";
+import { and } from "../compiler/_model/common.ts";
 
 Deno.test({
   name: "Basic constant",
@@ -481,6 +482,94 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: "Inferred type across modules",
+  fn() {
+    testMultiModuleTypecheck({
+      "module-1": `
+      export func foo(b: number) => b * 2`,
+
+      "module-2": `
+      from 'module-1' import { foo }
+      const stuff: number = foo(12)`
+    }, false)
+  }
+})
+
+Deno.test({
+  name: "Inferred type across module with name resolution",
+  fn() {
+    testMultiModuleTypecheck({
+      "module-1": `
+      func foo(a: number) => a * 2
+      export func bar(b: number) => foo(b) * 2`,
+
+      "module-2": `
+      from 'module-1' import { bar }
+      const stuff: number = bar(12)`
+    }, false)
+  }
+})
+
+Deno.test({
+  name: "Class 'this' access",
+  fn() {
+    testTypecheck(`
+    class Foo {
+
+      prop: number = 12
+
+      proc bar() {
+        this.prop = 14;
+      }
+    }
+    `, false)
+  }
+})
+
+Deno.test({
+  name: "Class 'this' access mismatch",
+  fn() {
+    testTypecheck(`
+    class Foo {
+
+      prop: number = 12
+
+      proc bar() {
+        this.prop23 = 14;
+      }
+    }
+    `, true)
+  }
+})
+
+Deno.test({
+  name: "Class 'this' access in markup",
+  fn() {
+    testTypecheck(`
+        
+    class Counter {
+      count: number = 0
+
+      public func memo render() =>
+          <div>
+              <button onClick={this.decrement}>{'-'}</button>
+              <span>{this.count}</span>
+              <button onClick={this.increment}>{'+'}</button>
+          </div>
+
+      proc decrement() {
+          this.count = this.count - 1;
+      }
+
+      proc increment() {
+          this.count = this.count + 1;
+      }
+    }
+    `, false)
+  }
+})
+
 // TODO: Invocation arguments
 // TODO: Reactions
 // TODO: Classes
@@ -496,13 +585,61 @@ function testTypecheck(code: string, shouldFail: boolean): void {
   const parsed = parse(code, reportError);
 
   const parents = getParentsMap(parsed)
-  const scopes = scopescan(reportError, parents, () => undefined, parsed);
-  typecheck(reportError, parents, scopes, parsed);
+  const scopes = scopescan(
+    reportError, 
+    and(new Set(), parents), 
+    new Set(), 
+    () => undefined, 
+    parsed
+  );
+  typecheck(
+    reportError, 
+    and(new Set(), parents), 
+    and(new Set(), scopes), 
+    parsed
+  );
 
   if (!shouldFail && errors.length > 0) {
-    throw `\n${code}\nType check should have succeeded but failed with errors\n` +
+    throw `\n${code}\n\nType check should have succeeded but failed with errors\n` +
       errors.map(err => prettyError("<test>", err)).join("\n")
   } else if (shouldFail && errors.length === 0) {
-    throw `\n${code}\nType check should have failed but succeeded`
+    throw `\n${code}\n\nType check should have failed but succeeded`
+  }
+}
+
+function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: boolean): void {
+  const errors: BagelError[] = [];
+  function reportError(err: BagelError) {
+    errors.push(err);
+  }
+
+  const parsed = Object.entries(modules).map(([module, code]) => [module, parse(code, reportError)] as const);
+
+  const parents = new Set(parsed.map(([_, ast]) => getParentsMap(ast)))
+
+  const scopes = new Set(parsed.map(([_, ast]) =>
+    scopescan(
+      reportError,
+      parents,
+      new Set(),
+      name => parsed.find(m => m[0] === name)?.[1],
+      ast
+    )
+  ));
+
+  for (let i = 0; i < parsed.length; i++) {
+    typecheck(
+      reportError, 
+      parents, 
+      scopes, 
+      parsed[i][1]
+    );
+  }
+
+  if (!shouldFail && errors.length > 0) {
+    throw `Type check should have succeeded but failed with errors\n\n` +
+      errors.map(err => prettyError("<test>", err)).join("\n")
+  } else if (shouldFail && errors.length === 0) {
+    throw `Type check should have failed but succeeded`
   }
 }

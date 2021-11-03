@@ -3,6 +3,7 @@ import { reshape } from "../compiler/2_reshape/index.ts";
 import { getParentsMap, scopescan } from "../compiler/3_checking/scopescan.ts";
 import { compile } from "../compiler/4_compile/index.ts";
 import { BagelError, prettyError } from "../compiler/errors.ts";
+import { and, ParentsMap } from "../compiler/_model/common.ts";
 
 Deno.test({
   name: "Simple func declaration",
@@ -416,10 +417,10 @@ function testCompile(code: string, exp: string) {
 
   const ast = reshape(parse(code, reportError));
   // console.log(JSON.stringify(withoutSourceInfo(ast), null, 2))
-  const parents = getParentsMap(ast)
-  const scopes = scopescan(reportError, parents, () => undefined, ast);
+  const parents = and<ParentsMap>(new Set(), getParentsMap(ast))
+  const scopes = scopescan(reportError, parents, new Set(), () => undefined, ast);
 
-  const compiled = compile(parents, scopes, ast, '<test>');
+  const compiled = compile(parents, and(new Set(), scopes), ast, '<test>');
 
   if (errors.length > 0) {
     throw `\n${code}\nFailed to parse:\n` +
