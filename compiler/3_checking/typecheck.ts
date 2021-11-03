@@ -1,5 +1,5 @@
 import { Module } from "../_model/ast.ts";
-import { BOOLEAN_TYPE, NIL_TYPE, REACTION_VIEW_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, NIL_TYPE, REACTION_VIEW_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
 import { propertiesOf, inferType, resolve, subtract } from "./typeinfer.ts";
@@ -230,6 +230,14 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 const conditionType = inferType(reportError, parents, scopes, ast.condition, true);
                 if (conditionType.kind !== "boolean-type") {
                     reportError(miscError(ast.condition, `Condition for while loop must be boolean`));
+                }
+            } break;
+            case "element-tag": {
+                for (const child of ast.children) {
+                    const childType = inferType(reportError, parents, scopes, child, true);
+                    if (!subsumes(parents, scopes, ELEMENT_TAG_CHILD_TYPE, childType, true)) {
+                        reportError(assignmentError(child, ELEMENT_TAG_CHILD_TYPE, childType));
+                    }
                 }
             } break;
         }        

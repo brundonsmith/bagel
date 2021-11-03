@@ -235,6 +235,30 @@ export const REACTION_VIEW_TYPE: TypeExpression = {
     startIndex: undefined,
     endIndex: undefined,
 }
+export const ELEMENT_TAG_CHILD_TYPE: TypeExpression = {
+    kind: "union-type",
+    members: [
+        STRING_TYPE,
+        NUMBER_TYPE,
+        NIL_TYPE,
+        { kind: "element-type", code: undefined, startIndex: undefined, endIndex: undefined },
+        { kind: "array-type", element: {
+            kind: "union-type",
+            members: [
+                STRING_TYPE,
+                NUMBER_TYPE,
+                NIL_TYPE,
+                { kind: "element-type", code: undefined, startIndex: undefined, endIndex: undefined },
+            ],
+            code: undefined,
+            startIndex: undefined,
+            endIndex: undefined,
+        }, code: undefined, startIndex: undefined, endIndex: undefined}
+    ],
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
 
 const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } = {
     "union-type": undefined,
