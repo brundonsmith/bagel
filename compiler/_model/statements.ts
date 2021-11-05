@@ -11,7 +11,6 @@ export type Statement =
     | Assignment
     | Invocation
     | Reaction
-    | Computation
 
 export type LetDeclaration = SourceInfo & {
     readonly kind: "let-declaration",
@@ -49,10 +48,4 @@ export type Reaction = SourceInfo & {
     readonly kind: "reaction",
     readonly view: Expression,
     readonly until: Expression|undefined,
-}
-
-export type Computation = SourceInfo & {
-    readonly kind: "computation",
-    readonly name: PlainIdentifier,
-    readonly expression: Expression,
 }

@@ -8,50 +8,15 @@ import { Statement } from "../_model/statements.ts";
  * passes and optimization
  */
 export function reshape(ast: Module): Module {
-    const clone = JSON.parse(JSON.stringify(ast));
+    // const clone = JSON.parse(JSON.stringify(ast));
 
-    walkParseTree(undefined, clone, (_, ast) => {
-        switch (ast.kind) {
-            case "block": {
-                for (let i = 0; i < ast.statements.length; i++) {
-                    const stmt = ast.statements[i]
-                    if (stmt.kind === "computation") {
-                        const { code, startIndex, endIndex, name, expression } = stmt;
+    // walkParseTree(undefined, clone, (_, ast) => {
+    //     switch (ast.kind) {
+    //     }
 
-                        // TODO: Once constants within procedures are a thing, 
-                        // this should be a constant
-                        // HACK: Type cast is safe because we clone above
-                        (ast.statements as Statement[])[i] = {
-                            kind: "let-declaration",
-                            name,
-                            code,
-                            startIndex,
-                            endIndex,
-                            value: {
-                                kind: "func",
-                                code: expression.code,
-                                startIndex: expression.startIndex,
-                                endIndex: expression.endIndex,
-                                consts: [],
-                                body: expression,
-                                type: {
-                                    kind: "func-type",
-                                    args: [],
-                                    returnType: UNKNOWN_TYPE,
-                                    typeParams: [],
-                                    code: undefined,
-                                    startIndex: undefined,
-                                    endIndex: undefined,
-                                }
-                            }
-                        }
-                    }
-                }
-            } break;
-        }
+    //     return undefined
+    // })
 
-        return undefined
-    })
-
-    return clone;
+    // return clone;
+    return ast;
 }

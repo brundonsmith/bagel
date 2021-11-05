@@ -95,7 +95,6 @@ function compileOne(parents: AllParents, scopes: AllScopes, module: string, ast:
         case "reaction": return `${INT}autorunUntil(
 ${compileOne(parents, scopes, module, ast.view)},
 ${given(ast.until, until => compileOne(parents, scopes, module, until))})`;
-        case "computation": return `const ${ast.name.name} = ${INT}computed(() => ${compileOne(parents, scopes, module, ast.expression)})`;
         case "indexer": return `${compileOne(parents, scopes, module, ast.subject)}[${compileOne(parents, scopes, module, ast.indexer)}]`;
         case "block": return `{ ${ast.statements.map(s => compileOne(parents, scopes, module, s)).join("; ")}; }`;
         case "element-tag": return `${INT}h('${ast.tagName.name}',{${
