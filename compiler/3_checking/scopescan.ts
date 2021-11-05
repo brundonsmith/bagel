@@ -2,7 +2,7 @@ import { AST, Module } from "../_model/ast.ts";
 import { AllParents, AllScopes, and, anyGet, Block, getScopeFor, MutableScope, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
 import { ClassDeclaration, ConstDeclaration, Declaration } from "../_model/declarations.ts";
 import { Func, Proc, Expression, Invocation, InlineConst, Case } from "../_model/expressions.ts";
-import { ForLoop, LetDeclaration } from "../_model/statements.ts";
+import { ConstDeclarationStatement, ForLoop, LetDeclaration } from "../_model/statements.ts";
 import { ANY_TYPE, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { walkParseTree } from "../utils.ts";
 import { alreadyDeclared, BagelError, cannotFindExport, cannotFindModule, miscError } from "../errors.ts";
@@ -49,7 +49,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                     break;
                 case "block":
                     for (const statement of ast.statements) {
-                        if (statement.kind === "let-declaration") {
+                        if (statement.kind === "let-declaration" || statement.kind === "const-declaration-statement") {
                             if (newScope.values[statement.name.name] != null || newScope.classes[statement.name.name] != null) {
                                 reportError(alreadyDeclared(statement.name))
                             }
@@ -130,7 +130,7 @@ export function getParentsMap(ast: AST): ParentsMap {
     return parents
 }
 
-export type ScopeOwner = Module|Func|Proc|Block|ForLoop|ClassDeclaration|Invocation|ConstDeclaration|InlineConst|LetDeclaration|Case;
+export type ScopeOwner = Module|Func|Proc|Block|ForLoop|ClassDeclaration|Invocation|ConstDeclaration|InlineConst|LetDeclaration|ConstDeclarationStatement|Case;
 
 function isScopeOwner(ast: AST): ast is ScopeOwner {
     return ast.kind === "module" 
@@ -143,6 +143,7 @@ function isScopeOwner(ast: AST): ast is ScopeOwner {
         || ast.kind === "const-declaration"
         || ast.kind === "inline-const"
         || ast.kind === "let-declaration"
+        || ast.kind === "const-declaration-statement"
         || ast.kind === "case"
 }
 
@@ -291,6 +292,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
         case "const-declaration":
         case "inline-const":
         case "let-declaration":
+        case "const-declaration-statement":
             newScope.values[ast.name.name] = {
                 mutability: ast.kind === "let-declaration" ? "all" : "none",
                 declaredType: ast.type,

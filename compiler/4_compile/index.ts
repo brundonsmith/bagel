@@ -51,6 +51,7 @@ function compileOne(parents: AllParents, scopes: AllScopes, module: string, ast:
         case "class-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${compileOne(parents, scopes, module, ast.value)}`
         case "class-function": return  '    ' + compileFuncDeclaration(parents, scopes, module, ast)
         case "let-declaration": return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(parents, scopes, module, ast.value)}`;
+        case "const-declaration-statement": return `const ${ast.name.name} = ${compileOne(parents, scopes, module, ast.value)}`;
         case "assignment": return `${compileOne(parents, scopes, module, ast.target)} = ${compileOne(parents, scopes, module, ast.value)}`;
         case "if-else-statement": return 'if ' + ast.cases
             .map(({ condition, outcome }) => 

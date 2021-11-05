@@ -220,7 +220,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                     const subjectType = inferType(reportError, parents, scopes, ast.target.subject, true);
 
                     if (!subjectType.mutable) {
-                        reportError(miscError(ast.target, `Cannot assign to property '${ast.target.property.name}' because the target object is immutable`));
+                        reportError(miscError(ast.target, `Cannot assign to property '${ast.target.property.name}' because the target object is constant`));
                     }
                 }
                 if (!subsumes(parents, scopes,  targetType, valueType, true)) {

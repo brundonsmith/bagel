@@ -684,6 +684,28 @@ Deno.test({
   name: "Immutability test 4",
   fn() {
     testTypecheck(`
+    proc foo(param: const { foo: string }) {
+      param.foo = 'stuff';
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 5",
+  fn() {
+    testTypecheck(`
+    proc foo(param: const { foo: { bar: string } }) {
+      param.foo.bar = 'stuff';
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 6",
+  fn() {
+    testTypecheck(`
     const obj = { foo: 'bar' }
 
     proc foo(param: { foo: string }) {
@@ -695,7 +717,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Immutability test 5",
+  name: "Immutability test 7",
   fn() {
     testTypecheck(`
     const obj = { foo: 'bar' }
@@ -708,11 +730,33 @@ Deno.test({
   }
 })
 
-// TODO: Invocation arguments
+Deno.test({
+  name: "Immutability test 8",
+  fn() {
+    testTypecheck(`
+
+    proc foo(param: { foo: string }) {
+      const obj = param;
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 9",
+  fn() {
+    testTypecheck(`
+
+    proc foo(param: { foo: string }) {
+      const obj = param;
+      obj.foo = 'other';
+    }`,
+    true)
+  }
+})
+
 // TODO: Reactions
-// TODO: Classes
 // TODO: if/else/switch
-// TODO: object property access
 
 function testTypecheck(code: string, shouldFail: boolean): void {
   const errors: BagelError[] = [];

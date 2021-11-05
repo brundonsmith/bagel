@@ -5,6 +5,7 @@ import { TypeExpression } from "./type-expressions.ts";
 export type Statement = 
     | JavascriptEscape
     | LetDeclaration
+    | ConstDeclarationStatement
     | IfElseStatement
     | ForLoop
     | WhileLoop
@@ -14,6 +15,13 @@ export type Statement =
 
 export type LetDeclaration = SourceInfo & Identifier & {
     readonly kind: "let-declaration",
+    readonly name: PlainIdentifier,
+    readonly type?: TypeExpression,
+    readonly value: Expression,
+}
+
+export type ConstDeclarationStatement = SourceInfo & Identifier & {
+    readonly kind: "const-declaration-statement",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly value: Expression,

@@ -5,7 +5,7 @@ import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
 import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator } from "../_model/expressions.ts";
-import { Assignment, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
+import { Assignment, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
@@ -125,19 +125,22 @@ const typeExpression: ParseFunction<TypeExpression> = (code, index) =>
     ?? nonArrayType(code, index)
 
 const arrayType: ParseFunction<ArrayType> = (code, startIndex) =>
-    given(nonArrayType(code, startIndex), ({ parsed: element, newIndex: index }) =>
+    given(parseOptional(code, startIndex, (code, index) =>
+        given(parseExact("const")(code, index), ({ parsed: constant, newIndex: index }) =>
+        given(consumeWhitespaceRequired(code, index), index => ({ parsed: constant, newIndex: index })))), ({ parsed: constant, newIndex: indexAfterConstant }) =>
+    given(nonArrayType(code, indexAfterConstant ?? startIndex), ({ parsed: element, newIndex: index }) =>
     given(consume(code, index, "[]"), index => ({
         parsed: {
             kind: "array-type",
             element,
-            mutable: undefined,
+            mutable: !constant,
             id: Symbol(),
             code,
             startIndex,
             endIndex: index,
         },
         newIndex: index,
-    })))
+    }))))
 
 // required because of the way arrayTypes are written
 const nonArrayType: ParseFunction<TypeExpression> = (code, index) =>
@@ -204,7 +207,10 @@ const namedType: ParseFunction<NamedType> = (code, startIndex) =>
     }))
 
 const objectType: ParseFunction<ObjectType> = (code, startIndex) =>
-    given(consume(code, startIndex, "{"), index =>
+    given(parseOptional(code, startIndex, (code, index) =>
+        given(parseExact("const")(code, index), ({ parsed: constant, newIndex: index }) =>
+        given(consumeWhitespaceRequired(code, index), index => ({ parsed: constant, newIndex: index })))), ({ parsed: constant, newIndex: indexAfterConstant }) =>
+    given(consume(code, indexAfterConstant ?? startIndex, "{"), index =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(code, index, _spreadOrEntry, ","), ({ parsed: entries, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -213,14 +219,14 @@ const objectType: ParseFunction<ObjectType> = (code, startIndex) =>
             kind: "object-type",
             spreads: entries.filter((e): e is NamedType => e.kind === "named-type"),
             entries: entries.filter((e): e is Attribute => e.kind === "attribute"),
-            mutable: undefined,
+            mutable: !constant,
             id: Symbol(),
             code,
             startIndex,
             endIndex: index,
         },
         newIndex: index,
-    }))))))
+    })))))))
 
 const _spreadOrEntry: ParseFunction<NamedType|Attribute> = (code, index) => 
     _objectTypeEntry(code, index) ?? _objectTypeSpread(code, index)
@@ -251,7 +257,10 @@ const _objectTypeEntry: ParseFunction<Attribute> = (code, startIndex) =>
     }))))))
 
 const indexerType: ParseFunction<IndexerType> = (code, startIndex) =>
-    given(consume(code, startIndex, "{"), index =>
+    given(parseOptional(code, startIndex, (code, index) =>
+        given(parseExact("const")(code, index), ({ parsed: constant, newIndex: index }) =>
+        given(consumeWhitespaceRequired(code, index), index => ({ parsed: constant, newIndex: index })))), ({ parsed: constant, newIndex: indexAfterConstant }) =>
+    given(consume(code, indexAfterConstant ?? startIndex, "{"), index =>
     given(consume(code, index, "["), index =>
     expec(typeExpression(code, index), err(code, index, 'Type expression for key'), ({ parsed: keyType, newIndex: index }) =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index =>
@@ -262,30 +271,33 @@ const indexerType: ParseFunction<IndexerType> = (code, startIndex) =>
             kind: "indexer-type",
             keyType,
             valueType,
-            mutable: undefined,
+            mutable: !constant,
             id: Symbol(),
             code,
             startIndex,
             endIndex: index,
         },
         newIndex: index,
-    }))))))))
+    })))))))))
 
 const tupleType: ParseFunction<TupleType> = (code, startIndex) =>
-    given(consume(code, startIndex, "["), index =>
+    given(parseOptional(code, startIndex, (code, index) =>
+        given(parseExact("const")(code, index), ({ parsed: constant, newIndex: index }) =>
+        given(consumeWhitespaceRequired(code, index), index => ({ parsed: constant, newIndex: index })))), ({ parsed: constant, newIndex: indexAfterConstant }) =>
+    given(consume(code, indexAfterConstant ?? startIndex, "["), index =>
     given(parseSeries(code, index, typeExpression, ","), ({ parsed: members, newIndex: index }) =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index => ({
         parsed: {
             kind: "tuple-type",
             members,
-            mutable: undefined,
+            mutable: !constant,
             id: Symbol(),
             code,
             startIndex,
             endIndex: index,
         },
         newIndex: index,
-    }))))
+    })))))
 
 const primitiveType: ParseFunction<PrimitiveType> = (code, startIndex) =>
     given(consume(code, startIndex, "string"), index => ({
@@ -730,6 +742,7 @@ const statement: ParseFunction<Statement> = (code, startIndex) =>
     reaction(code, startIndex)
     ?? javascriptEscape(code, startIndex)
     ?? letDeclaration(code, startIndex)
+    ?? constDeclarationStatement(code, startIndex)
     ?? ifElseStatement(code, startIndex)
     ?? forLoop(code, startIndex)
     ?? whileLoop(code, startIndex)
@@ -763,7 +776,7 @@ const reaction: ParseFunction<Reaction> = (code, startIndex) =>
 const letDeclaration: ParseFunction<LetDeclaration> = (code, startIndex) =>
     given(consume(code, startIndex, "let"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
-    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
+    expec(plainIdentifier(code, index), err(code, index, "Variable name"), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseOptional(code, index, (code, index) =>
         given(consume(code, index, ":"), index =>
@@ -776,6 +789,33 @@ const letDeclaration: ParseFunction<LetDeclaration> = (code, startIndex) =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
             parsed: {
                 kind: "let-declaration",
+                name,
+                value,
+                type,
+                id: Symbol(),
+                code,
+                startIndex,
+                endIndex: index,
+            },
+            newIndex: index,
+        }))))))))))))
+
+const constDeclarationStatement: ParseFunction<ConstDeclarationStatement> = (code, startIndex) => 
+    given(consume(code, startIndex, "const"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(plainIdentifier(code, index), err(code, index, "Constant name"), ({ parsed: name, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(parseOptional(code, index, (code, index) =>
+        given(consume(code, index, ":"), index =>
+        given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: type, newIndex }) =>
+    given(consumeWhitespace(code, newIndex ?? index), index =>
+    expec(consume(code, index, "="), err(code, index, '"="'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(expression(code, index), err(code, index, 'Expression'), ({ parsed: value, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
+            parsed: {
+                kind: "const-declaration-statement",
                 name,
                 value,
                 type,
