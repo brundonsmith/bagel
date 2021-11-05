@@ -223,9 +223,6 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
                 walkParseTree(nextPayload, ast.until, fn);
             }
         } break;
-        case "computation": {
-            walkParseTree(nextPayload, ast.expression, fn);
-        } break;
         case "let-declaration": {
             walkParseTree(nextPayload, ast.name, fn);
             walkParseTree(nextPayload, ast.value, fn);
