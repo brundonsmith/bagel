@@ -12,6 +12,7 @@ export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
 type BasicData =
     | {readonly [key: string]: BasicData}
     | readonly BasicData[]
+    | symbol
     | string
     | number
     | boolean

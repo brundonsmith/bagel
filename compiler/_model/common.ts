@@ -6,6 +6,8 @@ import { Expression } from "./expressions.ts";
 import { withoutSourceInfo, display } from "../debugging.ts";
 import { deepEquals } from "../utils.ts";
 
+export type Identifier = { readonly id: symbol }
+
 export type SourceInfo = {
     readonly code: string|undefined,
     readonly startIndex: number|undefined,
@@ -29,15 +31,15 @@ export function moreSpecificThan(a: Partial<SourceInfo>, b: Partial<SourceInfo>)
     return (a.startIndex as number) >= (b.startIndex as number) && (a.endIndex as number) <= (b.endIndex as number)
 }
 
-type ReadonlyWeakMap<K extends {}, V> = Omit<WeakMap<K, V>, 'set'|'delete'>
+type ReadonlyMap<K extends {}, V> = Omit<Map<K, V>, 'set'|'delete'>
 
-export type ParentsMap = ReadonlyWeakMap<AST, AST>
+export type ParentsMap = ReadonlyMap<symbol, AST>
 export type AllParents = Set<ParentsMap>
 
-export type ScopesMap = ReadonlyWeakMap<AST, Scope>
+export type ScopesMap = ReadonlyMap<symbol, Scope>
 export type AllScopes = Set<ScopesMap>
 
-export function anyHas<K extends {}, V>(all: Set<ReadonlyWeakMap<K, V>>, key: K): boolean {
+export function anyHas<K extends {}, V>(all: Set<ReadonlyMap<K, V>>, key: K): boolean {
     for (const map of all) {
         if (map.has(key)) {
             return true;
@@ -47,7 +49,7 @@ export function anyHas<K extends {}, V>(all: Set<ReadonlyWeakMap<K, V>>, key: K)
     return false;
 }
 
-export function anyGet<K extends {}, V>(all: Set<ReadonlyWeakMap<K, V>>, key: K): V | undefined {
+export function anyGet<K extends {}, V>(all: Set<ReadonlyMap<K, V>>, key: K): V | undefined {
     for (const map of all) {
         if (map.has(key)) {
             return map.get(key);
@@ -100,11 +102,11 @@ export function getScopeFor(parents: AllParents, scopes: AllScopes, ast: AST): S
     let current: AST|undefined = ast
 
     while (current != null) {
-        const currentScope = anyGet(scopes, current)
+        const currentScope = anyGet(scopes, current.id)
         if (currentScope) {
             return currentScope
         } else {
-            current = anyGet(parents, current)
+            current = anyGet(parents, current.id)
         }
     }
 
@@ -122,18 +124,19 @@ const EMPTY_SCOPE: Scope = {
     refinements: [],
 }
 
-export type PlainIdentifier = SourceInfo & {
+export type PlainIdentifier = SourceInfo & Identifier & {
     readonly kind: "plain-identifier",
     readonly name: string,
 }
 
-export type Block = SourceInfo & {
+export type Block = SourceInfo & Identifier & {
     readonly kind: "block",
     readonly statements: readonly Statement[],
 }
 
 export const KEYWORDS = [ "func", "proc", "if", "else", "switch", "case",
-"type", "class", "let", "const", "for", "while", 
+//"type", 
+"class", "let", "const", "for", "while", 
 "of", "nil", "public", "visible", "private", "reaction", 
 "triggers", "until", "true", "false", "import", "export", "from", "as", "test",
 "expr", "block" ] as const;

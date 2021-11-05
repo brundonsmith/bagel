@@ -240,10 +240,11 @@ export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize2((code, s
     given(identifierSegment(code, startIndex), ({ segment: name, newIndex: index }) => ({
         parsed: {
             kind: "plain-identifier",
+            name,
+            id: Symbol(),
             code,
             startIndex,
             endIndex: index,
-            name,
         },
         newIndex: index,
     })))

@@ -12,7 +12,7 @@ import { display, displayScope } from "../debugging.ts";
 
 
 export function scopescan(reportError: (error: BagelError) => void, parents: AllParents, otherScopes: AllScopes, getModule: (module: string) => Module|undefined, ast: AST): ScopesMap {
-    const scopesMap = new WeakMap<AST, MutableScope>()
+    const scopesMap = new Map<symbol, MutableScope>()
     const allScopes = and(otherScopes, scopesMap)
     
     walkParseTree<MutableScope|undefined>(undefined, ast, (payload, ast) => {
@@ -20,7 +20,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
         // If ast is of a type that defines its own scope, define that and 
         // mark it as this ast's scope
         if (isScopeOwner(ast)) {
-            let newScope = scopesMap.get(ast) 
+            let newScope = scopesMap.get(ast.id) 
                 ?? scopeFrom(reportError, getModule, parents, scopesMap, ast, payload)
 
             switch (ast.kind) {
@@ -29,7 +29,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                         // each const should establish a new scope to ensure their 
                         // order of evaluation works out
                         if (declaration.kind === "const-declaration") {
-                            scopesMap.set(declaration, newScope)
+                            scopesMap.set(declaration.id, newScope)
                             newScope = scopeFrom(reportError, getModule, parents, scopesMap, declaration, newScope)
                         }
                     }
@@ -42,7 +42,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                                 reportError(alreadyDeclared(c.name))
                             }
                             
-                            scopesMap.set(c.value, newScope)
+                            scopesMap.set(c.value.id, newScope)
                             newScope = scopeFrom(reportError, getModule, parents, scopesMap, c, newScope)
                         }
                     }
@@ -54,17 +54,17 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                                 reportError(alreadyDeclared(statement.name))
                             }
 
-                            scopesMap.set(statement, newScope)
+                            scopesMap.set(statement.id, newScope)
                             newScope = scopeFrom(reportError, getModule, parents, scopesMap, statement, newScope)
                         }
                     }
                     break;
             }
             
-            scopesMap.set(ast, newScope);
+            scopesMap.set(ast.id, newScope);
             return newScope;
         } else {
-            return scopesMap.get(ast) ?? payload;
+            return scopesMap.get(ast.id) ?? payload;
         }
     });
 
@@ -87,11 +87,9 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                 
                 // infer callback argument types based on context
                 const thisArgParentType = (() => {
-                    const parent = anyGet(parents, ast)
+                    const parent = anyGet(parents, ast.id)
                     if (parent?.kind === "invocation") {
-                        // console.log(display(parent.subject))
                         const parentSubjectType = inferType(reportError, parents, allScopes, parent.subject)
-                        // console.log(displayForm(parentSubjectType))
                         const thisArgIndex = parent.args.findIndex(a => a === ast)
     
                         if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
@@ -104,7 +102,6 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                     }
                 })()
     
-                // add func/proc arguments to scope
                 for (let i = 0; i < ast.type.args.length; i++) {
                     const arg = ast.type.args[i]
     
@@ -121,11 +118,11 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
 }
 
 export function getParentsMap(ast: AST): ParentsMap {
-    const parents = new WeakMap<AST, AST>()
+    const parents = new Map<symbol, AST>()
 
     walkParseTree<AST|undefined>(undefined, ast, (payload, ast) => {
         if (payload != null) {
-            parents.set(ast, payload)
+            parents.set(ast.id, payload)
         }
         return ast
     });
@@ -200,24 +197,20 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
 
                             const name = i.alias ?? i.name;
 
+                            if (newScope.values[name.name] != null || newScope.classes[name.name] != null) {
+                                reportError(alreadyDeclared(name))
+                            }
+
                             if (foreignDecl == null) {
                                 reportError(cannotFindExport(i, declaration));
-
-                                if (newScope.values[name.name] != null || newScope.classes[name.name] != null) {
-                                    reportError(alreadyDeclared(name))
-                                }
 
                                 newScope.values[name.name] = {
                                     mutability: "none",
                                     declaredType: UNKNOWN_TYPE,
                                 };
                             } else {
-                                if (newScope.values[name.name] != null || newScope.classes[name.name] != null) {
-                                    reportError(alreadyDeclared(name))
-                                }
-
                                 newScope.values[name.name] = {
-                                    mutability: "none",
+                                    mutability: "none", // TODO: If we ever allow global mutable state, this will need to allow for it
                                     declaredType: declType(foreignDecl) as TypeExpression,
                                     initialValue: declValue(foreignDecl),
                                 };
@@ -241,7 +234,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
 
             // infer callback argument types based on context
             const thisArgParentType = (() => {
-                const parent = anyGet(parents, ast)
+                const parent = anyGet(parents, ast.id)
                 if (parent?.kind === "invocation") {
                     const parentSubjectType = inferType(reportError, parents, and<ScopesMap>(new Set(), scopes), parent.subject)
                     const thisArgIndex = parent.args.findIndex(a => a === ast)
@@ -285,6 +278,8 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                     kind: "class-instance-type",
                     clazz: ast,
                     internal: true,
+                    mutable: true,
+                    id: Symbol(),
                     code: undefined,
                     startIndex: undefined,
                     endIndex: undefined
@@ -305,7 +300,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
         case "case": {
 
             // Type refinement
-            const parent = anyGet(parents, ast)
+            const parent = anyGet(parents, ast.id)
             if (parent?.kind === "if-else-expression") {
                 if (ast.condition.kind === "binary-operator" && ast.condition.ops[0][0].op === "!=") {
                     const targetExpression = 
@@ -368,8 +363,8 @@ function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
         typeofStr === "number" ? NUMBER_TYPE :
         typeofStr === "boolean" ? BOOLEAN_TYPE :
         typeofStr === "nil" ? NIL_TYPE :
-        typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, code: undefined, startIndex: undefined, endIndex: undefined } :
-        typeofStr === "object" ? { kind: "indexer-type", keyType: ANY_TYPE, valueType: ANY_TYPE, code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, mutable: undefined, id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "object" ? { kind: "indexer-type", keyType: ANY_TYPE, valueType: ANY_TYPE, mutable: undefined, id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined } :
         // TODO
         // type.value === "set" ?
         // type.value === "class-instance" ?

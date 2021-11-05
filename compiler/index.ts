@@ -151,7 +151,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
             )
             return [scopes, errors]
         } catch {
-            return [new WeakMap(), []]
+            return [new Map(), []]
         }
     };
     const scopesMap: (module: string) => (ast: Module) => [ScopesMap, readonly BagelError[]] = createTransformer((module: string) => createTransformer((ast: Module) => _scopesMap(module, ast)));

@@ -447,6 +447,58 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Property access success",
+  fn() {
+    testTypecheck(`
+      const obj = {
+        foo: {
+          bar: 12
+        }
+      }
+
+      const val: number = obj.foo.bar
+      `,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Property access failure",
+  fn() {
+    testTypecheck(`
+      const obj = {
+        foo: {
+          bar: 12
+        }
+      }
+
+      const val: number = obj.foo.other
+      `,
+      true
+    )
+  }
+})
+
+Deno.test({
+  name: "Property access named type success",
+  fn() {
+    testTypecheck(`
+      type Obj = {
+        foo: {
+          bar: number
+        }
+      }
+
+      func fn(obj: Obj): number =>
+        obj.foo.bar
+      `,
+      false
+    )
+  }
+})
+
+Deno.test({
   name: "Optional chain success",
   fn() {
     testTypecheck(
@@ -590,6 +642,69 @@ Deno.test({
     const foo = !a
     `
     , true)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 1",
+  fn() {
+    testTypecheck(`
+    const obj = { foo: 'stuff' }
+
+    proc foo() {
+      obj.foo = 'other';
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 2",
+  fn() {
+    testTypecheck(`
+    proc foo(param: { foo: string }) {
+      param = { foo: 'stuff' };
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 3",
+  fn() {
+    testTypecheck(`
+    proc foo(param: { foo: string }) {
+      param.foo = 'stuff';
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 4",
+  fn() {
+    testTypecheck(`
+    const obj = { foo: 'bar' }
+
+    proc foo(param: { foo: string }) {
+      let alias = obj;
+      alias.foo = 'other';
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 5",
+  fn() {
+    testTypecheck(`
+    const obj = { foo: 'bar' }
+
+    proc foo(param: { foo: string }) {
+      let alias = obj;
+      alias = { foo: 'other' };
+    }`,
+    false)
   }
 })
 

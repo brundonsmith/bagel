@@ -3,14 +3,13 @@ import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, NIL_TYPE, REACTION_VIEW_TYPE, STR
 import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
 import { propertiesOf, inferType, resolve, subtract } from "./typeinfer.ts";
-import { AllParents, AllScopes, getScopeFor, ParentsMap, ScopesMap } from "../_model/common.ts";
+import { AllParents, AllScopes, getScopeFor } from "../_model/common.ts";
 import { display } from "../debugging.ts";
 import { extendScope } from "./scopescan.ts";
 
 
 export function typecheck(reportError: (error: BagelError) => void, parents: AllParents, scopes: AllScopes, ast: Module) {
     walkParseTree<void>(undefined, ast, (_, ast) => {
-        // console.log('typechecking ', display(ast))
         const scope = getScopeFor(parents, scopes, ast)
 
         switch(ast.kind) {
@@ -211,15 +210,19 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             } break;
             case "assignment": {
                 if (ast.target.kind === "local-identifier" && getScopeFor(parents, scopes, ast.target).values[ast.target.name].mutability !== "all") {
-                    reportError(miscError(ast.target, `Cannot assign to '${ast.target.name}' because it is not mutable`));
+                    reportError(miscError(ast.target, `Cannot assign to '${ast.target.name}' because it's constant`));
                 }
-                //  else if(ast.target.kind === "property-accessor" && scope.values[ast.target.]) {
-                //    TODO: Have to figure out whether the mutability of any arbitrary base expression
-                // }
 
                 const targetType = inferType(reportError, parents, scopes, ast.target, true);
                 const valueType = inferType(reportError, parents, scopes, ast.value, true);
 
+                if (ast.target.kind === "property-accessor") {
+                    const subjectType = inferType(reportError, parents, scopes, ast.target.subject, true);
+
+                    if (!subjectType.mutable) {
+                        reportError(miscError(ast.target, `Cannot assign to property '${ast.target.property.name}' because the target object is immutable`));
+                    }
+                }
                 if (!subsumes(parents, scopes,  targetType, valueType, true)) {
                     reportError(assignmentError(ast.value, targetType, valueType));
                 }
@@ -256,6 +259,11 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
     const resolvedValue = resolve(getScopeFor(parents, scopes, value), value, resolveGenerics)
     // console.log('subsumes (resolved)?\n', { resolvedDestination: display(resolvedDestination), resolvedValue: display(resolvedValue) })
 
+    // constants can't be assigned to mutable slots
+    if (resolvedDestination.mutable && !resolvedValue.mutable) {
+        return false;
+    }
+
     if (resolvedValue.kind === "any-type" || resolvedDestination.kind === "any-type") {
         return true;
     } else if (resolvedDestination.kind === "unknown-type") {
@@ -281,7 +289,7 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
         }
     } else if (resolvedValue.kind === "union-type") {
         return false;
-    } else if(deepEquals(resolvedDestination, resolvedValue, ["code", "startIndex", "endIndex", "scope"])) {
+    } else if(deepEquals(resolvedDestination, resolvedValue, ["id", "mutable", "code", "startIndex", "endIndex"])) {
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
             // NOTE: Value and destination are flipped on purpose for args!
@@ -300,7 +308,7 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
 
         return (
             !!destinationEntries?.every(({ name: key, type: destinationValue }) => 
-                given(valueEntries?.find(e => deepEquals(e.name, key, ["code", "startIndex", "endIndex"]))?.type, value =>
+                given(valueEntries?.find(e => deepEquals(e.name, key, ["id", "mutable", "code", "startIndex", "endIndex"]))?.type, value =>
                     subsumes(parents, scopes,  destinationValue, value, resolveGenerics)))
         );
     } else if (resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") {

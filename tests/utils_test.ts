@@ -164,7 +164,7 @@ Deno.test({
         }
     };
 
-    if (!deepEquals(val, JSON.parse(JSON.stringify(val)))) {
+    if (!deepEquals(val, JSON.parse(JSON.stringify(val)), ["id"])) {
         throw "Values should be considered equal but were not"
     }
 }})
