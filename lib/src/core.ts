@@ -153,7 +153,7 @@ export function log<T>(expr: T): T {
 
 export const fromEntries = Object.fromEntries;
 
-const INNER_ITER = Symbol('INNER_ITER')
+export const INNER_ITER = Symbol('INNER_ITER')
 
 export type Iter<T> = {
     [INNER_ITER]: RawIter<T>,

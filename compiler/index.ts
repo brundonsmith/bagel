@@ -61,7 +61,7 @@ function bagelFileToJsBundleFile(module: string): string {
 }
 
 const IMPORTED_ITEMS = [ 'autorunUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h', 'render',
-'createTransformer', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan'
+'createTransformer', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER'
 ].map(s => `${s} as ${INT}${s}`).join(', ')
 
 const LIB_IMPORTS = `
@@ -348,7 +348,7 @@ const bundleOutput = debounce(async (entryFile: string) => {
     await esbuild.build({
         write: true,
         bundle: true,
-        minify: true,
+        minify: false,
         entryPoints: [ bagelFileToTsFile(entryFile) ],
         outfile: bundleFile
     })

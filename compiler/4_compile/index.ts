@@ -58,7 +58,7 @@ function compileOne(parents: AllParents, scopes: AllScopes, module: string, ast:
                 `(${compileOne(parents, scopes, module, condition)}) ${compileOne(parents, scopes, module, outcome)}`)
             .join(' else if ')
             + (ast.defaultCase ? ` else ${compileOne(parents, scopes, module, ast.defaultCase)}` : '');
-        case "for-loop": return `for (const ${compileOne(parents, scopes, module, ast.itemIdentifier)} of ${compileOne(parents, scopes, module, ast.iterator)}) ${compileOne(parents, scopes, module, ast.body)}`;
+        case "for-loop": return `for (const ${compileOne(parents, scopes, module, ast.itemIdentifier)} of ${compileOne(parents, scopes, module, ast.iterator)}[${INT}INNER_ITER]) ${compileOne(parents, scopes, module, ast.body)}`;
         case "while-loop": return `while (${compileOne(parents, scopes, module, ast.condition)}) ${compileOne(parents, scopes, module, ast.body)}`;
         case "proc": return compileProc(parents, scopes, module, ast);
         case "func": return compileFunc(parents, scopes, module, ast);
