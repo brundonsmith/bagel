@@ -8,11 +8,9 @@ import { reshape } from "./2_reshape/index.ts";
 import { BagelError, miscError, prettyError } from "./errors.ts";
 import { all, cacheDir, cachedModulePath, esOrNone, given, on, pathIsRemote, sOrNone } from "./utils.ts";
 import { Module } from "./_model/ast.ts";
-import { display } from './debugging.ts'
 
-import { observable, autorun, configure, computed } from "https://jspm.dev/mobx"
-import { createTransformer } from "https://jspm.dev/mobx-utils"
-import { AllParents, AllScopes, ParentsMap, ScopesMap } from "./_model/common.ts";
+import { ParentsMap, ScopesMap } from "./_model/common.ts";
+import { autorun, computed, configure, createTransformer, observable } from "./mobx.ts";
 
 configure({
     enforceActions: "never",
@@ -37,29 +35,6 @@ configure({
     }
 }
 
-async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
-    
-    for await (const file of Deno.readDir(dirPath)) {
-        const filePath = path.resolve(dirPath, file.name);
-
-        if ((await Deno.stat(filePath)).isDirectory) {
-            await getAllFiles(filePath, arrayOfFiles);
-        } else {
-            arrayOfFiles.push(filePath);
-        }
-    }
-  
-    return arrayOfFiles;
-}
-
-function bagelFileToTsFile(module: string): string {
-    return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + ".bgl.ts")
-}
-
-function bagelFileToJsBundleFile(module: string): string {
-    return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + ".bundle.js")
-}
-
 const IMPORTED_ITEMS = [ 'autorunUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h', 'render',
 'createTransformer', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER'
 ].map(s => `${s} as ${INT}${s}`).join(', ')
@@ -81,8 +56,8 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     const singleEntry = !(await Deno.stat(entryFileOrDir)).isDirectory
     const allFiles = singleEntry ? [ entryFileOrDir ] : await getAllFiles(entryFileOrDir);
 
-    const modules: Set<string> = observable(new Set<string>(allFiles.filter(f => f.match(/\.bgl$/i))));
-    const modulesSource: Map<string, string> = observable(new Map())
+    const modules = observable(new Set<string>(allFiles.filter(f => f.match(/\.bgl$/i))));
+    const modulesSource = observable(new Map<string, string>())
 
     fs.ensureDir(cacheDir())
 
@@ -112,16 +87,15 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         }
     })
     
-    const _parsed = (source: string): [Module, readonly BagelError[]] => {
+    const parsed = createTransformer((source: string): [Module, readonly BagelError[]] => {
         const errors: BagelError[] = []
         const mod = reshape(parse(source, err => errors.push(err)))
         return [mod, errors]
-    };
-    const parsed: typeof _parsed = createTransformer(_parsed);
+    });
 
-    const parentsMap: typeof getParentsMap = createTransformer(getParentsMap)
+    const parentsMap = createTransformer(getParentsMap)
 
-    const _allParents = computed(() => {
+    const allParents = computed(() => {
         const set = new Set<ParentsMap>()
 
         for (const module of modules) {
@@ -135,14 +109,13 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
 
         return set
     })
-    const allParents = (): AllParents => _allParents.get()
 
-    const _scopesMap = (module: string, ast: Module): [ScopesMap, readonly BagelError[]] => {
+    const scopesMap = createTransformer((module: string) => createTransformer((ast: Module): [ScopesMap, readonly BagelError[]] => {
         const errors: BagelError[] = []
         try {
             const scopes = scopescan(
                 err => errors.push(err), 
-                allParents(), 
+                allParents.get(), 
                 new Set(),
                 imported => 
                     given(modulesSource.get(canonicalModuleName(module, imported)), 
@@ -153,10 +126,9 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         } catch {
             return [new Map(), []]
         }
-    };
-    const scopesMap: (module: string) => (ast: Module) => [ScopesMap, readonly BagelError[]] = createTransformer((module: string) => createTransformer((ast: Module) => _scopesMap(module, ast)));
+    }));
 
-    const _allScopes = computed(() => {
+    const allScopes = computed(() => {
         const set = new Set<ScopesMap>()
 
         for (const module of modules) {
@@ -170,34 +142,32 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
 
         return set
     })
-    const allScopes = (): AllScopes => _allScopes.get()
 
     
-    const _typeerrors = (module: string, ast: Module): BagelError[] => {
+    const typeerrors = createTransformer((module: string) => createTransformer((ast: Module): BagelError[] => {
         try {
             const errors: BagelError[] = []
             const [_, scopeErrors] = scopesMap(module)(ast)
             typecheck(
                 err => errors.push(err), 
-                allParents(),
-                allScopes(), 
+                allParents.get(),
+                allScopes.get(), 
                 ast
             )
             return [...scopeErrors, ...errors]
         } catch (e) {
             return [ miscError(ast, e.toString()) ]
         }
-    }
-    const typeerrors: (module: string) => (ast: Module) => BagelError[] = createTransformer((module: string) => createTransformer((ast: Module) => _typeerrors(module, ast)));
+    }))
 
-    const _compiled = (module: string, ast: Module): string => {
+    const compiled = createTransformer((module: string) => createTransformer((ast: Module): string => {
         try {
             return (
                 LIB_IMPORTS + 
                 (ast.hasMain ? MOBX_CONFIGURE : '') + 
                 compile(
-                    allParents(), 
-                    allScopes(), 
+                    allParents.get(), 
+                    allScopes.get(), 
                     ast, 
                     module, 
                     includeTests
@@ -207,8 +177,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
             console.error(e)
             return '';
         }
-    }
-    const compiled: (module: string) => (ast: Module) => string = createTransformer((module: string) => createTransformer((ast: Module) => _compiled(module, ast)));
+    }))
 
     // add imported modules to set
     autorun(() => {
@@ -260,7 +229,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
             console.clear()
         }
 
-        const allErrors: Map<string, BagelError[]> = new Map()
+        const allErrors = new Map<string, BagelError[]>()
 
         for (const module of modules) {
             const source = modulesSource.get(module)
@@ -283,26 +252,26 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     })
 
     // write compiled code to disk
-    autorun(() => {
-        for (const module of modules) {
+    for (const module of modules) {
+        autorun(() => {
             const source = modulesSource.get(module)
             if (source) {
                 const jsPath = pathIsRemote(module)
                     ? cachedModulePath(module) + '.ts'
                     : bagelFileToTsFile(module)
-
-               
+            
                 const js = compiled(module)(parsed(source)[0])
 
-                Deno.writeFile(jsPath, new TextEncoder().encode(js));
-
-                // bundle
-                if (singleEntry && bundle) {
-                    bundleOutput(entryFileOrDir)
-                }
+                Deno.writeFile(jsPath, new TextEncoder().encode(js))
+                    .then(() => {
+                        // bundle
+                        if (singleEntry && bundle) {
+                            return bundleOutput(entryFileOrDir)
+                        }
+                    })
             }
-        }
-    })
+        })
+    }
 
     if (watch) {
         const watchers = new Map<string, Deno.FsWatcher>()
@@ -331,7 +300,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     }
 }
 
-const bundleOutput = debounce(async (entryFile: string) => {
+const bundleOutput = async (entryFile: string) => {
     const bundleFile = bagelFileToJsBundleFile(entryFile)
 
     // const result = await Deno.emit(windowsPathToModulePath(bagelFileToTsFile(entryFile)), {
@@ -352,10 +321,9 @@ const bundleOutput = debounce(async (entryFile: string) => {
         entryPoints: [ bagelFileToTsFile(entryFile) ],
         outfile: bundleFile
     })
- 
     
     console.log('Bundle written to ' + bundleFile)
-}, 100)
+}
 
 function test() {
     build({ entry: Deno.cwd(), emit: true, includeTests: true })
@@ -420,9 +388,42 @@ function test() {
     }, 1000)
 }
 
+async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
+    
+    for await (const file of Deno.readDir(dirPath)) {
+        const filePath = path.resolve(dirPath, file.name);
+
+        if ((await Deno.stat(filePath)).isDirectory) {
+            await getAllFiles(filePath, arrayOfFiles);
+        } else {
+            arrayOfFiles.push(filePath);
+        }
+    }
+  
+    return arrayOfFiles;
+}
+
+function bagelFileToTsFile(module: string): string {
+    return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + ".bgl.ts")
+}
+
+function bagelFileToJsBundleFile(module: string): string {
+    return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + ".bundle.js")
+}
+
 function windowsPathToModulePath(str: string) {
     return str.replaceAll('\\', '/').replace(/^C:/, '/').replace(/^file:\/\/\//i, '')
 }
+
+function canonicalModuleName(importerModule: string, importPath: string) {
+    if (pathIsRemote(importPath)) {
+        return importPath
+    } else {
+        const moduleDir = path.dirname(importerModule);
+        return path.resolve(moduleDir, importPath) + ".bgl"
+    }
+}
+
 
 // testInWorker(file.path)
 //     .then(failed => {
@@ -464,11 +465,3 @@ function windowsPathToModulePath(str: string) {
 //         }
 //     })
 // }
-function canonicalModuleName(importerModule: string, importPath: string) {
-    if (pathIsRemote(importPath)) {
-        return importPath
-    } else {
-        const moduleDir = path.dirname(importerModule);
-        return path.resolve(moduleDir, importPath) + ".bgl"
-    }
-}
