@@ -242,7 +242,7 @@ Deno.test({
         
             ___locals["count"] = 0;
 
-            for (const item of items) { ; };
+            for (const item of items[___INNER_ITER]) { ; };
 
             console.log(___locals["count"]);
         };`,
@@ -276,7 +276,7 @@ Deno.test({
         
             ___locals["count"] = 0;
 
-            for (const item of items) {
+            for (const item of items[___INNER_ITER]) {
                 if (item.foo) {
                     ___locals["count"] = (___locals["count"] + 1);
                 };
