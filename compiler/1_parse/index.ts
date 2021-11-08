@@ -154,9 +154,9 @@ const unionType: ParseFunction<UnionType> = (code, startIndex) =>
             ? {
                 parsed: {
                     kind: "union-type",
-                    mutable: undefined,
                     members,
                     id: Symbol(),
+                    mutable: undefined,
                     code,
                     startIndex,
                     endIndex: index,
@@ -183,8 +183,8 @@ const elementType: ParseFunction<ElementType> = (code, startIndex) =>
     given(consume(code, startIndex, "Element"), index => ({
         parsed: {
             kind: "element-type",
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -197,8 +197,8 @@ const namedType: ParseFunction<NamedType> = (code, startIndex) =>
         parsed: {
             kind: "named-type",
             name,
-            mutable: undefined,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -219,8 +219,8 @@ const objectType: ParseFunction<ObjectType> = (code, startIndex) =>
             kind: "object-type",
             spreads: entries.filter((e): e is NamedType => e.kind === "named-type"),
             entries: entries.filter((e): e is Attribute => e.kind === "attribute"),
-            mutable: !constant,
             id: Symbol(),
+            mutable: !constant,
             code,
             startIndex,
             endIndex: index,
@@ -247,8 +247,8 @@ const _objectTypeEntry: ParseFunction<Attribute> = (code, startIndex) =>
             kind: "attribute",
             name,
             type,
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index
@@ -303,8 +303,8 @@ const primitiveType: ParseFunction<PrimitiveType> = (code, startIndex) =>
     given(consume(code, startIndex, "string"), index => ({
         parsed: {
             kind: "string-type",
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -314,8 +314,8 @@ const primitiveType: ParseFunction<PrimitiveType> = (code, startIndex) =>
     ?? given(consume(code, startIndex, "number"), index => ({
         parsed: {
             kind: "number-type",
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -325,8 +325,8 @@ const primitiveType: ParseFunction<PrimitiveType> = (code, startIndex) =>
     ?? given(consume(code, startIndex, "boolean"), index => ({
         parsed: {
             kind: "boolean-type",
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -336,8 +336,8 @@ const primitiveType: ParseFunction<PrimitiveType> = (code, startIndex) =>
     ?? given(consume(code, startIndex, "nil"), index => ({
         parsed: {
             kind: "nil-type",
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -347,8 +347,8 @@ const primitiveType: ParseFunction<PrimitiveType> = (code, startIndex) =>
     ?? given(consume(code, startIndex, "unknown"), index => ({
         parsed: {
             kind: "unknown-type",
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -377,8 +377,8 @@ const funcType: ParseFunction<FuncType> = (code, startIndex) =>
             typeParams: typeParams ?? [],
             args,
             returnType,
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index
@@ -398,8 +398,8 @@ const procType: ParseFunction<FuncType|ProcType> = (code, startIndex) =>
             kind: "proc-type",
             typeParams: [], // TODO
             args,
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index
@@ -416,8 +416,8 @@ const iteratorType: ParseFunction<IteratorType> = (code, startIndex) =>
         parsed: {
             kind: "iterator-type",
             itemType,
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -434,8 +434,8 @@ const planType: ParseFunction<PlanType> = (code, startIndex) =>
         parsed: {
             kind: "plan-type",
             resultType,
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -451,8 +451,8 @@ const literalType: ParseFunction<LiteralType> = (code, startIndex) =>
         parsed: {
             kind: "literal-type",
             value,
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -473,8 +473,8 @@ const unknownType: ParseFunction<UnknownType> = (code, startIndex) =>
     given(consume(code, startIndex, "unknown"), index => ({
         parsed: {
             kind: "unknown-type",
-            mutable: false,
             id: Symbol(),
+            mutable: undefined,
             code,
             startIndex,
             endIndex: index,
@@ -723,8 +723,8 @@ const proc: ParseFunction<Proc> = (code, startIndex) =>
                 kind: "proc-type",
                 typeParams: [], // TODO
                 args,
-                mutable: false,
                 id: Symbol(),
+                mutable: undefined,
                 code,
                 startIndex,
                 endIndex: index
@@ -1006,8 +1006,8 @@ const func: ParseFunction<Func> = (code, startIndex) =>
                 typeParams: typeParams ?? [],
                 args,
                 returnType,
-                mutable: false,
                 id: Symbol(),
+                mutable: undefined,
                 code,
                 startIndex,
                 endIndex: index

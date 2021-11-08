@@ -254,29 +254,34 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
 }
 
 export function subsumes(parents: AllParents, scopes: AllScopes, destination: TypeExpression, value: TypeExpression, resolveGenerics?: boolean): boolean {
+    if (destination === value) {
+        return true;
+    }
+
     // console.log('subsumes?\n', { destination: display(destination), value: display(value) })
     const resolvedDestination = resolve(getScopeFor(parents, scopes, destination), destination, resolveGenerics)
-    const resolvedValue = resolve(getScopeFor(parents, scopes, value), value, resolveGenerics)
+    const resolvedValue =       resolve(getScopeFor(parents, scopes, value), value, resolveGenerics)
     // console.log('subsumes (resolved)?\n', { resolvedDestination: display(resolvedDestination), resolvedValue: display(resolvedValue) })
 
     // constants can't be assigned to mutable slots
-    if (resolvedDestination.mutable && !resolvedValue.mutable) {
+    if (resolvedDestination.mutable === true && resolvedValue.mutable === false) {
         return false;
     }
 
-    if (resolvedValue.kind === "any-type" || resolvedDestination.kind === "any-type") {
+    if (
+        resolvedValue.kind === "javascript-escape-type" || 
+        resolvedValue.kind === "any-type" || 
+        resolvedDestination.kind === "any-type" || 
+        resolvedDestination.kind === "unknown-type"
+    ) {
         return true;
-    } else if (resolvedDestination.kind === "unknown-type") {
-        return true;
-    } else if(resolvedValue.kind === "unknown-type") {
+    } else if (resolvedValue.kind === "unknown-type") {
         return false;
-    } else if (resolvedValue.kind === "javascript-escape-type") {
-        return true;
-    } else if(resolvedDestination.kind === "number-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "number-literal") {
-        return true;
-    } else if(resolvedDestination.kind === "string-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "exact-string-literal") {
-        return true;
-    } else if(resolvedDestination.kind === "boolean-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "boolean-literal") {
+    } else if (
+        (resolvedDestination.kind === "number-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "number-literal") ||
+        (resolvedDestination.kind === "string-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "exact-string-literal") ||
+        (resolvedDestination.kind === "boolean-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "boolean-literal")
+    ) {
         return true;
     } else if(resolvedDestination.kind === "union-type") {
         if (resolvedValue.kind === "union-type") {
@@ -304,11 +309,11 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
         return subsumes(parents, scopes, resolvedDestination.element, resolvedValue.element, resolveGenerics)
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
         const destinationEntries = propertiesOf(() => {}, parents, scopes, resolvedDestination)
-        const valueEntries = propertiesOf(() => {}, parents, scopes, resolvedValue)
+        const valueEntries =       propertiesOf(() => {}, parents, scopes, resolvedValue)
 
         return (
             !!destinationEntries?.every(({ name: key, type: destinationValue }) => 
-                given(valueEntries?.find(e => deepEquals(e.name, key, ["id", "mutable", "code", "startIndex", "endIndex"]))?.type, value =>
+                given(valueEntries?.find(e => e.name.name === key.name)?.type, value =>
                     subsumes(parents, scopes,  destinationValue, value, resolveGenerics)))
         );
     } else if (resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") {

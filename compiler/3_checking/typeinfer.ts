@@ -1,11 +1,11 @@
-import { AllParents, AllScopes, getScopeFor, MutableScope, Scope } from "../_model/common.ts";
+import { AllParents, AllScopes, DeclarationDescriptor, getScopeFor, Scope } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
-import { Attribute, BOOLEAN_TYPE, Mutability, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, given, memoize3, memoize4 } from "../utils.ts";
+import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { deepEquals, given, memoize4 } from "../utils.ts";
 import { displayForm, subsumes } from "./typecheck.ts";
 import { ClassMember, memberDeclaredType } from "../_model/declarations.ts";
 import { BagelError, miscError } from "../errors.ts";
-import { displayScope, withoutSourceInfo } from "../debugging.ts";
+import { withoutSourceInfo } from "../debugging.ts";
 import { extendScope } from "./scopescan.ts";
 
 export function inferType(
@@ -133,7 +133,7 @@ const inferTypeInner = memoize4((
                     return {
                         kind: "union-type",
                         members: [ baseType.valueType, NIL_TYPE ],
-                        mutable: false, // because of NIL_TYPE
+                        mutable: undefined,
                         id: Symbol(),
                         code: undefined,
                         startIndex: undefined,
@@ -156,7 +156,7 @@ const inferTypeInner = memoize4((
             const unionType: UnionType = {
                 kind: "union-type",
                 members: caseTypes,
-                mutable: caseTypes.every(t => t.mutable),
+                mutable: undefined,
                 id: Symbol(),
                 code: undefined,
                 startIndex: undefined,
@@ -206,7 +206,7 @@ const inferTypeInner = memoize4((
                 return {
                     kind: "union-type",
                     members: [propertyType, NIL_TYPE],
-                    mutable: false, // because of NIL_TYPE
+                    mutable: undefined,
                     id: Symbol(),
                     code: undefined,
                     startIndex: undefined,
@@ -230,7 +230,7 @@ const inferTypeInner = memoize4((
 
             return {
                 ...type,
-                mutable: type.mutable !== false && valueDescriptor.mutability !== "none",
+                mutable: type.mutable !== false && valueDescriptor?.mutability !== "none",
             } as TypeExpression
         }
         case "element-tag": {
@@ -238,7 +238,7 @@ const inferTypeInner = memoize4((
                 kind: "element-type",
                 // tagName: ast.tagName,
                 // attributes: ast.attributes
-                mutable: false,
+                mutable: undefined,
                 id: Symbol(),
                 code: undefined,
                 startIndex: undefined,
@@ -252,7 +252,7 @@ const inferTypeInner = memoize4((
                     kind: "attribute",
                     name,
                     type, 
-                    mutable: false,
+                    mutable: undefined,
                     id: Symbol(),
                     code: undefined,
                     startIndex: undefined,
@@ -285,7 +285,7 @@ const inferTypeInner = memoize4((
                     : {
                         kind: "union-type",
                         members: uniqueEntryTypes,
-                        mutable: uniqueEntryTypes.every(t => t.mutable),
+                        mutable: undefined,
                         id: Symbol(),
                         code: undefined,
                         startIndex: undefined,
@@ -352,7 +352,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
             return {
                 kind: "union-type",
                 members: memberTypes as TypeExpression[],
-                mutable: memberTypes.every(t => t.mutable),
+                mutable: undefined,
                 id: Symbol(),
                 code: type.code,
                 startIndex: type.startIndex,
@@ -380,7 +380,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
             typeParams: type.typeParams,
             args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, resolveGenerics)) })),
             returnType: given(type.returnType, returnType => resolve(contextOrScope, returnType, resolveGenerics)),
-            mutable: false,
+            mutable: undefined,
             id: Symbol(),
             code: type.code,
             startIndex: type.startIndex,
@@ -391,7 +391,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
             kind: "proc-type",
             typeParams: type.typeParams,
             args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, resolveGenerics)) })),
-            mutable: false,
+            mutable: undefined,
             id: Symbol(),
             code: type.code,
             startIndex: type.startIndex,
@@ -401,7 +401,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
         return {
             kind: "iterator-type",
             itemType: resolve(contextOrScope, type.itemType, resolveGenerics),
-            mutable: false,
+            mutable: undefined,
             id: Symbol(),
             code: type.code,
             startIndex: type.startIndex,
@@ -411,7 +411,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
         return {
             kind: "plan-type",
             resultType: resolve(contextOrScope, type.resultType, resolveGenerics),
-            mutable: false,
+            mutable: undefined,
             id: Symbol(),
             code: type.code,
             startIndex: type.startIndex,
@@ -447,7 +447,7 @@ function flattenUnions(type: TypeExpression): TypeExpression {
         return {
             kind: "union-type",
             members,
-            mutable: members.every(m => m.mutable),
+            mutable: undefined,
             id: type.id,
             code: type.code,
             startIndex: type.startIndex,
@@ -483,7 +483,7 @@ function distillUnion(parents: AllParents, scopes: AllScopes, type: TypeExpressi
         return {
             kind: "union-type",
             members,
-            mutable: members.every(m => m.mutable),
+            mutable: undefined,
             id: type.id,
             code: type.code,
             startIndex: type.startIndex,
@@ -582,6 +582,9 @@ export function propertiesOf(
     scopes: AllScopes,
     type: TypeExpression
 ): readonly Attribute[] | undefined {
+    const AST_NOISE = { code: undefined, startIndex: undefined, endIndex: undefined }
+    const TYPE_AST_NOISE = { mutable: undefined, ...AST_NOISE }
+
     switch (type.kind) {
         case "object-type": {
             const attrs = [...type.entries]
@@ -599,25 +602,24 @@ export function propertiesOf(
             return attrs
         }
         case "array-type":
+        // case "tuple-type":
             if (type.mutable) {
                 return [
                     {
                         kind: "attribute",
-                        name: { kind: "plain-identifier", name: "push", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+                        name: { kind: "plain-identifier", name: "push", id: Symbol(), ...AST_NOISE },
                         type: {
                             kind: "proc-type",
                             typeParams: [],
                             args: [{
-                                name: { kind: "plain-identifier", name: "el", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+                                name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
                                 type: type.element
                             }],
-                            mutable: false,
                             id: Symbol(),
-                            code: undefined, startIndex: undefined, endIndex: undefined
+                            ...TYPE_AST_NOISE
                         },
-                        mutable: false,
                         id: Symbol(),
-                        code: undefined, startIndex: undefined, endIndex: undefined
+                        ...TYPE_AST_NOISE
                     },
                 ]
             } else {
@@ -632,9 +634,8 @@ export function propertiesOf(
                     kind: "attribute",
                     name: member.name,
                     type: { ...memberType, mutable } as TypeExpression,
-                    mutable: false,
                     id: member.id,
-                    code: undefined, startIndex: undefined, endIndex: undefined
+                    ...TYPE_AST_NOISE
                 }
             }
 
@@ -649,92 +650,82 @@ export function propertiesOf(
         }
         case "iterator-type": {
             const { code: _, startIndex: _1, endIndex: _2, ...item } = type.itemType
-            const itemType = { ...item, code: undefined, startIndex: undefined, endIndex: undefined }
+            const itemType = { ...item, ...AST_NOISE }
 
             const iteratorProps: readonly Attribute[] = [
                 {
                     kind: "attribute",
-                    name: { kind: "plain-identifier", name: "filter", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+                    name: { kind: "plain-identifier", name: "filter", id: Symbol(), ...AST_NOISE },
                     type: {
                         kind: "func-type",
                         typeParams: [],
                         args: [{
-                            name: { kind: "plain-identifier", name: "fn", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+                            name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
                             type: {
                                 kind: "func-type",
                                 typeParams: [],
-                                args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined }, type: itemType }],
+                                args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: itemType }],
                                 returnType: BOOLEAN_TYPE,
-                                mutable: false,
                                 id: Symbol(),
-                                code: undefined, startIndex: undefined, endIndex: undefined
+                                ...TYPE_AST_NOISE
                             }
                         }],
                         returnType: {
                             kind: "iterator-type",
                             itemType,
-                            mutable: false,
                             id: Symbol(),
-                            code: undefined, startIndex: undefined, endIndex: undefined
+                            ...TYPE_AST_NOISE
                         },
-                        mutable: false,
                         id: Symbol(),
-                        code: undefined, startIndex: undefined, endIndex: undefined
+                        ...TYPE_AST_NOISE
                     },
-                    mutable: false,
                     id: Symbol(),
-                    code: undefined, startIndex: undefined, endIndex: undefined
+                    ...TYPE_AST_NOISE
                 },
                 {
                     kind: "attribute",
-                    name: { kind: "plain-identifier", name: "map", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+                    name: { kind: "plain-identifier", name: "map", id: Symbol(), ...AST_NOISE },
                     type: {
                         kind: "func-type",
                         typeParams: [
-                            { kind: "plain-identifier", name: "R", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined }
+                            { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }
                         ],
                         args: [{
-                            name: { kind: "plain-identifier", name: "fn", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+                            name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
                             type: {
                                 kind: "func-type",
-                                args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined }, type: itemType }],
-                                returnType: { kind: "named-type", mutable: false, id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined }, code: undefined, startIndex: undefined, endIndex: undefined },
+                                args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: itemType }],
+                                returnType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
                                 typeParams: [],
-                                mutable: false,
                                 id: Symbol(),
-                                code: undefined, startIndex: undefined, endIndex: undefined
+                                ...TYPE_AST_NOISE
                             }
                         }],
                         returnType: {
                             kind: "iterator-type",
-                            itemType: { kind: "named-type", mutable: false, id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined }, code: undefined, startIndex: undefined, endIndex: undefined },
-                            mutable: false,
+                            itemType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
                             id: Symbol(),
-                            code: undefined, startIndex: undefined, endIndex: undefined
+                            ...TYPE_AST_NOISE
                         },
-                        mutable: false,
                         id: Symbol(),
-                        code: undefined, startIndex: undefined, endIndex: undefined
+                        ...TYPE_AST_NOISE
                     },
-                    mutable: false,
                     id: Symbol(),
-                    code: undefined, startIndex: undefined, endIndex: undefined
+                    ...TYPE_AST_NOISE
                 },
                 {
                     kind: "attribute",
-                    name: { kind: "plain-identifier", name: "array", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+                    name: { kind: "plain-identifier", name: "array", id: Symbol(), ...AST_NOISE },
                     type: {
                         kind: "func-type",
                         typeParams: [],
                         args: [],
-                        returnType: { kind: "array-type", element: itemType, mutable: true, id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
-                        mutable: false,
+                        returnType: { kind: "array-type", element: itemType, mutable: true, id: Symbol(), ...AST_NOISE },
                         id: Symbol(),
-                        code: undefined, startIndex: undefined, endIndex: undefined
+                        ...TYPE_AST_NOISE
                     },
-                    mutable: false,
                     id: Symbol(),
-                    code: undefined, startIndex: undefined, endIndex: undefined
+                    ...TYPE_AST_NOISE
                 }
             ]
 
@@ -742,43 +733,39 @@ export function propertiesOf(
         }
         case "plan-type": {
             const { code: _, startIndex: _1, endIndex: _2, ...result } = type.resultType
-            const resultType = { ...result, code: undefined, startIndex: undefined, endIndex: undefined }
+            const resultType = { ...result, ...AST_NOISE }
 
             const planProps: readonly Attribute[] = [
                 {
                     kind: "attribute",
-                    name: { kind: "plain-identifier", name: "then", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+                    name: { kind: "plain-identifier", name: "then", id: Symbol(), ...AST_NOISE },
                     type: {
                         kind: "func-type",
                         typeParams: [
-                            { kind: "plain-identifier", name: "R", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined }
+                            { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }
                         ],
                         args: [{
-                            name: { kind: "plain-identifier", name: "fn", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+                            name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
                             type: {
                                 kind: "func-type",
-                                args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined }, type: resultType }],
-                                returnType: { kind: "named-type", mutable: false, id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined }, code: undefined, startIndex: undefined, endIndex: undefined },
+                                args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: resultType }],
+                                returnType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
                                 typeParams: [],
-                                mutable: false,
                                 id: Symbol(),
-                                code: undefined, startIndex: undefined, endIndex: undefined
+                                ...TYPE_AST_NOISE
                             }
                         }],
                         returnType: {
                             kind: "plan-type",
-                            resultType: { kind: "named-type", mutable: false, id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined }, code: undefined, startIndex: undefined, endIndex: undefined },
-                            mutable: false,
+                            resultType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
                             id: Symbol(),
-                            code: undefined, startIndex: undefined, endIndex: undefined
+                            ...TYPE_AST_NOISE
                         },
-                        mutable: false,
                         id: Symbol(),
-                        code: undefined, startIndex: undefined, endIndex: undefined
+                        ...TYPE_AST_NOISE
                     },
-                    mutable: false,
                     id: Symbol(),
-                    code: undefined, startIndex: undefined, endIndex: undefined
+                    ...TYPE_AST_NOISE
                 },
             ]
 

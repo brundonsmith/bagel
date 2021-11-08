@@ -365,8 +365,8 @@ function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
         typeofStr === "number" ? NUMBER_TYPE :
         typeofStr === "boolean" ? BOOLEAN_TYPE :
         typeofStr === "nil" ? NIL_TYPE :
-        typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, mutable: undefined, id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined } :
-        typeofStr === "object" ? { kind: "indexer-type", keyType: ANY_TYPE, valueType: ANY_TYPE, mutable: undefined, id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, mutable: true, id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "object" ? { kind: "indexer-type", keyType: ANY_TYPE, valueType: ANY_TYPE, mutable: true, id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined } :
         // TODO
         // type.value === "set" ?
         // type.value === "class-instance" ?
