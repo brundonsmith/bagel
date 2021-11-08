@@ -66,16 +66,16 @@ export function and<T>(all: Set<T>, addition: T): Set<T> {
 }
 
 export type Scope = {
-    readonly types: {readonly [key: string]: TypeDeclarationDescriptor},
-    readonly values: {readonly [key: string]: DeclarationDescriptor},
-    readonly classes: {readonly [key: string]: ClassDeclaration},
+    readonly types: ReadonlyTieredMap<string, TypeDeclarationDescriptor>,
+    readonly values: ReadonlyTieredMap<string, DeclarationDescriptor>,
+    readonly classes: ReadonlyTieredMap<string, ClassDeclaration>,
     readonly refinements: readonly Refinement[],
 }
 
 export type MutableScope = {
-    readonly types: {[key: string]: TypeDeclarationDescriptor},
-    readonly values: {[key: string]: DeclarationDescriptor},
-    readonly classes: {[key: string]: ClassDeclaration},
+    readonly types: TieredMap<string, TypeDeclarationDescriptor>,
+    readonly values: TieredMap<string, DeclarationDescriptor>,
+    readonly classes: TieredMap<string, ClassDeclaration>,
     readonly refinements: Refinement[],
 }
 
@@ -117,10 +117,60 @@ export function getScopeFor(parents: AllParents, scopes: AllScopes, ast: AST): S
     return EMPTY_SCOPE
 }
 
+export class TieredMap<K, V> {
+
+    get contents(): ReadonlyMap<K, V> {
+        return this._contents
+    }
+
+    get parent(): ReadonlyTieredMap<K, V>|undefined {
+        return this._parent
+    }
+
+    private readonly _contents = new Map<K, V>();
+
+    constructor(private readonly _parent?: ReadonlyTieredMap<K, V>) {
+        this._parent = _parent;
+    }
+
+    get(key: K): V|undefined {
+        // deno-lint-ignore no-this-alias
+        let current: ReadonlyTieredMap<K, V>|undefined = this;
+
+        while (current) {
+            if (current.contents.get(key)) {
+                return current.contents.get(key)
+            }
+
+            current = current.parent
+        }
+    }
+
+    set(key: K, value: V) {
+        this._contents.set(key, value);
+    }
+
+    entries(): [K, V][] {
+        // deno-lint-ignore no-this-alias
+        let current: ReadonlyTieredMap<K, V>|undefined = this;
+
+        const all = []
+        
+        while (current) {
+            all.push(...current.contents.entries())
+            current = current.parent
+        }
+
+        return all
+    }
+}
+
+export type ReadonlyTieredMap<K, V> = Omit<TieredMap<K, V>, 'set'>
+
 const EMPTY_SCOPE: Scope = {
-    types: {},
-    values: {},
-    classes: {},
+    types: new TieredMap(),
+    values: new TieredMap(),
+    classes: new TieredMap(),
     refinements: [],
 }
 

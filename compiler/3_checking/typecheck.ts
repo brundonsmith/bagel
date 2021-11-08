@@ -88,10 +88,10 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                                 const typeParam = subjectType.typeParams[i]
                                 const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
 
-                                scopeWithGenerics.types[typeParam.name] = {
+                                scopeWithGenerics.types.set(typeParam.name, {
                                     type: typeArg,
                                     isGenericParameter: false,
-                                }
+                                })
                             }
                         }
                     }
@@ -165,7 +165,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             } break;
             case "local-identifier": {
                 // console.log({ name: ast.name, scope: scope.values })
-                if (scope.values[ast.name] == null && scope.classes[ast.name] == null) {
+                if (scope.values.get(ast.name) == null && scope.classes.get(ast.name) == null) {
                     reportError(cannotFindName(ast));
                 }
             } break;
@@ -209,7 +209,8 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 }
             } break;
             case "assignment": {
-                if (ast.target.kind === "local-identifier" && getScopeFor(parents, scopes, ast.target).values[ast.target.name].mutability !== "all") {
+                const resolved = ast.target.kind === "local-identifier" ? getScopeFor(parents, scopes, ast.target).values.get(ast.target.name) : undefined
+                if (ast.target.kind === "local-identifier" && resolved != null && resolved.mutability !== "all") {
                     reportError(miscError(ast.target, `Cannot assign to '${ast.target.name}' because it's constant`));
                 }
 

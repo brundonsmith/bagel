@@ -4,7 +4,7 @@ import { AST } from "./_model/ast.ts";
 import { Scope } from "./_model/common.ts";
 import { isTypeExpression } from "./_model/type-expressions.ts";
 
-export function log<T>(expr: T, fn?: (expr: T) => string): T {
+export function log<T>(expr: T, fn?: (expr: T) => unknown): T {
     console.log(fn == null ? expr : fn(expr));
     return expr;
 }
@@ -27,35 +27,10 @@ export function withoutSourceInfo(ast: AST) {
 }
 
 export function displayScope(scope: Scope) {
-    let all: Scope = {
-        types: {},
-        values: {},
-        classes: {},
-        refinements: []
-    }
-
-    let types = scope.types
-    while(types != null) {
-        all = { ...all, types: { ...all.types, ...types } }
-        types = Object.getPrototypeOf(types)
-    }
-
-    let values = scope.values
-    while(values != null) {
-        all = { ...all, values: { ...all.values, ...values } }
-        values = Object.getPrototypeOf(values)
-    }
-
-    let classes = scope.classes
-    while(classes != null) {
-        all = { ...all, classes: { ...all.classes, ...classes } }
-        classes = Object.getPrototypeOf(classes)
-    }
-
     return {
-        types: Object.fromEntries(Object.entries(all.types).map(([key, value]) => [key, { ...value, type: display(value.type) }])),
-        values: Object.fromEntries(Object.entries(all.values).map(([key, value]) => [key, { ...value, declaredType: given(value.declaredType, display), initialValue: given(value.initialValue, display) }])),
-        classes: Object.fromEntries(Object.entries(all.classes).map(([key, value]) => [key, display(value)])),
+        types: Object.fromEntries(scope.types.entries().map(([key, value]) => [key, { ...value, type: display(value.type) }])),
+        values: Object.fromEntries(scope.values.entries().map(([key, value]) => [key, { ...value, declaredType: given(value.declaredType, display), initialValue: given(value.initialValue, display) }])),
+        classes: Object.fromEntries(scope.classes.entries().map(([key, value]) => [key, display(value)])),
     }
 }
 

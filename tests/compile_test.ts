@@ -229,7 +229,7 @@ Deno.test({
   name: "Basic proc declaration",
   fn() {
     testCompile(
-      `proc doStuff(a) {
+      `proc doStuff(items: Iterator<number>) {
             let count = 0;
             
             for (item of items) {
@@ -237,7 +237,7 @@ Deno.test({
 
             console.log(count);
         }`,
-      `const doStuff = (a): void => {
+      `const doStuff = (items: ___Iter<number>): void => {
             const ___locals: {count?: unknown} = ___observable({});
         
             ___locals["count"] = 0;
@@ -254,7 +254,7 @@ Deno.test({
   name: "Proc declaration with statements",
   fn() {
     testCompile(
-      `proc doStuff(a) {
+      `proc doStuff(items: Iterator<number>) {
             let count = 0;
 
             for (item of items) {
@@ -263,7 +263,7 @@ Deno.test({
                 }
 
                 if (count > 12) {
-                    console.log(a);
+                    console.log(items);
                 } else {
                     console.log(nil);
                 }
@@ -271,7 +271,7 @@ Deno.test({
 
             console.log(count);
         }`,
-      `const doStuff = (a): void => {
+      `const doStuff = (items: ___Iter<number>): void => {
             const ___locals: {count?: unknown} = ___observable({});
         
             ___locals["count"] = 0;
@@ -282,7 +282,7 @@ Deno.test({
                 };
                 
                 if ((___locals["count"] > 12)) {
-                    console.log(a);
+                    console.log(items);
                 } else {
                     console.log(undefined);
                 };

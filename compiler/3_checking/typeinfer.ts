@@ -1,9 +1,9 @@
-import { AllParents, AllScopes, DeclarationDescriptor, getScopeFor, Scope } from "../_model/common.ts";
+import { AllParents, AllScopes, DeclarationDescriptor, getScopeFor, Scope, TypeDeclarationDescriptor } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
 import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, memoize4 } from "../utils.ts";
 import { displayForm, subsumes } from "./typecheck.ts";
-import { ClassMember, memberDeclaredType } from "../_model/declarations.ts";
+import { ClassDeclaration, ClassMember, memberDeclaredType } from "../_model/declarations.ts";
 import { BagelError, miscError } from "../errors.ts";
 import { withoutSourceInfo } from "../debugging.ts";
 import { extendScope } from "./scopescan.ts";
@@ -100,10 +100,10 @@ const inferTypeInner = memoize4((
                             const typeParam = subjectType.typeParams[i]
                             const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
 
-                            scopeWithGenerics.types[typeParam.name] = {
+                            scopeWithGenerics.types.set(typeParam.name, {
                                 type: typeArg,
                                 isGenericParameter: false,
-                            }
+                            })
                         }
                     }
                 }
@@ -222,7 +222,7 @@ const inferTypeInner = memoize4((
             }
         }
         case "local-identifier": {
-            const valueDescriptor = getScopeFor(parents, scopes, ast).values[ast.name]
+            const valueDescriptor = getScopeFor(parents, scopes, ast).values.get(ast.name)
 
             const type = valueDescriptor?.declaredType 
                 ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, parents, scopes, initialValue))
@@ -298,16 +298,23 @@ const inferTypeInner = memoize4((
                 endIndex: undefined,
             };
         }
-        case "class-construction": return {
-            kind: "class-instance-type",
-            clazz: getScopeFor(parents, scopes, ast).classes[ast.clazz.name],
-            internal: false,
-            mutable: true,
-            id: Symbol(),
-            code: ast.clazz.code,
-            startIndex: ast.clazz.startIndex,
-            endIndex: ast.clazz.endIndex
-        };
+        case "class-construction": {
+            const clazz = getScopeFor(parents, scopes, ast).classes.get(ast.clazz.name)
+            if (clazz == null) {
+                return UNKNOWN_TYPE
+            }
+            
+            return {
+                kind: "class-instance-type",
+                clazz,
+                internal: false,
+                mutable: true,
+                id: Symbol(),
+                code: ast.clazz.code,
+                startIndex: ast.clazz.startIndex,
+                endIndex: ast.clazz.endIndex
+            };
+        }
         case "class-property":
         case "class-function":
         case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferType(reportError, parents, scopes, ast.value);
@@ -326,16 +333,19 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
             ? getScopeFor(contextOrScope[0], contextOrScope[1], type)
             : contextOrScope
 
-        if (resolutionScope.types[type.name.name]) {
-            if (!resolutionScope.types[type.name.name].isGenericParameter || resolveGenerics) {
-                return resolve(contextOrScope, resolutionScope.types[type.name.name].type, resolveGenerics)
+        if (resolutionScope.types.get(type.name.name)) {
+            const resolvedType = resolutionScope.types.get(type.name.name) as TypeDeclarationDescriptor
+            if (!resolvedType.isGenericParameter || resolveGenerics) {
+                return resolve(contextOrScope, resolvedType.type, resolveGenerics)
             } else {
                 return type
             }
-        } else if (resolutionScope.classes[type.name.name]) {
+        } else if (resolutionScope.classes.get(type.name.name)) {
+            const clazz = resolutionScope.classes.get(type.name.name) as ClassDeclaration
+
             return {
                 kind: "class-instance-type",
-                clazz: resolutionScope.classes[type.name.name],
+                clazz,
                 internal: false,
                 mutable: true,
                 id: Symbol(),

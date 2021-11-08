@@ -1,5 +1,5 @@
 import { AST, Module } from "../_model/ast.ts";
-import { AllParents, AllScopes, and, anyGet, Block, getScopeFor, MutableScope, ParentsMap, Scope, ScopesMap } from "../_model/common.ts";
+import { AllParents, AllScopes, and, anyGet, Block, DeclarationDescriptor, getScopeFor, MutableScope, ParentsMap, Scope, ScopesMap, TieredMap } from "../_model/common.ts";
 import { ClassDeclaration, ConstDeclaration, Declaration } from "../_model/declarations.ts";
 import { Func, Proc, Expression, Invocation, InlineConst, Case } from "../_model/expressions.ts";
 import { ConstDeclarationStatement, ForLoop, LetDeclaration } from "../_model/statements.ts";
@@ -38,7 +38,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                     // add inline constants to scope
                     if (ast.kind === "func") {
                         for (const c of ast.consts) {
-                            if (newScope.values[c.name.name] != null || newScope.classes[c.name.name] != null) {
+                            if (newScope.values.get(c.name.name) != null || newScope.classes.get(c.name.name) != null) {
                                 reportError(alreadyDeclared(c.name))
                             }
                             
@@ -50,7 +50,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                 case "block":
                     for (const statement of ast.statements) {
                         if (statement.kind === "let-declaration" || statement.kind === "const-declaration-statement") {
-                            if (newScope.values[statement.name.name] != null || newScope.classes[statement.name.name] != null) {
+                            if (newScope.values.get(statement.name.name) != null || newScope.classes.get(statement.name.name) != null) {
                                 reportError(alreadyDeclared(statement.name))
                             }
 
@@ -77,10 +77,10 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
 
                 // add loop element to scope
                 const iteratorType = inferType(reportError, parents, allScopes, ast.iterator)
-                scope.values[ast.itemIdentifier.name] = {
+                scope.values.set(ast.itemIdentifier.name, {
                     mutability: "contents-only",
                     declaredType: iteratorType.kind === "iterator-type" ? iteratorType.itemType : undefined,
-                }
+                })
             } break;
             case "func":
             case "proc": {
@@ -104,11 +104,13 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
     
                 for (let i = 0; i < ast.type.args.length; i++) {
                     const arg = ast.type.args[i]
+
+                    const descriptor = scope.values.get(arg.name.name) as DeclarationDescriptor
     
-                    scope.values[arg.name.name] = {
-                        ...scope.values[arg.name.name],
-                        declaredType: scope.values[arg.name.name].declaredType ?? thisArgParentType?.args[i].type,
-                    }
+                    scope.values.set(arg.name.name, {
+                        ...descriptor,
+                        declaredType: descriptor.declaredType ?? thisArgParentType?.args[i].type,
+                    })
                 }
             } break;
         }
@@ -148,35 +150,35 @@ function isScopeOwner(ast: AST): ast is ScopeOwner {
 }
 
 export function scopeFrom(reportError: (error: BagelError) => void, getModule: (module: string) => Module|undefined, parents: AllParents, scopes: ScopesMap, ast: ScopeOwner, parentScope?: Scope): MutableScope {
-    const newScope = parentScope != null 
+    const newScope: MutableScope = parentScope != null 
         ? extendScope(parentScope)
-        : { types: {}, values: {}, classes: {}, refinements: [] };
+        : { types: new TieredMap(), values: new TieredMap(), classes: new TieredMap(), refinements: [] };
 
     switch (ast.kind) {
         case "module":
             // add all declarations to scope
             for (const declaration of ast.declarations) {
                 if (declaration.kind === "type-declaration") {
-                    newScope.types[declaration.name.name] = {
+                    newScope.types.set(declaration.name.name, {
                         type: declaration.type,
                         isGenericParameter: false,
-                    }
+                    })
                 } else if (declaration.kind === "func-declaration" || declaration.kind === "proc-declaration") {
-                    if (newScope.values[declaration.name.name] != null || newScope.classes[declaration.name.name] != null) {
+                    if (newScope.values.get(declaration.name.name) != null || newScope.classes.get(declaration.name.name) != null) {
                         reportError(alreadyDeclared(declaration.name))
                     }
 
-                    newScope.values[declaration.name.name] = {
+                    newScope.values.set(declaration.name.name, {
                         mutability: "none",
                         declaredType: undefined, // fall back to the function proc's inner type, to allow for return-type inference
                         initialValue: declaration.value
-                    };
+                    });
                 } else if (declaration.kind === "class-declaration") {
-                    if (newScope.values[declaration.name.name] != null || newScope.classes[declaration.name.name] != null) {
+                    if (newScope.values.get(declaration.name.name) != null || newScope.classes.get(declaration.name.name) != null) {
                         reportError(alreadyDeclared(declaration.name))
                     }
                     
-                    newScope.classes[declaration.name.name] = declaration;
+                    newScope.classes.set(declaration.name.name, declaration);
                 } else if (declaration.kind === "import-declaration") {
                     const otherModule = getModule(declaration.path.value);
                     
@@ -186,10 +188,10 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                         for (const i of declaration.imports) {
                             const name = i.alias?.name ?? i.name.name;
 
-                            newScope.values[name] = {
+                            newScope.values.set(name, {
                                 mutability: "none",
                                 declaredType: UNKNOWN_TYPE,
-                            };
+                            });
                         }
                     } else {
                         for (const i of declaration.imports) {
@@ -198,23 +200,23 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
 
                             const name = i.alias ?? i.name;
 
-                            if (newScope.values[name.name] != null || newScope.classes[name.name] != null) {
+                            if (newScope.values.get(name.name) != null || newScope.classes.get(name.name) != null) {
                                 reportError(alreadyDeclared(name))
                             }
 
                             if (foreignDecl == null) {
                                 reportError(cannotFindExport(i, declaration));
 
-                                newScope.values[name.name] = {
+                                newScope.values.set(name.name, {
                                     mutability: "none",
                                     declaredType: UNKNOWN_TYPE,
-                                };
+                                });
                             } else {
-                                newScope.values[name.name] = {
+                                newScope.values.set(name.name, {
                                     mutability: "none", // TODO: If we ever allow global mutable state, this will need to allow for it
                                     declaredType: declType(foreignDecl) as TypeExpression,
                                     initialValue: declValue(foreignDecl),
-                                };
+                                });
                             }
                         }
                     }
@@ -227,10 +229,10 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
             // add any generic type parameters to scope
             for (const typeParam of ast.type.typeParams) {
                 // TODO: Use `extends` to give these more meaningful types in context
-                newScope.types[typeParam.name] = {
+                newScope.types.set(typeParam.name, {
                     type: UNKNOWN_TYPE,
                     isGenericParameter: true
-                }
+                })
             }
 
             // infer callback argument types based on context
@@ -254,26 +256,26 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
             for (let i = 0; i < ast.type.args.length; i++) {
                 const arg = ast.type.args[i]
 
-                if (newScope.values[arg.name.name] != null || newScope.classes[arg.name.name] != null) {
+                if (newScope.values.get(arg.name.name) != null || newScope.classes.get(arg.name.name) != null) {
                     reportError(alreadyDeclared(arg.name))
                 }
 
-                newScope.values[arg.name.name] = {
+                newScope.values.set(arg.name.name, {
                     mutability: ast.kind === "func" ? "none" : "contents-only",
                     declaredType: arg.type ?? thisArgParentType?.args[i].type,
-                }
+                })
             }
         } break;
         case "block":
             break;
         case "for-loop": {
-            if (newScope.values[ast.itemIdentifier.name] != null || newScope.classes[ast.itemIdentifier.name] != null) {
+            if (newScope.values.get(ast.itemIdentifier.name) != null || newScope.classes.get(ast.itemIdentifier.name) != null) {
                 reportError(alreadyDeclared(ast.itemIdentifier))
             }
             break;
         }
         case "class-declaration":
-            newScope.values["this"] = {
+            newScope.values.set("this", {
                 mutability: "contents-only",
                 declaredType: {
                     kind: "class-instance-type",
@@ -285,7 +287,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                     startIndex: undefined,
                     endIndex: undefined
                 },
-            }
+            })
             break;
         case "invocation":
             break;
@@ -293,11 +295,11 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
         case "inline-const":
         case "let-declaration":
         case "const-declaration-statement":
-            newScope.values[ast.name.name] = {
+            newScope.values.set(ast.name.name, {
                 mutability: ast.kind === "let-declaration" ? "all" : "none",
                 declaredType: ast.type,
                 initialValue: ast.value
-            };
+            });
             break;
         case "case": {
 
@@ -408,9 +410,9 @@ function declValue(declaration: Declaration): Expression|undefined {
 
 export function extendScope(scope: Scope): MutableScope {
     return {
-        types: Object.create(scope.types),
-        values: Object.create(scope.values),
-        classes: scope.classes, // classes can't be created in lower scopes, so we don't need to worry about hierarchy
+        types: new TieredMap(scope.types),
+        values: new TieredMap(scope.values),
+        classes: new TieredMap(scope.classes),
         refinements: [...scope.refinements],
     }
 }

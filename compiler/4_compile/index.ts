@@ -1,9 +1,11 @@
+import { displayScope, log } from "../debugging.ts";
 import { path } from "../deps.ts";
 import { cachedModulePath, given, pathIsRemote } from "../utils.ts";
 import { Module, AST } from "../_model/ast.ts";
-import { AllParents, AllScopes, getScopeFor, PlainIdentifier } from "../_model/common.ts";
+import { AllParents, AllScopes, DeclarationDescriptor, getScopeFor, PlainIdentifier } from "../_model/common.ts";
 import { ClassProperty, TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ClassFunction, ClassDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
+import { LetDeclaration, Statement } from "../_model/statements.ts";
 import { Arg, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
@@ -81,7 +83,7 @@ function compileOne(parents: AllParents, scopes: AllScopes, module: string, ast:
         case "debug": return compileOne(parents, scopes, module, ast.inner);
         case "property-accessor": return `${compileOne(parents, scopes, module, ast.subject)}.${compileOne(parents, scopes, module, ast.property)}`;
         case "plain-identifier": return ast.name;
-        case "local-identifier": return getScopeFor(parents, scopes, ast).values[ast.name]?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
+        case "local-identifier": return getScopeFor(parents, scopes, ast).values.get(ast.name)?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
         case "object-literal":  return `{${objectEntries(parents, scopes, module, ast.entries)}}`;
         case "array-literal":   return `[${ast.entries.map(e => compileOne(parents, scopes, module, e)).join(", ")}]`;
         case "string-literal":  return `\`${ast.segments.map(segment =>
@@ -145,13 +147,29 @@ const NIL = `undefined`;
 const LOCALS_OBJ = INT + "locals";
 
 function compileProc(parents: AllParents, scopes: AllScopes, module: string, proc: Proc): string {
-    const mutableLocals = Object.entries(getScopeFor(parents, scopes, proc.body).values)
-        .filter(e => e[1].mutability === "all");
+    const names = proc.body.statements.filter(s => s.kind === "let-declaration") as LetDeclaration[]
+    const lastStatement: Statement|undefined = proc.body.statements[proc.body.statements.length - 1]
+    const mutableLocals = (
+        lastStatement
+            ? (() => {
+                const scope = getScopeFor(parents, scopes, lastStatement)
+                return names.map(local => ({
+                    name: local.name.name,
+                    descriptor: scope.values.get(local.name.name) as DeclarationDescriptor
+                }))
+            })()
+            : []
+    )
 
     return (proc.type.typeParams.length > 0 ? `<${proc.type.typeParams.map(p => p.name).join(',')}>` : '')
         + `(${compileArgs(parents, scopes, module, proc.type.args)}): void => {
     ${mutableLocals.length > 0 ? // TODO: Handle ___locals for parent closures
-`    const ${LOCALS_OBJ}: {${mutableLocals.map(e => `${e[0]}?: ${compileOne(parents, scopes, module, e[1].declaredType ?? UNKNOWN_TYPE)}`).join(",")}} = ${INT}observable({});
+`    const ${LOCALS_OBJ}: {${
+        mutableLocals
+            .map(e => 
+                `${e.name}?: ${compileOne(parents, scopes, module, e.descriptor.declaredType ?? UNKNOWN_TYPE)}`)
+            .join(",")
+    }} = ${INT}observable({});
     
 `
     : ``}${proc.body.statements.map(s => compileOne(parents, scopes, module, s) + ';').join("\n")}
