@@ -637,7 +637,9 @@ export function propertiesOf(
             }
         case "class-instance-type": {
             const memberToAttribute = (member: ClassMember): Attribute => {
-                const memberType = memberDeclaredType(member) ?? inferType(reportError, parents, scopes, member.value);
+                const memberType = memberDeclaredType(member) && memberDeclaredType(member)?.kind !== "func-type"
+                    ? memberDeclaredType(member) as TypeExpression
+                    : inferType(reportError, parents, scopes, member.value);
                 const mutable = memberType.mutable && member.kind === "class-property" && (type.internal || member.access !== "visible")
 
                 return {
