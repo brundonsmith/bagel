@@ -65,12 +65,12 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     autorun(async () => {
         for (const module of modules) {
             if (modulesSource.get(module) == null) {
-                if (pathIsRemote(module)) {
+                if (pathIsRemote(module)) {  // http import
                     const path = cachedModulePath(module)
-                    if (await fs.exists(path)) {
+                    if (await fs.exists(path)) {  // module has already been cached locally
                         const source = await Deno.readTextFile(path)
                         modulesSource.set(module, source)
-                    } else {
+                    } else {  // need to download module before compiling
                         const res = await fetch(module)
     
                         if (res.status === 200) {
@@ -79,7 +79,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
                             modulesSource.set(module, source)
                         }
                     }
-                } else {
+                } else {  // local disk import
                     const source = await Deno.readTextFile(module)
                     modulesSource.set(module, source)
                 }
