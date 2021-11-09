@@ -1,2 +1,3 @@
 #!/bin/bash
-deno run --allow-read --allow-write --allow-net --allow-env --allow-run --unstable index.ts "$@"
+compiler_path=$( cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" ; pwd -P )
+deno run --allow-read --allow-write --allow-net --allow-env --allow-run --unstable "$compiler_path/index.ts" "$@"
