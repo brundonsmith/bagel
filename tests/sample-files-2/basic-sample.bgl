@@ -1,40 +1,5 @@
 
-from './lib-bgl' import { logp, add }
+from '../../lib/wrappers/core' import { logf }
+from './foo' import { x }
 
-func foo(x: number): number => add(1234, x)
-
-
-const f: T = 123
-type T = number
-
-type Stuff = {
-    foo: number
-}
-
-const BAR: Stuff = {
-    foo: 12
-}
-
-class MyClass {
-    private someState: number = 12
-
-    func foo() => 12
-
-    public proc bar(newState: number) {
-        this.someState = newState;
-    }
-}
-
-proc main() {
-    let a: string = '';
-    
-    reaction () => a
-    triggers (a: string) {
-        logp(a);
-    }
-    until () => a == 'the number is 123';
-
-    for (i of 0..10000) {
-        a = 'the number is ' + i;
-    }
-}
+func foo(x: number): boolean => 2 + 2 == 4

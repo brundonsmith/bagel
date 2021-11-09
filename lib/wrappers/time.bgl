@@ -5,6 +5,8 @@ import { Temporal } from '@js-temporal/polyfill'
 #js
 
 export class Instant {
+    visible epoch: number = js#undefined#js
+
     visible millisecond: number = js#undefined#js
     visible second: number = js#undefined#js
     visible minute: number = js#undefined#js
@@ -12,14 +14,9 @@ export class Instant {
 }
 
 export class Clock {
-    public func memo now(): Instant => js# {
+    public func now(): Instant => js# {
         updateTimeIfNeeded();
-
-        return new Temporal.ZonedDateTime(
-            time.now, // epoch nanoseconds
-            Temporal.TimeZone.from('America/Chicago'), // timezone
-            Temporal.Calendar.from('iso8601') // default calendar
-        );
+        return Temporal.Now.Instant();
     } #js
 }
 

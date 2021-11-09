@@ -1,0 +1,9 @@
+
+from '../../lib/wrappers/core' import { iter }
+
+func foo(arr: number[]) =>
+    iter<number>(arr)
+        .map<string>((n: number) => 'foo' + n)
+        .array()
+
+const a: string[] = foo([1, 2, 3])

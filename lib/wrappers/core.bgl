@@ -13,5 +13,5 @@ export func logf<T>(x: T): T =>
 export func iter<T>(x: T[]): Iterator<T> =>
     js# ___iter(x) #js
 
-export func typeof(val: unknown): 'string'|'number'|'boolean'|'nil'|'object'|'array'|'set'|'class-instance' =>
-    js# ___typeof(val) #js
+// export func typeof(val: unknown): 'string'|'number'|'boolean'|'nil'|'object'|'array'|'set'|'class-instance' =>
+//     js# ___typeof(val) #js

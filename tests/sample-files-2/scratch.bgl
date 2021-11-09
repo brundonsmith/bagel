@@ -1,4 +1,43 @@
 
-export func foo(a: number, b: number): number => 
-    const c = 2 * a,
-    c + b
+// const arr = [1, 2, 3]
+// const iter: Iter<number> = iter(arr)
+// const doubled = iter.map(n => n * 2).array()
+
+// from '../../lib/wrappers/core' import { logp }
+// from '../../lib/wrappers/time' import { clock }
+
+// func fib(n: number): number =>
+//     if (n < 2) {
+//         n
+//     } else {
+//         fib(n - 1) + fib(n - 2)
+//     }
+
+// func memo fibM(n: number): number =>
+//     if (n < 2) {
+//         n
+//     } else {
+//         fib(n - 1) + fib(n - 2)
+//     }
+
+
+// proc main() {
+//     const n = 40;
+
+//     logp('start: ' + clock.now().epochMilliseconds);
+//     fib(n);
+//     logp('first done: ' + clock.now().epochMilliseconds);
+//     fibM(n);
+//     logp('second done: ' + clock.now().epochMilliseconds);
+// }
+
+class Counter {
+    public func render() =>
+        <div>
+        </div>
+}
+
+proc main() {
+    let inst = new Counter();
+    const bar: Element = <div>{inst.render()}</div>;
+}
