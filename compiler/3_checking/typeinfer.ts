@@ -133,7 +133,7 @@ const inferTypeInner = memoize4((
                     return {
                         kind: "union-type",
                         members: [ baseType.valueType, NIL_TYPE ],
-                        mutable: undefined,
+                        mutability: undefined,
                         id: Symbol(),
                         code: undefined,
                         startIndex: undefined,
@@ -156,7 +156,7 @@ const inferTypeInner = memoize4((
             const unionType: UnionType = {
                 kind: "union-type",
                 members: caseTypes,
-                mutable: undefined,
+                mutability: undefined,
                 id: Symbol(),
                 code: undefined,
                 startIndex: undefined,
@@ -206,17 +206,22 @@ const inferTypeInner = memoize4((
                 return {
                     kind: "union-type",
                     members: [propertyType, NIL_TYPE],
-                    mutable: undefined,
+                    mutability: undefined,
                     id: Symbol(),
                     code: undefined,
                     startIndex: undefined,
                     endIndex: undefined
                 }
             } else {
-                const mutable = propertyType?.mutable && subjectType.mutable
+                const mutability = (
+                    propertyType?.mutability == null ? undefined :
+                    propertyType.mutability === "mutable" && subjectType.mutability === "mutable" ? "mutable" :
+                    subjectType.mutability === "absolute-const" ? "absolute-const" :
+                    "const"
+                )
     
                 return (
-                    given(propertyType, t => ({ ...t, mutable }) as TypeExpression) 
+                    given(propertyType, t => ({ ...t, mutability }) as TypeExpression) 
                         ?? UNKNOWN_TYPE
                 )
             }
@@ -228,9 +233,16 @@ const inferTypeInner = memoize4((
                 ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, parents, scopes, initialValue))
                 ?? UNKNOWN_TYPE
 
+            const mutability = (
+                type.mutability == null ? undefined :
+                valueDescriptor?.mutability === "absolute-none" ? "absolute-const" :
+                valueDescriptor?.mutability === "none" ? "const" :
+                type.mutability
+            )
+
             return {
                 ...type,
-                mutable: type.mutable !== false && valueDescriptor?.mutability !== "none",
+                mutability,
             } as TypeExpression
         }
         case "element-tag": {
@@ -238,7 +250,7 @@ const inferTypeInner = memoize4((
                 kind: "element-type",
                 // tagName: ast.tagName,
                 // attributes: ast.attributes
-                mutable: undefined,
+                mutability: undefined,
                 id: Symbol(),
                 code: undefined,
                 startIndex: undefined,
@@ -252,7 +264,7 @@ const inferTypeInner = memoize4((
                     kind: "attribute",
                     name,
                     type, 
-                    mutable: undefined,
+                    mutability: undefined,
                     id: Symbol(),
                     code: undefined,
                     startIndex: undefined,
@@ -264,7 +276,7 @@ const inferTypeInner = memoize4((
                 kind: "object-type",
                 spreads: [],
                 entries,
-                mutable: true,
+                mutability: "mutable",
                 id: Symbol(),
                 code: undefined,
                 startIndex: undefined,
@@ -285,13 +297,13 @@ const inferTypeInner = memoize4((
                     : {
                         kind: "union-type",
                         members: uniqueEntryTypes,
-                        mutable: undefined,
+                        mutability: undefined,
                         id: Symbol(),
                         code: undefined,
                         startIndex: undefined,
                         endIndex: undefined,
                     },
-                mutable: true,
+                mutability: "mutable",
                 id: Symbol(),
                 code: undefined,
                 startIndex: undefined,
@@ -308,7 +320,7 @@ const inferTypeInner = memoize4((
                 kind: "class-instance-type",
                 clazz,
                 internal: false,
-                mutable: true,
+                mutability: "mutable",
                 id: Symbol(),
                 code: ast.clazz.code,
                 startIndex: ast.clazz.startIndex,
@@ -324,6 +336,9 @@ const inferTypeInner = memoize4((
         case "boolean-literal": return BOOLEAN_TYPE;
         case "nil-literal": return NIL_TYPE;
         case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
+        default:
+            // @ts-expect-error
+            throw Error(ast.kind)
     }
 })
 
@@ -347,7 +362,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
                 kind: "class-instance-type",
                 clazz,
                 internal: false,
-                mutable: true,
+                mutability: "mutable",
                 id: Symbol(),
                 code: type.code,
                 startIndex: type.startIndex,
@@ -362,7 +377,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
             return {
                 kind: "union-type",
                 members: memberTypes as TypeExpression[],
-                mutable: undefined,
+                mutability: undefined,
                 id: Symbol(),
                 code: type.code,
                 startIndex: type.startIndex,
@@ -390,7 +405,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
             typeParams: type.typeParams,
             args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, resolveGenerics)) })),
             returnType: given(type.returnType, returnType => resolve(contextOrScope, returnType, resolveGenerics)),
-            mutable: undefined,
+            mutability: undefined,
             id: Symbol(),
             code: type.code,
             startIndex: type.startIndex,
@@ -401,7 +416,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
             kind: "proc-type",
             typeParams: type.typeParams,
             args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, resolveGenerics)) })),
-            mutable: undefined,
+            mutability: undefined,
             id: Symbol(),
             code: type.code,
             startIndex: type.startIndex,
@@ -411,7 +426,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
         return {
             kind: "iterator-type",
             itemType: resolve(contextOrScope, type.itemType, resolveGenerics),
-            mutable: undefined,
+            mutability: undefined,
             id: Symbol(),
             code: type.code,
             startIndex: type.startIndex,
@@ -421,7 +436,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
         return {
             kind: "plan-type",
             resultType: resolve(contextOrScope, type.resultType, resolveGenerics),
-            mutable: undefined,
+            mutability: undefined,
             id: Symbol(),
             code: type.code,
             startIndex: type.startIndex,
@@ -457,7 +472,7 @@ function flattenUnions(type: TypeExpression): TypeExpression {
         return {
             kind: "union-type",
             members,
-            mutable: undefined,
+            mutability: undefined,
             id: type.id,
             code: type.code,
             startIndex: type.startIndex,
@@ -493,7 +508,7 @@ function distillUnion(parents: AllParents, scopes: AllScopes, type: TypeExpressi
         return {
             kind: "union-type",
             members,
-            mutable: undefined,
+            mutability: undefined,
             id: type.id,
             code: type.code,
             startIndex: type.startIndex,
@@ -593,7 +608,7 @@ export function propertiesOf(
     type: TypeExpression
 ): readonly Attribute[] | undefined {
     const AST_NOISE = { code: undefined, startIndex: undefined, endIndex: undefined }
-    const TYPE_AST_NOISE = { mutable: undefined, ...AST_NOISE }
+    const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
 
     switch (type.kind) {
         case "object-type": {
@@ -613,7 +628,7 @@ export function propertiesOf(
         }
         case "array-type":
         // case "tuple-type":
-            if (type.mutable) {
+            if (type.mutability === "mutable") {
                 return [
                     {
                         kind: "attribute",
@@ -636,16 +651,23 @@ export function propertiesOf(
                 return []
             }
         case "class-instance-type": {
+            
             const memberToAttribute = (member: ClassMember): Attribute => {
+
                 const memberType = memberDeclaredType(member) && memberDeclaredType(member)?.kind !== "func-type"
                     ? memberDeclaredType(member) as TypeExpression
                     : inferType(reportError, parents, scopes, member.value);
-                const mutable = memberType.mutable && member.kind === "class-property" && (type.internal || member.access !== "visible")
+
+                const mutability = (
+                    memberType.mutability == null ? undefined :
+                    memberType.mutability === "mutable" && member.kind === "class-property" && (type.internal || member.access !== "visible") ? "mutable"
+                    : "const"
+                )
 
                 return {
                     kind: "attribute",
                     name: member.name,
-                    type: { ...memberType, mutable } as TypeExpression,
+                    type: { ...memberType, mutability } as TypeExpression,
                     id: member.id,
                     ...TYPE_AST_NOISE
                 }
@@ -732,7 +754,7 @@ export function propertiesOf(
                         kind: "func-type",
                         typeParams: [],
                         args: [],
-                        returnType: { kind: "array-type", element: itemType, mutable: true, id: Symbol(), ...AST_NOISE },
+                        returnType: { kind: "array-type", element: itemType, mutability: "mutable", id: Symbol(), ...AST_NOISE },
                         id: Symbol(),
                         ...TYPE_AST_NOISE
                     },

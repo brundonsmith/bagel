@@ -220,7 +220,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 if (ast.target.kind === "property-accessor") {
                     const subjectType = inferType(reportError, parents, scopes, ast.target.subject, true);
 
-                    if (!subjectType.mutable) {
+                    if (subjectType.mutability !== "mutable") {
                         reportError(miscError(ast.target, `Cannot assign to property '${ast.target.property.name}' because the target object is constant`));
                     }
                 }
@@ -265,7 +265,7 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
     // console.log('subsumes (resolved)?\n', { resolvedDestination: display(resolvedDestination), resolvedValue: display(resolvedValue) })
 
     // constants can't be assigned to mutable slots
-    if (resolvedDestination.mutable === true && resolvedValue.mutable === false) {
+    if (resolvedDestination.mutability === "mutable" && resolvedValue.mutability !== "mutable") {
         return false;
     }
 
@@ -327,28 +327,34 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
 }
 
 export function displayForm(typeExpression: TypeExpression): string {
+    let str: string;
+
     switch (typeExpression.kind) {
-        case "union-type": return '(' + typeExpression.members.map(displayForm).join(" | ") + ')';
-        case "named-type": return typeExpression.name.name;
-        case "proc-type": return `${typeExpression.typeParams.length > 0 ? `<${typeExpression.typeParams.map(p => p.name).join(',')}>` : ''}(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) {}`;
-        case "func-type": return `${typeExpression.typeParams.length > 0 ? `<${typeExpression.typeParams.map(p => p.name).join(',')}>` : ''}(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) => ${displayForm(typeExpression.returnType ?? UNKNOWN_TYPE)}`;
-        case "object-type": return `{${typeExpression.spreads.map(s => '...' + displayForm(s)).concat(typeExpression.entries.map(({ name, type }) => `${name.name}: ${displayForm(type)}`)).join(', ')}}`;
-        case "indexer-type": return `{ [${displayForm(typeExpression.keyType)}]: ${displayForm(typeExpression.valueType)} }`;
-        case "array-type": return `${displayForm(typeExpression.element)}[]`;
-        case "tuple-type": return `[${typeExpression.members.map(displayForm).join(", ")}]`;
-        case "string-type": return `string`;
-        case "number-type": return `number`;
-        case "boolean-type": return `boolean`;
-        case "nil-type": return `nil`;
-        case "literal-type": return JSON.stringify(typeExpression.value.value).replaceAll('"', "'");
-        case "nominal-type": return typeExpression.name;
-        case "iterator-type": return `Iterator<${displayForm(typeExpression.itemType)}>`;
-        case "plan-type": return `Plan<${displayForm(typeExpression.resultType)}>`;
-        case "unknown-type": return "unknown";
-        case "any-type": return "any";
-        case "element-type": return `Element`
-        // case "element-type": return `<${typeExpression.tagName}>`;
-        case "javascript-escape-type": return "<js escape>";
-        case "class-instance-type": return typeExpression.clazz.name.name;
+        case "union-type": str = '(' + typeExpression.members.map(displayForm).join(" | ") + ')'; break;
+        case "named-type": str = typeExpression.name.name; break;
+        case "proc-type": str = `${typeExpression.typeParams.length > 0 ? `<${typeExpression.typeParams.map(p => p.name).join(',')}>` : ''}(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) {}`; break;
+        case "func-type": str = `${typeExpression.typeParams.length > 0 ? `<${typeExpression.typeParams.map(p => p.name).join(',')}>` : ''}(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) => ${displayForm(typeExpression.returnType ?? UNKNOWN_TYPE)}`; break;
+        case "object-type": str = `{${typeExpression.spreads.map(s => '...' + displayForm(s)).concat(typeExpression.entries.map(({ name, type }) => `${name.name}: ${displayForm(type)}`)).join(', ')}}`; break;
+        case "indexer-type": str = `{ [${displayForm(typeExpression.keyType)}]: ${displayForm(typeExpression.valueType)} }`; break;
+        case "array-type": str = `${displayForm(typeExpression.element)}[]`; break;
+        case "tuple-type": str = `[${typeExpression.members.map(displayForm).join(", ")}]`; break;
+        case "string-type": str = `string`; break;
+        case "number-type": str = `number`; break;
+        case "boolean-type": str = `boolean`; break;
+        case "nil-type": str = `nil`; break;
+        case "literal-type": str = JSON.stringify(typeExpression.value.value).replaceAll('"', "'"); break;
+        case "nominal-type": str = typeExpression.name; break;
+        case "iterator-type": str = `Iterator<${displayForm(typeExpression.itemType)}>`; break;
+        case "plan-type": str = `Plan<${displayForm(typeExpression.resultType)}>`; break;
+        case "unknown-type": str = "unknown"; break;
+        case "any-type": str = "any"; break;
+        case "element-type": str = `Element`; break;
+        // case "element-type": str = `<${typeExpression.tagName}>`;
+        case "javascript-escape-type": str = "<js escape>"; break;
+        case "class-instance-type": str = typeExpression.clazz.name.name; break;
     }
+
+    const metaStr = typeExpression.mutability == null ? '' : ` [${typeExpression.mutability[0]}]`
+
+    return str + metaStr
 }
