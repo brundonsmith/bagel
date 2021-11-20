@@ -1,6 +1,6 @@
 import { AllParents, AllScopes, DeclarationDescriptor, getScopeFor, Scope, TypeDeclarationDescriptor } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
-import { Attribute, BOOLEAN_TYPE, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, memoize4 } from "../utils.ts";
 import { displayForm, subsumes } from "./typecheck.ts";
 import { ClassDeclaration, ClassMember, memberDeclaredType } from "../_model/declarations.ts";
@@ -92,18 +92,42 @@ const inferTypeInner = memoize4((
                 // bind type-args for this invocation
                 if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
                     if (subjectType.typeParams.length > 0) {
-                        if (subjectType.typeParams.length !== ast.typeArgs.length) {
-                            reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
-                        }
+                        if (ast.typeArgs.length > 0) {
+                            if (subjectType.typeParams.length !== ast.typeArgs.length) {
+                                reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
+                            }
 
-                        for (let i = 0; i < subjectType.typeParams.length; i++) {
-                            const typeParam = subjectType.typeParams[i]
-                            const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
+                            for (let i = 0; i < subjectType.typeParams.length; i++) {
+                                const typeParam = subjectType.typeParams[i]
+                                const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
 
-                            scopeWithGenerics.types.set(typeParam.name, {
-                                type: typeArg,
-                                isGenericParameter: false,
-                            })
+                                scopeWithGenerics.types.set(typeParam.name, {
+                                    type: typeArg,
+                                    isGenericParameter: false,
+                                })
+                            }
+                        } else {
+                            const invocationSubjectType: FuncType|ProcType = {
+                                ...subjectType,
+                                args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(reportError, parents, scopes, ast.args[index]) }))
+                            }
+    
+                            // attempt to infer params for generic
+                            const inferredBindings = fitTemplate(subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name));
+    
+                            if (inferredBindings.size === subjectType.typeParams.length) {
+                                for (let i = 0; i < subjectType.typeParams.length; i++) {
+                                    const typeParam = subjectType.typeParams[i]
+                                    const typeArg = inferredBindings.get(typeParam.name) ?? UNKNOWN_TYPE
+        
+                                    scopeWithGenerics.types.set(typeParam.name, {
+                                        type: typeArg,
+                                        isGenericParameter: false,
+                                    })
+                                }
+                            } else {
+                                reportError(miscError(ast, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
+                            }
                         }
                     }
                 }
@@ -807,3 +831,41 @@ export function propertiesOf(
         }
     }
 }
+
+export function fitTemplate(parameterized: TypeExpression, reified: TypeExpression, params: readonly string[]): ReadonlyMap<string, TypeExpression> {
+    switch (parameterized.kind) {
+        case "named-type": {
+            const matches = new Map<string, TypeExpression>();
+            matches.set(parameterized.name.name, reified);
+            return matches;
+        }
+        case "func-type": if (reified.kind === "func-type") {
+            const argsMatches = parameterized.args.map((arg, index) =>
+                fitTemplate(arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE, params))
+            
+            const matches = new Map<string, TypeExpression>();
+
+            for (const map of argsMatches) {
+                for (const [key, value] of map.entries()) {
+                    if (matches.has(key)) {
+                        matches.set(key, {
+                            kind: "union-type",
+                            members: [value, matches.get(key) as TypeExpression],
+                            id: Symbol(),
+                            mutability: undefined,
+                            code: undefined, startIndex: undefined, endIndex: undefined
+                        })
+                    } else {
+                        matches.set(key, value);
+                    }
+                }
+            }
+            
+            return matches;
+        } break;
+    }
+
+    return EMPTY_MAP;
+}
+
+const EMPTY_MAP: ReadonlyMap<string, TypeExpression> = new Map()

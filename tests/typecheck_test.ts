@@ -195,7 +195,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Basic generic with inference",
+  name: "Basic generic with return inference",
   fn() {
     testTypecheck(
       `
@@ -233,7 +233,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Nested generic calls with inference",
+  name: "Nested generic calls with return inference",
   fn() {
     testTypecheck(
       `
@@ -246,7 +246,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Nested generic calls with inference mismatch",
+  name: "Nested generic calls with return inference mismatch",
   fn() {
     testTypecheck(
       `
@@ -270,6 +270,30 @@ Deno.test({
     );
   },
 });
+
+Deno.test({
+  name: "Basic generic param inference",
+  fn() {
+    testTypecheck(
+      `
+      func other<T>(a: T): T => a
+      const c: number = other(12)`,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Basic generic param inference mismatch",
+  fn() {
+    testTypecheck(
+      `
+      func other<T>(a: T): T => a
+      const c: number = other('foo')`,
+      true
+    )
+  }
+})
 
 Deno.test({
   name: "Function consts out of order",

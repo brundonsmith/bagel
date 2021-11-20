@@ -1,8 +1,8 @@
 import { Module } from "../_model/ast.ts";
-import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, NIL_TYPE, REACTION_VIEW_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, NIL_TYPE, ProcType, REACTION_VIEW_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
-import { propertiesOf, inferType, resolve, subtract } from "./typeinfer.ts";
+import { propertiesOf, inferType, resolve, subtract, fitTemplate } from "./typeinfer.ts";
 import { AllParents, AllScopes, getScopeFor } from "../_model/common.ts";
 import { display } from "../debugging.ts";
 import { extendScope } from "./scopescan.ts";
@@ -80,18 +80,42 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                     // bind type-args for this invocation
                     if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
                         if (subjectType.typeParams.length > 0) {
-                            if (subjectType.typeParams.length !== ast.typeArgs.length) {
-                                reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
-                            }
-
-                            for (let i = 0; i < subjectType.typeParams.length; i++) {
-                                const typeParam = subjectType.typeParams[i]
-                                const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
-
-                                scopeWithGenerics.types.set(typeParam.name, {
-                                    type: typeArg,
-                                    isGenericParameter: false,
-                                })
+                            if (ast.typeArgs.length > 0) {
+                                if (subjectType.typeParams.length !== ast.typeArgs.length) {
+                                    reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
+                                }
+    
+                                for (let i = 0; i < subjectType.typeParams.length; i++) {
+                                    const typeParam = subjectType.typeParams[i]
+                                    const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
+    
+                                    scopeWithGenerics.types.set(typeParam.name, {
+                                        type: typeArg,
+                                        isGenericParameter: false,
+                                    })
+                                }
+                            } else {
+                                const invocationSubjectType: FuncType|ProcType = {
+                                    ...subjectType,
+                                    args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(reportError, parents, scopes, ast.args[index]) }))
+                                }
+        
+                                // attempt to infer params for generic
+                                const inferredBindings = fitTemplate(subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name));
+        
+                                if (inferredBindings.size === subjectType.typeParams.length) {
+                                    for (let i = 0; i < subjectType.typeParams.length; i++) {
+                                        const typeParam = subjectType.typeParams[i]
+                                        const typeArg = inferredBindings.get(typeParam.name) ?? UNKNOWN_TYPE
+            
+                                        scopeWithGenerics.types.set(typeParam.name, {
+                                            type: typeArg,
+                                            isGenericParameter: false,
+                                        })
+                                    }
+                                } else {
+                                    reportError(miscError(ast, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
+                                }
                             }
                         }
                     }
