@@ -1,8 +1,8 @@
-import { AllParents, AllScopes, DeclarationDescriptor, getScopeFor, Scope, TypeDeclarationDescriptor } from "../_model/common.ts";
+import { AllParents, AllScopes, getScopeFor, Scope, TypeDeclarationDescriptor } from "../_model/common.ts";
 import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
-import { Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, memoize4 } from "../utils.ts";
-import { displayForm, subsumes } from "./typecheck.ts";
+import { displayForm, subsumes, typesEqual } from "./typecheck.ts";
 import { ClassDeclaration, ClassMember, memberDeclaredType } from "../_model/declarations.ts";
 import { BagelError, miscError } from "../errors.ts";
 import { withoutSourceInfo } from "../debugging.ts";
@@ -113,7 +113,7 @@ const inferTypeInner = memoize4((
                             }
     
                             // attempt to infer params for generic
-                            const inferredBindings = fitTemplate(subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name));
+                            const inferredBindings = fitTemplate(reportError, parents, scopes, subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name));
     
                             if (inferredBindings.size === subjectType.typeParams.length) {
                                 for (let i = 0; i < subjectType.typeParams.length; i++) {
@@ -832,37 +832,95 @@ export function propertiesOf(
     }
 }
 
-export function fitTemplate(parameterized: TypeExpression, reified: TypeExpression, params: readonly string[]): ReadonlyMap<string, TypeExpression> {
-    switch (parameterized.kind) {
-        case "named-type": {
-            const matches = new Map<string, TypeExpression>();
-            matches.set(parameterized.name.name, reified);
-            return matches;
-        }
-        case "func-type": if (reified.kind === "func-type") {
-            const argsMatches = parameterized.args.map((arg, index) =>
-                fitTemplate(arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE, params))
-            
-            const matches = new Map<string, TypeExpression>();
+export function fitTemplate(
+    reportError: (error: BagelError) => void, 
+    parents: AllParents,
+    scopes: AllScopes,
+    parameterized: TypeExpression, 
+    reified: TypeExpression, 
+    params: readonly string[]
+): ReadonlyMap<string, TypeExpression> {
+    function isGenericParam(type: TypeExpression): type is NamedType {
+        return type.kind === "named-type" && params.includes(type.name.name)
+    }
 
-            for (const map of argsMatches) {
-                for (const [key, value] of map.entries()) {
-                    if (matches.has(key)) {
-                        matches.set(key, {
-                            kind: "union-type",
-                            members: [value, matches.get(key) as TypeExpression],
-                            id: Symbol(),
-                            mutability: undefined,
-                            code: undefined, startIndex: undefined, endIndex: undefined
-                        })
-                    } else {
-                        matches.set(key, value);
+    if (isGenericParam(parameterized)) {
+        const matches = new Map<string, TypeExpression>();
+        matches.set(parameterized.name.name, reified);
+        return matches;
+    }
+
+    if (parameterized.kind === "func-type" && reified.kind === "func-type") {
+        const matchGroups = [
+            ...parameterized.args.map((arg, index) =>
+                fitTemplate(reportError, parents, scopes, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE, params)),
+            fitTemplate(reportError, parents, scopes, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE, params)
+        ]
+        
+        const matches = new Map<string, TypeExpression>();
+
+        for (const map of matchGroups) {
+            for (const [key, value] of map.entries()) {
+                if (matches.has(key)) {
+                    matches.set(key, simplify(parents, scopes, {
+                        kind: "union-type",
+                        members: [value, matches.get(key) as TypeExpression],
+                        id: Symbol(),
+                        mutability: undefined,
+                        code: undefined, startIndex: undefined, endIndex: undefined
+                    }))
+                } else {
+                    matches.set(key, value);
+                }
+            }
+        }
+        
+        return matches;
+    }
+
+    if (parameterized.kind === "union-type") {
+        if (reified.kind === "union-type") {
+            const parameterizedMembers = [...parameterized.members];
+            const reifiedMembers = [...reified.members];
+
+            const remove = new Set<TypeExpression>();
+
+            for (const p of parameterizedMembers) {
+                for (const r of reifiedMembers) {
+                    if (typesEqual(p, r)) {
+                        remove.add(p);
+                        remove.add(r);
                     }
                 }
             }
-            
+
+            const parameterizedMembersRemaining = parameterizedMembers.filter(m => !remove.has(m))
+            const reifiedMembersRemaining = reifiedMembers.filter(m => !remove.has(m))
+
+            console.log(parameterizedMembersRemaining)
+
+            if (parameterizedMembersRemaining.length === 1 && isGenericParam(parameterizedMembersRemaining[0])) {
+                const matches = new Map<string, TypeExpression>();
+
+                matches.set(parameterizedMembersRemaining[0].name.name, simplify(parents, scopes, {
+                    kind: "union-type",
+                    members: reifiedMembersRemaining,
+                    id: Symbol(),
+                    mutability: undefined,
+                    code: undefined, startIndex: undefined, endIndex: undefined
+                }))
+                
+                return matches;
+            }
+        } else if(parameterized.members.some(isGenericParam)) {
+            const param = parameterized.members.find(isGenericParam) as NamedType;
+
+            const matches = new Map<string, TypeExpression>();
+
+            matches.set(param.name.name, reified);
+
             return matches;
-        } break;
+        }
     }
 
     return EMPTY_MAP;

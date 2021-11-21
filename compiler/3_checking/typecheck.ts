@@ -101,7 +101,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                                 }
         
                                 // attempt to infer params for generic
-                                const inferredBindings = fitTemplate(subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name));
+                                const inferredBindings = fitTemplate(reportError, parents, scopes, subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name));
         
                                 if (inferredBindings.size === subjectType.typeParams.length) {
                                     for (let i = 0; i < subjectType.typeParams.length; i++) {
@@ -319,7 +319,7 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
         }
     } else if (resolvedValue.kind === "union-type") {
         return false;
-    } else if(deepEquals(resolvedDestination, resolvedValue, ["id", "mutable", "code", "startIndex", "endIndex"])) {
+    } else if(typesEqual(resolvedDestination, resolvedValue)) {
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
             // NOTE: Value and destination are flipped on purpose for args!
@@ -348,6 +348,10 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
     }
 
     return false;
+}
+
+export function typesEqual(a: TypeExpression, b: TypeExpression): boolean {
+    return deepEquals(a, b, ["id", "code", "startIndex", "endIndex"])
 }
 
 export function displayForm(typeExpression: TypeExpression): string {

@@ -296,6 +296,30 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Union generic param inference",
+  fn() {
+    testTypecheck(
+      `
+      func other<T>(a: T|nil): T|nil => a
+      const c: number|nil = other(12)`,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Union generic param inference mismatch",
+  fn() {
+    testTypecheck(
+      `
+      func other<T>(a: T|nil): T|nil => a
+      const c: number = other(12)`,
+      true
+    )
+  }
+})
+
+Deno.test({
   name: "Function consts out of order",
   fn() {
     testTypecheck(
