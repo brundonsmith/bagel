@@ -166,7 +166,6 @@ export type JavascriptEscapeType = SourceInfo & Identifier & {
 }
 
 export type Mutability = { readonly mutability: "absolute-const"|"const"|"mutable" }
-export type Mutability = { readonly mutable: boolean }
 
 export const STRING_TYPE: StringType = {
     kind: "string-type",
