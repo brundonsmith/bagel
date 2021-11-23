@@ -109,11 +109,18 @@ const inferTypeInner = memoize4((
                         } else {
                             const invocationSubjectType: FuncType|ProcType = {
                                 ...subjectType,
-                                args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(reportError, parents, scopes, ast.args[index]) }))
+                                args: subjectType.args.map((arg, index) => ({
+                                    ...arg,
+                                    type: inferType(reportError, parents, scopes, ast.args[index])
+                                }))
                             }
     
                             // attempt to infer params for generic
-                            const inferredBindings = fitTemplate(reportError, parents, scopes, subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name));
+                            const inferredBindings = fitTemplate(reportError, parents, scopes, 
+                                subjectType, 
+                                invocationSubjectType, 
+                                subjectType.typeParams.map(param => param.name)
+                            );
     
                             if (inferredBindings.size === subjectType.typeParams.length) {
                                 for (let i = 0; i < subjectType.typeParams.length; i++) {
@@ -394,7 +401,8 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
             }
         }
     } else if(type.kind === "union-type") {
-        const memberTypes = type.members.map(member => resolve(contextOrScope, member, resolveGenerics));
+        const memberTypes = type.members.map(member =>
+            resolve(contextOrScope, member, resolveGenerics));
         if (memberTypes.some(member => member == null)) {
             return UNKNOWN_TYPE;
         } else {
@@ -854,21 +862,24 @@ export function fitTemplate(
         const matchGroups = [
             ...parameterized.args.map((arg, index) =>
                 fitTemplate(reportError, parents, scopes, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE, params)),
-            fitTemplate(reportError, parents, scopes, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE, params)
+            // fitTemplate(reportError, parents, scopes, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE, params)
         ]
-        
+
         const matches = new Map<string, TypeExpression>();
 
         for (const map of matchGroups) {
             for (const [key, value] of map.entries()) {
-                if (matches.has(key)) {
-                    matches.set(key, simplify(parents, scopes, {
-                        kind: "union-type",
-                        members: [value, matches.get(key) as TypeExpression],
-                        id: Symbol(),
-                        mutability: undefined,
-                        code: undefined, startIndex: undefined, endIndex: undefined
-                    }))
+                const existing = matches.get(key)
+                if (existing) {
+                    if (!subsumes(parents, scopes, existing, value)) {
+                        matches.set(key, simplify(parents, scopes, {
+                            kind: "union-type",
+                            members: [value, existing],
+                            id: Symbol(),
+                            mutability: undefined,
+                            code: undefined, startIndex: undefined, endIndex: undefined
+                        }))
+                    }
                 } else {
                     matches.set(key, value);
                 }
@@ -896,8 +907,6 @@ export function fitTemplate(
 
             const parameterizedMembersRemaining = parameterizedMembers.filter(m => !remove.has(m))
             const reifiedMembersRemaining = reifiedMembers.filter(m => !remove.has(m))
-
-            console.log(parameterizedMembersRemaining)
 
             if (parameterizedMembersRemaining.length === 1 && isGenericParam(parameterizedMembersRemaining[0])) {
                 const matches = new Map<string, TypeExpression>();
