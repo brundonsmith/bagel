@@ -10,7 +10,7 @@ import { extendScope } from "./scopescan.ts";
 
 export function typecheck(reportError: (error: BagelError) => void, parents: AllParents, scopes: AllScopes, ast: Module) {
     walkParseTree<void>(undefined, ast, (_, ast) => {
-        const scope = getScopeFor(parents, scopes, ast)
+        const scope = getScopeFor(reportError, parents, scopes, ast)
 
         switch(ast.kind) {
             case "const-declaration": {
@@ -71,7 +71,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             } break;
             case "pipe":
             case "invocation": {
-                const scope = getScopeFor(parents, scopes, ast)
+                const scope = getScopeFor(reportError, parents, scopes, ast)
                 
                 let subjectType = inferType(reportError, parents, scopes, ast.subject);
                 if (ast.kind === "invocation") {
@@ -233,7 +233,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 }
             } break;
             case "assignment": {
-                const resolved = ast.target.kind === "local-identifier" ? getScopeFor(parents, scopes, ast.target).values.get(ast.target.name) : undefined
+                const resolved = ast.target.kind === "local-identifier" ? getScopeFor(reportError, parents, scopes, ast.target).values.get(ast.target.name) : undefined
                 if (ast.target.kind === "local-identifier" && resolved != null && resolved.mutability !== "all") {
                     reportError(miscError(ast.target, `Cannot assign to '${ast.target.name}' because it's constant`));
                 }
@@ -284,8 +284,8 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
     }
 
     // console.log('subsumes?\n', { destination: display(destination), value: display(value) })
-    const resolvedDestination = resolve(getScopeFor(parents, scopes, destination), destination, resolveGenerics)
-    const resolvedValue =       resolve(getScopeFor(parents, scopes, value), value, resolveGenerics)
+    const resolvedDestination = resolve(getScopeFor(undefined, parents, scopes, destination), destination, resolveGenerics)
+    const resolvedValue =       resolve(getScopeFor(undefined, parents, scopes, value), value, resolveGenerics)
     // console.log('subsumes (resolved)?\n', { resolvedDestination: display(resolvedDestination), resolvedValue: display(resolvedValue) })
 
     // constants can't be assigned to mutable slots

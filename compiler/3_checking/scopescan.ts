@@ -71,7 +71,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
     walkParseTree<void>(undefined, ast, (_, ast) => {
 
         // infer
-        const scope = getScopeFor(parents, allScopes, ast) as MutableScope
+        const scope = getScopeFor(reportError, parents, allScopes, ast) as MutableScope
         switch(ast.kind) {
             case "for-loop": {
 

@@ -5,6 +5,7 @@ import { ClassDeclaration } from "./declarations.ts";
 import { Expression } from "./expressions.ts";
 import { withoutSourceInfo, display } from "../debugging.ts";
 import { deepEquals } from "../utils.ts";
+import { BagelError, miscError } from "../errors.ts";
 
 export type Identifier = { readonly id: symbol }
 
@@ -98,7 +99,7 @@ export function equivalent(a: Expression, b: Expression): boolean {
     return deepEquals(withoutSourceInfo(a), withoutSourceInfo(b))
 }
 
-export function getScopeFor(parents: AllParents, scopes: AllScopes, ast: AST): Scope {
+export function getScopeFor(reportError: undefined|((error: BagelError) => void), parents: AllParents, scopes: AllScopes, ast: AST): Scope {
     let current: AST|undefined = ast
 
     while (current != null) {
@@ -111,7 +112,12 @@ export function getScopeFor(parents: AllParents, scopes: AllScopes, ast: AST): S
     }
 
     if (ast.kind === "local-identifier") {
-        throw Error("Failed to find a Scope in which to resolve identifier '" + ast.name + "'")
+        const message = "Failed to find a Scope in which to resolve identifier '" + ast.name + "'"
+        if (reportError) {
+            reportError(miscError(ast, message))
+        } else {
+            throw Error(message)
+        }
     }
 
     return EMPTY_SCOPE

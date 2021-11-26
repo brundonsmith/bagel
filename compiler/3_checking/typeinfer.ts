@@ -19,7 +19,7 @@ export function inferType(
 
     let refinedType = baseType
     {
-        const scope = getScopeFor(parents, scopes, ast)
+        const scope = getScopeFor(reportError, parents, scopes, ast)
         for (const refinement of scope.refinements ?? []) {
             switch (refinement.kind) {
                 case "subtraction": {
@@ -83,7 +83,7 @@ const inferTypeInner = memoize4((
         case "negation-operator": return BOOLEAN_TYPE;
         case "pipe":
         case "invocation": {
-            const scope = getScopeFor(parents, scopes, ast)
+            const scope = getScopeFor(reportError, parents, scopes, ast)
 
             let subjectType = inferType(reportError, parents, scopes, ast.subject);
             if (ast.kind === "invocation") {
@@ -258,7 +258,7 @@ const inferTypeInner = memoize4((
             }
         }
         case "local-identifier": {
-            const valueDescriptor = getScopeFor(parents, scopes, ast).values.get(ast.name)
+            const valueDescriptor = getScopeFor(reportError, parents, scopes, ast).values.get(ast.name)
 
             const type = valueDescriptor?.declaredType 
                 ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, parents, scopes, initialValue))
@@ -341,7 +341,7 @@ const inferTypeInner = memoize4((
             };
         }
         case "class-construction": {
-            const clazz = getScopeFor(parents, scopes, ast).classes.get(ast.clazz.name)
+            const clazz = getScopeFor(reportError, parents, scopes, ast).classes.get(ast.clazz.name)
             if (clazz == null) {
                 return UNKNOWN_TYPE
             }
@@ -375,7 +375,7 @@ const inferTypeInner = memoize4((
 export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: TypeExpression, resolveGenerics?: boolean): TypeExpression {
     if (type.kind === "named-type") {
         const resolutionScope = Array.isArray(contextOrScope)
-            ? getScopeFor(contextOrScope[0], contextOrScope[1], type)
+            ? getScopeFor(undefined, contextOrScope[0], contextOrScope[1], type)
             : contextOrScope
 
         if (resolutionScope.types.get(type.name.name)) {

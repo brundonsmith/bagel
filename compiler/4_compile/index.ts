@@ -83,7 +83,7 @@ function compileOne(parents: AllParents, scopes: AllScopes, module: string, ast:
         case "debug": return compileOne(parents, scopes, module, ast.inner);
         case "property-accessor": return `${compileOne(parents, scopes, module, ast.subject)}.${compileOne(parents, scopes, module, ast.property)}`;
         case "plain-identifier": return ast.name;
-        case "local-identifier": return getScopeFor(parents, scopes, ast).values.get(ast.name)?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
+        case "local-identifier": return getScopeFor(undefined, parents, scopes, ast).values.get(ast.name)?.mutability === "all" ? `${LOCALS_OBJ}["${ast.name}"]` : ast.name;
         case "object-literal":  return `{${objectEntries(parents, scopes, module, ast.entries)}}`;
         case "array-literal":   return `[${ast.entries.map(e => compileOne(parents, scopes, module, e)).join(", ")}]`;
         case "string-literal":  return `\`${ast.segments.map(segment =>
@@ -152,7 +152,7 @@ function compileProc(parents: AllParents, scopes: AllScopes, module: string, pro
     const mutableLocals = (
         lastStatement
             ? (() => {
-                const scope = getScopeFor(parents, scopes, lastStatement)
+                const scope = getScopeFor(undefined, parents, scopes, lastStatement)
                 return names.map(local => ({
                     name: local.name.name,
                     descriptor: scope.values.get(local.name.name) as DeclarationDescriptor
