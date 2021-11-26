@@ -53,6 +53,7 @@ ${INT}configure({
 async function build({ entry, bundle, watch, emit, includeTests }: { entry: string, bundle?: boolean, watch?: boolean, includeTests?: boolean, emit: boolean }) {
     if (!entry) throw Error("Bagel: No file or directory provided")
     const entryFileOrDir = path.resolve(Deno.cwd(), entry);
+    if (!await fs.exists(entryFileOrDir)) throw Error(`Bagel: ${entry} not found`)
     const singleEntry = !(await Deno.stat(entryFileOrDir)).isDirectory
     const allFiles = singleEntry ? [ entryFileOrDir ] : await getAllFiles(entryFileOrDir);
 
