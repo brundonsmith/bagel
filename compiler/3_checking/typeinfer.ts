@@ -888,6 +888,10 @@ export function fitTemplate(
         return matches;
     }
 
+    if (parameterized.kind === "array-type" && reified.kind === "array-type") {
+        return fitTemplate(reportError, parents, scopes, parameterized.element, reified.element, params);
+    }
+
     if (parameterized.kind === "union-type") {
         if (reified.kind === "union-type") {
             const parameterizedMembers = [...parameterized.members];
