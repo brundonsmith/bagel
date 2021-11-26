@@ -169,7 +169,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                     }
 
                     newScope.values.set(declaration.name.name, {
-                        mutability: "absolute-none",
+                        mutability: "immutable",
                         declaredType: undefined, // fall back to the function proc's inner type, to allow for return-type inference
                         initialValue: declaration.value
                     });
@@ -189,7 +189,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                             const name = i.alias?.name ?? i.name.name;
 
                             newScope.values.set(name, {
-                                mutability: "absolute-none",
+                                mutability: "immutable",
                                 declaredType: UNKNOWN_TYPE,
                             });
                         }
@@ -208,12 +208,12 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                                 reportError(cannotFindExport(i, declaration));
 
                                 newScope.values.set(name.name, {
-                                    mutability: "absolute-none",
+                                    mutability: "immutable",
                                     declaredType: UNKNOWN_TYPE,
                                 });
                             } else {
                                 newScope.values.set(name.name, {
-                                    mutability: "absolute-none", // TODO: If we ever allow global mutable state, this will need to allow for it
+                                    mutability: "immutable", // TODO: If we ever allow global mutable state, this will need to allow for it
                                     declaredType: declType(foreignDecl) as TypeExpression,
                                     initialValue: declValue(foreignDecl),
                                 });
@@ -261,7 +261,7 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                 }
 
                 newScope.values.set(arg.name.name, {
-                    mutability: ast.kind === "func" ? "none" : "contents-only",
+                    mutability: ast.kind === "func" ? "readonly" : "contents-only",
                     declaredType: arg.type ?? thisArgParentType?.args[i].type,
                 })
             }
@@ -298,8 +298,8 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
             newScope.values.set(ast.name.name, {
                 mutability: (
                     ast.kind === "let-declaration" ? "all" :
-                    ast.kind === "const-declaration" ? "absolute-none" :
-                    "none"
+                    ast.kind === "const-declaration" ? "immutable" :
+                    "readonly"
                 ),
                 declaredType: ast.type,
                 initialValue: ast.value
@@ -371,8 +371,8 @@ function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
         typeofStr === "number" ? NUMBER_TYPE :
         typeofStr === "boolean" ? BOOLEAN_TYPE :
         typeofStr === "nil" ? NIL_TYPE :
-        typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, mutability: "const", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined } :
-        typeofStr === "object" ? { kind: "indexer-type", keyType: ANY_TYPE, valueType: ANY_TYPE, mutability: "const", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, mutability: "readonly", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "object" ? { kind: "indexer-type", keyType: ANY_TYPE, valueType: ANY_TYPE, mutability: "readonly", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined } :
         // TODO
         // type.value === "set" ?
         // type.value === "class-instance" ?

@@ -85,7 +85,7 @@ export type TypeDeclarationDescriptor = {
 }
 
 export type DeclarationDescriptor = {
-    readonly mutability: "all"|"contents-only"|"none"|"absolute-none",
+    readonly mutability: "all"|"contents-only"|"readonly"|"immutable",
     readonly declaredType?: TypeExpression,
     readonly initialValue?: Expression,
 }

@@ -165,7 +165,7 @@ export type JavascriptEscapeType = SourceInfo & Identifier & {
     readonly mutability: undefined,
 }
 
-export type Mutability = { readonly mutability: "absolute-const"|"const"|"mutable" }
+export type Mutability = { readonly mutability: "immutable"|"readonly"|"mutable" }
 
 export const STRING_TYPE: StringType = {
     kind: "string-type",
@@ -299,7 +299,7 @@ export const ELEMENT_TAG_CHILD_TYPE: TypeExpression = {
             startIndex: undefined,
             endIndex: undefined,
             mutability: undefined,
-        }, mutability: "absolute-const", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined}
+        }, mutability: "immutable", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined}
     ],
     mutability: undefined,
     id: Symbol(),

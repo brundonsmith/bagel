@@ -247,8 +247,8 @@ const inferTypeInner = memoize4((
                 const mutability = (
                     propertyType?.mutability == null ? undefined :
                     propertyType.mutability === "mutable" && subjectType.mutability === "mutable" ? "mutable" :
-                    subjectType.mutability === "absolute-const" ? "absolute-const" :
-                    "const"
+                    subjectType.mutability === "immutable" ? "immutable" :
+                    "readonly"
                 )
     
                 return (
@@ -266,11 +266,10 @@ const inferTypeInner = memoize4((
 
             const mutability = (
                 type.mutability == null ? undefined :
-                valueDescriptor?.mutability === "absolute-none" ? "absolute-const" :
-                valueDescriptor?.mutability === "none" ? "const" :
+                valueDescriptor?.mutability === "immutable" ? "immutable" :
+                valueDescriptor?.mutability === "readonly" ? "readonly" :
                 type.mutability
             )
-
             return {
                 ...type,
                 mutability,
@@ -693,7 +692,7 @@ export function propertiesOf(
                 const mutability = (
                     memberType.mutability == null ? undefined :
                     memberType.mutability === "mutable" && member.kind === "class-property" && (type.internal || member.access !== "visible") ? "mutable"
-                    : "const"
+                    : "readonly"
                 )
 
                 return {
