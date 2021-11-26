@@ -638,8 +638,6 @@ export function propertiesOf(
     scopes: AllScopes,
     type: TypeExpression
 ): readonly Attribute[] | undefined {
-    const AST_NOISE = { code: undefined, startIndex: undefined, endIndex: undefined }
-    const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
 
     switch (type.kind) {
         case "object-type": {
@@ -657,30 +655,32 @@ export function propertiesOf(
 
             return attrs
         }
-        case "array-type":
+        case "string-type": {
+            return [
+                attribute("length", NUMBER_TYPE),
+            ]
+        }
+        case "array-type": {
         // case "tuple-type":
+            const props: Attribute[] = [
+                attribute("length", NUMBER_TYPE),
+            ];
+
             if (type.mutability === "mutable") {
-                return [
-                    {
-                        kind: "attribute",
-                        name: { kind: "plain-identifier", name: "push", id: Symbol(), ...AST_NOISE },
-                        type: {
-                            kind: "proc-type",
-                            typeParams: [],
-                            args: [{
-                                name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
-                                type: type.element
-                            }],
-                            id: Symbol(),
-                            ...TYPE_AST_NOISE
-                        },
-                        id: Symbol(),
-                        ...TYPE_AST_NOISE
-                    },
-                ]
-            } else {
-                return []
+                props.push(attribute("push", {
+                    kind: "proc-type",
+                    typeParams: [],
+                    args: [{
+                        name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
+                        type: type.element
+                    }],
+                    id: Symbol(),
+                    ...TYPE_AST_NOISE
+                }))
             }
+
+            return props;
+        }
         case "class-instance-type": {
             
             const memberToAttribute = (member: ClassMember): Attribute => {
@@ -718,80 +718,62 @@ export function propertiesOf(
             const itemType = { ...item, ...AST_NOISE }
 
             const iteratorProps: readonly Attribute[] = [
-                {
-                    kind: "attribute",
-                    name: { kind: "plain-identifier", name: "filter", id: Symbol(), ...AST_NOISE },
-                    type: {
-                        kind: "func-type",
-                        typeParams: [],
-                        args: [{
-                            name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
-                            type: {
-                                kind: "func-type",
-                                typeParams: [],
-                                args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: itemType }],
-                                returnType: BOOLEAN_TYPE,
-                                id: Symbol(),
-                                ...TYPE_AST_NOISE
-                            }
-                        }],
-                        returnType: {
-                            kind: "iterator-type",
-                            itemType,
+                attribute("filter", {
+                    kind: "func-type",
+                    typeParams: [],
+                    args: [{
+                        name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
+                        type: {
+                            kind: "func-type",
+                            typeParams: [],
+                            args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: itemType }],
+                            returnType: BOOLEAN_TYPE,
                             id: Symbol(),
                             ...TYPE_AST_NOISE
-                        },
+                        }
+                    }],
+                    returnType: {
+                        kind: "iterator-type",
+                        itemType,
                         id: Symbol(),
                         ...TYPE_AST_NOISE
                     },
                     id: Symbol(),
                     ...TYPE_AST_NOISE
-                },
-                {
-                    kind: "attribute",
-                    name: { kind: "plain-identifier", name: "map", id: Symbol(), ...AST_NOISE },
-                    type: {
-                        kind: "func-type",
-                        typeParams: [
-                            { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }
-                        ],
-                        args: [{
-                            name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
-                            type: {
-                                kind: "func-type",
-                                args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: itemType }],
-                                returnType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
-                                typeParams: [],
-                                id: Symbol(),
-                                ...TYPE_AST_NOISE
-                            }
-                        }],
-                        returnType: {
-                            kind: "iterator-type",
-                            itemType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
+                }),
+                attribute("map", {
+                    kind: "func-type",
+                    typeParams: [
+                        { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }
+                    ],
+                    args: [{
+                        name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
+                        type: {
+                            kind: "func-type",
+                            args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: itemType }],
+                            returnType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
+                            typeParams: [],
                             id: Symbol(),
                             ...TYPE_AST_NOISE
-                        },
+                        }
+                    }],
+                    returnType: {
+                        kind: "iterator-type",
+                        itemType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
                         id: Symbol(),
                         ...TYPE_AST_NOISE
                     },
                     id: Symbol(),
                     ...TYPE_AST_NOISE
-                },
-                {
-                    kind: "attribute",
-                    name: { kind: "plain-identifier", name: "array", id: Symbol(), ...AST_NOISE },
-                    type: {
-                        kind: "func-type",
-                        typeParams: [],
-                        args: [],
-                        returnType: { kind: "array-type", element: itemType, mutability: "mutable", id: Symbol(), ...AST_NOISE },
-                        id: Symbol(),
-                        ...TYPE_AST_NOISE
-                    },
+                }),
+                attribute("array", {
+                    kind: "func-type",
+                    typeParams: [],
+                    args: [],
+                    returnType: { kind: "array-type", element: itemType, mutability: "mutable", id: Symbol(), ...AST_NOISE },
                     id: Symbol(),
                     ...TYPE_AST_NOISE
-                }
+                }),
             ]
 
             return iteratorProps
@@ -801,43 +783,50 @@ export function propertiesOf(
             const resultType = { ...result, ...AST_NOISE }
 
             const planProps: readonly Attribute[] = [
-                {
-                    kind: "attribute",
-                    name: { kind: "plain-identifier", name: "then", id: Symbol(), ...AST_NOISE },
-                    type: {
-                        kind: "func-type",
-                        typeParams: [
-                            { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }
-                        ],
-                        args: [{
-                            name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
-                            type: {
-                                kind: "func-type",
-                                args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: resultType }],
-                                returnType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
-                                typeParams: [],
-                                id: Symbol(),
-                                ...TYPE_AST_NOISE
-                            }
-                        }],
-                        returnType: {
-                            kind: "plan-type",
-                            resultType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
+                attribute("then", {
+                    kind: "func-type",
+                    typeParams: [
+                        { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }
+                    ],
+                    args: [{
+                        name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
+                        type: {
+                            kind: "func-type",
+                            args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: resultType }],
+                            returnType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
+                            typeParams: [],
                             id: Symbol(),
                             ...TYPE_AST_NOISE
-                        },
+                        }
+                    }],
+                    returnType: {
+                        kind: "plan-type",
+                        resultType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
                         id: Symbol(),
                         ...TYPE_AST_NOISE
                     },
                     id: Symbol(),
                     ...TYPE_AST_NOISE
-                },
+                }),
             ]
 
             return planProps
         }
     }
 }
+
+function attribute(name: string, type: TypeExpression): Attribute {
+    return {
+        kind: "attribute",
+        name: { kind: "plain-identifier", name, id: Symbol(), ...AST_NOISE },
+        type,
+        id: Symbol(),
+        ...TYPE_AST_NOISE
+    }
+}
+
+const AST_NOISE = { code: undefined, startIndex: undefined, endIndex: undefined }
+const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
 
 export function fitTemplate(
     reportError: (error: BagelError) => void, 
