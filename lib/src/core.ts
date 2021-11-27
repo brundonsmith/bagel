@@ -83,6 +83,26 @@ function* filter<T>(fn: (el: T) => boolean, iter: RawIter<T>): RawIter<T> {
     }
 }
 
+function every<T>(fn: (el: T) => boolean, iter: RawIter<T>): boolean {
+    for (const el of iter) {
+        if (!fn(el)) {
+            return false
+        }
+    }
+
+    return true
+}
+
+function some<T>(fn: (el: T) => boolean, iter: RawIter<T>): boolean {
+    for (const el of iter) {
+        if (fn(el)) {
+            return true
+        }
+    }
+
+    return false
+}
+
 export function* entries<V>(obj: {[key: string]: V}): RawIter<[string, V]> {
     for (const key in obj) {
         yield [key, obj[key]];
@@ -163,6 +183,8 @@ export type Iter<T> = {
     filter(fn: (el: T) => boolean): Iter<T>;
     slice(start: number, end?: number): Iter<T>;
     sort(fn: (a: T, b: T) => number): Iter<T>;
+    every(fn: (a: T) => boolean): boolean;
+    some(fn: (a: T) => boolean): boolean;
     count(): number;
     concat(other: RawIter<T>|Iter<T>): Iter<T>;
     zip<R>(other: RawIter<R>|Iter<R>): Iter<[T|undefined, R|undefined]>;
@@ -188,6 +210,14 @@ const CHAINABLE_PROTOTYPE: Omit<Iter<unknown>, typeof INNER_ITER> = {
 
     sort(fn) {
         return iter(Array.from((this as Iter<unknown>)[INNER_ITER]).sort(fn))
+    },
+
+    every(fn) {
+        return every(fn, (this as Iter<unknown>)[INNER_ITER])
+    },
+
+    some(fn) {
+        return some(fn, (this as Iter<unknown>)[INNER_ITER])
     },
 
     count() {
