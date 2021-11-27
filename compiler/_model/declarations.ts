@@ -11,9 +11,12 @@ export type Declaration =
     | FuncDeclaration
     | ConstDeclaration
     | ClassDeclaration
+    | StoreDeclaration
     | TestExprDeclaration
     | TestBlockDeclaration
     | Debug
+
+type Exported = { readonly exported: boolean }
 
 export type ImportDeclaration = SourceInfo & Identifier & {
     readonly kind: "import-declaration",
@@ -27,43 +30,44 @@ export type ImportItem = SourceInfo & Identifier & {
     readonly alias?: PlainIdentifier,
 }
 
-export type TypeDeclaration = SourceInfo & Identifier & {
+export type TypeDeclaration = SourceInfo & Identifier & Exported & {
     readonly kind: "type-declaration",
     readonly name: PlainIdentifier,
     readonly type: TypeExpression,
-    readonly exported: boolean,
 }
 
-export type ProcDeclaration = SourceInfo & Identifier & {
+export type ProcDeclaration = SourceInfo & Identifier & Exported & {
     readonly kind: "proc-declaration",
     readonly name: PlainIdentifier,
     readonly value: Proc,
-    readonly exported: boolean,
 }
 
-export type FuncDeclaration = SourceInfo & Identifier & {
+export type FuncDeclaration = SourceInfo & Identifier & Exported & {
     readonly kind: "func-declaration",
     readonly memo: boolean,
     readonly name: PlainIdentifier,
     readonly value: Func,
-    readonly exported: boolean,
 }
 
-export type ConstDeclaration = SourceInfo & Identifier & {
+export type ConstDeclaration = SourceInfo & Identifier & Exported & {
     readonly kind: "const-declaration",
     readonly name: PlainIdentifier,
     readonly type: TypeExpression|undefined,
     readonly value: Expression,
-    readonly exported: boolean,
 }
 
-export type ClassDeclaration = SourceInfo & Identifier & {
+export type ClassDeclaration = SourceInfo & Identifier & Exported & {
     readonly kind: "class-declaration",
     readonly name: PlainIdentifier,
     readonly typeParams: readonly PlainIdentifier[],
     readonly members: readonly ClassMember[],
-    readonly exported: boolean,
     // TODO: constructor
+}
+
+export type StoreDeclaration = SourceInfo & Identifier & Exported & {
+    readonly kind: "store-declaration",
+    readonly name: PlainIdentifier,
+    readonly members: readonly ClassMember[],
 }
 
 export type ClassMember =

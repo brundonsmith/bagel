@@ -90,6 +90,12 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
                 walkParseTree(nextPayload, member, fn);
             }
         } break;
+        case "store-declaration": {
+            walkParseTree(nextPayload, ast.name, fn);
+            for(const member of ast.members) {
+                walkParseTree(nextPayload, member, fn);
+            }
+        } break;
         case "class-property":
         case "class-function":
         case "class-procedure": {

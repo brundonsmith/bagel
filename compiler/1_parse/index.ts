@@ -3,7 +3,7 @@ import { BagelError, isError } from "../errors.ts";
 import { memoize, memoize2 } from "../utils.ts";
 import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "../_model/common.ts";
-import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
+import { ClassDeclaration, ClassFunction, ClassMember, ClassProcedure, ClassProperty, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ClassConstruction, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator } from "../_model/expressions.ts";
 import { Assignment, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType } from "../_model/type-expressions.ts";
@@ -62,6 +62,7 @@ const declaration: ParseFunction<Declaration> = (code, index) =>
     ?? funcDeclaration(code, index)
     ?? constDeclaration(code, index)
     ?? classDeclaration(code, index)
+    ?? storeDeclaration(code, index)
     ?? testExprDeclaration(code, index)
     ?? testBlockDeclaration(code, index)
     ?? javascriptEscape(code, index)
@@ -573,6 +574,32 @@ const classDeclaration: ParseFunction<ClassDeclaration> = (code, startIndex) =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
         parsed: {
             kind: "class-declaration",
+            name,
+            typeParams: [],
+            members,
+            exported: exported != null,
+            id: Symbol(),
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        newIndex: index
+    }))))))))))
+
+const storeDeclaration: ParseFunction<StoreDeclaration> = (code, startIndex) =>
+    given(parseOptional(code, startIndex, (code, index) =>
+        given(parseExact("export")(code, index), ({ parsed: exported, newIndex: index }) =>
+        given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
+    given(consume(code, indexAfterExport ?? startIndex, "store"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(plainIdentifier(code, index), err(code, index, "Store name"), ({ parsed: name, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
+    given(parseSeries(code, index, classMember), ({ parsed: members, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
+        parsed: {
+            kind: "store-declaration",
             name,
             typeParams: [],
             members,
