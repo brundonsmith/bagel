@@ -35,7 +35,7 @@ configure({
     }
 }
 
-const IMPORTED_ITEMS = [ 'autorunUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h', 'render',
+const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h', 'render',
 'createTransformer', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER'
 ].map(s => `${s} as ${INT}${s}`).join(', ')
 

@@ -8,14 +8,15 @@ export {
     makeObservable
 } from "mobx"
 
-import { when, autorun } from "mobx";
+import { when, reaction } from "mobx";
 
-export function autorunUntil(
-    view: () => unknown,
+export function reactionUntil<T>(
+    data: () => T,
+    effect: (data: T) => void,
     until?: () => boolean,
     opts: unknown = {}
 ): void {
-    const r = autorun(view, opts);
+    const r = reaction(data, effect, opts);
     if (until) {
         when(until, r);
     }

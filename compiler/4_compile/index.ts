@@ -95,8 +95,9 @@ function compileOne(parents: AllParents, scopes: AllScopes, module: string, ast:
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
-        case "reaction": return `${INT}autorunUntil(
-${compileOne(parents, scopes, module, ast.view)},
+        case "reaction": return `${INT}reactionUntil(
+${compileOne(parents, scopes, module, ast.data)},
+${compileOne(parents, scopes, module, ast.effect)},
 ${given(ast.until, until => compileOne(parents, scopes, module, until))})`;
         case "indexer": return `${compileOne(parents, scopes, module, ast.subject)}[${compileOne(parents, scopes, module, ast.indexer)}]`;
         case "block": return `{ ${ast.statements.map(s => compileOne(parents, scopes, module, s)).join("; ")}; }`;

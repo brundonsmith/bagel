@@ -1,5 +1,5 @@
 import { Module } from "../_model/ast.ts";
-import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, NIL_TYPE, ProcType, REACTION_VIEW_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, NIL_TYPE, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, walkParseTree } from "../utils.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
 import { propertiesOf, inferType, resolve, subtract, fitTemplate } from "./typeinfer.ts";
@@ -207,12 +207,21 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
 
             // not expressions, but should have their contents checked
             case "reaction": {
-                const viewType = inferType(reportError, parents, scopes, ast.view, true);
+                const dataType = inferType(reportError, parents, scopes, ast.data, true);
+                const effectType = inferType(reportError, parents, scopes, ast.effect, true);
 
-                if (viewType.kind !== "proc-type") {
-                    reportError(miscError(ast.view, `Expected procedure in effect clause`));
-                } else if (!subsumes(parents, scopes,  REACTION_VIEW_TYPE, viewType, true)) {
-                    reportError(assignmentError(ast.view, REACTION_VIEW_TYPE, viewType));
+                if (dataType.kind !== "func-type") {
+                    reportError(miscError(ast.data, `Expected function in observe clause`));
+                } else if (dataType.args.length > 0) {
+                    reportError(miscError(ast.data, `Observe function should take no arguments; provided function expects ${dataType.args.length}`));
+                }
+                
+                if (effectType.kind !== "proc-type") {
+                    reportError(miscError(ast.effect, `Expected procedure in effect clause`));
+                } else if (effectType.args.length > 1) {
+                    reportError(miscError(ast.data, `Effect procedure should take exactly one argument; provided procedure expects ${effectType.args.length}`));
+                } else if (dataType.kind === "func-type" && !subsumes(parents, scopes, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE)) {
+                    reportError(assignmentError(ast.effect, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE));
                 }
 
                 if (ast.until) {

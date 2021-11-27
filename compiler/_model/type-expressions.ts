@@ -269,16 +269,6 @@ export const REACTION_EFFECT_TYPE: TypeExpression = {
     startIndex: undefined,
     endIndex: undefined,
 }
-export const REACTION_VIEW_TYPE: TypeExpression = {
-    kind: 'proc-type',
-    args: [],
-    typeParams: [],
-    mutability: undefined,
-    id: Symbol(),
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
-}
 export const ELEMENT_TAG_CHILD_TYPE: TypeExpression = {
     kind: "union-type",
     members: [
