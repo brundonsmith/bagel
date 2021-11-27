@@ -1,9 +1,9 @@
 import { displayScope, log } from "../debugging.ts";
 import { path } from "../deps.ts";
-import { cachedModulePath, given, pathIsRemote } from "../utils.ts";
+import { cachedModulePath, given, ModuleName, pathIsRemote } from "../utils.ts";
 import { Module, AST } from "../_model/ast.ts";
 import { AllParents, AllScopes, DeclarationDescriptor, getScopeFor, PlainIdentifier } from "../_model/common.ts";
-import { ClassProperty, TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ClassFunction, ClassDeclaration } from "../_model/declarations.ts";
+import { ClassProperty, TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ClassFunction, ClassMember } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
 import { LetDeclaration, Statement } from "../_model/statements.ts";
 import { Arg, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
@@ -43,7 +43,7 @@ function compileOne(parents: AllParents, scopes: AllScopes, module: string, ast:
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(parents, scopes, module, name) + (alias ? ` as ${compileOne(parents, scopes, module, alias)}` : ``)
-        ).join(", ")} } from "${pathIsRemote(ast.path.value) ? (path.relative(path.dirname(module), cachedModulePath(ast.path.value)).replaceAll(/\\/g, '/') + '.ts') : (ast.path.value + '.bgl.ts')}";`;
+        ).join(", ")} } from "${pathIsRemote(ast.path.value) ? (path.relative(path.dirname(module), cachedModulePath(ast.path.value as ModuleName)).replaceAll(/\\/g, '/') + '.ts') : (ast.path.value + '.bgl.ts')}";`;
         case "type-declaration":  return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileOne(parents, scopes, module, ast.type)};`;
         case "proc-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(parents, scopes, module, ast.value) + ';';
         case "func-declaration":  return compileFuncDeclaration(parents, scopes, module, ast)
@@ -232,7 +232,7 @@ const compileFuncBody = (parents: AllParents, scopes: AllScopes, module: string,
 }
 
 
-function compileClassConstructor(clazz: ClassDeclaration): string {
+function compileClassConstructor(clazz: { readonly members: readonly ClassMember[] }): string {
     return `constructor() {
         ${INT}makeObservable(this, {
             ${clazz.members.map(member =>

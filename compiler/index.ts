@@ -6,11 +6,11 @@ import { compile, INT } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { BagelError, miscError, prettyError } from "./errors.ts";
-import { all, cacheDir, cachedModulePath, esOrNone, given, on, pathIsRemote, sOrNone } from "./utils.ts";
+import { all, cacheDir, cachedModulePath, esOrNone, given, ModuleName, NominalType, on, pathIsRemote, sOrNone, transformify1, transformify2 } from "./utils.ts";
 import { Module } from "./_model/ast.ts";
 
 import { ParentsMap, ScopesMap } from "./_model/common.ts";
-import { autorun, computed, configure, createTransformer, observable } from "./mobx.ts";
+import { autorun, computed, configure, observable } from "./mobx.ts";
 
 configure({
     enforceActions: "never",
@@ -19,14 +19,14 @@ configure({
     observableRequiresReaction: false,
 });
 
-{ // start
+async function main() {
     const command = Deno.args[0]
     const bundle = Deno.args.includes("--bundle");
     const watch = Deno.args.includes("--watch");
 
     switch (command) {
-        case "build": build({ entry: Deno.args[1], bundle, watch, emit: true }); break;
-        case "check": build({ entry: Deno.args[1], bundle, watch, emit: false }); break;
+        case "build": await build({ entry: Deno.args[1], bundle, watch, emit: true }); break;
+        case "check": await build({ entry: Deno.args[1], bundle, watch, emit: false }); break;
         case "test": test(); break; // test(Deno.args[1]); break;
         case "run": throw Error("Unimplemented!"); break;
         case "format": throw Error("Unimplemented!"); break;
@@ -35,21 +35,6 @@ configure({
     }
 }
 
-const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h', 'render',
-'createTransformer', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER'
-].map(s => `${s} as ${INT}${s}`).join(', ')
-
-const LIB_IMPORTS = `
-import { ${IMPORTED_ITEMS} } from "../../lib/src/core.ts";
-`
-const MOBX_CONFIGURE = `
-${INT}configure({
-    enforceActions: "never",
-    computedRequiresReaction: false,
-    reactionRequiresObservable: false,
-    observableRequiresReaction: false,
-});`
-
 async function build({ entry, bundle, watch, emit, includeTests }: { entry: string, bundle?: boolean, watch?: boolean, includeTests?: boolean, emit: boolean }) {
     if (!entry) fail("Bagel: No file or directory provided")
     const entryFileOrDir = path.resolve(Deno.cwd(), entry);
@@ -57,10 +42,13 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     const singleEntry = !(await Deno.stat(entryFileOrDir)).isDirectory
     const allFiles = singleEntry ? [ entryFileOrDir ] : await getAllFiles(entryFileOrDir);
 
-    const modules = observable(new Set<string>(allFiles.filter(f => f.match(/\.bgl$/i))));
-    const modulesSource = observable(new Map<string, string>())
-
     fs.ensureDir(cacheDir())
+
+    // base state
+    const modules = observable(new Set<ModuleName>(allFiles.filter(f => f.match(/\.bgl$/i)) as ModuleName[]));
+    const modulesSource = observable(new Map<ModuleName, string>())
+
+    const modulesOutstanding = () => modules.size > modulesSource.size
 
     // Load modules from disk or web
     autorun(async () => {
@@ -88,13 +76,13 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         }
     })
     
-    const parsed = createTransformer((source: string): [Module, readonly BagelError[]] => {
+    const parsed = transformify1((source: string): { ast: Module, errors: readonly BagelError[] } => {
         const errors: BagelError[] = []
-        const mod = reshape(parse(source, err => errors.push(err)))
-        return [mod, errors]
+        const ast = reshape(parse(source, err => errors.push(err)))
+        return { ast, errors }
     });
 
-    const parentsMap = createTransformer(getParentsMap)
+    const parentsMap = transformify1(getParentsMap)
 
     const allParents = computed(() => {
         const set = new Set<ParentsMap>()
@@ -103,31 +91,32 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
             const source = modulesSource.get(module)
             
             if (source) {
-                const ast = parsed(source)
-                set.add(parentsMap(ast[0]))
+                const { ast } = parsed(source)
+                set.add(parentsMap(ast))
             }
         }
 
         return set
     })
 
-    const scopesMap = createTransformer((module: string) => createTransformer((ast: Module): [ScopesMap, readonly BagelError[]] => {
-        const errors: BagelError[] = []
+    const scopesMap = transformify2((module: ModuleName, ast: Module): { scopes: ScopesMap, errors: readonly BagelError[] } => {
         try {
+            const errors: BagelError[] = []
             const scopes = scopescan(
-                err => errors.push(err), 
+                err => errors.push(err),
                 allParents.get(), 
                 new Set(),
                 imported => 
                     given(modulesSource.get(canonicalModuleName(module, imported)), 
-                        source => parsed(source)[0]), 
+                        source => parsed(source).ast), 
                 ast
             )
-            return [scopes, errors]
+
+            return { scopes, errors }
         } catch {
-            return [new Map(), []]
+            return { scopes: new Map(), errors: [] }
         }
-    }));
+    })
 
     const allScopes = computed(() => {
         const set = new Set<ScopesMap>()
@@ -136,32 +125,34 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
             const source = modulesSource.get(module)
             
             if (source) {
-                const ast = parsed(source)  
-                set.add(scopesMap(module)(ast[0])[0])
+                const { ast } = parsed(source)
+                const { scopes } = scopesMap(module, ast)
+
+                set.add(scopes)
             }
         }
 
         return set
     })
 
-    
-    const typeerrors = createTransformer((module: string) => createTransformer((ast: Module): BagelError[] => {
+    const typeerrors = transformify2((module: ModuleName, ast: Module): BagelError[] => {
+        const errors: BagelError[] = []
         try {
-            const errors: BagelError[] = []
-            const [_, scopeErrors] = scopesMap(module)(ast)
+            const { errors: scopeErrors } = scopesMap(module, ast)
+            errors.push(...scopeErrors)
             typecheck(
                 err => errors.push(err), 
                 allParents.get(),
                 allScopes.get(), 
                 ast
             )
-            return [...scopeErrors, ...errors]
+            return errors
         } catch (e) {
-            return [ miscError(ast, e.toString()) ]
+            return [ ...errors, miscError(ast, e.toString()) ]
         }
-    }))
+    })
 
-    const compiled = createTransformer((module: string) => createTransformer((ast: Module): string => {
+    const compiled = transformify2((module: ModuleName, ast: Module): string => {
         try {
             return (
                 LIB_IMPORTS + 
@@ -178,14 +169,14 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
             console.error(e)
             return '';
         }
-    }))
+    })
 
     // add imported modules to set
     autorun(() => {
         for (const module of modules) {
             const source = modulesSource.get(module)
             if (source) {
-                const ast = parsed(source)[0]
+                const { ast } = parsed(source)
 
                 for (const decl of ast.declarations) {
                     if (decl.kind === "import-declaration") {
@@ -200,82 +191,58 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         }
     })
 
-    const printErrors = debounce((errors: Map<string, BagelError[]>) => {
-        if (watch) {
-            console.clear()
-        }
-
-        let totalErrors = 0;
-
-        if (errors.size === 0) {
-            console.log('No errors')
-        } else {
-            console.log()
-            for (const [module, errs] of errors.entries()) {
-                totalErrors += errs.length;
-
-                for (const err of errs) {
-                    console.log(prettyError(module, err))
-                }
-            }
-
-            console.log(`Found ${totalErrors} error${sOrNone(totalErrors)} across ${errors.size} module${sOrNone(errors.size)}`)
-        }
-        
-    }, 100)
-    
     // print errors as they occur
     autorun(() => {
-        if (watch) {
-            console.clear()
-        }
+        if (!modulesOutstanding()) {
+            const allErrors = new Map<ModuleName, BagelError[]>()
 
-        const allErrors = new Map<string, BagelError[]>()
+            for (const module of modules) {
+                const source = modulesSource.get(module)
+                if (source) {
+                    const { ast, errors: parseErrors } = parsed(source)
+                    const errors = [...parseErrors, ...typeerrors(module, ast)]
+                    // .filter((err, _, arr) => 
+                    //     err.kind === "bagel-syntax-error" ||
+                    //     !arr.some(other =>
+                    //         other !== err && 
+                    //         other.kind !== "bagel-syntax-error" && moreSpecificThan(other.ast ?? {}, err.ast ?? {})))
 
-        for (const module of modules) {
-            const source = modulesSource.get(module)
-            if (source) {
-                const [ast, parseErrors] = parsed(source)
-                const errors = [...parseErrors, ...typeerrors(module)(ast)]
-                // .filter((err, _, arr) => 
-                //     err.kind === "bagel-syntax-error" ||
-                //     !arr.some(other =>
-                //         other !== err && 
-                //         other.kind !== "bagel-syntax-error" && moreSpecificThan(other.ast ?? {}, err.ast ?? {})))
-
-                if (errors.length > 0) {
-                    allErrors.set(module, errors)
+                    if (errors.length > 0) {
+                        allErrors.set(module, errors)
+                    }
                 }
             }
-        }
 
-        printErrors(allErrors)
+            printErrors(allErrors, watch)
+        }
     })
 
     // write compiled code to disk
-    for (const module of modules) {
-        autorun(() => {
-            const source = modulesSource.get(module)
-            if (source) {
-                const jsPath = pathIsRemote(module)
+    autorun(() => {
+        if (!modulesOutstanding()) {
+            const compiledModules = [...modulesSource.entries()].map(([module, source]) => ({
+                jsPath: pathIsRemote(module)
                     ? cachedModulePath(module) + '.ts'
-                    : bagelFileToTsFile(module)
-            
-                const js = compiled(module)(parsed(source)[0])
+                    : bagelFileToTsFile(module),
+                js: compiled(module, parsed(source).ast)
+            }))
 
-                Deno.writeFile(jsPath, new TextEncoder().encode(js))
+            if (emit) {
+                Promise.all(compiledModules.map(({ jsPath, js }) =>
+                        Deno.writeTextFile(jsPath, js)))
                     .then(() => {
                         // bundle
                         if (singleEntry && bundle) {
-                            return bundleOutput(entryFileOrDir)
+                            bundleOutput(entryFileOrDir as ModuleName)
                         }
                     })
             }
-        })
-    }
+        }
+    })
 
+    // if watch mode is enabled, reload files from disk when changes detected
     if (watch) {
-        const watchers = new Map<string, Deno.FsWatcher>()
+        const watchers = new Map<ModuleName, Deno.FsWatcher>()
 
         autorun(() => {
             for (const module of modules) {
@@ -301,7 +268,34 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
     }
 }
 
-const bundleOutput = async (entryFile: string) => {
+/**
+ * Print list of errors
+ */
+const printErrors = debounce((errors: Map<ModuleName, BagelError[]>, watch?: boolean) => {
+    if (watch) {
+        console.clear()
+    }
+
+    let totalErrors = 0;
+
+    if (errors.size === 0) {
+        console.log('No errors')
+    } else {
+        console.log()
+
+        for (const [module, errs] of errors.entries()) {
+            totalErrors += errs.length;
+
+            for (const err of errs) {
+                console.log(prettyError(module, err))
+            }
+        }
+
+        console.log(`Found ${totalErrors} error${sOrNone(totalErrors)} across ${errors.size} module${sOrNone(errors.size)}`)
+    }
+}, 100)
+    
+const bundleOutput = async (entryFile: ModuleName) => {
     const bundleFile = bagelFileToJsBundleFile(entryFile)
 
     // const result = await Deno.emit(windowsPathToModulePath(bagelFileToTsFile(entryFile)), {
@@ -322,6 +316,8 @@ const bundleOutput = async (entryFile: string) => {
         entryPoints: [ bagelFileToTsFile(entryFile) ],
         outfile: bundleFile
     })
+
+    esbuild.stop()
     
     console.log('Bundle written to ' + bundleFile)
 }
@@ -389,6 +385,21 @@ function test() {
     }, 1000)
 }
 
+const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h', 'render',
+'createTransformer', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER'
+].map(s => `${s} as ${INT}${s}`).join(', ')
+
+const LIB_IMPORTS = `
+import { ${IMPORTED_ITEMS} } from "../../lib/src/core.ts";
+`
+const MOBX_CONFIGURE = `
+${INT}configure({
+    enforceActions: "never",
+    computedRequiresReaction: false,
+    reactionRequiresObservable: false,
+    observableRequiresReaction: false,
+});`
+
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
     for await (const file of Deno.readDir(dirPath)) {
@@ -404,11 +415,11 @@ async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     return arrayOfFiles;
 }
 
-function bagelFileToTsFile(module: string): string {
+function bagelFileToTsFile(module: ModuleName): string {
     return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + ".bgl.ts")
 }
 
-function bagelFileToJsBundleFile(module: string): string {
+function bagelFileToJsBundleFile(module: ModuleName): string {
     return path.resolve(path.dirname(module), path.basename(module).split(".")[0] + ".bundle.js")
 }
 
@@ -416,12 +427,12 @@ function windowsPathToModulePath(str: string) {
     return str.replaceAll('\\', '/').replace(/^C:/, '/').replace(/^file:\/\/\//i, '')
 }
 
-function canonicalModuleName(importerModule: string, importPath: string) {
+function canonicalModuleName(importerModule: ModuleName, importPath: string): ModuleName {
     if (pathIsRemote(importPath)) {
-        return importPath
+        return importPath as ModuleName
     } else {
         const moduleDir = path.dirname(importerModule);
-        return path.resolve(moduleDir, importPath) + ".bgl"
+        return (path.resolve(moduleDir, importPath) + ".bgl") as ModuleName
     }
 }
 
@@ -471,3 +482,5 @@ function fail(msg: string) {
 //         }
 //     })
 // }
+
+await main();
