@@ -31,7 +31,7 @@ configure({
         case "run": throw Error("Unimplemented!"); break;
         case "format": throw Error("Unimplemented!"); break;
         default:
-            throw Error(`Must provide a command: build, check, test, run, format`)
+            fail(`Must provide a command: build, check, test, run, format`)
     }
 }
 
@@ -51,9 +51,9 @@ ${INT}configure({
 });`
 
 async function build({ entry, bundle, watch, emit, includeTests }: { entry: string, bundle?: boolean, watch?: boolean, includeTests?: boolean, emit: boolean }) {
-    if (!entry) throw Error("Bagel: No file or directory provided")
+    if (!entry) fail("Bagel: No file or directory provided")
     const entryFileOrDir = path.resolve(Deno.cwd(), entry);
-    if (!await fs.exists(entryFileOrDir)) throw Error(`Bagel: ${entry} not found`)
+    if (!await fs.exists(entryFileOrDir)) fail(`Bagel: ${entry} not found`)
     const singleEntry = !(await Deno.stat(entryFileOrDir)).isDirectory
     const allFiles = singleEntry ? [ entryFileOrDir ] : await getAllFiles(entryFileOrDir);
 
@@ -423,6 +423,11 @@ function canonicalModuleName(importerModule: string, importPath: string) {
         const moduleDir = path.dirname(importerModule);
         return path.resolve(moduleDir, importPath) + ".bgl"
     }
+}
+
+function fail(msg: string) {
+    console.error(msg)
+    Deno.exit(1)
 }
 
 
