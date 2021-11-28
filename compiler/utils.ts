@@ -54,208 +54,208 @@ export function deepEquals(a: BasicData, b: BasicData, ignorePropNames: string[]
     return false;
 }
 
-export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST) => T): void {
-    const nextPayload = fn(payload, ast);
-    
+export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: AST, current: AST }> {
+    yield { parent, current: ast }
+
     switch(ast.kind) {
         case "module": {
             for (const declaration of ast.declarations) {
-                walkParseTree(nextPayload, declaration, fn);
+                yield* iterateParseTree(declaration, ast)
             }
         } break;
         case "block": {
             for(const statement of ast.statements) {
-                walkParseTree(nextPayload, statement, fn);
+                yield* iterateParseTree(statement, ast)
             }
         } break;
         case "type-declaration": {
-            walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.type, fn);
+            yield* iterateParseTree(ast.name, ast)
+            yield* iterateParseTree(ast.type, ast)
         } break;
         case "func-declaration":
         case "proc-declaration": {
-            walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.value, fn);
+            yield* iterateParseTree(ast.name, ast)
+            yield* iterateParseTree(ast.value, ast)
         } break;
         case "const-declaration": {
-            walkParseTree(nextPayload, ast.name, fn);
+            yield* iterateParseTree(ast.name, ast)
             if (ast.type) {
-                walkParseTree(nextPayload, ast.type, fn);
+                yield* iterateParseTree(ast.type, ast)
             }
-            walkParseTree(nextPayload, ast.value, fn);
+            yield* iterateParseTree(ast.value, ast)
         } break;
         case "class-declaration": {
-            walkParseTree(nextPayload, ast.name, fn);
+            yield* iterateParseTree(ast.name, ast)
             for(const member of ast.members) {
-                walkParseTree(nextPayload, member, fn);
+                yield* iterateParseTree(member, ast)
             }
         } break;
         case "store-declaration": {
-            walkParseTree(nextPayload, ast.name, fn);
+            yield* iterateParseTree(ast.name, ast)
             for(const member of ast.members) {
-                walkParseTree(nextPayload, member, fn);
+                yield* iterateParseTree(member, ast)
             }
         } break;
         case "class-property":
         case "class-function":
         case "class-procedure": {
-            walkParseTree(nextPayload, ast.name, fn);
+            yield* iterateParseTree(ast.name, ast)
             if (ast.kind === "class-property" && ast.type) {
-                walkParseTree(nextPayload, ast.type, fn);
+                yield* iterateParseTree(ast.type, ast)
             }
-            walkParseTree(nextPayload, ast.value, fn);
+            yield* iterateParseTree(ast.value, ast)
         } break;
         case "test-expr-declaration": {
-            walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.expr, fn);
+            yield* iterateParseTree(ast.name, ast)
+            yield* iterateParseTree(ast.expr, ast)
         } break;
         case "test-block-declaration": {
-            walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.block, fn);
+            yield* iterateParseTree(ast.name, ast)
+            yield* iterateParseTree(ast.block, ast)
         } break;
         case "proc":
         case "func": {
-            walkParseTree(nextPayload, ast.type, fn);
+            yield* iterateParseTree(ast.type, ast)
 
             if (ast.kind === "func") {
                 for (const c of ast.consts) {
-                    walkParseTree(nextPayload, c, fn);
+                    yield* iterateParseTree(c, ast)
                 }
             }
             
-            walkParseTree(nextPayload, ast.body, fn);
+            yield* iterateParseTree(ast.body, ast)
         } break;
         case "inline-const":
-            walkParseTree(nextPayload, ast.name, fn);
+            yield* iterateParseTree(ast.name, ast)
             if (ast.type) {
-                walkParseTree(nextPayload, ast.type, fn);
+                yield* iterateParseTree(ast.type, ast)
             }
-            walkParseTree(nextPayload, ast.value, fn);
+            yield* iterateParseTree(ast.value, ast)
             break;
         case "pipe":
         case "invocation": {
-            walkParseTree(nextPayload, ast.subject, fn);
+            yield* iterateParseTree(ast.subject, ast)
 
             if (ast.kind === "invocation" && ast.typeArgs) {
                 for (const arg of ast.typeArgs) {
-                    walkParseTree(nextPayload, arg, fn);
+                    yield* iterateParseTree(arg, ast)
                 }
             }
 
             for (const arg of ast.args) {
-                walkParseTree(nextPayload, arg, fn);
+                yield* iterateParseTree(arg, ast)
             }
         } break;
         case "binary-operator": {
-            walkParseTree(nextPayload, ast.base, fn);
+            yield* iterateParseTree(ast.base, ast)
             for (const [op, expr] of ast.ops) {
-                walkParseTree(nextPayload, op, fn)
-                walkParseTree(nextPayload, expr, fn)
+                yield* iterateParseTree(op, ast)
+                yield* iterateParseTree(expr, ast)
             }
         } break;
         case "negation-operator": {
-            walkParseTree(nextPayload, ast.base, fn)
+            yield* iterateParseTree(ast.base, ast)
         } break;
         case "element-tag": {
             for (const [name, value] of ast.attributes) {
-                walkParseTree(nextPayload, name, fn);
-                walkParseTree(nextPayload, value, fn);
+                yield* iterateParseTree(name, ast)
+                yield* iterateParseTree(value, ast)
             }
             for (const child of ast.children) {
-                walkParseTree(nextPayload, child, fn);
+                yield* iterateParseTree(child, ast)
             }
         } break;
         case "class-construction": {
-            walkParseTree(nextPayload, ast.clazz, fn);
+            yield* iterateParseTree(ast.clazz, ast)
         } break;
         case "indexer": {
-            walkParseTree(nextPayload, ast.subject, fn);
-            walkParseTree(nextPayload, ast.indexer, fn);
+            yield* iterateParseTree(ast.subject, ast)
+            yield* iterateParseTree(ast.indexer, ast)
         } break;
         case "if-else-statement": {
             for (const { condition, outcome } of ast.cases) {
-                walkParseTree(nextPayload, condition, fn);
-                walkParseTree(nextPayload, outcome, fn);
+                yield* iterateParseTree(condition, ast)
+                yield* iterateParseTree(outcome, ast)
             }
             if (ast.defaultCase != null) {
-                walkParseTree(nextPayload, ast.defaultCase, fn);
+                yield* iterateParseTree(ast.defaultCase, ast)
             }
 
         } break;
         case "if-else-expression":
         case "switch-expression": {
             if (ast.kind === "switch-expression") {
-                walkParseTree(nextPayload, ast.value, fn);
+                yield* iterateParseTree(ast.value, ast)
             }
             for (const c of ast.cases) {
-                walkParseTree(nextPayload, c, fn);
+                yield* iterateParseTree(c, ast)
             }
             if (ast.defaultCase != null) {
-                walkParseTree(nextPayload, ast.defaultCase, fn);
+                yield* iterateParseTree(ast.defaultCase, ast)
             }
         } break;
         case "case": {
-            walkParseTree(nextPayload, ast.condition, fn);
-            walkParseTree(nextPayload, ast.outcome, fn);
+            yield* iterateParseTree(ast.condition, ast)
+            yield* iterateParseTree(ast.outcome, ast)
         } break;
         case "parenthesized-expression":
         case "debug": {
-            walkParseTree(nextPayload, ast.inner, fn);
+            yield* iterateParseTree(ast.inner, ast)
         } break;
         case "property-accessor": {
-            walkParseTree(nextPayload, ast.subject, fn);
-            walkParseTree(nextPayload, ast.property, fn);
+            yield* iterateParseTree(ast.subject, ast)
+            yield* iterateParseTree(ast.property, ast)
         } break;
         case "object-literal": {
             for (const [key, value] of ast.entries) {
-                walkParseTree(nextPayload, key, fn);
-                walkParseTree(nextPayload, value, fn);
+                yield* iterateParseTree(key, ast)
+                yield* iterateParseTree(value, ast)
             }
         } break;
         case "array-literal": {
             for (const element of ast.entries) {
-                walkParseTree(nextPayload, element, fn);
+                yield* iterateParseTree(element, ast)
             }
         } break;
         case "string-literal": {
             for (const segment of ast.segments) {
                 if (typeof segment !== "string") {
-                    walkParseTree(nextPayload, segment, fn);
+                    yield* iterateParseTree(segment, ast)
                 }
             }
         } break;
 
         case "reaction": {
-            walkParseTree(nextPayload, ast.data, fn);
-            walkParseTree(nextPayload, ast.effect, fn);
+            yield* iterateParseTree(ast.data, ast)
+            yield* iterateParseTree(ast.effect, ast)
             if (ast.until) {
-                walkParseTree(nextPayload, ast.until, fn);
+                yield* iterateParseTree(ast.until, ast)
             }
         } break;
         case "let-declaration":
         case "const-declaration-statement": {
-            walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.value, fn);
+            yield* iterateParseTree(ast.name, ast)
+            yield* iterateParseTree(ast.value, ast)
         } break;
         case "assignment": {
-            walkParseTree(nextPayload, ast.target, fn);
-            walkParseTree(nextPayload, ast.value, fn);
+            yield* iterateParseTree(ast.target, ast)
+            yield* iterateParseTree(ast.value, ast)
         } break;
         case "for-loop": {
-            walkParseTree(nextPayload, ast.itemIdentifier, fn);
-            walkParseTree(nextPayload, ast.iterator, fn);
-            walkParseTree(nextPayload, ast.body, fn);
+            yield* iterateParseTree(ast.itemIdentifier, ast)
+            yield* iterateParseTree(ast.iterator, ast)
+            yield* iterateParseTree(ast.body, ast)
         } break;
         case "while-loop": {
-            walkParseTree(nextPayload, ast.condition, fn);
-            walkParseTree(nextPayload, ast.body, fn);
+            yield* iterateParseTree(ast.condition, ast)
+            yield* iterateParseTree(ast.body, ast)
         } break;
         case "import-declaration": {
-            walkParseTree(nextPayload, ast.path, fn);
+            yield* iterateParseTree(ast.path, ast)
             for (const i of ast.imports) {
-                walkParseTree(nextPayload, i.name, fn);
+                yield* iterateParseTree(i.name, ast)
                 if (i.alias) {
-                    walkParseTree(nextPayload, i.alias, fn);
+                    yield* iterateParseTree(i.alias, ast)
                 }
             }
         } break;
@@ -263,66 +263,66 @@ export function walkParseTree<T>(payload: T, ast: AST, fn: (payload: T, ast: AST
         // types
         case "union-type": {
             for (const m of ast.members) {
-                walkParseTree(nextPayload, m, fn);
+                yield* iterateParseTree(m, ast)
             }
         } break;
         case "named-type": {
-            walkParseTree(nextPayload, ast.name, fn);
+            yield* iterateParseTree(ast.name, ast)
         } break;
         case "proc-type":
         case "func-type": {
             for (const m of ast.typeParams) {
-                walkParseTree(nextPayload, m, fn);
+                yield* iterateParseTree(m, ast)
             }
             for (const arg of ast.args) {
-                walkParseTree(nextPayload, arg.name, fn);
+                yield* iterateParseTree(arg.name, ast)
                 if (arg.type) {
-                    walkParseTree(nextPayload, arg.type, fn);
+                    yield* iterateParseTree(arg.type, ast)
                 }
             }
 
             if (ast.kind === "func-type" && ast.returnType) {
-                walkParseTree(nextPayload, ast.returnType, fn);
+                yield* iterateParseTree(ast.returnType, ast)
             }
         } break;
         case "object-type": {
             for (const spread of ast.spreads) {
-                walkParseTree(nextPayload, spread, fn)
+                yield* iterateParseTree(spread, ast)
             }
             for (const attribute of ast.entries) {
-                walkParseTree(nextPayload, attribute, fn)
+                yield* iterateParseTree(attribute, ast)
             }
         } break;
         case "attribute": {
-            walkParseTree(nextPayload, ast.name, fn);
-            walkParseTree(nextPayload, ast.type, fn);
+            yield* iterateParseTree(ast.name, ast)
+            yield* iterateParseTree(ast.type, ast)
         } break;
         case "indexer-type": {
-            walkParseTree(nextPayload, ast.keyType, fn);
-            walkParseTree(nextPayload, ast.valueType, fn);
+            yield* iterateParseTree(ast.keyType, ast)
+            yield* iterateParseTree(ast.valueType, ast)
         } break;
         case "array-type": {
-            walkParseTree(nextPayload, ast.element, fn);
+            yield* iterateParseTree(ast.element, ast)
         } break;
         case "tuple-type": {
             for (const m of ast.members) {
-                walkParseTree(nextPayload, m, fn);
+                yield* iterateParseTree(m, ast)
             }
         } break;
         case "literal-type": {
-            walkParseTree(nextPayload, ast.value, fn);
+            yield* iterateParseTree(ast.value, ast)
         } break;
         case "nominal-type": {
-            walkParseTree(nextPayload, ast.inner, fn);
+            yield* iterateParseTree(ast.inner, ast)
         } break;
         case "iterator-type": {
-            walkParseTree(nextPayload, ast.itemType, fn);
+            yield* iterateParseTree(ast.itemType, ast)
         } break;
         case "plan-type": {
-            walkParseTree(nextPayload, ast.resultType, fn);
+            yield* iterateParseTree(ast.resultType, ast)
         } break;
         case "class-instance-type": {
-            walkParseTree(nextPayload, ast.clazz, fn);
+            yield* iterateParseTree(ast.clazz, ast)
         } break;
 
         // atomic

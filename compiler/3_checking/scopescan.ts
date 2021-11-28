@@ -4,28 +4,28 @@ import { ClassDeclaration, ConstDeclaration, Declaration } from "../_model/decla
 import { Func, Proc, Expression, Invocation, InlineConst, Case } from "../_model/expressions.ts";
 import { ConstDeclarationStatement, ForLoop, LetDeclaration } from "../_model/statements.ts";
 import { ANY_TYPE, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { walkParseTree } from "../utils.ts";
-import { alreadyDeclared, BagelError, cannotFindExport, cannotFindModule, miscError } from "../errors.ts";
+import { given, iterateParseTree } from "../utils.ts";
+import { alreadyDeclared, BagelError, cannotFindExport, cannotFindModule } from "../errors.ts";
 import { inferType } from "./typeinfer.ts";
 import { displayForm } from "./typecheck.ts";
-import { display, displayScope } from "../debugging.ts";
+import { display, displayScope, withoutSourceInfo } from "../debugging.ts";
 
 
 export function scopescan(reportError: (error: BagelError) => void, parents: AllParents, otherScopes: AllScopes, getModule: (module: string) => Module|undefined, ast: AST): ScopesMap {
     const scopesMap = new Map<symbol, MutableScope>()
     const allScopes = and(otherScopes, scopesMap)
-    
-    walkParseTree<MutableScope|undefined>(undefined, ast, (payload, ast) => {
 
+    for (const { parent, current } of iterateParseTree(ast)) {
+        
         // If ast is of a type that defines its own scope, define that and 
         // mark it as this ast's scope
-        if (isScopeOwner(ast)) {
-            let newScope = scopesMap.get(ast.id) 
-                ?? scopeFrom(reportError, getModule, parents, scopesMap, ast, payload)
+        if (isScopeOwner(current)) {
+            let newScope = scopesMap.get(current.id)
+                ?? scopeFrom(reportError, getModule, parents, scopesMap, current, given(parent, p => scopesMap.get(p.id)))
 
-            switch (ast.kind) {
+            switch (current.kind) {
                 case "module":
-                    for (const declaration of ast.declarations) {
+                    for (const declaration of current.declarations) {
                         // each const should establish a new scope to ensure their 
                         // order of evaluation works out
                         if (declaration.kind === "const-declaration") {
@@ -36,8 +36,8 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                     break;
                 case "func":
                     // add inline constants to scope
-                    if (ast.kind === "func") {
-                        for (const c of ast.consts) {
+                    if (current.kind === "func") {
+                        for (const c of current.consts) {
                             if (newScope.values.get(c.name.name) != null || newScope.classes.get(c.name.name) != null) {
                                 reportError(alreadyDeclared(c.name))
                             }
@@ -48,7 +48,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                     }
                     break;
                 case "block":
-                    for (const statement of ast.statements) {
+                    for (const statement of current.statements) {
                         if (statement.kind === "let-declaration" || statement.kind === "const-declaration-statement") {
                             if (newScope.values.get(statement.name.name) != null || newScope.classes.get(statement.name.name) != null) {
                                 reportError(alreadyDeclared(statement.name))
@@ -61,23 +61,26 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                     break;
             }
             
-            scopesMap.set(ast.id, newScope);
-            return newScope;
-        } else {
-            return scopesMap.get(ast.id) ?? payload;
-        }
-    });
+            scopesMap.set(current.id, newScope);
+        } else if (!scopesMap.has(current.id) && parent != null) {
+            const parentScope = scopesMap.get(parent.id)
 
-    walkParseTree<void>(undefined, ast, (_, ast) => {
+            if (parentScope != null) {
+                scopesMap.set(current.id, parentScope);
+            }
+        }
+    }
+
+    for (const { current } of iterateParseTree(ast)) {
 
         // infer
-        const scope = getScopeFor(reportError, parents, allScopes, ast) as MutableScope
-        switch(ast.kind) {
+        const scope = getScopeFor(reportError, parents, allScopes, current) as MutableScope
+        switch(current.kind) {
             case "for-loop": {
 
                 // add loop element to scope
-                const iteratorType = inferType(reportError, parents, allScopes, ast.iterator)
-                scope.values.set(ast.itemIdentifier.name, {
+                const iteratorType = inferType(reportError, parents, allScopes, current.iterator)
+                scope.values.set(current.itemIdentifier.name, {
                     mutability: "contents-only",
                     declaredType: iteratorType.kind === "iterator-type" ? iteratorType.itemType : undefined,
                 })
@@ -87,23 +90,23 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                 
                 // infer callback argument types based on context
                 const thisArgParentType = (() => {
-                    const parent = anyGet(parents, ast.id)
+                    const parent = anyGet(parents, current.id)
                     if (parent?.kind === "invocation") {
                         const parentSubjectType = inferType(reportError, parents, allScopes, parent.subject)
-                        const thisArgIndex = parent.args.findIndex(a => a === ast)
+                        const thisArgIndex = parent.args.findIndex(a => a === current)
     
                         if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
                             const thisArgParentType = parentSubjectType.args[thisArgIndex]?.type
     
-                            if (thisArgParentType && thisArgParentType.kind === ast.type.kind) {
+                            if (thisArgParentType && thisArgParentType.kind === current.type.kind) {
                                 return thisArgParentType;
                             }
                         }
                     }
                 })()
     
-                for (let i = 0; i < ast.type.args.length; i++) {
-                    const arg = ast.type.args[i]
+                for (let i = 0; i < current.type.args.length; i++) {
+                    const arg = current.type.args[i]
 
                     const descriptor = scope.values.get(arg.name.name) as DeclarationDescriptor
     
@@ -114,7 +117,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                 }
             } break;
         }
-    });
+    }
 
     return scopesMap
 }
@@ -122,12 +125,11 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
 export function getParentsMap(ast: AST): ParentsMap {
     const parents = new Map<symbol, AST>()
 
-    walkParseTree<AST|undefined>(undefined, ast, (payload, ast) => {
-        if (payload != null) {
-            parents.set(ast.id, payload)
+    for (const { parent, current } of iterateParseTree(ast)) {
+        if (parent != null) {
+            parents.set(current.id, parent)
         }
-        return ast
-    });
+    }
 
     return parents
 }

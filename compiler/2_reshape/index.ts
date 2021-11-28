@@ -1,7 +1,4 @@
 import { Module } from "../_model/ast.ts";
-import { UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { walkParseTree } from "../utils.ts";
-import { Statement } from "../_model/statements.ts";
 import { Declaration } from "../_model/declarations.ts";
 import { INT } from '../4_compile/index.ts';
 
@@ -10,14 +7,6 @@ import { INT } from '../4_compile/index.ts';
  * passes and optimization
  */
 export function reshape(ast: Module): Module {
-
-    // walkParseTree(undefined, clone, (_, ast) => {
-    //     switch (ast.kind) {
-    //     }
-
-    //     return undefined
-    // })
-
     const declarations: Declaration[] = [];
 
     for (const decl of ast.declarations) {

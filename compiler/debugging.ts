@@ -1,5 +1,5 @@
 import { displayForm } from "./3_checking/typecheck.ts";
-import { given, walkParseTree } from "./utils.ts";
+import { given, iterateParseTree } from "./utils.ts";
 import { AST } from "./_model/ast.ts";
 import { Scope } from "./_model/common.ts";
 import { isTypeExpression } from "./_model/type-expressions.ts";
@@ -12,16 +12,14 @@ export function log<T>(expr: T, fn?: (expr: T) => unknown): T {
 export function withoutSourceInfo(ast: AST) {
     const clone = JSON.parse(JSON.stringify(ast))
 
-    walkParseTree(undefined, clone, (_, ast) => {
+    for (const { current } of iterateParseTree(clone)) {
         // @ts-ignore
-        delete ast.code
+        delete current.code
         // @ts-ignore
-        delete ast.startIndex
+        delete current.startIndex
         // @ts-ignore
-        delete ast.endIndex
-
-        return undefined
-    })
+        delete current.endIndex
+    }
 
     return clone
 }

@@ -1,6 +1,6 @@
 import { Module } from "../_model/ast.ts";
 import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, NIL_TYPE, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, given, walkParseTree } from "../utils.ts";
+import { deepEquals, given, iterateParseTree } from "../utils.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
 import { propertiesOf, inferType, resolve, subtract, fitTemplate } from "./typeinfer.ts";
 import { AllParents, AllScopes, getScopeFor } from "../_model/common.ts";
@@ -8,46 +8,46 @@ import { display } from "../debugging.ts";
 import { extendScope } from "./scopescan.ts";
 
 
-export function typecheck(reportError: (error: BagelError) => void, parents: AllParents, scopes: AllScopes, ast: Module) {
-    walkParseTree<void>(undefined, ast, (_, ast) => {
-        const scope = getScopeFor(reportError, parents, scopes, ast)
+export function typecheck(reportError: (error: BagelError) => void, parents: AllParents, scopes: AllScopes, ast2: Module) {
+    for (const { current } of iterateParseTree(ast2)) {
+        const scope = getScopeFor(reportError, parents, scopes, current)
 
-        switch(ast.kind) {
+        switch(current.kind) {
             case "const-declaration": {
 
                 // make sure value fits declared type, if there is one
-                const valueType = inferType(reportError, parents, scopes, ast.value, true);
-                if (ast.type != null && !subsumes(parents, scopes,  ast.type, valueType, true)) {
-                    reportError(assignmentError(ast.value, ast.type, valueType));
+                const valueType = inferType(reportError, parents, scopes, current.value, true);
+                if (current.type != null && !subsumes(parents, scopes,  current.type, valueType, true)) {
+                    reportError(assignmentError(current.value, current.type, valueType));
                 }
 
                 // forbid top-level const from being a func (should be a real func declaration) TODO: procs too
-                if (ast.value.kind === "func") {
+                if (current.value.kind === "func") {
                     const maxPreviewLength = 8
-                    const fn = display(ast.value)
+                    const fn = display(current.value)
                     const sample = fn.substr(0, maxPreviewLength)
                     const truncated = fn.length > maxPreviewLength
-                    reportError(miscError(ast, `Top-level const functions should be actual func declarations: func ${ast.name.name}${sample}${truncated ? '...' : ''}`))
+                    reportError(miscError(current, `Top-level const functions should be actual func declarations: func ${current.name.name}${sample}${truncated ? '...' : ''}`))
                 }
             } break;
             case "func-declaration": {
                 // forbid top-level funcs with no arguments
-                if (ast.value.type.args.length === 0 && ast.value.body.kind !== "javascript-escape") {
-                    reportError(miscError(ast, "Top-level function declarations aren't allowed to take zero arguments, because the result will always be the same. Consider making this a constant."))
-                }
+                // if (ast.value.type.args.length === 0 && ast.value.body.kind !== "javascript-escape") {
+                //     reportError(miscError(ast, "Top-level function declarations aren't allowed to take zero arguments, because the result will always be the same. Consider making this a constant."))
+                // }
             } break;
             case "test-expr-declaration": {
 
                 // make sure test value is a boolean
-                const valueType = inferType(reportError, parents, scopes, ast.expr, true);
+                const valueType = inferType(reportError, parents, scopes, current.expr, true);
                 if (!subsumes(parents, scopes,  BOOLEAN_TYPE, valueType, true)) {
-                    reportError(assignmentError(ast.expr, BOOLEAN_TYPE, valueType));
+                    reportError(assignmentError(current.expr, BOOLEAN_TYPE, valueType));
                 }
             } break;
             case "func": {
 
                 // make sure each const fits its declared type, if there is one
-                for (const c of ast.consts) {
+                for (const c of current.consts) {
                     const valueType = inferType(reportError, parents, scopes, c.value, true)
                     if (c.type && !subsumes(parents, scopes,  c.type, valueType, true)) {
                         reportError(assignmentError(c.value, c.type, valueType));
@@ -55,39 +55,39 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 }
 
                 // make sure body expression fits declared return type, if there is one
-                const bodyType = inferType(reportError, parents, scopes, ast.body, true);
-                if (ast.type.returnType != null && !subsumes(parents, scopes,  ast.type.returnType, bodyType, true)) {
-                    reportError(assignmentError(ast.body, ast.type.returnType, bodyType));
+                const bodyType = inferType(reportError, parents, scopes, current.body, true);
+                if (current.type.returnType != null && !subsumes(parents, scopes,  current.type.returnType, bodyType, true)) {
+                    reportError(assignmentError(current.body, current.type.returnType, bodyType));
                 }
             } break;
             case "binary-operator": {
                 // This gets checked in typeinfer
             } break;
             case "negation-operator": {
-                const baseType = inferType(reportError, parents, scopes, ast.base, true);
+                const baseType = inferType(reportError, parents, scopes, current.base, true);
                 if (!subsumes(parents, scopes,  BOOLEAN_TYPE, baseType, true)) {
-                    reportError(assignmentError(ast.base, BOOLEAN_TYPE, baseType));
+                    reportError(assignmentError(current.base, BOOLEAN_TYPE, baseType));
                 }
             } break;
             case "pipe":
             case "invocation": {
-                const scope = getScopeFor(reportError, parents, scopes, ast)
+                const scope = getScopeFor(reportError, parents, scopes, current)
                 
-                let subjectType = inferType(reportError, parents, scopes, ast.subject);
-                if (ast.kind === "invocation") {
+                let subjectType = inferType(reportError, parents, scopes, current.subject);
+                if (current.kind === "invocation") {
                     const scopeWithGenerics = extendScope(scope)
 
                     // bind type-args for this invocation
                     if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
                         if (subjectType.typeParams.length > 0) {
-                            if (ast.typeArgs.length > 0) {
-                                if (subjectType.typeParams.length !== ast.typeArgs.length) {
-                                    reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
+                            if (current.typeArgs.length > 0) {
+                                if (subjectType.typeParams.length !== current.typeArgs.length) {
+                                    reportError(miscError(current, `Expected ${subjectType.typeParams.length} type arguments, but got ${current.typeArgs.length}`))
                                 }
     
                                 for (let i = 0; i < subjectType.typeParams.length; i++) {
                                     const typeParam = subjectType.typeParams[i]
-                                    const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
+                                    const typeArg = current.typeArgs?.[i] ?? UNKNOWN_TYPE
     
                                     scopeWithGenerics.types.set(typeParam.name, {
                                         type: typeArg,
@@ -97,7 +97,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                             } else {
                                 const invocationSubjectType: FuncType|ProcType = {
                                     ...subjectType,
-                                    args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(reportError, parents, scopes, ast.args[index]) }))
+                                    args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(reportError, parents, scopes, current.args[index]) }))
                                 }
         
                                 // attempt to infer params for generic
@@ -114,7 +114,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                                         })
                                     }
                                 } else {
-                                    reportError(miscError(ast, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
+                                    reportError(miscError(current, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
                                 }
                             }
                         }
@@ -124,13 +124,13 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 }
 
                 if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {  // check that subject is callable
-                    reportError(miscError(ast.subject, "Expression must be a function or procedure to be called"));
-                } else if (subjectType.args.length !== ast.args.length) {  // check that the right number of arguments are passed
+                    reportError(miscError(current.subject, "Expression must be a function or procedure to be called"));
+                } else if (subjectType.args.length !== current.args.length) {  // check that the right number of arguments are passed
                     const functionOrProcedure = subjectType.kind === "func-type" ? "Function" : "Procedure"
-                    reportError(miscError(ast, `${functionOrProcedure} expected ${subjectType.args.length} arguments but got ${ast.args.length}`));
+                    reportError(miscError(current, `${functionOrProcedure} expected ${subjectType.args.length} arguments but got ${current.args.length}`));
                 } else {  // check that each argument matches the expected type
-                    for (let i = 0; i < ast.args.length; i++) {
-                        const arg = ast.args[i]
+                    for (let i = 0; i < current.args.length; i++) {
+                        const arg = current.args[i]
                         const subjectArgType = subjectType.args[i].type ?? UNKNOWN_TYPE
 
                         const argValueType = inferType(reportError, parents, scopes, arg, true)
@@ -144,9 +144,9 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             case "if-else-expression":
             case "if-else-statement":
             case "switch-expression": {
-                const valueType = ast.kind === "if-else-expression" || ast.kind === "if-else-statement" ? BOOLEAN_TYPE : inferType(reportError, parents, scopes, ast.value, true);
+                const valueType = current.kind === "if-else-expression" || current.kind === "if-else-statement" ? BOOLEAN_TYPE : inferType(reportError, parents, scopes, current.value, true);
 
-                for (const { condition } of ast.cases) {
+                for (const { condition } of current.cases) {
                     const conditionType = inferType(reportError, parents, scopes, condition, true);
                     if (!subsumes(parents, scopes,  valueType, conditionType, true)) {
                         reportError(assignmentError(condition, valueType, conditionType));
@@ -154,47 +154,47 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 }
             } break;
             case "indexer": {
-                const baseType = inferType(reportError, parents, scopes, ast.subject, true);
-                const indexerType = inferType(reportError, parents, scopes, ast.indexer, true);
+                const baseType = inferType(reportError, parents, scopes, current.subject, true);
+                const indexerType = inferType(reportError, parents, scopes, current.indexer, true);
                 
                 if (baseType.kind === "object-type" && indexerType.kind === "literal-type") {
                     const key = indexerType.value.value;
                     const valueType = propertiesOf(reportError, parents, scopes, baseType)?.find(entry => entry.name.name === key)?.type;
                     if (valueType == null) {
-                        reportError(miscError(ast.indexer, `Property '${key}' doesn't exist on type '${displayForm(baseType)}'`));
+                        reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${displayForm(baseType)}'`));
                     }
                 } else if (baseType.kind === "indexer-type") {
                     if (!subsumes(parents, scopes,  baseType.keyType, indexerType, true)) {
-                        reportError(assignmentError(ast.indexer, baseType.keyType, indexerType));
+                        reportError(assignmentError(current.indexer, baseType.keyType, indexerType));
                     }
                 } else {
-                    reportError(miscError(ast.indexer, `Expression of type '${indexerType}' can't be used to index type '${displayForm(baseType)}'`));
+                    reportError(miscError(current.indexer, `Expression of type '${indexerType}' can't be used to index type '${displayForm(baseType)}'`));
                 }
             } break;
             case "property-accessor": {
-                const subjectType = inferType(reportError, parents, scopes, ast.subject, true);
-                const subjectProperties = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
+                const subjectType = inferType(reportError, parents, scopes, current.subject, true);
+                const subjectProperties = current.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
                     ? propertiesOf(reportError, parents, scopes, subtract(parents, scopes, subjectType, NIL_TYPE))
                     : propertiesOf(reportError, parents, scopes, subjectType)
 
                 if (subjectProperties == null) {
-                    reportError(miscError(ast.subject, `Can only use dot operator (".") on objects with known properties`));
-                } else if (!subjectProperties.some(property => property.name.name === ast.property.name)) {
+                    reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties`));
+                } else if (!subjectProperties.some(property => property.name.name === current.property.name)) {
                     if (subjectType.kind === "class-instance-type") {
-                        reportError(miscError(ast.property, `Property '${ast.property.name}' does not exist on class '${subjectType.clazz.name.name}'`));
+                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on class '${subjectType.clazz.name.name}'`));
                     } else {
-                        reportError(miscError(ast.property, `Property '${ast.property.name}' does not exist on type '${displayForm(subjectType)}'`));
+                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${displayForm(subjectType)}'`));
                     }
                 }
             } break;
             case "local-identifier": {
                 // console.log({ name: ast.name, scope: scope.values })
-                if (scope.values.get(ast.name) == null && scope.classes.get(ast.name) == null) {
-                    reportError(cannotFindName(ast));
+                if (scope.values.get(current.name) == null && scope.classes.get(current.name) == null) {
+                    reportError(cannotFindName(current));
                 }
             } break;
             case "string-literal": {
-                for (const segment of ast.segments) {
+                for (const segment of current.segments) {
                     if (typeof segment !== "string") {
                         const segmentType = inferType(reportError, parents, scopes, segment, true);
 
@@ -207,76 +207,76 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
 
             // not expressions, but should have their contents checked
             case "reaction": {
-                const dataType = inferType(reportError, parents, scopes, ast.data, true);
-                const effectType = inferType(reportError, parents, scopes, ast.effect, true);
+                const dataType = inferType(reportError, parents, scopes, current.data, true);
+                const effectType = inferType(reportError, parents, scopes, current.effect, true);
 
                 if (dataType.kind !== "func-type") {
-                    reportError(miscError(ast.data, `Expected function in observe clause`));
+                    reportError(miscError(current.data, `Expected function in observe clause`));
                 } else if (dataType.args.length > 0) {
-                    reportError(miscError(ast.data, `Observe function should take no arguments; provided function expects ${dataType.args.length}`));
+                    reportError(miscError(current.data, `Observe function should take no arguments; provided function expects ${dataType.args.length}`));
                 }
                 
                 if (effectType.kind !== "proc-type") {
-                    reportError(miscError(ast.effect, `Expected procedure in effect clause`));
+                    reportError(miscError(current.effect, `Expected procedure in effect clause`));
                 } else if (effectType.args.length > 1) {
-                    reportError(miscError(ast.data, `Effect procedure should take exactly one argument; provided procedure expects ${effectType.args.length}`));
+                    reportError(miscError(current.data, `Effect procedure should take exactly one argument; provided procedure expects ${effectType.args.length}`));
                 } else if (dataType.kind === "func-type" && !subsumes(parents, scopes, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE)) {
-                    reportError(assignmentError(ast.effect, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE));
+                    reportError(assignmentError(current.effect, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE));
                 }
 
-                if (ast.until) {
-                    const untilType = inferType(reportError, parents, scopes, ast.until, true);
+                if (current.until) {
+                    const untilType = inferType(reportError, parents, scopes, current.until, true);
 
                     if (untilType.kind !== "boolean-type") {
-                        reportError(miscError(ast.until, `Expected boolean expression in until clause`));
+                        reportError(miscError(current.until, `Expected boolean expression in until clause`));
                     }
                 }
             } break;
             case "let-declaration": {
-                const valueType = inferType(reportError, parents, scopes, ast.value, true);
+                const valueType = inferType(reportError, parents, scopes, current.value, true);
 
-                if (ast.type != null) {
-                    if (!subsumes(parents, scopes,  ast.type, valueType, true)) {
-                        reportError(assignmentError(ast.value, ast.type, valueType));
+                if (current.type != null) {
+                    if (!subsumes(parents, scopes,  current.type, valueType, true)) {
+                        reportError(assignmentError(current.value, current.type, valueType));
                     }
                 }
             } break;
             case "assignment": {
-                const resolved = ast.target.kind === "local-identifier" ? getScopeFor(reportError, parents, scopes, ast.target).values.get(ast.target.name) : undefined
-                if (ast.target.kind === "local-identifier" && resolved != null && resolved.mutability !== "all") {
-                    reportError(miscError(ast.target, `Cannot assign to '${ast.target.name}' because it's constant`));
+                const resolved = current.target.kind === "local-identifier" ? getScopeFor(reportError, parents, scopes, current.target).values.get(current.target.name) : undefined
+                if (current.target.kind === "local-identifier" && resolved != null && resolved.mutability !== "all") {
+                    reportError(miscError(current.target, `Cannot assign to '${current.target.name}' because it's constant`));
                 }
 
-                const targetType = inferType(reportError, parents, scopes, ast.target, true);
-                const valueType = inferType(reportError, parents, scopes, ast.value, true);
+                const targetType = inferType(reportError, parents, scopes, current.target, true);
+                const valueType = inferType(reportError, parents, scopes, current.value, true);
 
-                if (ast.target.kind === "property-accessor") {
-                    const subjectType = inferType(reportError, parents, scopes, ast.target.subject, true);
+                if (current.target.kind === "property-accessor") {
+                    const subjectType = inferType(reportError, parents, scopes, current.target.subject, true);
 
                     if (subjectType.mutability !== "mutable") {
-                        reportError(miscError(ast.target, `Cannot assign to property '${ast.target.property.name}' because the target object is constant`));
+                        reportError(miscError(current.target, `Cannot assign to property '${current.target.property.name}' because the target object is constant`));
                     }
                 }
                 if (!subsumes(parents, scopes,  targetType, valueType, true)) {
-                    reportError(assignmentError(ast.value, targetType, valueType));
+                    reportError(assignmentError(current.value, targetType, valueType));
                 }
             } break;
             case "for-loop": {
                 // TODO: Disallow shadowing? Not sure
 
-                const iteratorType = inferType(reportError, parents, scopes, ast.iterator, true);
+                const iteratorType = inferType(reportError, parents, scopes, current.iterator, true);
                 if (iteratorType.kind !== "iterator-type") {
-                    reportError(miscError(ast.iterator, `Expected iterator after "of" in for loop`));
+                    reportError(miscError(current.iterator, `Expected iterator after "of" in for loop`));
                 }
             } break;
             case "while-loop": {
-                const conditionType = inferType(reportError, parents, scopes, ast.condition, true);
+                const conditionType = inferType(reportError, parents, scopes, current.condition, true);
                 if (conditionType.kind !== "boolean-type") {
-                    reportError(miscError(ast.condition, `Condition for while loop must be boolean`));
+                    reportError(miscError(current.condition, `Condition for while loop must be boolean`));
                 }
             } break;
             case "element-tag": {
-                for (const child of ast.children) {
+                for (const child of current.children) {
                     const childType = inferType(reportError, parents, scopes, child, true);
                     if (!subsumes(parents, scopes, ELEMENT_TAG_CHILD_TYPE, childType, true)) {
                         reportError(assignmentError(child, ELEMENT_TAG_CHILD_TYPE, childType));
@@ -284,7 +284,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 }
             } break;
         }        
-    });
+    }
 }
 
 export function subsumes(parents: AllParents, scopes: AllScopes, destination: TypeExpression, value: TypeExpression, resolveGenerics?: boolean): boolean {
