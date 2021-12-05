@@ -1,43 +1,18 @@
 
-// const arr = [1, 2, 3]
-// const iter: Iter<number> = iter(arr)
-// const doubled = iter.map(n => n * 2).array()
+from '../../lib/wrappers/core' import { logp }
 
-// from '../../lib/wrappers/core' import { logp }
-// from '../../lib/wrappers/time' import { clock }
+const a = 12
 
-// func fib(n: number): number =>
-//     if (n < 2) {
-//         n
-//     } else {
-//         fib(n - 1) + fib(n - 2)
-//     }
+store Foo {
+    prop = 12
 
-// func memo fibM(n: number): number =>
-//     if (n < 2) {
-//         n
-//     } else {
-//         fib(n - 1) + fib(n - 2)
-//     }
-
-
-// proc main() {
-//     const n = 40;
-
-//     logp('start: ' + clock.now().epochMilliseconds);
-//     fib(n);
-//     logp('first done: ' + clock.now().epochMilliseconds);
-//     fibM(n);
-//     logp('second done: ' + clock.now().epochMilliseconds);
-// }
-
-class Counter {
-    public func render() =>
-        <div>
-        </div>
+    public proc prn() {
+        logp(this.prop);
+    }
 }
 
+const b = 'other'
+
 proc main() {
-    let inst = new Counter();
-    const bar: Element = <div>{inst.render()}</div>;
+    Foo.prn();
 }

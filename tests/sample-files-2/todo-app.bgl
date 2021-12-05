@@ -5,42 +5,52 @@ from '../../lib/wrappers/json' import { parse, stringify }
 
 const lsKey = 'todo-list'
 
-type TodoItemData = {
+// const AppStore: {
+//     items: TodoItem[],
+//     addItem: () {},
+//     clearDone: () {}
+// } = {
+//     items: [],
+//     addItem: () {},
+//     clearDone: () {}
+// }
+
+type TodoItem = {
     text: string,
     done: boolean
 }
 
-class TodoItem {
+// func renderApp() =>
+//     <div>
+//         {iter<TodoItem>(AppStore.items)
+//             .map<Element>(renderTodoItem)
+//             .array()}
 
-    func constructor(item: TodoItemData) => TodoItem { item: item }
+//         <button onClick={AppStore.addItem}>{'Add'}</button>
+//         <button onClick={AppStore.clearDone}>{'Clear done'}</button>
+//     </div>
 
-    private item: TodoItemData
+// func renderTodoItem(item: TodoItem) =>
+//     <div>
+//         <input value={item.text} onChange={handleItemTextChange(item)}></input>
+//         <input type={'checkbox'} checked={item.done} onChange={handleItemDoneChange(item)}></input>
+//     </div>
+
+// func memo handleItemTextChange(item: TodoItem) =>
+//     (e) {
+//         item.text = e.target.value;
+//     }
+
+// func memo handleItemDoneChange(item: TodoItem) =>
+//     (e) {
+//         item.done = e.target.checked;
+//     }
+
+func itemValid(item: TodoItem) => item.text.length > 3
+
+store AppStore {
     
-    public func memo render() =>
-        <div>
-            <input value={item.text} onChange={this.handleItemTextChange(item)}></input>
-            <input type={'checkbox'} checked={item.done} onChange={this.handleItemDoneChange(item)}></input>
-        </div>
-}
-
-class TodoApp {
-    
-    public func memo render() =>
-        <div>
-            {iter<TodoItem>(this.todoItems())
-                .map<Element>(item => item.render())
-                .array()}
-
-            <button onClick={this.addItem}>{'Add'}</button>
-            <button onClick={this.clearDone}>{'Clear done'}</button>
-        </div>
-
-    private func memo todoItems() =>
-        iter<TodoItemData>(this.items)
-            .map<Element>(item => new TodoItem(item))
-            .array()
-
-    visible items: TodoItemData[] = (
+    visible items: TodoItem[] = (
         if (localStorage.getItem(lsKey) != nil) {
             parse(localStorage.getItem(lsKey))
         } else {
@@ -48,35 +58,29 @@ class TodoApp {
         }
     )
 
-    func memo handleItemTextChange(item: TodoItemData) =>
-        (e) {
-            item.text = e.target.value;
-        }
-
-    func memo handleItemDoneChange(item: TodoItemData) =>
-        (e) {
-            item.done = e.target.checked;
-        }
+    func allValid() => iter(this.items)//.every(itemValid)
 
     proc addItem() {
         this.items.push({ text: '', done: false });
     }
 
     proc clearDone() {
-        this.items = iter<TodoItemData>(this.items).filter(item => item.done == false).array();
+        this.items = iter(this.items).filter(item => item.done == false).array();
     }
 }
 
 proc main() {
-    let app = new TodoApp();
+    // reaction () => stringify(app.items, 0)
+    // triggers (json) {
+    //     localStorage.setItem(lsKey, json);
+    // }
+    // forever;
 
-    autorun () {
-        localStorage.setItem(lsKey, stringify(app.items, 0));
-    }
-    forever;
-
-    autorun () {
-        ___render(app.render());
-    }
-    forever;
+    // reaction () => renderApp()
+    // triggers (content) {
+    //     ___render(content);
+    // }
+    // forever;
 }
+
+// shared namespace (parent object? module?) for all global/system/browser/externalities?

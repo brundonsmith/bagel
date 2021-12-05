@@ -1,16 +1,16 @@
 
-from './lib-bgl' import { map, arrayFrom, logp }
+from '../../lib/wrappers/core' import { logp }
 
-export func fibonacci(n: number): number =>
+export func memo fibonacci(n: number): number =>
     if (n <= 1) {
         n
     } else {
         fibonacci(n - 1) + fibonacci(n - 2)
     }
 
-const first10 = 0..10 |> map(fibonacci) |> arrayFrom
+// const first10 = 0..10 |> map(fibonacci) |> arrayFrom
 
 
 proc main() {
-    logp(first10);
+    logp(fibonacci(10));
 }
