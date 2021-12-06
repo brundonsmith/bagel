@@ -213,6 +213,11 @@ export function scopeFrom(reportError: (error: BagelError) => void, getModule: (
                                     mutability: "immutable",
                                     declaredType: UNKNOWN_TYPE,
                                 });
+                            } else if (foreignDecl.kind === 'type-declaration') {
+                                newScope.types.set(name.name, {
+                                    isGenericParameter: false,
+                                    type: foreignDecl.type
+                                })
                             } else {
                                 newScope.values.set(name.name, {
                                     mutability: "immutable", // TODO: If we ever allow global mutable state, this will need to allow for it
