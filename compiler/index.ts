@@ -10,7 +10,7 @@ import { all, cacheDir, cachedModulePath, esOrNone, given, ModuleName, on, pathI
 import { Module } from "./_model/ast.ts";
 
 import { ParentsMap, ScopesMap } from "./_model/common.ts";
-import { autorun, computed, configure, observable } from "./mobx.ts";
+import { autorun, computed, configure, observable, computedFn } from "./mobx.ts";
 
 configure({
     enforceActions: "never",
@@ -76,13 +76,13 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         }
     })
     
-    const parsed = transformify1((source: string): { ast: Module, errors: readonly BagelError[] } => {
+    const parsed = computedFn((source: string): { ast: Module, errors: readonly BagelError[] } => {
         const errors: BagelError[] = []
         const ast = reshape(parse(source, err => errors.push(err)))
         return { ast, errors }
     });
 
-    const parentsMap = transformify1(getParentsMap)
+    const parentsMap = computedFn(getParentsMap)
 
     const allParents = computed(() => {
         const set = new Set<ParentsMap>()
@@ -99,7 +99,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         return set
     })
 
-    const scopesMap = transformify2((module: ModuleName, ast: Module): { scopes: ScopesMap, errors: readonly BagelError[] } => {
+    const scopesMap = computedFn((module: ModuleName, ast: Module): { scopes: ScopesMap, errors: readonly BagelError[] } => {
         try {
             const errors: BagelError[] = []
             const scopes = scopescan(
@@ -135,7 +135,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         return set
     })
 
-    const typeerrors = transformify2((module: ModuleName, ast: Module): BagelError[] => {
+    const typeerrors = computedFn((module: ModuleName, ast: Module): BagelError[] => {
         const errors: BagelError[] = []
         try {
             const { errors: scopeErrors } = scopesMap(module, ast)
@@ -152,7 +152,7 @@ async function build({ entry, bundle, watch, emit, includeTests }: { entry: stri
         }
     })
 
-    const compiled = transformify2((module: ModuleName, ast: Module): string => {
+    const compiled = computedFn((module: ModuleName, ast: Module): string => {
         try {
             return (
                 LIB_IMPORTS + 
