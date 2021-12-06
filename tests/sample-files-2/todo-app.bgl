@@ -1,86 +1,79 @@
 
-from '../../lib/wrappers/core' import { iter }
+from '../../lib/wrappers/core' import { iter, logf, logp }
 from '../../lib/wrappers/local-storage' import { localStorage }
 from '../../lib/wrappers/json' import { parse, stringify }
+from '../../lib/wrappers/html' import { render, Event }
 
 const lsKey = 'todo-list'
-
-// const AppStore: {
-//     items: TodoItem[],
-//     addItem: () {},
-//     clearDone: () {}
-// } = {
-//     items: [],
-//     addItem: () {},
-//     clearDone: () {}
-// }
 
 type TodoItem = {
     text: string,
     done: boolean
 }
 
-// func renderApp() =>
-//     <div>
-//         {iter<TodoItem>(AppStore.items)
-//             .map<Element>(renderTodoItem)
-//             .array()}
+func renderApp() =>
+    <div>
+        {iter<TodoItem>(AppStore.items)
+            .map<Element>(renderTodoItem)
+            .array()}
 
-//         <button onClick={AppStore.addItem}>{'Add'}</button>
-//         <button onClick={AppStore.clearDone}>{'Clear done'}</button>
-//     </div>
+        <button onClick={AppStore.addItem}>{'Add'}</button>
+        <button onClick={AppStore.clearDone}>{'Clear done'}</button>
+    </div>
 
-// func renderTodoItem(item: TodoItem) =>
-//     <div>
-//         <input value={item.text} onChange={handleItemTextChange(item)}></input>
-//         <input type={'checkbox'} checked={item.done} onChange={handleItemDoneChange(item)}></input>
-//     </div>
+func renderTodoItem(item: TodoItem) =>
+    <div>
+        <input value={item.text} onChange={handleItemTextChange(item)}></input>
+        <input type={'checkbox'} checked={item.done} onChange={handleItemDoneChange(item)}></input>
+    </div>
 
-// func memo handleItemTextChange(item: TodoItem) =>
-//     (e) {
-//         item.text = e.target.value;
-//     }
+func memo handleItemTextChange(item: TodoItem) =>
+    (e: Event) {
+        logp('onChange');
+        item.text = e.target.value;
+    }
 
-// func memo handleItemDoneChange(item: TodoItem) =>
-//     (e) {
-//         item.done = e.target.checked;
-//     }
+func memo handleItemDoneChange(item: TodoItem) =>
+    (e: Event) {
+        item.done = e.target.checked;
+    }
 
 func itemValid(item: TodoItem) => item.text.length > 3
 
 store AppStore {
     
     visible items: TodoItem[] = (
-        if (localStorage.getItem(lsKey) != nil) {
+        if (logf(localStorage.getItem(lsKey)) != nil) {
             parse(localStorage.getItem(lsKey))
         } else {
             []
         }
     )
 
-    func allValid() => iter(this.items)//.every(itemValid)
+    func allValid() => iter<TodoItem>(this.items)//.every(itemValid)
 
-    proc addItem() {
+    public proc addItem() {
         this.items.push({ text: '', done: false });
     }
 
-    proc clearDone() {
+    public proc clearDone() {
         this.items = iter(this.items).filter(item => item.done == false).array();
     }
 }
 
 proc main() {
-    // reaction () => stringify(app.items, 0)
-    // triggers (json) {
-    //     localStorage.setItem(lsKey, json);
-    // }
-    // forever;
+    observe () => stringify(AppStore.items, 0)
+    triggering (json) {
+        logp('setting ' + lsKey);
+        // localStorage.setItem(lsKey, json);
+    }
+    forever;
 
-    // reaction () => renderApp()
-    // triggers (content) {
-    //     ___render(content);
-    // }
-    // forever;
+    observe () => renderApp()
+    triggering (content: Element) {
+        render(content);
+    }
+    forever;
 }
 
 // shared namespace (parent object? module?) for all global/system/browser/externalities?
