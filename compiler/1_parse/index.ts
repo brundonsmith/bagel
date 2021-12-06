@@ -1788,7 +1788,7 @@ const debug: ParseFunction<Debug> = (code, startIndex) =>
     }))))))
 
 const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
-    [ javascriptEscape, pipe, classConstruction, elementTag ],
+    [ debug, javascriptEscape, pipe, classConstruction, elementTag ],
     [ func, proc, range ],
     [ binaryOperator(0) ],
     [ binaryOperator(1) ],
@@ -1802,7 +1802,7 @@ const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
     [ invocationAccessorChain ],
     [ parenthesized ],
     [ localIdentifier ],
-    [ ifElseExpression, debug, switchExpression, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
+    [ ifElseExpression, switchExpression, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
         stringLiteral, numberLiteral ],
 ];
 
