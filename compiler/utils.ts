@@ -1,5 +1,4 @@
 import { os, path } from "./deps.ts";
-import { createTransformer } from "./mobx.ts";
 import { AST } from "./_model/ast.ts";
 
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
@@ -485,12 +484,6 @@ export function memoize5<A1, A2, A3, A4, A5, R>(fn: (arg1: A1, arg2: A2, arg3: A
     return mFn
 }
 
-export const transformify1: <F extends (a1: any) => unknown>(fn: F) => F = createTransformer as any
-
-export function transformify2<F extends (a1: any, a2: any) => unknown>(fn: F): F {
-    const transformed = createTransformer(a1 => createTransformer(a2 => fn(a1, a2)))
-    return ((a1: any, a2: any) => transformed(a1)(a2)) as any
-}
 export const cacheDir = () => {
     const tempDir = os.tempDir()
         ?? (os.platform() === "darwin" || os.platform() === "linux" ? "/tmp" : undefined)

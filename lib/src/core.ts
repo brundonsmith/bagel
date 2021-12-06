@@ -20,10 +20,12 @@ export function reactionUntil<T>(
     if (until) {
         when(until, r);
     }
+
+    effect(data())
 }
 
 export {
-    createTransformer
+    computedFn
 } from "mobx-utils"
 
 

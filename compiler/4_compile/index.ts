@@ -186,22 +186,7 @@ const compileFuncDeclaration = (parents: AllParents, scopes: AllScopes, module: 
         : (decl.access + ' readonly')
 
     if (decl.memo) {
-        const memoizerPrefix = decl.kind === "func-declaration" 
-            ? 'const' 
-            : 'private readonly'
-
-        const memoizer = decl.value.type.args.length === 0
-            ? `${memoizerPrefix} ${INT}${decl.name.name} = ${INT}computed(() => ${body});\n`
-            : `${memoizerPrefix} ${INT}${decl.name.name} = ${decl.value.type.args.map(arg => 
-                `${INT}createTransformer((${compileOneArg(parents, scopes, module, arg)}) => `).join('')}\n` +
-                `${body}\n` +
-                new Array(decl.value.type.args.length).fill(')').join('') + ';\n';
-
-        const invocationArgs = decl.value.type.args.length === 0
-            ? `.get()`
-            : decl.value.type.args.map(a => `(${a.name.name})`).join('')
-                
-        return memoizer + `${prefix} ${decl.name.name} = ` + signature + ` => ${decl.kind === "class-function" ? 'this.' : ''}${INT}${decl.name.name}${invocationArgs};`;
+        return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ');';
     } else {
         return `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
     }

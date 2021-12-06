@@ -6,7 +6,7 @@ import { compile, INT } from "./4_compile/index.ts";
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { BagelError, miscError, prettyError } from "./errors.ts";
-import { all, cacheDir, cachedModulePath, esOrNone, given, ModuleName, NominalType, on, pathIsRemote, sOrNone, transformify1, transformify2 } from "./utils.ts";
+import { all, cacheDir, cachedModulePath, esOrNone, given, ModuleName, on, pathIsRemote, sOrNone } from "./utils.ts";
 import { Module } from "./_model/ast.ts";
 
 import { ParentsMap, ScopesMap } from "./_model/common.ts";
@@ -385,8 +385,8 @@ function test() {
     }, 1000)
 }
 
-const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h', 'render',
-'createTransformer', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER'
+const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h',
+'computedFn', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER'
 ].map(s => `${s} as ${INT}${s}`).join(', ')
 
 const LIB_IMPORTS = `

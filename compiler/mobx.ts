@@ -7,4 +7,4 @@ export const observable: <T>(x: T) => T = mobx.observable as any
 export const autorun: (fn: () => void) => void = mobx.autorun as any
 export const computed: <T>(fn: () => T) => { get(): T } = mobx.computed as any
 
-export const createTransformer: <P, R>(fn: (p: P) => R) => (p: P) => R = mobx_utils.createTransformer as any
+export const computedFn: <F extends (...args: any[]) => any>(fn: F) => F = mobx_utils.computedFn as any

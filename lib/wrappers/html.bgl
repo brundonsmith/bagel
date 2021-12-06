@@ -1,0 +1,13 @@
+
+js#
+import { render as ___render } from '../src/core.ts'
+#js
+
+export func render(el: Element): void => js# ___render(el) #js
+
+export type Event = {
+    target: {
+        value: string,
+        checked: boolean|nil
+    }
+}
