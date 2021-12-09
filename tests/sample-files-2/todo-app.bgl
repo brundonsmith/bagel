@@ -21,7 +21,7 @@ func renderApp() =>
         <button onClick={AppStore.clearDone}>{'Clear done'}</button>
     </div>
 
-func renderTodoItem(item: TodoItem) =>
+func memo renderTodoItem(item: TodoItem) =>
     <div>
         <input value={item.text} onChange={handleItemTextChange(item)}></input>
         <input type={'checkbox'} checked={item.done} onChange={handleItemDoneChange(item)}></input>
@@ -29,7 +29,6 @@ func renderTodoItem(item: TodoItem) =>
 
 func memo handleItemTextChange(item: TodoItem) =>
     (e: Event) {
-        logp('onChange');
         item.text = e.target.value;
     }
 

@@ -56,3 +56,39 @@ only get invoked by others
     just need some - any - function that returns an instance of the class?
         - Ah but it has to be special because how is it called?
             - Unless it lives outside of the class?
+
+- constraints on reactions:
+    - effect can reference anything
+    - data clause can only reference things that will get collected when the 
+      reaction itself should get collected
+        - local variables that don't escape the scope
+        - private class members that don't escape the class
+        - these can be passed to functions, but not to procs?
+            - if there's no global state, they actually could be passed to procs
+              (we'd know nothing could still be holding on to them)
+            - most importantly, can't be assigned to anything passed into the 
+              current scope from the outside
+            - generally: the "outside world" can be reduced to a) proc args, and 
+              b) global state (if we have that)
+            - No global state to start, and think about adding it later?
+
+Things we know about a value:
+- Mutable or not in current context
+- Mutable or not to *anybody*
+    - Combined, three possible states: constant, readonly (currently), mutable
+    - 2 and 3 will be observable; 1 should be boxed and could maybe be 
+      optimized for immutability
+- Owned by current scope or not
+    - Must be a) created in local scope, and b) not leaked to parent proc or 
+      global state
+- Procs do or don't modify local (observable) state
+  - Procs that don't modify local state modify the system and/or outside world
+  - Reaction effects can *only* modify the outside world? This would prevent
+    GC issues!
+      - How do we demarcate procs and other operations that only modify the 
+      outside world?
+        - Ones with no mutable arguments? (every arg type is mutability !== "mutable")
+          - Global application state would break this shortcut and make the 
+            overall goal more complicated (but still possible!)
+
+- Imba has explicit calls for starting a server, mounting an app, or even appending a child to an existing element
