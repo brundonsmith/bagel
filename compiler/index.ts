@@ -1,16 +1,10 @@
-import { Colors, debounce, path, fs } from "./deps.ts";
+import { Colors, path, fs } from "./deps.ts";
 
-import { getParentsMap, scopescan } from "./3_checking/scopescan.ts";
-import { typecheck } from "./3_checking/typecheck.ts";
-import { compile, INT } from "./4_compile/index.ts";
-import { parse } from "./1_parse/index.ts";
-import { reshape } from "./2_reshape/index.ts";
-import { BagelError, miscError, prettyError } from "./errors.ts";
-import { all, cacheDir, cachedModulePath, esOrNone, given, ModuleName, on, pathIsRemote, sOrNone } from "./utils.ts";
-import { Module } from "./_model/ast.ts";
+import { BagelError, prettyError } from "./errors.ts";
+import { all, cacheDir, cachedModulePath, esOrNone, ModuleName, on, pathIsRemote, sOrNone } from "./utils.ts";
 
-import { ParentsMap, ScopesMap } from "./_model/common.ts";
-import { autorun, computed, configure, observable, computedFn } from "./mobx.ts";
+import { autorun, configure, runInAction } from "./mobx.ts";
+import Store from "./store.ts";
 
 configure({
     enforceActions: "never",
@@ -21,309 +15,168 @@ configure({
 
 async function main() {
     const command = Deno.args[0]
+    const entry = command === 'test' ? Deno.cwd() : Deno.args[1]
     const bundle = Deno.args.includes("--bundle");
     const watch = Deno.args.includes("--watch");
+    const includeTests = command === 'test'
+    const emit = command === 'build'
 
-    switch (command) {
-        case "build": await build({ entry: Deno.args[1], bundle, watch, emit: true }); break;
-        case "check": await build({ entry: Deno.args[1], bundle, watch, emit: false }); break;
-        case "test": test(); break; // test(Deno.args[1]); break;
-        case "run": throw Error("Unimplemented!"); break;
-        case "format": throw Error("Unimplemented!"); break;
-        default:
-            fail(`Must provide a command: build, check, test, run, format`)
-    }
-}
-
-async function build({ entry, bundle, watch, emit, includeTests }: { entry: string, bundle?: boolean, watch?: boolean, includeTests?: boolean, emit: boolean }) {
+    if (!command) fail(`Must provide a command: build, check, test, run, format`)
     if (!entry) fail("Bagel: No file or directory provided")
-    const entryFileOrDir = path.resolve(Deno.cwd(), entry);
+
+    const entryFileOrDir = path.resolve(Deno.cwd(), entry) as ModuleName;
     if (!await fs.exists(entryFileOrDir)) fail(`Bagel: ${entry} not found`)
     const singleEntry = !(await Deno.stat(entryFileOrDir)).isDirectory
     const allFiles = singleEntry ? [ entryFileOrDir ] : await getAllFiles(entryFileOrDir);
 
     fs.ensureDir(cacheDir())
-
-    // base state
-    const modules = observable(new Set<ModuleName>(allFiles.filter(f => f.match(/\.bgl$/i)) as ModuleName[]));
-    const modulesSource = observable(new Map<ModuleName, string>())
-
-    const modulesOutstanding = () => modules.size > modulesSource.size
-
-    // Load modules from disk or web
-    autorun(async () => {
-        for (const module of modules) {
-            if (modulesSource.get(module) == null) {
-                if (pathIsRemote(module)) {  // http import
-                    const path = cachedModulePath(module)
-                    if (await fs.exists(path)) {  // module has already been cached locally
-                        const source = await Deno.readTextFile(path)
-                        modulesSource.set(module, source)
-                    } else {  // need to download module before compiling
-                        const res = await fetch(module)
     
-                        if (res.status === 200) {
-                            const source = await res.text()
-                            await Deno.writeTextFile(path, source)
-                            modulesSource.set(module, source)
-                        }
-                    }
-                } else {  // local disk import
-                    const source = await Deno.readTextFile(module)
-                    modulesSource.set(module, source)
-                }
-            }
-        }
-    })
-    
-    const parsed = computedFn((source: string): { ast: Module, errors: readonly BagelError[] } => {
-        const errors: BagelError[] = []
-        const ast = reshape(parse(source, err => errors.push(err)))
-        return { ast, errors }
-    });
-
-    const parentsMap = computedFn(getParentsMap)
-
-    const allParents = computed(() => {
-        const set = new Set<ParentsMap>()
-
-        for (const module of modules) {
-            const source = modulesSource.get(module)
-            
-            if (source) {
-                const { ast } = parsed(source)
-                set.add(parentsMap(ast))
-            }
-        }
-
-        return set
+    runInAction(() => {
+        Store.config = { entryFileOrDir, singleEntry, bundle, watch, emit, includeTests }
+        Store.modules = new Set(allFiles.filter(f => f.match(/\.bgl$/i)) as ModuleName[])
     })
 
-    const scopesMap = computedFn((module: ModuleName, ast: Module): { scopes: ScopesMap, errors: readonly BagelError[] } => {
-        try {
-            const errors: BagelError[] = []
-            const scopes = scopescan(
-                err => errors.push(err),
-                allParents.get(), 
-                new Set(),
-                imported => 
-                    given(modulesSource.get(canonicalModuleName(module, imported)), 
-                        source => parsed(source).ast), 
-                ast
-            )
-
-            return { scopes, errors }
-        } catch {
-            return { scopes: new Map(), errors: [] }
-        }
-    })
-
-    const allScopes = computed(() => {
-        const set = new Set<ScopesMap>()
-
-        for (const module of modules) {
-            const source = modulesSource.get(module)
-            
-            if (source) {
-                const { ast } = parsed(source)
-                const { scopes } = scopesMap(module, ast)
-
-                set.add(scopes)
-            }
-        }
-
-        return set
-    })
-
-    const typeerrors = computedFn((module: ModuleName, ast: Module): BagelError[] => {
-        const errors: BagelError[] = []
-        try {
-            const { errors: scopeErrors } = scopesMap(module, ast)
-            errors.push(...scopeErrors)
-            typecheck(
-                err => errors.push(err), 
-                allParents.get(),
-                allScopes.get(), 
-                ast
-            )
-            return errors
-        } catch (e) {
-            return [ ...errors, miscError(ast, e.toString()) ]
-        }
-    })
-
-    const compiled = computedFn((module: ModuleName, ast: Module): string => {
-        try {
-            return (
-                LIB_IMPORTS + 
-                (ast.hasMain ? MOBX_CONFIGURE : '') + 
-                compile(
-                    allParents.get(), 
-                    allScopes.get(), 
-                    ast, 
-                    module, 
-                    includeTests
-                )
-            )
-        } catch (e) {
-            console.error(e)
-            return '';
-        }
-    })
-
-    // add imported modules to set
-    autorun(() => {
-        for (const module of modules) {
-            const source = modulesSource.get(module)
-            if (source) {
-                const { ast } = parsed(source)
-
-                for (const decl of ast.declarations) {
-                    if (decl.kind === "import-declaration") {
-                        const importedModule = canonicalModuleName(module, decl.path.value)
-
-                        if (!modules.has(importedModule)) {
-                            modules.add(importedModule)
-                        }
-                    }
-                }
-            }
-        }
-    })
-
-    // print errors as they occur
-    autorun(() => {
-        if (!modulesOutstanding()) {
-            const allErrors = new Map<ModuleName, BagelError[]>()
-
-            for (const module of modules) {
-                const source = modulesSource.get(module)
-                if (source) {
-                    const { ast, errors: parseErrors } = parsed(source)
-                    const errors = [...parseErrors, ...typeerrors(module, ast)]
-                    // .filter((err, _, arr) => 
-                    //     err.kind === "bagel-syntax-error" ||
-                    //     !arr.some(other =>
-                    //         other !== err && 
-                    //         other.kind !== "bagel-syntax-error" && moreSpecificThan(other.ast ?? {}, err.ast ?? {})))
-
-                    if (errors.length > 0) {
-                        allErrors.set(module, errors)
-                    }
-                }
-            }
-
-            printErrors(allErrors, watch)
-        }
-    })
-
-    // write compiled code to disk
-    autorun(() => {
-        if (!modulesOutstanding()) {
-            const compiledModules = [...modulesSource.entries()].map(([module, source]) => ({
-                jsPath: pathIsRemote(module)
-                    ? cachedModulePath(module) + '.ts'
-                    : bagelFileToTsFile(module),
-                js: compiled(module, parsed(source).ast)
-            }))
-
-            if (emit) {
-                Promise.all(compiledModules.map(({ jsPath, js }) =>
-                        Deno.writeTextFile(jsPath, js)))
-                    .then(() => {
-                        // bundle
-                        if (singleEntry && bundle) {
-                            bundleOutput(entryFileOrDir as ModuleName)
-                        }
-                    })
-            }
-        }
-    })
-
-    // if watch mode is enabled, reload files from disk when changes detected
-    if (watch) {
-        const watchers = new Map<ModuleName, Deno.FsWatcher>()
-
-        autorun(() => {
-            for (const module of modules) {
-                if (watchers.get(module) == null) {
-                    const watcher = Deno.watchFs(module);
-                    watchers.set(module, watcher);
-
-                    on(watcher, async () => {
-                        try {
-                            const fileContents = await Deno.readTextFile(module);
-
-                            if (fileContents && fileContents !== modulesSource.get(module)) {
-                                modulesSource.set(module, fileContents)
-                            }
-                        } catch (e) {
-                            console.error("Failed to read module " + module + "\n")
-                            console.error(e)
-                        }
-                    })
-                }
-            }
-        })
-    }
+    // switch (command) {
+    //     case "build": await build({ entry: Deno.args[1], bundle, watch, emit: true }); break;
+    //     case "check": await build({ entry: Deno.args[1], bundle, watch, emit: false }); break;
+    //     case "test": test(); break; // test(Deno.args[1]); break;
+    //     case "run": throw Error("Unimplemented!"); break;
+    //     case "format": throw Error("Unimplemented!"); break;
+    //     default:
+    //         fail(`Must provide a command: build, check, test, run, format`)
+    // }
 }
 
-/**
- * Print list of errors
- */
-const printErrors = debounce((errors: Map<ModuleName, BagelError[]>, watch?: boolean) => {
-    if (watch) {
-        console.clear()
+// Load modules from disk or web
+autorun(async () => {
+    for (const module of Store.modules) {
+        if (Store.modulesSource.get(module) == null) {
+            if (pathIsRemote(module)) {  // http import
+                const path = cachedModulePath(module)
+                if (await fs.exists(path)) {  // module has already been cached locally
+                    const source = await Deno.readTextFile(path)
+                    Store.modulesSource.set(module, source)
+                } else {  // need to download module before compiling
+                    const res = await fetch(module)
+
+                    if (res.status === 200) {
+                        const source = await res.text()
+                        await Deno.writeTextFile(path, source)
+                        Store.modulesSource.set(module, source)
+                    }
+                }
+            } else {  // local disk import
+                const source = await Deno.readTextFile(module)
+                Store.modulesSource.set(module, source)
+            }
+        }
     }
+})
 
-    let totalErrors = 0;
+// add imported modules to set
+autorun(() => {
+    for (const module of Store.modules) {
+        const source = Store.modulesSource.get(module)
+        if (source) {
+            const { ast } = Store.parsed(source)
 
-    if (errors.size === 0) {
-        console.log('No errors')
-    } else {
-        console.log()
+            for (const decl of ast.declarations) {
+                if (decl.kind === "import-declaration") {
+                    const importedModule = canonicalModuleName(module, decl.path.value)
 
-        for (const [module, errs] of errors.entries()) {
-            totalErrors += errs.length;
+                    if (!Store.modules.has(importedModule)) {
+                        Store.modules.add(importedModule)
+                    }
+                }
+            }
+        }
+    }
+})
 
-            for (const err of errs) {
-                console.log(prettyError(module, err))
+// print errors as they occur
+autorun(() => {
+    const config = Store.config
+
+    if (config != null && !Store.modulesOutstanding) {
+        const allErrors = new Map<ModuleName, BagelError[]>()
+
+        for (const module of Store.modules) {
+            const source = Store.modulesSource.get(module)
+            if (source) {
+                const { ast, errors: parseErrors } = Store.parsed(source)
+                const errors = [...parseErrors, ...Store.typeerrors(module, ast)]
+                // .filter((err, _, arr) => 
+                //     err.kind === "bagel-syntax-error" ||
+                //     !arr.some(other =>
+                //         other !== err && 
+                //         other.kind !== "bagel-syntax-error" && moreSpecificThan(other.ast ?? {}, err.ast ?? {})))
+
+                if (errors.length > 0) {
+                    allErrors.set(module, errors)
+                }
             }
         }
 
-        console.log(`Found ${totalErrors} error${sOrNone(totalErrors)} across ${errors.size} module${sOrNone(errors.size)}`)
+        printErrors(allErrors, config.watch)
     }
-}, 100)
-    
-const bundleOutput = async (entryFile: ModuleName) => {
-    const bundleFile = bagelFileToJsBundleFile(entryFile)
+})
 
-    // const result = await Deno.emit(windowsPathToModulePath(bagelFileToTsFile(entryFile)), {
-    //     bundle: "classic",
-    // });
-    // const code = result.files['deno:///bundle.js']
-    
-    // // await Promise.all(Object.entries(result.files).map(([name, code]) => 
-    // //     Deno.writeTextFile(name, code)))
-    // await Deno.writeTextFile(bundleFile, code)
+// write compiled code to disk
+autorun(() => {
+    const config = Store.config
 
-    const esbuild = await import("https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js")
- 
-    await esbuild.build({
-        write: true,
-        bundle: true,
-        minify: false,
-        entryPoints: [ bagelFileToTsFile(entryFile) ],
-        outfile: bundleFile
-    })
+    if (config != null && !Store.modulesOutstanding) {
+        const compiledModules = [...Store.modulesSource.entries()].map(([module, source]) => ({
+            jsPath: pathIsRemote(module)
+                ? cachedModulePath(module) + '.ts'
+                : bagelFileToTsFile(module),
+            js: Store.compiled(module, Store.parsed(source).ast)
+        }))
 
-    esbuild.stop()
-    
-    console.log('Bundle written to ' + bundleFile)
-}
+        if (config.emit && !Store.modulesOutstanding) {
+            Promise.all(compiledModules.map(({ jsPath, js }) =>
+                    Deno.writeTextFile(jsPath, js)))
+                .then(() => {
+                    // bundle
+                    if (config.singleEntry && config.bundle) {
+                        bundleOutput(config.entryFileOrDir)
+                    }
+                })
+        }
+    }
+})
+
+// if watch mode is enabled, reload files from disk when changes detected
+const watchers = new Map<ModuleName, Deno.FsWatcher>()
+
+autorun(() => {
+    const config = Store.config
+
+    if (config != null && config.watch) {
+        for (const module of Store.modules) {
+            if (watchers.get(module) == null) {
+                const watcher = Deno.watchFs(module);
+                watchers.set(module, watcher);
+
+                on(watcher, async () => {
+                    try {
+                        const fileContents = await Deno.readTextFile(module);
+
+                        if (fileContents && fileContents !== Store.modulesSource.get(module)) {
+                            Store.modulesSource.set(module, fileContents)
+                        }
+                    } catch (e) {
+                        console.error("Failed to read module " + module + "\n")
+                        console.error(e)
+                    }
+                })
+            }
+        }
+    }
+})
 
 function test() {
-    build({ entry: Deno.cwd(), emit: true, includeTests: true })
+    // build({ entry: Deno.cwd(), emit: true, includeTests: true })
 
     setTimeout(async () => {
         const thisModulePath = windowsPathToModulePath(path.dirname(import.meta.url))
@@ -385,20 +238,62 @@ function test() {
     }, 1000)
 }
 
-const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h',
-'computedFn', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER'
-].map(s => `${s} as ${INT}${s}`).join(', ')
+/**
+ * Print list of errors
+ */
+const printErrors = (errors: Map<ModuleName, BagelError[]>, watch?: boolean) => {
+    if (watch) {
+        console.clear()
+    }
 
-const LIB_IMPORTS = `
-import { ${IMPORTED_ITEMS} } from "../../lib/src/core.ts";
-`
-const MOBX_CONFIGURE = `
-${INT}configure({
-    enforceActions: "never",
-    computedRequiresReaction: false,
-    reactionRequiresObservable: false,
-    observableRequiresReaction: false,
-});`
+    let totalErrors = 0;
+
+    if (errors.size === 0) {
+        console.log('No errors')
+    } else {
+        console.log()
+
+        for (const [module, errs] of errors.entries()) {
+            totalErrors += errs.length;
+
+            for (const err of errs) {
+                console.log(prettyError(module, err))
+            }
+        }
+
+        console.log(`Found ${totalErrors} error${sOrNone(totalErrors)} across ${errors.size} module${sOrNone(errors.size)}`)
+    }
+}
+    
+const bundleOutput = async (entryFile: ModuleName) => {
+    const bundleFile = bagelFileToJsBundleFile(entryFile)
+
+    // const result = await Deno.emit(windowsPathToModulePath(bagelFileToTsFile(entryFile)), {
+    //     bundle: "classic",
+    // });
+    // const code = result.files['deno:///bundle.js']
+    
+    // // await Promise.all(Object.entries(result.files).map(([name, code]) => 
+    // //     Deno.writeTextFile(name, code)))
+    // await Deno.writeTextFile(bundleFile, code)
+
+    const esbuild = await import("https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js")
+
+    try {
+        await esbuild.build({
+            write: true,
+            bundle: true,
+            minify: false,
+            entryPoints: [ bagelFileToTsFile(entryFile) ],
+            outfile: bundleFile
+        })
+
+        console.log('Bundle written to ' + bundleFile)
+    } catch {
+    } finally {
+        esbuild.stop()
+    }
+}
 
 async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     
