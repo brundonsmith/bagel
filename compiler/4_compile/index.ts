@@ -164,7 +164,7 @@ function compileProc(parents: AllParents, scopes: AllScopes, module: string, pro
 `    const ${LOCALS_OBJ}: {${
         letDeclarations
             .map(e => 
-                `${e.name}?: any`)
+                `${e.name.name}?: any`)
             .join(",")
     }} = ${INT}observable({});
     
