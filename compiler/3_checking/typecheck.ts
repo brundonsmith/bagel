@@ -3,12 +3,12 @@ import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, NIL_TYPE, ProcType, STR
 import { deepEquals, given, iterateParseTree } from "../utils.ts";
 import { assignmentError,miscError,cannotFindName, BagelError } from "../errors.ts";
 import { propertiesOf, inferType, resolve, subtract, fitTemplate } from "./typeinfer.ts";
-import { AllParents, AllScopes, getScopeFor } from "../_model/common.ts";
+import { AllParents, AllScopes, getBindingMutability, getScopeFor } from "../_model/common.ts";
 import { display } from "../debugging.ts";
 import { extendScope } from "./scopescan.ts";
 
 
-export function typecheck(reportError: (error: BagelError) => void, parents: AllParents, scopes: AllScopes, ast2: Module) {
+export function typecheck(reportError: (error: BagelError) => void, getModule: (module: string) => Module|undefined, parents: AllParents, scopes: AllScopes, ast2: Module) {
     for (const { current } of iterateParseTree(ast2)) {
         const scope = getScopeFor(reportError, parents, scopes, current)
 
@@ -16,7 +16,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             case "const-declaration": {
 
                 // make sure value fits declared type, if there is one
-                const valueType = inferType(reportError, parents, scopes, current.value, true);
+                const valueType = inferType(reportError, getModule, parents, scopes, current.value, true);
                 if (current.type != null && !subsumes(parents, scopes,  current.type, valueType, true)) {
                     reportError(assignmentError(current.value, current.type, valueType));
                 }
@@ -39,7 +39,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             case "test-expr-declaration": {
 
                 // make sure test value is a boolean
-                const valueType = inferType(reportError, parents, scopes, current.expr, true);
+                const valueType = inferType(reportError, getModule, parents, scopes, current.expr, true);
                 if (!subsumes(parents, scopes,  BOOLEAN_TYPE, valueType, true)) {
                     reportError(assignmentError(current.expr, BOOLEAN_TYPE, valueType));
                 }
@@ -48,14 +48,14 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
 
                 // make sure each const fits its declared type, if there is one
                 for (const c of current.consts) {
-                    const valueType = inferType(reportError, parents, scopes, c.value, true)
+                    const valueType = inferType(reportError, getModule, parents, scopes, c.value, true)
                     if (c.type && !subsumes(parents, scopes,  c.type, valueType, true)) {
                         reportError(assignmentError(c.value, c.type, valueType));
                     }
                 }
 
                 // make sure body expression fits declared return type, if there is one
-                const bodyType = inferType(reportError, parents, scopes, current.body, true);
+                const bodyType = inferType(reportError, getModule, parents, scopes, current.body, true);
                 if (current.type.returnType != null && !subsumes(parents, scopes,  current.type.returnType, bodyType, true)) {
                     reportError(assignmentError(current.body, current.type.returnType, bodyType));
                 }
@@ -64,7 +64,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 // This gets checked in typeinfer
             } break;
             case "negation-operator": {
-                const baseType = inferType(reportError, parents, scopes, current.base, true);
+                const baseType = inferType(reportError, getModule, parents, scopes, current.base, true);
                 if (!subsumes(parents, scopes,  BOOLEAN_TYPE, baseType, true)) {
                     reportError(assignmentError(current.base, BOOLEAN_TYPE, baseType));
                 }
@@ -73,7 +73,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             case "invocation": {
                 const scope = getScopeFor(reportError, parents, scopes, current)
                 
-                let subjectType = inferType(reportError, parents, scopes, current.subject);
+                let subjectType = inferType(reportError, getModule, parents, scopes, current.subject);
                 if (current.kind === "invocation") {
                     const scopeWithGenerics = extendScope(scope)
 
@@ -97,7 +97,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                             } else {
                                 const invocationSubjectType: FuncType|ProcType = {
                                     ...subjectType,
-                                    args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(reportError, parents, scopes, current.args[index]) }))
+                                    args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(reportError, getModule, parents, scopes, current.args[index]) }))
                                 }
         
                                 // attempt to infer params for generic
@@ -120,7 +120,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                         }
                     }
 
-                    subjectType = resolve(scopeWithGenerics, subjectType, true);
+                    subjectType = resolve(reportError, getModule, scopeWithGenerics, subjectType, true);
                 }
 
                 if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {  // check that subject is callable
@@ -133,7 +133,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                         const arg = current.args[i]
                         const subjectArgType = subjectType.args[i].type ?? UNKNOWN_TYPE
 
-                        const argValueType = inferType(reportError, parents, scopes, arg, true)
+                        const argValueType = inferType(reportError, getModule, parents, scopes, arg, true)
 
                         if (!subsumes(parents, scopes,  subjectArgType, argValueType, true)) {
                             reportError(assignmentError(arg, subjectArgType, argValueType));
@@ -144,22 +144,22 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             case "if-else-expression":
             case "if-else-statement":
             case "switch-expression": {
-                const valueType = current.kind === "if-else-expression" || current.kind === "if-else-statement" ? BOOLEAN_TYPE : inferType(reportError, parents, scopes, current.value, true);
+                const valueType = current.kind === "if-else-expression" || current.kind === "if-else-statement" ? BOOLEAN_TYPE : inferType(reportError, getModule, parents, scopes, current.value, true);
 
                 for (const { condition } of current.cases) {
-                    const conditionType = inferType(reportError, parents, scopes, condition, true);
+                    const conditionType = inferType(reportError, getModule, parents, scopes, condition, true);
                     if (!subsumes(parents, scopes,  valueType, conditionType, true)) {
                         reportError(assignmentError(condition, valueType, conditionType));
                     }
                 }
             } break;
             case "indexer": {
-                const baseType = inferType(reportError, parents, scopes, current.subject, true);
-                const indexerType = inferType(reportError, parents, scopes, current.indexer, true);
+                const baseType = inferType(reportError, getModule, parents, scopes, current.subject, true);
+                const indexerType = inferType(reportError, getModule, parents, scopes, current.indexer, true);
                 
                 if (baseType.kind === "object-type" && indexerType.kind === "literal-type") {
                     const key = indexerType.value.value;
-                    const valueType = propertiesOf(reportError, parents, scopes, baseType)?.find(entry => entry.name.name === key)?.type;
+                    const valueType = propertiesOf(reportError, getModule, parents, scopes, baseType)?.find(entry => entry.name.name === key)?.type;
                     if (valueType == null) {
                         reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${displayForm(baseType)}'`));
                     }
@@ -172,13 +172,13 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 }
             } break;
             case "property-accessor": {
-                const subjectType = inferType(reportError, parents, scopes, current.subject, true);
+                const subjectType = inferType(reportError, getModule, parents, scopes, current.subject, true);
                 const subjectProperties = current.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-                    ? propertiesOf(reportError, parents, scopes, subtract(parents, scopes, subjectType, NIL_TYPE))
-                    : propertiesOf(reportError, parents, scopes, subjectType)
+                    ? propertiesOf(reportError, getModule, parents, scopes, subtract(parents, scopes, subjectType, NIL_TYPE))
+                    : propertiesOf(reportError, getModule, parents, scopes, subjectType)
 
                 if (subjectProperties == null) {
-                    reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties`));
+                    reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${displayForm(subjectType)}")`));
                 } else if (!subjectProperties.some(property => property.name.name === current.property.name)) {
                     if (subjectType.kind === "class-instance-type") {
                         reportError(miscError(current.property, `Property '${current.property.name}' does not exist on class '${subjectType.clazz.name.name}'`));
@@ -188,15 +188,14 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 }
             } break;
             case "local-identifier": {
-                // console.log({ name: ast.name, scope: scope.values })
-                if (scope.values.get(current.name) == null && scope.classes.get(current.name) == null) {
+                if (!scope.values.has(current.name) && !scope.imports.has(current.name) && !scope.classes.has(current.name)) {
                     reportError(cannotFindName(current));
                 }
             } break;
             case "string-literal": {
                 for (const segment of current.segments) {
                     if (typeof segment !== "string") {
-                        const segmentType = inferType(reportError, parents, scopes, segment, true);
+                        const segmentType = inferType(reportError, getModule, parents, scopes, segment, true);
 
                         if (!subsumes(parents, scopes,  STRING_TEMPLATE_INSERT_TYPE, segmentType, true)) {
                             reportError(assignmentError(segment, STRING_TEMPLATE_INSERT_TYPE, segmentType));
@@ -207,8 +206,8 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
 
             // not expressions, but should have their contents checked
             case "reaction": {
-                const dataType = inferType(reportError, parents, scopes, current.data, true);
-                const effectType = inferType(reportError, parents, scopes, current.effect, true);
+                const dataType = inferType(reportError, getModule, parents, scopes, current.data, true);
+                const effectType = inferType(reportError, getModule, parents, scopes, current.effect, true);
 
                 if (dataType.kind !== "func-type") {
                     reportError(miscError(current.data, `Expected function in observe clause`));
@@ -225,7 +224,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 }
 
                 if (current.until) {
-                    const untilType = inferType(reportError, parents, scopes, current.until, true);
+                    const untilType = inferType(reportError, getModule, parents, scopes, current.until, true);
 
                     if (untilType.kind !== "boolean-type") {
                         reportError(miscError(current.until, `Expected boolean expression in until clause`));
@@ -233,7 +232,7 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
                 }
             } break;
             case "let-declaration": {
-                const valueType = inferType(reportError, parents, scopes, current.value, true);
+                const valueType = inferType(reportError, getModule, parents, scopes, current.value, true);
 
                 if (current.type != null) {
                     if (!subsumes(parents, scopes,  current.type, valueType, true)) {
@@ -243,15 +242,15 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             } break;
             case "assignment": {
                 const resolved = current.target.kind === "local-identifier" ? getScopeFor(reportError, parents, scopes, current.target).values.get(current.target.name) : undefined
-                if (current.target.kind === "local-identifier" && resolved != null && resolved.mutability !== "all") {
+                if (current.target.kind === "local-identifier" && resolved != null && getBindingMutability(resolved) !== "assignable") {
                     reportError(miscError(current.target, `Cannot assign to '${current.target.name}' because it's constant`));
                 }
 
-                const targetType = inferType(reportError, parents, scopes, current.target, true);
-                const valueType = inferType(reportError, parents, scopes, current.value, true);
+                const targetType = inferType(reportError, getModule, parents, scopes, current.target, true);
+                const valueType = inferType(reportError, getModule, parents, scopes, current.value, true);
 
                 if (current.target.kind === "property-accessor") {
-                    const subjectType = inferType(reportError, parents, scopes, current.target.subject, true);
+                    const subjectType = inferType(reportError, getModule, parents, scopes, current.target.subject, true);
 
                     if (subjectType.mutability !== "mutable") {
                         reportError(miscError(current.target, `Cannot assign to property '${current.target.property.name}' because the target object is constant`));
@@ -264,20 +263,20 @@ export function typecheck(reportError: (error: BagelError) => void, parents: All
             case "for-loop": {
                 // TODO: Disallow shadowing? Not sure
 
-                const iteratorType = inferType(reportError, parents, scopes, current.iterator, true);
+                const iteratorType = inferType(reportError, getModule, parents, scopes, current.iterator, true);
                 if (iteratorType.kind !== "iterator-type") {
                     reportError(miscError(current.iterator, `Expected iterator after "of" in for loop`));
                 }
             } break;
             case "while-loop": {
-                const conditionType = inferType(reportError, parents, scopes, current.condition, true);
+                const conditionType = inferType(reportError, getModule, parents, scopes, current.condition, true);
                 if (conditionType.kind !== "boolean-type") {
                     reportError(miscError(current.condition, `Condition for while loop must be boolean`));
                 }
             } break;
             case "element-tag": {
                 for (const child of current.children) {
-                    const childType = inferType(reportError, parents, scopes, child, true);
+                    const childType = inferType(reportError, getModule, parents, scopes, child, true);
                     if (!subsumes(parents, scopes, ELEMENT_TAG_CHILD_TYPE, childType, true)) {
                         reportError(assignmentError(child, ELEMENT_TAG_CHILD_TYPE, childType));
                     }
@@ -293,8 +292,8 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
     }
 
     // console.log('subsumes?\n', { destination: display(destination), value: display(value) })
-    const resolvedDestination = resolve(getScopeFor(undefined, parents, scopes, destination), destination, resolveGenerics)
-    const resolvedValue =       resolve(getScopeFor(undefined, parents, scopes, value), value, resolveGenerics)
+    const resolvedDestination = resolve(() => {}, () => undefined, getScopeFor(undefined, parents, scopes, destination), destination, resolveGenerics)
+    const resolvedValue =       resolve(() => {}, () => undefined, getScopeFor(undefined, parents, scopes, value), value, resolveGenerics)
     // console.log('subsumes (resolved)?\n', { resolvedDestination: display(resolvedDestination), resolvedValue: display(resolvedValue) })
 
     // constants can't be assigned to mutable slots
@@ -342,8 +341,8 @@ export function subsumes(parents: AllParents, scopes: AllScopes, destination: Ty
     } else if (resolvedDestination.kind === "array-type" && resolvedValue.kind === "array-type") {
         return subsumes(parents, scopes, resolvedDestination.element, resolvedValue.element, resolveGenerics)
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
-        const destinationEntries = propertiesOf(() => {}, parents, scopes, resolvedDestination)
-        const valueEntries =       propertiesOf(() => {}, parents, scopes, resolvedValue)
+        const destinationEntries = propertiesOf(() => {}, () => undefined, parents, scopes, resolvedDestination)
+        const valueEntries =       propertiesOf(() => {}, () => undefined, parents, scopes, resolvedValue)
 
         return (
             !!destinationEntries?.every(({ name: key, type: destinationValue }) => 

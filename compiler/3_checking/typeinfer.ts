@@ -1,21 +1,25 @@
-import { AllParents, AllScopes, getScopeFor, Scope, TypeDeclarationDescriptor } from "../_model/common.ts";
-import { BinaryOp, Expression, isExpression } from "../_model/expressions.ts";
-import { Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, given, memoize4 } from "../utils.ts";
+// deno-lint-ignore-file no-fallthrough
+import { AllParents, AllScopes, anyGet, getScopeFor, Scope } from "../_model/common.ts";
+import { BinaryOp, Expression, InlineConst, isExpression } from "../_model/expressions.ts";
+import { Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { deepEquals, given, memoize5 } from "../utils.ts";
 import { displayForm, subsumes, typesEqual } from "./typecheck.ts";
-import { ClassDeclaration, ClassMember, memberDeclaredType } from "../_model/declarations.ts";
-import { BagelError, miscError } from "../errors.ts";
-import { withoutSourceInfo } from "../debugging.ts";
+import { ClassMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
+import { assignmentError, BagelError, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
+import { display, withoutSourceInfo } from "../debugging.ts";
 import { extendScope } from "./scopescan.ts";
+import { Module } from "../_model/ast.ts";
+import { LetDeclaration,ConstDeclarationStatement } from "../_model/statements.ts";
 
 export function inferType(
-    reportError: (error: BagelError) => void, 
+    reportError: (error: BagelError) => void,
+    getModule: (module: string) => Module|undefined,
     parents: AllParents,
     scopes: AllScopes,
     ast: Expression|ClassMember,
     resolveGenerics?: boolean,
 ): TypeExpression {
-    const baseType = inferTypeInner(reportError, parents, scopes, ast)
+    const baseType = inferTypeInner(reportError, getModule, parents, scopes, ast)
 
     let refinedType = baseType
     {
@@ -32,12 +36,13 @@ export function inferType(
         }
     }
 
-    return resolve([parents, scopes],
+    return resolve(reportError, getModule, [parents, scopes],
         simplify(parents, scopes, refinedType), resolveGenerics);
 }
 
-const inferTypeInner = memoize4((
-    reportError: (error: BagelError) => void, 
+const inferTypeInner = memoize5((
+    reportError: (error: BagelError) => void,
+    getModule: (module: string) => Module|undefined, 
     parents: AllParents,
     scopes: AllScopes,
     ast: Expression|ClassMember,
@@ -46,9 +51,28 @@ const inferTypeInner = memoize4((
         case "proc":
             return ast.type
         case "func": {
+            
+            // infer callback type based on context
+            {
+                const parent = anyGet(parents, ast.id)
+
+                if (parent?.kind === "invocation") {
+                    const parentSubjectType = inferType(reportError, getModule, parents, scopes, parent.subject)
+                    const thisArgIndex = parent.args.findIndex(a => a === ast)
+
+                    if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
+                        const thisArgParentType = parentSubjectType.args[thisArgIndex]?.type
+
+                        if (thisArgParentType && thisArgParentType.kind === ast.type.kind) {
+                            return thisArgParentType;
+                        }
+                    }
+                }
+            }
+
             // if no return-type is declared, try inferring the type from the inner expression
             const returnType = ast.type.returnType ??
-                inferType(reportError, parents, scopes, ast.body)
+                inferType(reportError, getModule, parents, scopes, ast.body)
 
             return {
                 ...ast.type,
@@ -57,10 +81,10 @@ const inferTypeInner = memoize4((
 
         }
         case "binary-operator": {
-            let leftType = inferType(reportError, parents, scopes, ast.base);
+            let leftType = inferType(reportError, getModule, parents, scopes, ast.base);
 
             for (const [op, expr] of ast.ops) {
-                const rightType = inferType(reportError, parents, scopes, expr);
+                const rightType = inferType(reportError, getModule, parents, scopes, expr);
 
                 const types = BINARY_OPERATOR_TYPES[op.op].find(({ left, right }) =>
                     subsumes(parents, scopes, left, leftType) && subsumes(parents, scopes, right, rightType))
@@ -85,10 +109,10 @@ const inferTypeInner = memoize4((
         case "invocation": {
             const scope = getScopeFor(reportError, parents, scopes, ast)
 
-            let subjectType = inferType(reportError, parents, scopes, ast.subject);
+            let subjectType = inferType(reportError, getModule, parents, scopes, ast.subject);
             if (ast.kind === "invocation") {
                 const scopeWithGenerics = extendScope(scope)
-
+                
                 // bind type-args for this invocation
                 if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
                     if (subjectType.typeParams.length > 0) {
@@ -111,7 +135,7 @@ const inferTypeInner = memoize4((
                                 ...subjectType,
                                 args: subjectType.args.map((arg, index) => ({
                                     ...arg,
-                                    type: inferType(reportError, parents, scopes, ast.args[index])
+                                    type: inferType(reportError, getModule, parents, scopes, ast.args[index])
                                 }))
                             }
     
@@ -139,7 +163,7 @@ const inferTypeInner = memoize4((
                     }
                 }
 
-                subjectType = resolve(scopeWithGenerics, subjectType);
+                subjectType = resolve(reportError, getModule, scopeWithGenerics, subjectType);
             }
 
             if (subjectType.kind === "func-type") {
@@ -149,12 +173,12 @@ const inferTypeInner = memoize4((
             }
         }
         case "indexer": {
-            const baseType = inferType(reportError, parents, scopes, ast.subject);
-            const indexerType = inferType(reportError, parents, scopes, ast.indexer);
+            const baseType = inferType(reportError, getModule, parents, scopes, ast.subject);
+            const indexerType = inferType(reportError, getModule, parents, scopes, ast.indexer);
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "exact-string-literal") {
                 const key = indexerType.value.value;
-                const valueType = propertiesOf(reportError, parents, scopes, baseType)?.find(entry => entry.name.name === key)?.type;
+                const valueType = propertiesOf(reportError, getModule, parents, scopes, baseType)?.find(entry => entry.name.name === key)?.type;
 
                 return valueType ?? UNKNOWN_TYPE;
             } else if (baseType.kind === "indexer-type") {
@@ -179,10 +203,10 @@ const inferTypeInner = memoize4((
         }
         case "if-else-expression":
         case "switch-expression": {
-            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, parents, scopes, ast.value)
+            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, getModule, parents, scopes, ast.value)
 
             const caseTypes = ast.cases.map(({ outcome }) => 
-                inferType(reportError, parents, scopes, outcome))
+                inferType(reportError, getModule, parents, scopes, outcome))
 
             const unionType: UnionType = {
                 kind: "union-type",
@@ -200,7 +224,7 @@ const inferTypeInner = memoize4((
                     members: [
                         ...unionType.members,
                         ast.defaultCase 
-                            ? inferType(reportError, parents, scopes, ast.defaultCase) 
+                            ? inferType(reportError, getModule, parents, scopes, ast.defaultCase) 
                             : NIL_TYPE
                     ]
                 }
@@ -211,7 +235,7 @@ const inferTypeInner = memoize4((
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
         case "debug": {
             if (isExpression(ast.inner)) {
-                const type = inferType(reportError, parents, scopes, ast.inner)
+                const type = inferType(reportError, getModule, parents, scopes, ast.inner)
                 console.log(JSON.stringify({
                     bgl: given(ast.inner.code, code =>
                         given(ast.inner.startIndex, startIndex =>
@@ -225,13 +249,13 @@ const inferTypeInner = memoize4((
             }
         }
         case "parenthesized-expression":
-            return inferType(reportError, parents, scopes, ast.inner);
+            return inferType(reportError, getModule, parents, scopes, ast.inner);
         case "property-accessor": {
-            const subjectType = inferType(reportError, parents, scopes, ast.subject);
+            const subjectType = inferType(reportError, getModule, parents, scopes, ast.subject);
             const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
                 ? subtract(parents, scopes, subjectType, NIL_TYPE)
                 : subjectType;
-            const propertyType = propertiesOf(reportError, parents, scopes, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)?.type
+            const propertyType = propertiesOf(reportError, getModule, parents, scopes, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)?.type
 
             if (ast.optional && propertyType) {
                 return {
@@ -258,22 +282,109 @@ const inferTypeInner = memoize4((
             }
         }
         case "local-identifier": {
-            const valueDescriptor = getScopeFor(reportError, parents, scopes, ast).values.get(ast.name)
+            const scope = getScopeFor(reportError, parents, scopes, ast)
 
-            const type = valueDescriptor?.declaredType 
-                ?? given(valueDescriptor?.initialValue, initialValue => inferType(reportError, parents, scopes, initialValue))
-                ?? UNKNOWN_TYPE
 
-            const mutability = (
-                type.mutability == null ? undefined :
-                valueDescriptor?.mutability === "immutable" ? "immutable" :
-                valueDescriptor?.mutability === "readonly" ? "readonly" :
-                type.mutability
-            )
-            return {
-                ...type,
-                mutability,
-            } as TypeExpression
+            // deno-lint-ignore no-inner-declarations
+            function getDeclType(decl: Declaration|LetDeclaration|ConstDeclarationStatement|InlineConst): TypeExpression {
+                switch (decl.kind) {
+                    case 'const-declaration':
+                    case 'let-declaration':
+                    case 'const-declaration-statement': {
+                        const baseType = decl.type ?? inferType(reportError, getModule, parents, scopes, decl.value)
+                        const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
+                            decl.kind === 'const-declaration' || decl.kind === 'const-declaration-statement'
+                                ? 'immutable'
+                                : mutability)
+
+                        return {
+                            ...baseType,
+                            mutability
+                        } as TypeExpression
+                    }
+                    case 'func-declaration':
+                    case 'proc-declaration':
+                    case 'inline-const': {
+                        const baseType = inferType(reportError, getModule, parents, scopes, decl.value)
+                        const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
+                            decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
+                                ? 'immutable'
+                                : 'readonly')
+
+                        return {
+                            ...baseType,
+                            mutability
+                        } as TypeExpression
+                    }
+                    // case 'store-declaration':
+                    //     return ast.
+                    default:
+                        // @ts-expect-error
+                        throw Error('Unreachable!' + binding.ast.kind)
+                }
+            }
+    
+
+            const binding = scope.values.get(ast.name)
+
+            if (binding != null) {
+                switch (binding?.kind) {
+                    case 'basic': return getDeclType(binding.ast)
+                    case 'arg': {
+                        return binding.holder.type.args[binding.argIndex].type 
+                            ?? (inferType(reportError, getModule, parents, scopes, binding.holder) as FuncType|ProcType)
+                                .args[binding.argIndex].type
+                            ?? UNKNOWN_TYPE
+                    }
+                    case 'iterator': {
+                        const iteratorType = inferType(reportError, getModule, parents, scopes, binding.iterator)
+    
+                        if (!subsumes(parents, scopes, ITERATOR_OF_ANY, iteratorType)) {
+                            reportError(assignmentError(binding.iterator, ITERATOR_OF_ANY, iteratorType))
+                        }
+    
+                        return iteratorType.kind === 'iterator-type' ? iteratorType.itemType : UNKNOWN_TYPE
+                    }
+                    case 'this': return {
+                        kind: "class-instance-type",
+                        clazz: binding.store,
+                        internal: true,
+                        mutability: "mutable",
+                        id: Symbol(),
+                        code: undefined,
+                        startIndex: undefined,
+                        endIndex: undefined
+                    }
+                    default:
+                        // @ts-expect-error
+                        throw Error('Unreachable!' + binding.kind)
+                }
+            }
+
+
+            const imported = scope.imports.get(ast.name)
+
+            if (imported != null) {
+                const otherModule = getModule(imported.importDeclaration.path.value)
+
+                if (otherModule == null) {
+                    reportError(cannotFindModule(imported.importDeclaration));
+                    return UNKNOWN_TYPE
+                }
+
+                const foreignDecl = otherModule.declarations.find(foreignDeclCandidate => 
+                    declExported(foreignDeclCandidate) && declName(foreignDeclCandidate) === imported.importItem.name.name);
+                
+                if (foreignDecl == null) {
+                    reportError(cannotFindExport(imported.importItem, imported.importDeclaration));
+                    return UNKNOWN_TYPE
+                }
+
+                return getDeclType(foreignDecl)
+            }
+
+            reportError(cannotFindName(ast))
+            return UNKNOWN_TYPE
         }
         case "element-tag": {
             return {
@@ -289,7 +400,7 @@ const inferTypeInner = memoize4((
         }
         case "object-literal": {
             const entries: Attribute[] = ast.entries.map(([name, value]) => {
-                const type = inferType(reportError, parents, scopes, value);
+                const type = inferType(reportError, getModule, parents, scopes, value);
                 return {
                     kind: "attribute",
                     name,
@@ -314,7 +425,7 @@ const inferTypeInner = memoize4((
             };
         }
         case "array-literal": {
-            const entries = ast.entries.map(entry => inferType(reportError, parents, scopes, entry));
+            const entries = ast.entries.map(entry => inferType(reportError, getModule, parents, scopes, entry));
 
             // NOTE: This could be slightly better where different element types overlap each other
             const uniqueEntryTypes = entries.filter((el, index, arr) => 
@@ -359,7 +470,7 @@ const inferTypeInner = memoize4((
         }
         case "class-property":
         case "class-function":
-        case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferType(reportError, parents, scopes, ast.value);
+        case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferType(reportError, getModule, parents, scopes, ast.value);
         case "string-literal": return STRING_TYPE;
         case "exact-string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
@@ -372,25 +483,66 @@ const inferTypeInner = memoize4((
     }
 })
 
-export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: TypeExpression, resolveGenerics?: boolean): TypeExpression {
+export function resolve(
+    reportError: (error: BagelError) => void,
+    getModule: (module: string) => Module|undefined, 
+    contextOrScope: [AllParents, AllScopes]|Scope, 
+    type: TypeExpression, 
+    resolveGenerics?: boolean
+): TypeExpression {
     if (type.kind === "named-type") {
         const resolutionScope = Array.isArray(contextOrScope)
             ? getScopeFor(undefined, contextOrScope[0], contextOrScope[1], type)
             : contextOrScope
 
-        if (resolutionScope.types.get(type.name.name)) {
-            const resolvedType = resolutionScope.types.get(type.name.name) as TypeDeclarationDescriptor
-            if (!resolvedType.isGenericParameter || resolveGenerics) {
-                return resolve(contextOrScope, resolvedType.type, resolveGenerics)
+
+        const resolvedType = resolutionScope.types.get(type.name.name)
+
+        if (resolvedType != null) {
+            if (resolvedType.type.kind === "named-type" && resolvedType.type.name.name === type.name.name) {
+                // cycle??
+                return UNKNOWN_TYPE
+            } else if (!resolvedType.isGenericParameter || resolveGenerics) {
+                return resolve(reportError, getModule, contextOrScope, resolvedType.type, resolveGenerics)
             } else {
                 return type
             }
-        } else if (resolutionScope.classes.get(type.name.name)) {
-            const clazz = resolutionScope.classes.get(type.name.name) as ClassDeclaration
+        }
 
+        
+        const resolvedImport = resolutionScope.imports.get(type.name.name)
+
+        if (resolvedImport != null) {
+            const otherModule = getModule(resolvedImport.importDeclaration.path.value)
+
+            if (otherModule == null) {
+                reportError(cannotFindModule(resolvedImport.importDeclaration));
+                return UNKNOWN_TYPE
+            }
+
+            const foreignDecl = otherModule.declarations.find(foreignDeclCandidate => 
+                declExported(foreignDeclCandidate) && declName(foreignDeclCandidate) === resolvedImport.importItem.name.name);
+            
+            if (foreignDecl == null) {
+                reportError(cannotFindExport(resolvedImport.importItem, resolvedImport.importDeclaration));
+                return UNKNOWN_TYPE
+            }
+
+            if (foreignDecl.kind !== 'type-declaration') {
+                reportError(miscError(type.name, `Imported declaration "${type.name.name}" is not a type`))
+                return UNKNOWN_TYPE
+            }
+
+            return foreignDecl.type
+        }
+
+
+        const resolvedClazz = resolutionScope.classes.get(type.name.name)
+
+        if (resolvedClazz) {
             return {
                 kind: "class-instance-type",
-                clazz,
+                clazz: resolvedClazz,
                 internal: false,
                 mutability: "mutable",
                 id: Symbol(),
@@ -399,9 +551,12 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
                 endIndex: type.endIndex
             }
         }
+
+        reportError(cannotFindName(type.name))
+        return UNKNOWN_TYPE
     } else if(type.kind === "union-type") {
         const memberTypes = type.members.map(member =>
-            resolve(contextOrScope, member, resolveGenerics));
+            resolve(reportError, getModule, contextOrScope, member, resolveGenerics));
         if (memberTypes.some(member => member == null)) {
             return UNKNOWN_TYPE;
         } else {
@@ -417,14 +572,14 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
         }
     } else if(type.kind === "object-type") {
         const entries = type.entries.map(({ type, ...rest }) => 
-            ({ ...rest, type: resolve(contextOrScope, type, resolveGenerics) }))
+            ({ ...rest, type: resolve(reportError, getModule, contextOrScope, type, resolveGenerics) }))
 
         return {
             ...type,
             entries,
         }
     } else if(type.kind === "array-type") {
-        const element = resolve(contextOrScope, type.element, resolveGenerics)
+        const element = resolve(reportError, getModule, contextOrScope, type.element, resolveGenerics)
 
         return {
             ...type,
@@ -434,8 +589,8 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
         return {
             kind: "func-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, resolveGenerics)) })),
-            returnType: given(type.returnType, returnType => resolve(contextOrScope, returnType, resolveGenerics)),
+            args: type.args.map(({ type, ...other }) => ({ ...other, type: given(type, t => resolve(reportError, getModule, contextOrScope, t, resolveGenerics)) })),
+            returnType: given(type.returnType, returnType => resolve(reportError, getModule, contextOrScope, returnType, resolveGenerics)),
             mutability: undefined,
             id: Symbol(),
             code: type.code,
@@ -446,7 +601,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
         return {
             kind: "proc-type",
             typeParams: type.typeParams,
-            args: type.args.map(({ name, type }) => ({ name, type: given(type, t => resolve(contextOrScope, t, resolveGenerics)) })),
+            args: type.args.map(({ type, ...other }) => ({ ...other, type: given(type, t => resolve(reportError, getModule, contextOrScope, t, resolveGenerics)) })),
             mutability: undefined,
             id: Symbol(),
             code: type.code,
@@ -456,7 +611,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
     } else if(type.kind === "iterator-type") {
         return {
             kind: "iterator-type",
-            itemType: resolve(contextOrScope, type.itemType, resolveGenerics),
+            itemType: resolve(reportError, getModule, contextOrScope, type.itemType, resolveGenerics),
             mutability: undefined,
             id: Symbol(),
             code: type.code,
@@ -466,7 +621,7 @@ export function resolve(contextOrScope: [AllParents, AllScopes]|Scope, type: Typ
     } else if(type.kind === "plan-type") {
         return {
             kind: "plan-type",
-            resultType: resolve(contextOrScope, type.resultType, resolveGenerics),
+            resultType: resolve(reportError, getModule, contextOrScope, type.resultType, resolveGenerics),
             mutability: undefined,
             id: Symbol(),
             code: type.code,
@@ -633,7 +788,8 @@ const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right:
 }
 
 export function propertiesOf(
-    reportError: (error: BagelError) => void, 
+    reportError: (error: BagelError) => void,
+    getModule: (module: string) => Module|undefined,
     parents: AllParents,
     scopes: AllScopes,
     type: TypeExpression
@@ -644,12 +800,12 @@ export function propertiesOf(
             const attrs = [...type.entries]
 
             for (const spread of type.spreads) {
-                const resolved = resolve([parents, scopes], spread)
+                const resolved = resolve(reportError, getModule, [parents, scopes], spread)
         
                 if (resolved.kind !== "object-type") {
                     reportError(miscError(spread, `${displayForm(resolved)} is not an object type; can only spread object types into object types`))
                 } else {
-                    attrs.push(...(propertiesOf(reportError, parents, scopes, resolved) ?? []))
+                    attrs.push(...(propertiesOf(reportError, getModule, parents, scopes, resolved) ?? []))
                 }
             }
 
@@ -671,8 +827,11 @@ export function propertiesOf(
                     kind: "proc-type",
                     typeParams: [],
                     args: [{
+                        kind: "arg",
                         name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
-                        type: type.element
+                        type: type.element,
+                        id: Symbol(),
+                        ...AST_NOISE
                     }],
                     id: Symbol(),
                     ...TYPE_AST_NOISE
@@ -687,7 +846,7 @@ export function propertiesOf(
 
                 const memberType = memberDeclaredType(member) && memberDeclaredType(member)?.kind !== "func-type"
                     ? memberDeclaredType(member) as TypeExpression
-                    : inferType(reportError, parents, scopes, member.value);
+                    : inferType(reportError, getModule, parents, scopes, member.value);
 
                 const mutability = (
                     memberType.mutability == null ? undefined :
@@ -722,15 +881,24 @@ export function propertiesOf(
                     kind: "func-type",
                     typeParams: [],
                     args: [{
+                        kind: "arg",
                         name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
                         type: {
                             kind: "func-type",
                             typeParams: [],
-                            args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: itemType }],
+                            args: [{
+                                kind: "arg",
+                                name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
+                                type: itemType,
+                                id: Symbol(),
+                                ...AST_NOISE
+                            }],
                             returnType: BOOLEAN_TYPE,
                             id: Symbol(),
                             ...TYPE_AST_NOISE
-                        }
+                        },
+                        id: Symbol(),
+                        ...AST_NOISE
                     }],
                     returnType: {
                         kind: "iterator-type",
@@ -747,15 +915,24 @@ export function propertiesOf(
                         { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }
                     ],
                     args: [{
+                        kind: "arg",
                         name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
                         type: {
                             kind: "func-type",
-                            args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: itemType }],
+                            args: [{
+                                kind: "arg",
+                                name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
+                                type: itemType,
+                                id: Symbol(),
+                                ...AST_NOISE
+                            }],
                             returnType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
                             typeParams: [],
                             id: Symbol(),
                             ...TYPE_AST_NOISE
-                        }
+                        },
+                        id: Symbol(),
+                        ...AST_NOISE
                     }],
                     returnType: {
                         kind: "iterator-type",
@@ -789,15 +966,24 @@ export function propertiesOf(
                         { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }
                     ],
                     args: [{
+                        kind: "arg",
                         name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
                         type: {
                             kind: "func-type",
-                            args: [{ name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE }, type: resultType }],
+                            args: [{
+                                kind: "arg",
+                                name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
+                                type: resultType,
+                                id: Symbol(),
+                                ...TYPE_AST_NOISE
+                            }],
                             returnType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
                             typeParams: [],
                             id: Symbol(),
                             ...TYPE_AST_NOISE
-                        }
+                        },
+                        id: Symbol(),
+                        ...TYPE_AST_NOISE
                     }],
                     returnType: {
                         kind: "plan-type",
@@ -925,6 +1111,26 @@ export function fitTemplate(
     }
 
     return EMPTY_MAP;
+}
+
+function declExported(declaration: Declaration): boolean|undefined {
+    if (declaration.kind !== "import-declaration" && 
+        declaration.kind !== "javascript-escape" && 
+        declaration.kind !== "debug" &&
+        declaration.kind !== "test-expr-declaration" &&
+        declaration.kind !== "test-block-declaration") {
+        return declaration.exported;
+    }
+}
+
+function declName(declaration: Declaration): string|undefined {
+    if (declaration.kind !== "import-declaration" && 
+        declaration.kind !== "javascript-escape" && 
+        declaration.kind !== "debug" &&
+        declaration.kind !== "test-expr-declaration" &&
+        declaration.kind !== "test-block-declaration") {
+        return declaration.name.name;
+    }
 }
 
 const EMPTY_MAP: ReadonlyMap<string, TypeExpression> = new Map()

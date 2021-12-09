@@ -6,8 +6,8 @@ import { compile, INT } from "./4_compile/index.ts";
 import { path } from "./deps.ts";
 import { BagelError, miscError } from "./errors.ts";
 import { computedFn, makeAutoObservable } from "./mobx.ts";
-import { given, ModuleName, pathIsRemote } from "./utils.ts";
-import { Module } from "./_model/ast.ts";
+import { given, iterateParseTree, ModuleName, pathIsRemote } from "./utils.ts";
+import { AST, Module } from "./_model/ast.ts";
 import { ParentsMap, ScopesMap } from "./_model/common.ts";
 
 class _Store {
@@ -54,16 +54,12 @@ class _Store {
         return set
     }
 
-    readonly scopesMap = computedFn((module: ModuleName, ast: Module): { scopes: ScopesMap, errors: readonly BagelError[] } => {
+    readonly scopesMap = computedFn((ast: Module): { scopes: ScopesMap, errors: readonly BagelError[] } => {
         try {
             const errors: BagelError[] = []
             const scopes = scopescan(
                 err => errors.push(err),
-                this.allParents, 
-                new Set(),
-                imported => 
-                    given(this.modulesSource.get(canonicalModuleName(module, imported)), 
-                        source => this.parsed(source).ast), 
+                this.allParents,
                 ast
             )
 
@@ -81,7 +77,7 @@ class _Store {
             
             if (source) {
                 const { ast } = this.parsed(source)
-                const { scopes } = this.scopesMap(module, ast)
+                const { scopes } = this.scopesMap(ast)
 
                 set.add(scopes)
             }
@@ -90,13 +86,32 @@ class _Store {
         return set
     }
 
+    readonly getModuleFor = computedFn((ast: AST): ModuleName|undefined => {
+        for (const moduleName of this.modules) {
+            const source = this.modulesSource.get(moduleName)
+
+            if (source) {
+                const { ast: moduleAst } = this.parsed(source)
+
+                for (const { current } of iterateParseTree(moduleAst)) {
+                    if (current.id === ast.id) {
+                        return moduleName
+                    }
+                }
+            }
+        }
+    })
+
     readonly typeerrors = computedFn((module: ModuleName, ast: Module): BagelError[] => {
         const errors: BagelError[] = []
         try {
-            const { errors: scopeErrors } = this.scopesMap(module, ast)
+            const { errors: scopeErrors } = this.scopesMap(ast)
             errors.push(...scopeErrors)
             typecheck(
-                err => errors.push(err), 
+                err => errors.push(err),
+                imported => 
+                    given(this.modulesSource.get(canonicalModuleName(module, imported)), 
+                        source => this.parsed(source).ast), 
                 this.allParents,
                 this.allScopes, 
                 ast

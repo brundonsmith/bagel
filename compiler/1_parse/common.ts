@@ -3,7 +3,6 @@ import { BagelError, isError } from "../errors.ts";
 import { memoize2, memoize3 } from "../utils.ts";
 import { AST } from "../_model/ast.ts";
 import { KEYWORDS, PlainIdentifier } from "../_model/common.ts";
-import { Expression } from "../_model/expressions.ts";
 
 export const consume = memoize3((code: string, index: number, segment: string): number|undefined => {
     for (let i = 0; i < segment.length; i++) {
@@ -231,7 +230,7 @@ export function expec<T, R>(val: T|BagelError|undefined, err: BagelError, fn: (v
 }
 
 export function err(code: string|undefined, index: number|undefined, expected: string): BagelError {
-    return { kind: "bagel-syntax-error", code, index, message: `${expected} expected`, stack: undefined };
+    return { kind: "bagel-syntax-error", ast: undefined, code, index, message: `${expected} expected`, stack: undefined };
 }
 
 export type ParseFunction<T> = (code: string, index: number) => ParseResult<T> | BagelError | undefined;

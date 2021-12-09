@@ -30,6 +30,7 @@ export function parse(code: string, reportError: (error: BagelError) => void): M
     } else if (index < code.length) {
         reportError({
             kind: "bagel-syntax-error",
+            ast: undefined,
             code,
             index,
             message: `Failed to parse entire file`,
@@ -366,7 +367,7 @@ const funcType: ParseFunction<FuncType> = (code, startIndex) =>
         given(consume(code, index, ">"), index => ({ parsed: typeParams, newIndex: index }))))))), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
     given(consume(code, indexAfterTypeParams ?? startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
-    given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
+    given(parseSeries(code, index, arg, ","), ({ parsed: args, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
@@ -390,7 +391,7 @@ const funcType: ParseFunction<FuncType> = (code, startIndex) =>
 const procType: ParseFunction<FuncType|ProcType> = (code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
-    given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
+    given(parseSeries(code, index, arg, ","), ({ parsed: args, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
@@ -1057,31 +1058,43 @@ const func: ParseFunction<Func> = (code, startIndex) =>
 const _args: ParseFunction<Arg[]> = (code, index) =>
     _singleArgument(code, index) ?? _seriesOfArguments(code, index)
 
-const _singleArgument: ParseFunction<Arg[]> = (code, index) =>
-    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) => ({
+const _singleArgument: ParseFunction<Arg[]> = (code, startIndex) =>
+    given(plainIdentifier(code, startIndex), ({ parsed: name, newIndex: index }) => ({
         parsed: [
-            { name }
+            {
+                kind: "arg",
+                name,
+                id: Symbol(),
+                code,
+                startIndex,
+                endIndex: index
+            }
         ],
         newIndex: index
     }))
 
 const _seriesOfArguments: ParseFunction<Arg[]> = (code, index) =>
     given(consume(code, index, "("), index =>
-    given(parseSeries(code, index, _argumentDeclaration, ","), ({ parsed: args, newIndex: index }) =>
+    given(parseSeries(code, index, arg, ","), ({ parsed: args, newIndex: index }) =>
     given(consume(code, index, ")"), index => ({
         parsed: args,
         newIndex: index
     }))))
 
-const _argumentDeclaration = (code: string, index: number): ParseResult<Arg> | BagelError | undefined => 
-    given(plainIdentifier(code, index), ({ parsed: name, newIndex: index }) =>
+const arg: ParseFunction<Arg> = (code, startIndex) => 
+    given(plainIdentifier(code, startIndex), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index => 
     given(parseOptional(code, index, (code, index) =>
         given(consume(code, index, ":"), index =>
             given(consumeWhitespace(code, index), index => typeExpression(code, index)))), ({ parsed: type, newIndex }) => ({
         parsed: {
+            kind: "arg",
             name,
             type,
+            id: Symbol(),
+            code,
+            startIndex,
+            endIndex: index
         },
         newIndex: newIndex ?? index
     }))))

@@ -27,7 +27,7 @@ export function withoutSourceInfo(ast: AST) {
 export function displayScope(scope: Scope) {
     return {
         types: Object.fromEntries(scope.types.entries().map(([key, value]) => [key, { ...value, type: display(value.type) }])),
-        values: Object.fromEntries(scope.values.entries().map(([key, value]) => [key, { ...value, declaredType: given(value.declaredType, display), initialValue: given(value.initialValue, display) }])),
+        values: scope.values,//Object.fromEntries(scope.values.entries().map(([key, value]) => [key, { ...value, declaredType: given(value.declaredType, display), initialValue: given(value.initialValue, display) }])),
         classes: Object.fromEntries(scope.classes.entries().map(([key, value]) => [key, display(value)])),
     }
 }

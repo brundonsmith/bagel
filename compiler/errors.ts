@@ -5,7 +5,7 @@ import { ImportDeclaration,ImportItem } from "./_model/declarations.ts";
 import { LocalIdentifier } from "./_model/expressions.ts";
 import { TypeExpression } from "./_model/type-expressions.ts";
 import { Colors } from "./deps.ts";
-import { given } from "./utils.ts";
+import { given, ModuleName } from "./utils.ts";
 
 export type BagelError =
     | BagelSyntaxError
@@ -18,6 +18,7 @@ export type BagelError =
 
 export type BagelSyntaxError = {
     kind: "bagel-syntax-error",
+    ast: undefined,
     code: string|undefined,
     index: number|undefined,
     message: string,
@@ -34,7 +35,7 @@ export type BagelAssignableToError = {
 
 export type BagelCannotFindNameError = {
     kind: "bagel-cannot-find-name-error",
-    ast: LocalIdentifier,
+    ast: LocalIdentifier|PlainIdentifier,
 }
 
 export type BagelAlreadyDeclaredError = {
@@ -97,7 +98,7 @@ export function assignmentError(ast: AST, destination: TypeExpression, value: Ty
     return { kind: "bagel-assignable-to-error", ast, destination, value, stack: undefined };
 }
 
-export function cannotFindName(ast: LocalIdentifier): BagelCannotFindNameError {
+export function cannotFindName(ast: LocalIdentifier|PlainIdentifier): BagelCannotFindNameError {
     return { kind: "bagel-cannot-find-name-error", ast };
 }
 
@@ -117,7 +118,7 @@ export function cannotFindExport(ast: ImportItem, importDeclaration: ImportDecla
     return { kind: "bagel-cannot-find-export-error", ast, importDeclaration }
 }
 
-export const prettyError = (modulePath: string, error: BagelError): string => {
+export function prettyError(modulePath: ModuleName, error: BagelError): string {
     let output = "";
 
     const code = error.kind === 'bagel-syntax-error' ? error.code : error.ast?.kind !== "module" ? error.ast?.code : undefined
@@ -136,7 +137,7 @@ export const prettyError = (modulePath: string, error: BagelError): string => {
             + Colors.white(":") 
             + Colors.yellow(String(column))
     }
-    
+
     infoLine += Colors.white(" - ")
         + Colors.red("error")
         + Colors.white(" " + (error.kind === "bagel-syntax-error" ? error.message : errorMessage(error)))

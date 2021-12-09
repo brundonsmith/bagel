@@ -1,10 +1,11 @@
 import { Colors, path, fs } from "./deps.ts";
 
 import { BagelError, prettyError } from "./errors.ts";
-import { all, cacheDir, cachedModulePath, esOrNone, ModuleName, on, pathIsRemote, sOrNone } from "./utils.ts";
+import { all, cacheDir, cachedModulePath, esOrNone, given, ModuleName, on, pathIsRemote, sOrNone } from "./utils.ts";
 
 import { autorun, configure, runInAction } from "./mobx.ts";
 import Store from "./store.ts";
+import { display } from "./debugging.ts";
 
 configure({
     enforceActions: "never",
@@ -99,20 +100,27 @@ autorun(() => {
 
     if (config != null && !Store.modulesOutstanding) {
         const allErrors = new Map<ModuleName, BagelError[]>()
+        
+        for (const module of Store.modules) {
+            allErrors.set(module, [])
+        }
 
         for (const module of Store.modules) {
             const source = Store.modulesSource.get(module)
+
             if (source) {
                 const { ast, errors: parseErrors } = Store.parsed(source)
-                const errors = [...parseErrors, ...Store.typeerrors(module, ast)]
-                // .filter((err, _, arr) => 
-                //     err.kind === "bagel-syntax-error" ||
-                //     !arr.some(other =>
-                //         other !== err && 
-                //         other.kind !== "bagel-syntax-error" && moreSpecificThan(other.ast ?? {}, err.ast ?? {})))
 
-                if (errors.length > 0) {
-                    allErrors.set(module, errors)
+                for (const err of parseErrors) {
+                    const errorModule = given(err.ast, Store.getModuleFor) ?? module;
+                    (allErrors.get(errorModule) as BagelError[]).push(err)
+                }
+
+                const typecheckErrors = Store.typeerrors(module, ast)
+                
+                for (const err of typecheckErrors) {
+                    const errorModule = given(err.ast, Store.getModuleFor) ?? module;
+                    (allErrors.get(errorModule) as BagelError[]).push(err)
                 }
             }
         }

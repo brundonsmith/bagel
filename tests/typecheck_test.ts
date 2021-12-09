@@ -3,6 +3,7 @@ import { typecheck } from "../compiler/3_checking/typecheck.ts";
 import { parse } from "../compiler/1_parse/index.ts";
 import { BagelError,prettyError } from "../compiler/errors.ts";
 import { and } from "../compiler/_model/common.ts";
+import { ModuleName } from "../compiler/utils.ts";
 
 Deno.test({
   name: "Basic constant",
@@ -159,6 +160,18 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Callback argument type inference",
+  fn() {
+    testTypecheck(
+      `
+      func foo(fn: (n: number) => number) => fn(12)
+      const bar = foo(n => 2 * n)`,
+      false
+    )
+  }
+})
+
+Deno.test({
   name: "Basic explicit generic",
   fn() {
     testTypecheck(
@@ -263,7 +276,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      func fnA<R>(a: T): T => a
+      func fnA<T>(a: T): T => a
       func fnB<T>(b: T): T => fnA<T>(b)
       const c: number = fnB<number>(12)`,
       false,
@@ -318,6 +331,49 @@ Deno.test({
     )
   }
 })
+
+// Deno.test({
+//   name: "Complex generic param inference",
+//   fn() {
+//     testTypecheck(
+//       `
+//       func given<T,R>(val: T|nil, fn: (val: T) => R): R|nil => if (val != nil) { fn(val) }
+//       func double(n: number|nil): number|nil => given(n, x => x * 2)`,
+//       false
+//     )
+//   }
+// })
+
+// Deno.test({
+//   name: "Union generic param inference mismatch",
+//   fn() {
+//     testTypecheck(
+//       `
+//       func other<T>(a: T|nil): T|nil => a
+//       const c: number = other(12)`,
+//       true
+//     )
+//   }
+// })
+
+// Deno.test({
+//   name: "Weird stack overflow!",
+//   fn() {
+//     testTypecheck(
+//       `
+//       func foo<T>(items: T[]): T[] => items
+
+//       store AppStore {
+          
+//           private items = []
+
+//           func allValid() => foo(this.items)
+//       }
+//       `,
+//       false
+//     )
+//   }
+// })
 
 Deno.test({
   name: "Function consts out of order",
@@ -817,21 +873,20 @@ function testTypecheck(code: string, shouldFail: boolean): void {
   const parents = getParentsMap(parsed)
   const scopes = scopescan(
     reportError, 
-    and(new Set(), parents), 
-    new Set(), 
-    () => undefined, 
+    and(new Set(), parents),
     parsed
   );
   typecheck(
     reportError, 
+    () => undefined, 
     and(new Set(), parents), 
-    and(new Set(), scopes), 
+    and(new Set(), scopes),
     parsed
   );
 
   if (!shouldFail && errors.length > 0) {
     throw `\n${code}\n\nType check should have succeeded but failed with errors\n` +
-      errors.map(err => prettyError("<test>", err)).join("\n")
+      errors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
   } else if (shouldFail && errors.length === 0) {
     throw `\n${code}\n\nType check should have failed but succeeded`
   }
@@ -851,8 +906,6 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
     scopescan(
       reportError,
       parents,
-      new Set(),
-      name => parsed.find(m => m[0] === name)?.[1],
       ast
     )
   ));
@@ -860,6 +913,7 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
   for (let i = 0; i < parsed.length; i++) {
     typecheck(
       reportError, 
+      name => parsed.find(m => m[0] === name)?.[1],
       parents, 
       scopes, 
       parsed[i][1]
@@ -868,7 +922,7 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
 
   if (!shouldFail && errors.length > 0) {
     throw `Type check should have succeeded but failed with errors\n\n` +
-      errors.map(err => prettyError("<test>", err)).join("\n")
+      errors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
   } else if (shouldFail && errors.length === 0) {
     throw `Type check should have failed but succeeded`
   }

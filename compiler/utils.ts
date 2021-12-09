@@ -252,11 +252,15 @@ export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: A
         case "import-declaration": {
             yield* iterateParseTree(ast.path, ast)
             for (const i of ast.imports) {
-                yield* iterateParseTree(i.name, ast)
-                if (i.alias) {
-                    yield* iterateParseTree(i.alias, ast)
-                }
+                yield* iterateParseTree(i, ast)
             }
+        } break;
+        case "import-item": {
+            yield* iterateParseTree(ast.name)
+            if (ast.alias) {
+                yield* iterateParseTree(ast.alias, ast)
+            }
+
         } break;
 
         // types
@@ -282,6 +286,13 @@ export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: A
 
             if (ast.kind === "func-type" && ast.returnType) {
                 yield* iterateParseTree(ast.returnType, ast)
+            }
+        } break;
+        case "arg": {
+            yield* iterateParseTree(ast.name, ast)
+
+            if (ast.type) {
+                yield* iterateParseTree(ast.type, ast)
             }
         } break;
         case "object-type": {

@@ -1,7 +1,7 @@
-import { ClassMember, Declaration } from "./declarations.ts";
+import { ClassMember, Declaration, ImportItem } from "./declarations.ts";
 import { Case, Expression, InlineConst, Operator } from "./expressions.ts";
 import { Statement } from "./statements.ts";
-import { Attribute, TypeExpression } from "./type-expressions.ts";
+import { Arg, Attribute, TypeExpression } from "./type-expressions.ts";
 import { Block, Identifier, PlainIdentifier, SourceInfo } from "./common.ts";
 
 export type AST = (
@@ -18,6 +18,8 @@ export type AST = (
     | Operator
     | Debug
     | Case
+    | Arg
+    | ImportItem
 )
 
 export type Module = SourceInfo & Identifier & {

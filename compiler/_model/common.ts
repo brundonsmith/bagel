@@ -1,10 +1,11 @@
+// deno-lint-ignore-file no-fallthrough
 import { AST } from "./ast.ts";
-import { Statement } from "./statements.ts";
+import { ConstDeclarationStatement, LetDeclaration, Statement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
-import { ClassDeclaration } from "./declarations.ts";
-import { Expression } from "./expressions.ts";
+import { ClassDeclaration, ConstDeclaration, FuncDeclaration, ImportDeclaration, ImportItem, ProcDeclaration, StoreDeclaration } from "./declarations.ts";
+import { Expression, Func, InlineConst, Proc } from "./expressions.ts";
 import { withoutSourceInfo, display } from "../debugging.ts";
-import { deepEquals } from "../utils.ts";
+import { deepEquals, ModuleName } from "../utils.ts";
 import { BagelError, miscError } from "../errors.ts";
 
 export type Identifier = { readonly id: symbol }
@@ -68,14 +69,50 @@ export function and<T>(all: Set<T>, addition: T): Set<T> {
 
 export type Scope = {
     readonly types: ReadonlyTieredMap<string, TypeDeclarationDescriptor>,
-    readonly values: ReadonlyTieredMap<string, DeclarationDescriptor>,
+    readonly values: ReadonlyTieredMap<string, Binding>,
+    readonly imports: ReadonlyTieredMap<string, { importItem: ImportItem, importDeclaration: ImportDeclaration }>,
     readonly classes: ReadonlyTieredMap<string, ClassDeclaration>,
     readonly refinements: readonly Refinement[],
 }
 
+export type Binding =
+    | { kind: "basic", ast: ConstDeclaration|ProcDeclaration|FuncDeclaration|LetDeclaration|ConstDeclarationStatement|InlineConst }
+    | { kind: "iterator", iterator: Expression }
+    | { kind: "arg", holder: Func|Proc, argIndex: number }
+    | { kind: "this", store: ClassDeclaration }
+
+export function getBindingMutability(binding: Binding): "immutable"|"readonly"|"mutable"|"assignable" {
+    switch (binding.kind) {
+        case 'basic':
+            switch (binding.ast.kind) {
+                case 'const-declaration':
+                case 'const-declaration-statement':
+                case 'func-declaration':
+                case 'proc-declaration':
+                case 'inline-const':
+                    return 'immutable'
+                case 'let-declaration':
+                    return 'assignable'
+                // case 'store-declaration':
+                //     return 'mutable'
+                default:
+                    // @ts-expect-error
+                    throw Error('Unreachable!' + binding.ast.kind)
+            }
+        case 'arg':
+        case 'iterator':
+        case 'this':
+            return 'mutable'
+        default:
+            // @ts-expect-error
+            throw Error('Unreachable!' + binding.kind)
+    }
+}
+
 export type MutableScope = {
     readonly types: TieredMap<string, TypeDeclarationDescriptor>,
-    readonly values: TieredMap<string, DeclarationDescriptor>,
+    readonly values: TieredMap<string, Binding>,
+    imports: TieredMap<string, { importItem: ImportItem, importDeclaration: ImportDeclaration }>,
     readonly classes: TieredMap<string, ClassDeclaration>,
     readonly refinements: Refinement[],
 }
@@ -83,12 +120,6 @@ export type MutableScope = {
 export type TypeDeclarationDescriptor = {
     readonly isGenericParameter: boolean,
     readonly type: TypeExpression,
-}
-
-export type DeclarationDescriptor = {
-    readonly mutability: "all"|"contents-only"|"readonly"|"immutable",
-    readonly declaredType?: TypeExpression,
-    readonly initialValue?: Expression,
 }
 
 export type Refinement =
@@ -120,7 +151,7 @@ export function getScopeFor(reportError: undefined|((error: BagelError) => void)
         }
     }
 
-    return EMPTY_SCOPE
+    return createEmptyScope()
 }
 
 export class TieredMap<K, V> {
@@ -152,6 +183,21 @@ export class TieredMap<K, V> {
         }
     }
 
+    has(key: K): boolean {
+        // deno-lint-ignore no-this-alias
+        let current: ReadonlyTieredMap<K, V>|undefined = this;
+
+        while (current) {
+            if (current.contents.has(key)) {
+                return true
+            }
+
+            current = current.parent
+        }
+
+        return false
+    }
+
     set(key: K, value: V) {
         this._contents.set(key, value);
     }
@@ -173,11 +219,14 @@ export class TieredMap<K, V> {
 
 export type ReadonlyTieredMap<K, V> = Omit<TieredMap<K, V>, 'set'>
 
-const EMPTY_SCOPE: Scope = {
-    types: new TieredMap(),
-    values: new TieredMap(),
-    classes: new TieredMap(),
-    refinements: [],
+export function createEmptyScope(): MutableScope {
+    return {
+        types: new TieredMap(),
+        values: new TieredMap(),
+        imports: new TieredMap(),
+        classes: new TieredMap(),
+        refinements: [],
+    }
 }
 
 export type PlainIdentifier = SourceInfo & Identifier & {

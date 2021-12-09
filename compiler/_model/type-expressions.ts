@@ -53,7 +53,11 @@ export type FuncType = SourceInfo & Identifier & {
     readonly mutability: undefined,
 }
 
-export type Arg = { readonly name: PlainIdentifier, readonly type?: TypeExpression }
+export type Arg = SourceInfo & Identifier & {
+    readonly kind: "arg",
+    readonly name: PlainIdentifier,
+    readonly type?: TypeExpression
+}
 
 export type ElementType = SourceInfo & Identifier & {
     readonly kind: "element-type",
@@ -232,6 +236,15 @@ export const ITERATOR_OF_NUMBERS_TYPE: IteratorType = {
     startIndex: undefined,
     endIndex: undefined,
 }
+export const ITERATOR_OF_ANY: IteratorType = {
+    kind: "iterator-type",
+    itemType: ANY_TYPE,
+    mutability: undefined,
+    id: Symbol(),
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
 export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
     kind: "union-type",
     members: [
@@ -260,8 +273,13 @@ export const REACTION_EFFECT_TYPE: TypeExpression = {
     kind: "proc-type",
     typeParams: [],
     args: [{
+        kind: "arg",
         name: { kind: "plain-identifier", name: "_", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
-        type: UNKNOWN_TYPE
+        type: UNKNOWN_TYPE,
+        id: Symbol(),
+        code: undefined,
+        startIndex: undefined,
+        endIndex: undefined,
     }],
     mutability: undefined,
     id: Symbol(),
