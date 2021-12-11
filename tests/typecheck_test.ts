@@ -668,10 +668,10 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Class 'this' access",
+  name: "Store 'this' access",
   fn() {
     testTypecheck(`
-    class Foo {
+    store Foo {
 
       prop: number = 12
 
@@ -684,10 +684,10 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Class 'this' access mismatch",
+  name: "Store 'this' access mismatch",
   fn() {
     testTypecheck(`
-    class Foo {
+    store Foo {
 
       prop: number = 12
 
@@ -700,11 +700,11 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Class 'this' access in markup",
+  name: "Store 'this' access in markup",
   fn() {
     testTypecheck(`
         
-    class Counter {
+    store Counter {
       count: number = 0
 
       public func memo render() =>
@@ -723,6 +723,25 @@ Deno.test({
       }
     }
     `, false)
+  }
+})
+
+
+Deno.test({
+  name: "Store 'this' access from outside",
+  fn() {
+    testTypecheck(`
+        
+    store Counter {
+      count: number = 0
+    }
+
+    proc bar(val: unknown) { }
+
+    proc foo() {
+      bar(this);
+    }
+    `, true)
   }
 })
 

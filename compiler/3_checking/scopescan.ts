@@ -1,6 +1,6 @@
 import { AST, Module } from "../_model/ast.ts";
 import { AllParents, anyGet, Block, createEmptyScope, MutableScope, ParentsMap, Scope, ScopesMap, TieredMap } from "../_model/common.ts";
-import { ClassDeclaration, ConstDeclaration } from "../_model/declarations.ts";
+import { StoreDeclaration, ConstDeclaration } from "../_model/declarations.ts";
 import { Func, Proc, Invocation, InlineConst, Case } from "../_model/expressions.ts";
 import { ConstDeclarationStatement, ForLoop, LetDeclaration } from "../_model/statements.ts";
 import { ANY_TYPE, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
@@ -34,7 +34,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                     // add inline constants to scope
                     if (current.kind === "func") {
                         for (const c of current.consts) {
-                            if (newScope.values.get(c.name.name) != null || newScope.classes.get(c.name.name) != null) {
+                            if (newScope.values.get(c.name.name) != null) {
                                 reportError(alreadyDeclared(c.name))
                             }
                             
@@ -46,7 +46,7 @@ export function scopescan(reportError: (error: BagelError) => void, parents: All
                 case "block":
                     for (const statement of current.statements) {
                         if (statement.kind === "let-declaration" || statement.kind === "const-declaration-statement") {
-                            if (newScope.values.get(statement.name.name) != null || newScope.classes.get(statement.name.name) != null) {
+                            if (newScope.values.get(statement.name.name) != null) {
                                 reportError(alreadyDeclared(statement.name))
                             }
 
@@ -82,7 +82,7 @@ export function getParentsMap(ast: AST): ParentsMap {
     return parents
 }
 
-export type ScopeOwner = Module|Func|Proc|Block|ForLoop|ClassDeclaration|Invocation|ConstDeclaration|InlineConst|LetDeclaration|ConstDeclarationStatement|Case;
+export type ScopeOwner = Module|Func|Proc|Block|ForLoop|StoreDeclaration|Invocation|ConstDeclaration|InlineConst|LetDeclaration|ConstDeclarationStatement|Case;
 
 function isScopeOwner(ast: AST): ast is ScopeOwner {
     return ast.kind === "module" 
@@ -90,7 +90,7 @@ function isScopeOwner(ast: AST): ast is ScopeOwner {
         || ast.kind === "proc" 
         || ast.kind === "block" 
         || ast.kind === "for-loop" 
-        || ast.kind === "class-declaration" 
+        || ast.kind === "store-declaration" 
         || ast.kind === "invocation"
         || ast.kind === "const-declaration"
         || ast.kind === "inline-const"
@@ -113,8 +113,8 @@ export function scopeFrom(reportError: (error: BagelError) => void,parents: AllP
                         type: declaration.type,
                         isGenericParameter: false,
                     })
-                } else if (declaration.kind === "func-declaration" || declaration.kind === "proc-declaration") {
-                    if (newScope.values.get(declaration.name.name) != null || newScope.classes.get(declaration.name.name) != null) {
+                } else if (declaration.kind === "func-declaration" || declaration.kind === "proc-declaration" || declaration.kind === "store-declaration") {
+                    if (newScope.values.get(declaration.name.name) != null) {
                         reportError(alreadyDeclared(declaration.name))
                     }
 
@@ -122,17 +122,11 @@ export function scopeFrom(reportError: (error: BagelError) => void,parents: AllP
                         kind: "basic",
                         ast: declaration
                     });
-                } else if (declaration.kind === "class-declaration") {
-                    if (newScope.values.get(declaration.name.name) != null || newScope.classes.get(declaration.name.name) != null) {
-                        reportError(alreadyDeclared(declaration.name))
-                    }
-                    
-                    newScope.classes.set(declaration.name.name, declaration);
                 } else if (declaration.kind === "import-declaration") {
                     for (const importItem of declaration.imports) {
                         const name = importItem.alias ?? importItem.name;
 
-                        if (newScope.values.get(name.name) != null || newScope.classes.get(name.name) != null) {
+                        if (newScope.values.get(name.name) != null) {
                             reportError(alreadyDeclared(name))
                         }
                         
@@ -160,7 +154,7 @@ export function scopeFrom(reportError: (error: BagelError) => void,parents: AllP
             for (let i = 0; i < ast.type.args.length; i++) {
                 const arg = ast.type.args[i]
 
-                if (newScope.values.get(arg.name.name) != null || newScope.classes.get(arg.name.name) != null) {
+                if (newScope.values.get(arg.name.name) != null) {
                     reportError(alreadyDeclared(arg.name))
                 }
 
@@ -174,7 +168,7 @@ export function scopeFrom(reportError: (error: BagelError) => void,parents: AllP
         case "block":
             break;
         case "for-loop": {
-            if (newScope.values.get(ast.itemIdentifier.name) != null || newScope.classes.get(ast.itemIdentifier.name) != null) {
+            if (newScope.values.get(ast.itemIdentifier.name) != null) {
                 reportError(alreadyDeclared(ast.itemIdentifier))
             }
 
@@ -185,7 +179,7 @@ export function scopeFrom(reportError: (error: BagelError) => void,parents: AllP
             })
             break;
         }
-        case "class-declaration":
+        case "store-declaration":
             newScope.values.set("this", {
                 kind: "this",
                 store: ast
@@ -282,7 +276,6 @@ export function extendScope(scope: Scope): MutableScope {
         types: new TieredMap(scope.types),
         values: new TieredMap(scope.values),
         imports: new TieredMap(scope.imports),
-        classes: new TieredMap(scope.classes),
         refinements: [...scope.refinements],
     }
 }

@@ -2,7 +2,7 @@ import { path } from "../deps.ts";
 import { cachedModulePath, given, ModuleName, pathIsRemote } from "../utils.ts";
 import { Module, AST } from "../_model/ast.ts";
 import { AllParents, AllScopes, getBindingMutability, getScopeFor, PlainIdentifier } from "../_model/common.ts";
-import { ClassProperty, TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ClassFunction, ClassMember } from "../_model/declarations.ts";
+import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, StoreDeclaration, StoreFunction, StoreProperty } from "../_model/declarations.ts";
 import { Expression, Proc, Func } from "../_model/expressions.ts";
 import { LetDeclaration } from "../_model/statements.ts";
 import { Arg, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
@@ -47,10 +47,10 @@ function compileOne(parents: AllParents, scopes: AllScopes, module: string, ast:
         case "proc-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(parents, scopes, module, ast.value) + ';';
         case "func-declaration":  return compileFuncDeclaration(parents, scopes, module, ast)
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(parents, scopes, module, ast.name)}${ast.type ? `: ${compileOne(parents, scopes, module, ast.type)}` : ''} = ${compileOne(parents, scopes, module, ast.value)};`;
-        case "class-declaration": return (ast.exported ? `export ` : ``) + `class ${compileOne(parents, scopes, module, ast.name)} {\n\n${compileClassConstructor(ast)}\n\n${ast.members.map(m => compileOne(parents, scopes, module, m)).join('\n')}\n}`;
-        case "class-property": return  compileClassProperty(parents, scopes, module, ast)
-        case "class-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${compileOne(parents, scopes, module, ast.value)}`
-        case "class-function": return  '    ' + compileFuncDeclaration(parents, scopes, module, ast)
+        case "store-declaration": return compileStoreDeclaration(parents, scopes, module, ast);
+        case "store-property": return  compileStoreProperty(parents, scopes, module, ast)
+        case "store-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${compileOne(parents, scopes, module, ast.value)}`
+        case "store-function": return  '    ' + compileFuncDeclaration(parents, scopes, module, ast)
         case "let-declaration": return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(parents, scopes, module, ast.value)}`;
         case "const-declaration-statement": return `const ${ast.name.name} = ${compileOne(parents, scopes, module, ast.value)}`;
         case "assignment": return `${compileOne(parents, scopes, module, ast.target)} = ${compileOne(parents, scopes, module, ast.value)}`;
@@ -110,7 +110,6 @@ ${given(ast.until, until => compileOne(parents, scopes, module, until))})`;
         case "block": return `{ ${ast.statements.map(s => compileOne(parents, scopes, module, s)).join("; ")}; }`;
         case "element-tag": return `${INT}h('${ast.tagName.name}',{${
             objectEntries(parents, scopes, module, (ast.attributes as [PlainIdentifier, Expression|Expression[]][]))}}, ${ast.children.map(c => compileOne(parents, scopes, module, c)).join(', ')})`;
-        case "class-construction": return `new ${ast.clazz.name}()`;
         case "union-type": return ast.members.map(m => compileOne(parents, scopes, module, m)).join(" | ");
         case "named-type": return ast.name.name;
         case "proc-type": return `(${compileArgs(parents, scopes, module, ast.args)}) => void`;
@@ -173,7 +172,7 @@ function compileProc(parents: AllParents, scopes: AllScopes, module: string, pro
 }`;
 }
 
-const compileFuncDeclaration = (parents: AllParents, scopes: AllScopes, module: string, decl: FuncDeclaration|ClassFunction): string => {
+const compileFuncDeclaration = (parents: AllParents, scopes: AllScopes, module: string, decl: FuncDeclaration|StoreFunction): string => {
     const signature = compileFuncSignature(parents, scopes, module, decl.value)
     const body = compileFuncBody(parents, scopes, module, decl.value)
     
@@ -212,19 +211,26 @@ const compileFuncBody = (parents: AllParents, scopes: AllScopes, module: string,
             `\n    return ${bodyExpr};\n}`
 }
 
-
-function compileClassConstructor(clazz: { readonly members: readonly ClassMember[] }): string {
-    return `constructor() {
-        ${INT}makeObservable(this, {
-            ${clazz.members.map(member =>
-                member.kind === "class-property" ?
-                    `${member.access === "visible" ? INT : ''}${member.name.name}: ${INT}observable`
-                : '').filter(s => !!s).join(', ')}
-        });
-    }`
+function compileStoreDeclaration(parents: AllParents, scopes: AllScopes, module: string, store: StoreDeclaration) {
+    return `class ${INT}${store.name.name} {
+        
+        constructor() {
+            ${INT}makeObservable(this, {
+                ${store.members.map(member =>
+                    member.kind === "store-property" ?
+                        `${member.access === "visible" ? INT : ''}${member.name.name}: ${INT}observable`
+                    : '').filter(s => !!s).join(', ')}
+            });
+        }
+        
+        ${store.members.map(m =>
+            compileOne(parents, scopes, module, m)).join('\n')}
+        
+    };
+    ${store.exported ? 'export ' : ''}const ${store.name.name} = new ${INT}${store.name.name}();`
 }
 
-function compileClassProperty(parents: AllParents, scopes: AllScopes, module: string, ast: ClassProperty): string {
+function compileStoreProperty(parents: AllParents, scopes: AllScopes, module: string, ast: StoreProperty): string {
     const typeDeclaration = ast.type ? ': ' + compileOne(parents, scopes, module, ast.type) : ''
 
     if (ast.access === "visible") {

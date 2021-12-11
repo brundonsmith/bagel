@@ -4,7 +4,7 @@ import { BinaryOp, Expression, InlineConst, isExpression } from "../_model/expre
 import { Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, memoize5 } from "../utils.ts";
 import { displayForm, subsumes, typesEqual } from "./typecheck.ts";
-import { ClassMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
+import { StoreMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
 import { assignmentError, BagelError, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
 import { display, withoutSourceInfo } from "../debugging.ts";
 import { extendScope } from "./scopescan.ts";
@@ -16,7 +16,7 @@ export function inferType(
     getModule: (module: string) => Module|undefined,
     parents: AllParents,
     scopes: AllScopes,
-    ast: Expression|ClassMember,
+    ast: Expression|StoreMember,
     resolveGenerics?: boolean,
 ): TypeExpression {
     const baseType = inferTypeInner(reportError, getModule, parents, scopes, ast)
@@ -45,7 +45,7 @@ const inferTypeInner = memoize5((
     getModule: (module: string) => Module|undefined, 
     parents: AllParents,
     scopes: AllScopes,
-    ast: Expression|ClassMember,
+    ast: Expression|StoreMember,
 ): TypeExpression => {
     switch(ast.kind) {
         case "proc":
@@ -346,8 +346,8 @@ const inferTypeInner = memoize5((
                         return iteratorType.kind === 'iterator-type' ? iteratorType.itemType : UNKNOWN_TYPE
                     }
                     case 'this': return {
-                        kind: "class-instance-type",
-                        clazz: binding.store,
+                        kind: "store-type",
+                        store: binding.store,
                         internal: true,
                         mutability: "mutable",
                         id: Symbol(),
@@ -451,26 +451,9 @@ const inferTypeInner = memoize5((
                 endIndex: undefined,
             };
         }
-        case "class-construction": {
-            const clazz = getScopeFor(reportError, parents, scopes, ast).classes.get(ast.clazz.name)
-            if (clazz == null) {
-                return UNKNOWN_TYPE
-            }
-            
-            return {
-                kind: "class-instance-type",
-                clazz,
-                internal: false,
-                mutability: "mutable",
-                id: Symbol(),
-                code: ast.clazz.code,
-                startIndex: ast.clazz.startIndex,
-                endIndex: ast.clazz.endIndex
-            };
-        }
-        case "class-property":
-        case "class-function":
-        case "class-procedure": return (ast.kind === "class-property" ? ast.type : undefined) ?? inferType(reportError, getModule, parents, scopes, ast.value);
+        case "store-property":
+        case "store-function":
+        case "store-procedure": return (ast.kind === "store-property" ? ast.type : undefined) ?? inferType(reportError, getModule, parents, scopes, ast.value);
         case "string-literal": return STRING_TYPE;
         case "exact-string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
@@ -534,22 +517,6 @@ export function resolve(
             }
 
             return foreignDecl.type
-        }
-
-
-        const resolvedClazz = resolutionScope.classes.get(type.name.name)
-
-        if (resolvedClazz) {
-            return {
-                kind: "class-instance-type",
-                clazz: resolvedClazz,
-                internal: false,
-                mutability: "mutable",
-                id: Symbol(),
-                code: type.code,
-                startIndex: type.startIndex,
-                endIndex: type.endIndex
-            }
         }
 
         reportError(cannotFindName(type.name))
@@ -840,9 +807,9 @@ export function propertiesOf(
 
             return props;
         }
-        case "class-instance-type": {
+        case "store-type": {
             
-            const memberToAttribute = (member: ClassMember): Attribute => {
+            const memberToAttribute = (member: StoreMember): Attribute => {
 
                 const memberType = memberDeclaredType(member) && memberDeclaredType(member)?.kind !== "func-type"
                     ? memberDeclaredType(member) as TypeExpression
@@ -850,7 +817,7 @@ export function propertiesOf(
 
                 const mutability = (
                     memberType.mutability == null ? undefined :
-                    memberType.mutability === "mutable" && member.kind === "class-property" && (type.internal || member.access !== "visible") ? "mutable"
+                    memberType.mutability === "mutable" && member.kind === "store-property" && (type.internal || member.access !== "visible") ? "mutable"
                     : "readonly"
                 )
 
@@ -864,10 +831,10 @@ export function propertiesOf(
             }
 
             if (type.internal) {
-                return type.clazz.members
+                return type.store.members
                     .map(memberToAttribute)
             } else {
-                return type.clazz.members
+                return type.store.members
                     .filter(member => member.access !== "private")
                     .map(memberToAttribute)
             }

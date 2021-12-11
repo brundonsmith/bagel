@@ -26,7 +26,6 @@ export type Expression =
     | ExactStringLiteral
     | NumberLiteral
     | ElementTag
-    | ClassConstruction
 
 export type JavascriptEscape = SourceInfo & Identifier & {
     readonly kind: "javascript-escape",
@@ -188,11 +187,6 @@ export type ElementTag = SourceInfo & Identifier & {
     readonly children: readonly Expression[],
 }
 
-export type ClassConstruction = SourceInfo & Identifier & {
-    readonly kind: "class-construction",
-    readonly clazz: LocalIdentifier,
-}
-
 const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "proc": undefined,
     "func": undefined,
@@ -217,7 +211,6 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "nil-literal": undefined,
     "javascript-escape": undefined,
     "debug": undefined,
-    "class-construction": undefined,
 };
 
 export function isExpression(ast: AST): ast is Expression {

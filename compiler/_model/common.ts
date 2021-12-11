@@ -2,10 +2,10 @@
 import { AST } from "./ast.ts";
 import { ConstDeclarationStatement, LetDeclaration, Statement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
-import { ClassDeclaration, ConstDeclaration, FuncDeclaration, ImportDeclaration, ImportItem, ProcDeclaration, StoreDeclaration } from "./declarations.ts";
+import { ConstDeclaration, FuncDeclaration, ImportDeclaration, ImportItem, ProcDeclaration, StoreDeclaration } from "./declarations.ts";
 import { Expression, Func, InlineConst, Proc } from "./expressions.ts";
 import { withoutSourceInfo, display } from "../debugging.ts";
-import { deepEquals, ModuleName } from "../utils.ts";
+import { deepEquals } from "../utils.ts";
 import { BagelError, miscError } from "../errors.ts";
 
 export type Identifier = { readonly id: symbol }
@@ -71,15 +71,14 @@ export type Scope = {
     readonly types: ReadonlyTieredMap<string, TypeDeclarationDescriptor>,
     readonly values: ReadonlyTieredMap<string, Binding>,
     readonly imports: ReadonlyTieredMap<string, { importItem: ImportItem, importDeclaration: ImportDeclaration }>,
-    readonly classes: ReadonlyTieredMap<string, ClassDeclaration>,
     readonly refinements: readonly Refinement[],
 }
 
 export type Binding =
-    | { kind: "basic", ast: ConstDeclaration|ProcDeclaration|FuncDeclaration|LetDeclaration|ConstDeclarationStatement|InlineConst }
+    | { kind: "basic", ast: ConstDeclaration|ProcDeclaration|FuncDeclaration|LetDeclaration|ConstDeclarationStatement|InlineConst|StoreDeclaration }
     | { kind: "iterator", iterator: Expression }
     | { kind: "arg", holder: Func|Proc, argIndex: number }
-    | { kind: "this", store: ClassDeclaration }
+    | { kind: "this", store: StoreDeclaration }
 
 export function getBindingMutability(binding: Binding): "immutable"|"readonly"|"mutable"|"assignable" {
     switch (binding.kind) {
@@ -93,8 +92,8 @@ export function getBindingMutability(binding: Binding): "immutable"|"readonly"|"
                     return 'immutable'
                 case 'let-declaration':
                     return 'assignable'
-                // case 'store-declaration':
-                //     return 'mutable'
+                case 'store-declaration':
+                    return 'mutable'
                 default:
                     // @ts-expect-error
                     throw Error('Unreachable!' + binding.ast.kind)
@@ -113,7 +112,6 @@ export type MutableScope = {
     readonly types: TieredMap<string, TypeDeclarationDescriptor>,
     readonly values: TieredMap<string, Binding>,
     imports: TieredMap<string, { importItem: ImportItem, importDeclaration: ImportDeclaration }>,
-    readonly classes: TieredMap<string, ClassDeclaration>,
     readonly refinements: Refinement[],
 }
 
@@ -224,7 +222,6 @@ export function createEmptyScope(): MutableScope {
         types: new TieredMap(),
         values: new TieredMap(),
         imports: new TieredMap(),
-        classes: new TieredMap(),
         refinements: [],
     }
 }

@@ -83,23 +83,17 @@ export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: A
             }
             yield* iterateParseTree(ast.value, ast)
         } break;
-        case "class-declaration": {
-            yield* iterateParseTree(ast.name, ast)
-            for(const member of ast.members) {
-                yield* iterateParseTree(member, ast)
-            }
-        } break;
         case "store-declaration": {
             yield* iterateParseTree(ast.name, ast)
             for(const member of ast.members) {
                 yield* iterateParseTree(member, ast)
             }
         } break;
-        case "class-property":
-        case "class-function":
-        case "class-procedure": {
+        case "store-property":
+        case "store-function":
+        case "store-procedure": {
             yield* iterateParseTree(ast.name, ast)
-            if (ast.kind === "class-property" && ast.type) {
+            if (ast.kind === "store-property" && ast.type) {
                 yield* iterateParseTree(ast.type, ast)
             }
             yield* iterateParseTree(ast.value, ast)
@@ -163,9 +157,6 @@ export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: A
             for (const child of ast.children) {
                 yield* iterateParseTree(child, ast)
             }
-        } break;
-        case "class-construction": {
-            yield* iterateParseTree(ast.clazz, ast)
         } break;
         case "indexer": {
             yield* iterateParseTree(ast.subject, ast)
@@ -331,8 +322,8 @@ export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: A
         case "plan-type": {
             yield* iterateParseTree(ast.resultType, ast)
         } break;
-        case "class-instance-type": {
-            yield* iterateParseTree(ast.clazz, ast)
+        case "store-type": {
+            yield* iterateParseTree(ast.store, ast)
         } break;
 
         // atomic

@@ -1,6 +1,6 @@
 import { AST } from "./ast.ts";
 import { Identifier, PlainIdentifier, SourceInfo } from "./common.ts";
-import { ClassDeclaration } from "./declarations.ts";
+import { StoreDeclaration } from "./declarations.ts";
 import { BooleanLiteral, ExactStringLiteral, NumberLiteral } from "./expressions.ts";
 
 export type TypeExpression =
@@ -17,7 +17,7 @@ export type TypeExpression =
     | NumberType
     | BooleanType
     | NilType
-    | ClassInstanceType
+    | StoreType
     | LiteralType
     | NominalType
     | IteratorType
@@ -128,9 +128,9 @@ export type LiteralType = SourceInfo & Identifier & {
     readonly mutability: undefined,
 }
 
-export type ClassInstanceType = SourceInfo & Identifier & Mutability & {
-    readonly kind: "class-instance-type",
-    readonly clazz: ClassDeclaration,
+export type StoreType = SourceInfo & Identifier & Mutability & {
+    readonly kind: "store-type",
+    readonly store: StoreDeclaration,
     readonly internal: boolean,
 }
 
@@ -335,7 +335,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "plan-type": undefined,
     "literal-type": undefined,
     "tuple-type": undefined,
-    "class-instance-type": undefined,
+    "store-type": undefined,
     "nominal-type": undefined,
     "javascript-escape-type": undefined,
 }

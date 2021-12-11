@@ -10,7 +10,6 @@ export type Declaration =
     | ProcDeclaration
     | FuncDeclaration
     | ConstDeclaration
-    | ClassDeclaration
     | StoreDeclaration
     | TestExprDeclaration
     | TestBlockDeclaration
@@ -56,50 +55,42 @@ export type ConstDeclaration = SourceInfo & Identifier & Exported & {
     readonly value: Expression,
 }
 
-export type ClassDeclaration = SourceInfo & Identifier & Exported & {
-    readonly kind: "class-declaration",
-    readonly name: PlainIdentifier,
-    readonly typeParams: readonly PlainIdentifier[],
-    readonly members: readonly ClassMember[],
-    // TODO: constructor
-}
-
 export type StoreDeclaration = SourceInfo & Identifier & Exported & {
     readonly kind: "store-declaration",
     readonly name: PlainIdentifier,
-    readonly members: readonly ClassMember[],
+    readonly members: readonly StoreMember[],
 }
 
-export type ClassMember =
-    | ClassProperty
-    | ClassFunction
-    | ClassProcedure
+export type StoreMember =
+    | StoreProperty
+    | StoreFunction
+    | StoreProcedure
 
-export type ClassProperty = SourceInfo & Identifier & {
-    readonly kind: "class-property",
+export type StoreProperty = SourceInfo & Identifier & {
+    readonly kind: "store-property",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly value: Expression,
     readonly access: 'private'|'public'|'visible',
 }
 
-export type ClassFunction = SourceInfo & Identifier & {
-    readonly kind: "class-function",
+export type StoreFunction = SourceInfo & Identifier & {
+    readonly kind: "store-function",
     readonly memo: boolean,
     readonly name: PlainIdentifier,
     readonly value: Func,
     readonly access: 'private'|'public',
 }
 
-export type ClassProcedure = SourceInfo & Identifier & {
-    readonly kind: "class-procedure",
+export type StoreProcedure = SourceInfo & Identifier & {
+    readonly kind: "store-procedure",
     readonly name: PlainIdentifier,
     readonly value: Proc,
     readonly access: 'private'|'public',
 }
 
-export function memberDeclaredType(m: ClassMember): TypeExpression|undefined {
-    return m.kind === "class-property" ? m.type : m.value.type
+export function memberDeclaredType(m: StoreMember): TypeExpression|undefined {
+    return m.kind === "store-property" ? m.type : m.value.type
 }
 
 export type TestExprDeclaration = SourceInfo & Identifier & {

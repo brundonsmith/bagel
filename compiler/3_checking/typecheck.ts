@@ -180,15 +180,15 @@ export function typecheck(reportError: (error: BagelError) => void, getModule: (
                 if (subjectProperties == null) {
                     reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${displayForm(subjectType)}")`));
                 } else if (!subjectProperties.some(property => property.name.name === current.property.name)) {
-                    if (subjectType.kind === "class-instance-type") {
-                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on class '${subjectType.clazz.name.name}'`));
+                    if (subjectType.kind === "store-type") {
+                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on store '${subjectType.store.name.name}'`));
                     } else {
                         reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${displayForm(subjectType)}'`));
                     }
                 }
             } break;
             case "local-identifier": {
-                if (!scope.values.has(current.name) && !scope.imports.has(current.name) && !scope.classes.has(current.name)) {
+                if (!scope.values.has(current.name) && !scope.imports.has(current.name)) {
                     reportError(cannotFindName(current));
                 }
             } break;
@@ -387,7 +387,7 @@ export function displayForm(typeExpression: TypeExpression): string {
         case "element-type": str = `Element`; break;
         // case "element-type": str = `<${typeExpression.tagName}>`;
         case "javascript-escape-type": str = "<js escape>"; break;
-        case "class-instance-type": str = typeExpression.clazz.name.name; break;
+        case "store-type": str = typeExpression.store.name.name; break;
     }
 
     const metaStr = typeExpression.mutability == null ? '' : ` [${typeExpression.mutability[0]}]`

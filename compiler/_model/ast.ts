@@ -1,4 +1,4 @@
-import { ClassMember, Declaration, ImportItem } from "./declarations.ts";
+import { StoreMember, Declaration, ImportItem } from "./declarations.ts";
 import { Case, Expression, InlineConst, Operator } from "./expressions.ts";
 import { Statement } from "./statements.ts";
 import { Arg, Attribute, TypeExpression } from "./type-expressions.ts";
@@ -7,7 +7,7 @@ import { Block, Identifier, PlainIdentifier, SourceInfo } from "./common.ts";
 export type AST = (
     | Module
     | Declaration
-    | ClassMember
+    | StoreMember
     | Expression
     | InlineConst
     | Attribute
