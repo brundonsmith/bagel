@@ -1,4 +1,4 @@
-import { Block, Identifier, PlainIdentifier, SourceInfo } from "./common.ts";
+import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
 import { Expression, Invocation, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions.ts";
 import { TypeExpression } from "./type-expressions.ts";
 
@@ -13,46 +13,48 @@ export type Statement =
     | Invocation
     | Reaction
 
-export type LetDeclaration = SourceInfo & Identifier & {
+export type LetDeclaration = SourceInfo & {
     readonly kind: "let-declaration",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly value: Expression,
+    readonly next: Block,
 }
 
-export type ConstDeclarationStatement = SourceInfo & Identifier & {
+export type ConstDeclarationStatement = SourceInfo & {
     readonly kind: "const-declaration-statement",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly value: Expression,
+    readonly next: Block,
 }
 
-export type IfElseStatement = SourceInfo & Identifier & {
+export type IfElseStatement = SourceInfo & {
     readonly kind: "if-else-statement",
     readonly cases: readonly { readonly condition: Expression, readonly outcome: Block }[],
     readonly defaultCase?: Block
 }
 
-export type ForLoop = SourceInfo & Identifier & {
+export type ForLoop = SourceInfo & {
     readonly kind: "for-loop",
     readonly itemIdentifier: PlainIdentifier,
     readonly iterator: Expression,
     readonly body: Block,
 }
 
-export type WhileLoop = SourceInfo & Identifier & {
+export type WhileLoop = SourceInfo & {
     readonly kind: "while-loop",
     readonly condition: Expression,
     readonly body: Block,
 }
 
-export type Assignment = SourceInfo & Identifier & {
+export type Assignment = SourceInfo & {
     readonly kind: "assignment",
     readonly target: LocalIdentifier | PropertyAccessor,
     readonly value: Expression,
 }
 
-export type Reaction = SourceInfo & Identifier & {
+export type Reaction = SourceInfo & {
     readonly kind: "reaction",
     readonly data: Expression,
     readonly effect: Expression,

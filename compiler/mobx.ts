@@ -11,4 +11,4 @@ export const computed: <T>(fn: () => T) => { get(): T } = mobx.computed as any
 export const trace: () => void = mobx.trace
 export const runInAction: (fn: () => void) => void = mobx.runInAction
 
-export const computedFn: <F extends (...args: any[]) => any>(fn: F) => F = mobx_utils.computedFn as any
+export const computedFn: <F extends (...args: any[]) => any>(fn: F, opts: { requiresReaction: false }) => F = mobx_utils.computedFn as any

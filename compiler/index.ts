@@ -31,11 +31,11 @@ async function main() {
     const allFiles = singleEntry ? [ entryFileOrDir ] : await getAllFiles(entryFileOrDir);
 
     fs.ensureDir(cacheDir())
-    
-    runInAction(() => {
-        Store.config = { entryFileOrDir, singleEntry, bundle, watch, emit, includeTests }
-        Store.modules = new Set(allFiles.filter(f => f.match(/\.bgl$/i)) as ModuleName[])
-    })
+
+    Store.initializeFromEntry(
+        allFiles.filter(f => f.match(/\.bgl$/i)) as ModuleName[],
+        { entryFileOrDir, singleEntry, bundle, watch, emit, includeTests }
+    )
 
     // switch (command) {
     //     case "build": await build({ entry: Deno.args[1], bundle, watch, emit: true }); break;
@@ -79,7 +79,7 @@ autorun(() => {
     for (const module of Store.modules) {
         const source = Store.modulesSource.get(module)
         if (source) {
-            const { ast } = Store.parsed(source)
+            const { ast } = Store.parsed(module, source)
 
             for (const decl of ast.declarations) {
                 if (decl.kind === "import-declaration") {
@@ -109,7 +109,7 @@ autorun(() => {
             const source = Store.modulesSource.get(module)
 
             if (source) {
-                const { ast, errors: parseErrors } = Store.parsed(source)
+                const { ast, errors: parseErrors } = Store.parsed(module, source)
 
                 for (const err of parseErrors) {
                     const errorModule = given(err.ast, Store.getModuleFor) ?? module;
@@ -138,7 +138,7 @@ autorun(() => {
             jsPath: pathIsRemote(module)
                 ? cachedModulePath(module) + '.ts'
                 : bagelFileToTsFile(module),
-            js: Store.compiled(module, Store.parsed(source).ast)
+            js: Store.compiled(module, Store.parsed(module, source).ast)
         }))
 
         if (config.emit && !Store.modulesOutstanding) {

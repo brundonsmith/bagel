@@ -1,7 +1,6 @@
 import { displayForm } from "./3_checking/typecheck.ts";
-import { given, iterateParseTree } from "./utils.ts";
+import { iterateParseTree } from "./utils.ts";
 import { AST } from "./_model/ast.ts";
-import { Scope } from "./_model/common.ts";
 import { isTypeExpression } from "./_model/type-expressions.ts";
 
 export function log<T>(expr: T, fn?: (expr: T) => unknown): T {
@@ -22,13 +21,6 @@ export function withoutSourceInfo(ast: AST) {
     }
 
     return clone
-}
-
-export function displayScope(scope: Scope) {
-    return {
-        types: Object.fromEntries(scope.types.entries().map(([key, value]) => [key, { ...value, type: display(value.type) }])),
-        values: scope.values,//Object.fromEntries(scope.values.entries().map(([key, value]) => [key, { ...value, declaredType: given(value.declaredType, display), initialValue: given(value.initialValue, display) }])),
-    }
 }
 
 export function display(ast: AST): string {

@@ -1,15 +1,14 @@
 import { StoreMember, Declaration, ImportItem } from "./declarations.ts";
-import { Case, Expression, InlineConst, Operator } from "./expressions.ts";
+import { Case, Expression, Operator } from "./expressions.ts";
 import { Statement } from "./statements.ts";
 import { Arg, Attribute, TypeExpression } from "./type-expressions.ts";
-import { Block, Identifier, PlainIdentifier, SourceInfo } from "./common.ts";
+import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
 
 export type AST = (
     | Module
     | Declaration
     | StoreMember
     | Expression
-    | InlineConst
     | Attribute
     | Statement
     | TypeExpression
@@ -22,13 +21,13 @@ export type AST = (
     | ImportItem
 )
 
-export type Module = SourceInfo & Identifier & {
+export type Module = SourceInfo & {
     readonly kind: "module",
     readonly hasMain: boolean,
     readonly declarations: readonly Declaration[],
 }
 
-export type Debug = SourceInfo & Identifier & {
+export type Debug = SourceInfo & {
     readonly kind: "debug",
     readonly inner: AST,
 }

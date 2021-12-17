@@ -1,50 +1,48 @@
 // deno-lint-ignore-file no-fallthrough
-import { AllParents, AllScopes, anyGet, getScopeFor, Scope } from "../_model/common.ts";
+import { GetParent, GetBinding, ReportError, GetModule, Refinement } from "../_model/common.ts";
 import { BinaryOp, Expression, InlineConst, isExpression } from "../_model/expressions.ts";
-import { Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ANY_TYPE, Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, memoize5 } from "../utils.ts";
 import { displayForm, subsumes, typesEqual } from "./typecheck.ts";
 import { StoreMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
-import { assignmentError, BagelError, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
-import { display, withoutSourceInfo } from "../debugging.ts";
-import { extendScope } from "./scopescan.ts";
-import { Module } from "../_model/ast.ts";
+import { assignmentError, cannotFindName, miscError } from "../errors.ts";
+import { withoutSourceInfo } from "../debugging.ts";
+import { AST } from "../_model/ast.ts";
 import { LetDeclaration,ConstDeclarationStatement } from "../_model/statements.ts";
 
 export function inferType(
-    reportError: (error: BagelError) => void,
-    getModule: (module: string) => Module|undefined,
-    parents: AllParents,
-    scopes: AllScopes,
+    reportError: ReportError,
+    getModule: GetModule,
+    getParent: GetParent,
+    getBinding: GetBinding,
     ast: Expression|StoreMember,
-    resolveGenerics?: boolean,
 ): TypeExpression {
-    const baseType = inferTypeInner(reportError, getModule, parents, scopes, ast)
+    const baseType = inferTypeInner(reportError, getModule, getParent, getBinding, ast)
 
     let refinedType = baseType
     {
-        const scope = getScopeFor(reportError, parents, scopes, ast)
-        for (const refinement of scope.refinements ?? []) {
+        const refinements = resolveRefinements(getParent, ast)
+
+        for (const refinement of refinements ?? []) {
             switch (refinement.kind) {
                 case "subtraction": {
-                    refinedType = subtract(parents, scopes, refinedType, refinement.type)
+                    refinedType = subtract(getParent, getBinding, refinedType, refinement.type)
                 } break;
                 case "narrowing": {
-                    refinedType = narrow(parents, scopes, refinedType, refinement.type)
+                    refinedType = narrow(getParent, getBinding, refinedType, refinement.type)
                 } break;
             }
         }
     }
 
-    return resolve(reportError, getModule, [parents, scopes],
-        simplify(parents, scopes, refinedType), resolveGenerics);
+    return simplify(getParent, getBinding, refinedType)
 }
 
 const inferTypeInner = memoize5((
-    reportError: (error: BagelError) => void,
-    getModule: (module: string) => Module|undefined, 
-    parents: AllParents,
-    scopes: AllScopes,
+    reportError: ReportError,
+    getModule: GetModule, 
+    getParent: GetParent,
+    getBinding: GetBinding,
     ast: Expression|StoreMember,
 ): TypeExpression => {
     switch(ast.kind) {
@@ -54,10 +52,10 @@ const inferTypeInner = memoize5((
             
             // infer callback type based on context
             {
-                const parent = anyGet(parents, ast.id)
+                const parent = getParent(ast)
 
                 if (parent?.kind === "invocation") {
-                    const parentSubjectType = inferType(reportError, getModule, parents, scopes, parent.subject)
+                    const parentSubjectType = inferType(reportError, getModule, getParent, getBinding, parent.subject)
                     const thisArgIndex = parent.args.findIndex(a => a === ast)
 
                     if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
@@ -72,7 +70,7 @@ const inferTypeInner = memoize5((
 
             // if no return-type is declared, try inferring the type from the inner expression
             const returnType = ast.type.returnType ??
-                inferType(reportError, getModule, parents, scopes, ast.body)
+                inferType(reportError, getModule, getParent, getBinding, ast.body)
 
             return {
                 ...ast.type,
@@ -81,13 +79,13 @@ const inferTypeInner = memoize5((
 
         }
         case "binary-operator": {
-            let leftType = inferType(reportError, getModule, parents, scopes, ast.base);
+            let leftType = inferType(reportError, getModule, getParent, getBinding, ast.base);
 
             for (const [op, expr] of ast.ops) {
-                const rightType = inferType(reportError, getModule, parents, scopes, expr);
+                const rightType = inferType(reportError, getModule, getParent, getBinding, expr);
 
                 const types = BINARY_OPERATOR_TYPES[op.op].find(({ left, right }) =>
-                    subsumes(parents, scopes, left, leftType) && subsumes(parents, scopes, right, rightType))
+                    subsumes(getParent, getBinding, left, leftType) && subsumes(getParent, getBinding, right, rightType))
 
                 if (types == null) {
                     reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
@@ -107,64 +105,61 @@ const inferTypeInner = memoize5((
         case "negation-operator": return BOOLEAN_TYPE;
         case "pipe":
         case "invocation": {
-            const scope = getScopeFor(reportError, parents, scopes, ast)
+            // const scope = getScope(ast)
 
-            let subjectType = inferType(reportError, getModule, parents, scopes, ast.subject);
-            if (ast.kind === "invocation") {
-                const scopeWithGenerics = extendScope(scope)
-                
-                // bind type-args for this invocation
-                if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
-                    if (subjectType.typeParams.length > 0) {
-                        if (ast.typeArgs.length > 0) {
-                            if (subjectType.typeParams.length !== ast.typeArgs.length) {
-                                reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
-                            }
+            let subjectType = inferType(reportError, getModule, getParent, getBinding, ast.subject);
 
-                            for (let i = 0; i < subjectType.typeParams.length; i++) {
-                                const typeParam = subjectType.typeParams[i]
-                                const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
+            // bind type-args for this invocation
+            // if (ast.kind === "invocation") {    
+            //     if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
+            //         if (subjectType.typeParams.length > 0) {
+            //             if (ast.typeArgs.length > 0) { // explicit type arguments
+            //                 if (subjectType.typeParams.length !== ast.typeArgs.length) {
+            //                     reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
+            //                 }
 
-                                scopeWithGenerics.types.set(typeParam.name, {
-                                    type: typeArg,
-                                    isGenericParameter: false,
-                                })
-                            }
-                        } else {
-                            const invocationSubjectType: FuncType|ProcType = {
-                                ...subjectType,
-                                args: subjectType.args.map((arg, index) => ({
-                                    ...arg,
-                                    type: inferType(reportError, getModule, parents, scopes, ast.args[index])
-                                }))
-                            }
+            //                 for (let i = 0; i < subjectType.typeParams.length; i++) {
+            //                     const typeParam = subjectType.typeParams[i]
+            //                     const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
+
+            //                     scopeWithGenerics.types.set(typeParam.name, {
+            //                         type: typeArg,
+            //                         isGenericParameter: false,
+            //                     })
+            //                 }
+            //             } else { // no type arguments (try to infer)
+            //                 const invocationSubjectType: FuncType|ProcType = {
+            //                     ...subjectType,
+            //                     args: subjectType.args.map((arg, index) => ({
+            //                         ...arg,
+            //                         type: inferType(reportError, getModule, getParent, getBinding, ast.args[index])
+            //                     }))
+            //                 }
     
-                            // attempt to infer params for generic
-                            const inferredBindings = fitTemplate(reportError, parents, scopes, 
-                                subjectType, 
-                                invocationSubjectType, 
-                                subjectType.typeParams.map(param => param.name)
-                            );
+            //                 // attempt to infer params for generic
+            //                 const inferredBindings = fitTemplate(reportError, getParent, getBinding, 
+            //                     subjectType, 
+            //                     invocationSubjectType, 
+            //                     subjectType.typeParams.map(param => param.name)
+            //                 );
     
-                            if (inferredBindings.size === subjectType.typeParams.length) {
-                                for (let i = 0; i < subjectType.typeParams.length; i++) {
-                                    const typeParam = subjectType.typeParams[i]
-                                    const typeArg = inferredBindings.get(typeParam.name) ?? UNKNOWN_TYPE
+            //                 if (inferredBindings.size === subjectType.typeParams.length) {
+            //                     for (let i = 0; i < subjectType.typeParams.length; i++) {
+            //                         const typeParam = subjectType.typeParams[i]
+            //                         const typeArg = inferredBindings.get(typeParam.name) ?? UNKNOWN_TYPE
         
-                                    scopeWithGenerics.types.set(typeParam.name, {
-                                        type: typeArg,
-                                        isGenericParameter: false,
-                                    })
-                                }
-                            } else {
-                                reportError(miscError(ast, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
-                            }
-                        }
-                    }
-                }
-
-                subjectType = resolve(reportError, getModule, scopeWithGenerics, subjectType);
-            }
+            //                         scopeWithGenerics.types.set(typeParam.name, {
+            //                             type: typeArg,
+            //                             isGenericParameter: false,
+            //                         })
+            //                     }
+            //                 } else {
+            //                     reportError(miscError(ast, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
 
             if (subjectType.kind === "func-type") {
                 return subjectType.returnType ?? UNKNOWN_TYPE;
@@ -173,23 +168,23 @@ const inferTypeInner = memoize5((
             }
         }
         case "indexer": {
-            const baseType = inferType(reportError, getModule, parents, scopes, ast.subject);
-            const indexerType = inferType(reportError, getModule, parents, scopes, ast.indexer);
+            const baseType = inferType(reportError, getModule, getParent, getBinding, ast.subject);
+            const indexerType = inferType(reportError, getModule, getParent, getBinding, ast.indexer);
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "exact-string-literal") {
                 const key = indexerType.value.value;
-                const valueType = propertiesOf(reportError, getModule, parents, scopes, baseType)?.find(entry => entry.name.name === key)?.type;
+                const valueType = propertiesOf(reportError, getModule, getParent, getBinding, baseType)?.find(entry => entry.name.name === key)?.type;
 
                 return valueType ?? UNKNOWN_TYPE;
             } else if (baseType.kind === "indexer-type") {
-                if (!subsumes(parents, scopes, baseType.keyType, indexerType)) {
+                if (!subsumes(getParent, getBinding, baseType.keyType, indexerType)) {
                     return UNKNOWN_TYPE;
                 } else {
                     return {
                         kind: "union-type",
                         members: [ baseType.valueType, NIL_TYPE ],
                         mutability: undefined,
-                        id: Symbol(),
+                        module: undefined,
                         code: undefined,
                         startIndex: undefined,
                         endIndex: undefined,
@@ -203,28 +198,28 @@ const inferTypeInner = memoize5((
         }
         case "if-else-expression":
         case "switch-expression": {
-            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, getModule, parents, scopes, ast.value)
+            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, getModule, getParent, getBinding, ast.value)
 
             const caseTypes = ast.cases.map(({ outcome }) => 
-                inferType(reportError, getModule, parents, scopes, outcome))
+                inferType(reportError, getModule, getParent, getBinding, outcome))
 
             const unionType: UnionType = {
                 kind: "union-type",
                 members: caseTypes,
                 mutability: undefined,
-                id: Symbol(),
+                module: undefined,
                 code: undefined,
                 startIndex: undefined,
                 endIndex: undefined,
             };
 
-            if (!subsumes(parents, scopes, unionType, valueType)) {
+            if (!subsumes(getParent, getBinding, unionType, valueType)) {
                 return {
                     ...unionType,
                     members: [
                         ...unionType.members,
                         ast.defaultCase 
-                            ? inferType(reportError, getModule, parents, scopes, ast.defaultCase) 
+                            ? inferType(reportError, getModule, getParent, getBinding, ast.defaultCase) 
                             : NIL_TYPE
                     ]
                 }
@@ -235,7 +230,7 @@ const inferTypeInner = memoize5((
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
         case "debug": {
             if (isExpression(ast.inner)) {
-                const type = inferType(reportError, getModule, parents, scopes, ast.inner)
+                const type = inferType(reportError, getModule, getParent, getBinding, ast.inner)
                 console.log(JSON.stringify({
                     bgl: given(ast.inner.code, code =>
                         given(ast.inner.startIndex, startIndex =>
@@ -249,20 +244,22 @@ const inferTypeInner = memoize5((
             }
         }
         case "parenthesized-expression":
-            return inferType(reportError, getModule, parents, scopes, ast.inner);
+            return inferType(reportError, getModule, getParent, getBinding, ast.inner);
+        case "inline-const":
+            return inferType(reportError, getModule, getParent, getBinding, ast.next);
         case "property-accessor": {
-            const subjectType = inferType(reportError, getModule, parents, scopes, ast.subject);
+            const subjectType = inferType(reportError, getModule, getParent, getBinding, ast.subject);
             const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-                ? subtract(parents, scopes, subjectType, NIL_TYPE)
+                ? subtract(getParent, getBinding, subjectType, NIL_TYPE)
                 : subjectType;
-            const propertyType = propertiesOf(reportError, getModule, parents, scopes, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)?.type
+            const propertyType = propertiesOf(reportError, getModule, getParent, getBinding, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)?.type
 
             if (ast.optional && propertyType) {
                 return {
                     kind: "union-type",
                     members: [propertyType, NIL_TYPE],
                     mutability: undefined,
-                    id: Symbol(),
+                    module: undefined,
                     code: undefined,
                     startIndex: undefined,
                     endIndex: undefined
@@ -282,8 +279,6 @@ const inferTypeInner = memoize5((
             }
         }
         case "local-identifier": {
-            const scope = getScopeFor(reportError, parents, scopes, ast)
-
 
             // deno-lint-ignore no-inner-declarations
             function getDeclType(decl: Declaration|LetDeclaration|ConstDeclarationStatement|InlineConst): TypeExpression {
@@ -291,7 +286,7 @@ const inferTypeInner = memoize5((
                     case 'const-declaration':
                     case 'let-declaration':
                     case 'const-declaration-statement': {
-                        const baseType = decl.type ?? inferType(reportError, getModule, parents, scopes, decl.value)
+                        const baseType = decl.type ?? inferType(reportError, getModule, getParent, getBinding, decl.value)
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
                             decl.kind === 'const-declaration' || decl.kind === 'const-declaration-statement'
                                 ? 'immutable'
@@ -305,7 +300,7 @@ const inferTypeInner = memoize5((
                     case 'func-declaration':
                     case 'proc-declaration':
                     case 'inline-const': {
-                        const baseType = inferType(reportError, getModule, parents, scopes, decl.value)
+                        const baseType = inferType(reportError, getModule, getParent, getBinding, decl.value)
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
                             decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
                                 ? 'immutable'
@@ -324,63 +319,41 @@ const inferTypeInner = memoize5((
                 }
             }
     
+            const resolution = getBinding(reportError, ast)
 
-            const binding = scope.values.get(ast.name)
-
-            if (binding != null) {
-                switch (binding?.kind) {
-                    case 'basic': return getDeclType(binding.ast)
+            if (resolution != null) {
+                switch (resolution.kind) {
+                    case 'basic': return getDeclType(resolution.ast)
                     case 'arg': {
-                        return binding.holder.type.args[binding.argIndex].type 
-                            ?? (inferType(reportError, getModule, parents, scopes, binding.holder) as FuncType|ProcType)
-                                .args[binding.argIndex].type
+                        return resolution.holder.type.args[resolution.argIndex].type 
+                            ?? (inferType(reportError, getModule, getParent, getBinding, resolution.holder) as FuncType|ProcType)
+                                .args[resolution.argIndex].type
                             ?? UNKNOWN_TYPE
                     }
                     case 'iterator': {
-                        const iteratorType = inferType(reportError, getModule, parents, scopes, binding.iterator)
+                        const iteratorType = inferType(reportError, getModule, getParent, getBinding, resolution.iterator)
     
-                        if (!subsumes(parents, scopes, ITERATOR_OF_ANY, iteratorType)) {
-                            reportError(assignmentError(binding.iterator, ITERATOR_OF_ANY, iteratorType))
+                        if (!subsumes(getParent, getBinding, ITERATOR_OF_ANY, iteratorType)) {
+                            reportError(assignmentError(resolution.iterator, ITERATOR_OF_ANY, iteratorType))
                         }
     
                         return iteratorType.kind === 'iterator-type' ? iteratorType.itemType : UNKNOWN_TYPE
                     }
                     case 'this': return {
                         kind: "store-type",
-                        store: binding.store,
+                        store: resolution.store,
                         internal: true,
                         mutability: "mutable",
-                        id: Symbol(),
+                        module: undefined,
                         code: undefined,
                         startIndex: undefined,
                         endIndex: undefined
                     }
+                    case 'type-binding': break;
                     default:
                         // @ts-expect-error
-                        throw Error('Unreachable!' + binding.kind)
+                        throw Error('Unreachable!' + resolution.kind)
                 }
-            }
-
-
-            const imported = scope.imports.get(ast.name)
-
-            if (imported != null) {
-                const otherModule = getModule(imported.importDeclaration.path.value)
-
-                if (otherModule == null) {
-                    reportError(cannotFindModule(imported.importDeclaration));
-                    return UNKNOWN_TYPE
-                }
-
-                const foreignDecl = otherModule.declarations.find(foreignDeclCandidate => 
-                    declExported(foreignDeclCandidate) && declName(foreignDeclCandidate) === imported.importItem.name.name);
-                
-                if (foreignDecl == null) {
-                    reportError(cannotFindExport(imported.importItem, imported.importDeclaration));
-                    return UNKNOWN_TYPE
-                }
-
-                return getDeclType(foreignDecl)
             }
 
             reportError(cannotFindName(ast))
@@ -392,7 +365,7 @@ const inferTypeInner = memoize5((
                 // tagName: ast.tagName,
                 // attributes: ast.attributes
                 mutability: undefined,
-                id: Symbol(),
+                module: undefined,
                 code: undefined,
                 startIndex: undefined,
                 endIndex: undefined,
@@ -400,13 +373,13 @@ const inferTypeInner = memoize5((
         }
         case "object-literal": {
             const entries: Attribute[] = ast.entries.map(([name, value]) => {
-                const type = inferType(reportError, getModule, parents, scopes, value);
+                const type = inferType(reportError, getModule, getParent, getBinding, value);
                 return {
                     kind: "attribute",
                     name,
                     type, 
                     mutability: undefined,
-                    id: Symbol(),
+                    module: undefined,
                     code: undefined,
                     startIndex: undefined,
                     endIndex: undefined,
@@ -418,14 +391,14 @@ const inferTypeInner = memoize5((
                 spreads: [],
                 entries,
                 mutability: "mutable",
-                id: Symbol(),
+                module: undefined,
                 code: undefined,
                 startIndex: undefined,
                 endIndex: undefined,
             };
         }
         case "array-literal": {
-            const entries = ast.entries.map(entry => inferType(reportError, getModule, parents, scopes, entry));
+            const entries = ast.entries.map(entry => inferType(reportError, getModule, getParent, getBinding, entry));
 
             // NOTE: This could be slightly better where different element types overlap each other
             const uniqueEntryTypes = entries.filter((el, index, arr) => 
@@ -439,13 +412,13 @@ const inferTypeInner = memoize5((
                         kind: "union-type",
                         members: uniqueEntryTypes,
                         mutability: undefined,
-                        id: Symbol(),
+                        module: undefined,
                         code: undefined,
                         startIndex: undefined,
                         endIndex: undefined,
                     },
                 mutability: "mutable",
-                id: Symbol(),
+                module: undefined,
                 code: undefined,
                 startIndex: undefined,
                 endIndex: undefined,
@@ -453,7 +426,7 @@ const inferTypeInner = memoize5((
         }
         case "store-property":
         case "store-function":
-        case "store-procedure": return (ast.kind === "store-property" ? ast.type : undefined) ?? inferType(reportError, getModule, parents, scopes, ast.value);
+        case "store-procedure": return (ast.kind === "store-property" ? ast.type : undefined) ?? inferType(reportError, getModule, getParent, getBinding, ast.value);
         case "string-literal": return STRING_TYPE;
         case "exact-string-literal": return STRING_TYPE;
         case "number-literal": return NUMBER_TYPE;
@@ -466,144 +439,9 @@ const inferTypeInner = memoize5((
     }
 })
 
-export function resolve(
-    reportError: (error: BagelError) => void,
-    getModule: (module: string) => Module|undefined, 
-    contextOrScope: [AllParents, AllScopes]|Scope, 
-    type: TypeExpression, 
-    resolveGenerics?: boolean
-): TypeExpression {
-    if (type.kind === "named-type") {
-        const resolutionScope = Array.isArray(contextOrScope)
-            ? getScopeFor(undefined, contextOrScope[0], contextOrScope[1], type)
-            : contextOrScope
-
-
-        const resolvedType = resolutionScope.types.get(type.name.name)
-
-        if (resolvedType != null) {
-            if (resolvedType.type.kind === "named-type" && resolvedType.type.name.name === type.name.name) {
-                // cycle??
-                return UNKNOWN_TYPE
-            } else if (!resolvedType.isGenericParameter || resolveGenerics) {
-                return resolve(reportError, getModule, contextOrScope, resolvedType.type, resolveGenerics)
-            } else {
-                return type
-            }
-        }
-
-        
-        const resolvedImport = resolutionScope.imports.get(type.name.name)
-
-        if (resolvedImport != null) {
-            const otherModule = getModule(resolvedImport.importDeclaration.path.value)
-
-            if (otherModule == null) {
-                reportError(cannotFindModule(resolvedImport.importDeclaration));
-                return UNKNOWN_TYPE
-            }
-
-            const foreignDecl = otherModule.declarations.find(foreignDeclCandidate => 
-                declExported(foreignDeclCandidate) && declName(foreignDeclCandidate) === resolvedImport.importItem.name.name);
-            
-            if (foreignDecl == null) {
-                reportError(cannotFindExport(resolvedImport.importItem, resolvedImport.importDeclaration));
-                return UNKNOWN_TYPE
-            }
-
-            if (foreignDecl.kind !== 'type-declaration') {
-                reportError(miscError(type.name, `Imported declaration "${type.name.name}" is not a type`))
-                return UNKNOWN_TYPE
-            }
-
-            return foreignDecl.type
-        }
-
-        reportError(cannotFindName(type.name))
-        return UNKNOWN_TYPE
-    } else if(type.kind === "union-type") {
-        const memberTypes = type.members.map(member =>
-            resolve(reportError, getModule, contextOrScope, member, resolveGenerics));
-        if (memberTypes.some(member => member == null)) {
-            return UNKNOWN_TYPE;
-        } else {
-            return {
-                kind: "union-type",
-                members: memberTypes as TypeExpression[],
-                mutability: undefined,
-                id: Symbol(),
-                code: type.code,
-                startIndex: type.startIndex,
-                endIndex: type.endIndex,
-            };
-        }
-    } else if(type.kind === "object-type") {
-        const entries = type.entries.map(({ type, ...rest }) => 
-            ({ ...rest, type: resolve(reportError, getModule, contextOrScope, type, resolveGenerics) }))
-
-        return {
-            ...type,
-            entries,
-        }
-    } else if(type.kind === "array-type") {
-        const element = resolve(reportError, getModule, contextOrScope, type.element, resolveGenerics)
-
-        return {
-            ...type,
-            element,
-        };
-    } else if(type.kind === "func-type") {
-        return {
-            kind: "func-type",
-            typeParams: type.typeParams,
-            args: type.args.map(({ type, ...other }) => ({ ...other, type: given(type, t => resolve(reportError, getModule, contextOrScope, t, resolveGenerics)) })),
-            returnType: given(type.returnType, returnType => resolve(reportError, getModule, contextOrScope, returnType, resolveGenerics)),
-            mutability: undefined,
-            id: Symbol(),
-            code: type.code,
-            startIndex: type.startIndex,
-            endIndex: type.endIndex,
-        };
-    } else if(type.kind === "proc-type") {
-        return {
-            kind: "proc-type",
-            typeParams: type.typeParams,
-            args: type.args.map(({ type, ...other }) => ({ ...other, type: given(type, t => resolve(reportError, getModule, contextOrScope, t, resolveGenerics)) })),
-            mutability: undefined,
-            id: Symbol(),
-            code: type.code,
-            startIndex: type.startIndex,
-            endIndex: type.endIndex,
-        };
-    } else if(type.kind === "iterator-type") {
-        return {
-            kind: "iterator-type",
-            itemType: resolve(reportError, getModule, contextOrScope, type.itemType, resolveGenerics),
-            mutability: undefined,
-            id: Symbol(),
-            code: type.code,
-            startIndex: type.startIndex,
-            endIndex: type.endIndex,
-        };
-    } else if(type.kind === "plan-type") {
-        return {
-            kind: "plan-type",
-            resultType: resolve(reportError, getModule, contextOrScope, type.resultType, resolveGenerics),
-            mutability: undefined,
-            id: Symbol(),
-            code: type.code,
-            startIndex: type.startIndex,
-            endIndex: type.endIndex,
-        };
-    }
-
-    // TODO: Recurse onIndexerType, TupleType, etc
-    return type;
-}
-
-export function simplify(parents: AllParents, scopes: AllScopes, type: TypeExpression): TypeExpression {
+export function simplify(getParent: GetParent, getBinding: GetBinding, type: TypeExpression): TypeExpression {
     return handleSingletonUnion(
-        distillUnion(parents, scopes,
+        distillUnion(getParent, getBinding,
             flattenUnions(type)));
 }
 
@@ -626,7 +464,7 @@ function flattenUnions(type: TypeExpression): TypeExpression {
             kind: "union-type",
             members,
             mutability: undefined,
-            id: type.id,
+            module: type.module,
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -639,7 +477,7 @@ function flattenUnions(type: TypeExpression): TypeExpression {
 /**
  * Remove redundant members in union type (members subsumed by other members)
  */
-function distillUnion(parents: AllParents, scopes: AllScopes, type: TypeExpression): TypeExpression {
+function distillUnion(getParent: GetParent, getBinding: GetBinding, type: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         const indicesToDrop = new Set<number>();
 
@@ -649,7 +487,7 @@ function distillUnion(parents: AllParents, scopes: AllScopes, type: TypeExpressi
                     const a = type.members[i];
                     const b = type.members[j];
 
-                    if (subsumes(parents, scopes, b, a) && !indicesToDrop.has(j)) {
+                    if (subsumes(getParent, getBinding, b, a) && !indicesToDrop.has(j)) {
                         indicesToDrop.add(i);
                     }
                 }
@@ -662,7 +500,7 @@ function distillUnion(parents: AllParents, scopes: AllScopes, type: TypeExpressi
             kind: "union-type",
             members,
             mutability: undefined,
-            id: type.id,
+            module: type.module,
             code: type.code,
             startIndex: type.startIndex,
             endIndex: type.endIndex,
@@ -683,22 +521,22 @@ function distillUnion(parents: AllParents, scopes: AllScopes, type: TypeExpressi
     }
 }
 
-export function subtract(parents: AllParents, scopes: AllScopes, type: TypeExpression, without: TypeExpression): TypeExpression {
+export function subtract(getParent: GetParent, getBinding: GetBinding, type: TypeExpression, without: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
-        return simplify(parents, scopes, {
+        return simplify(getParent, getBinding, {
             ...type,
-            members: type.members.filter(member => !subsumes(parents, scopes, without, member))
+            members: type.members.filter(member => !subsumes(getParent, getBinding, without, member))
         })
     } else { // TODO: There's probably more we can do here
         return type
     }
 }
 
-function narrow(parents: AllParents, scopes: AllScopes, type: TypeExpression, fit: TypeExpression): TypeExpression {
+function narrow(getParent: GetParent, getBinding: GetBinding, type: TypeExpression, fit: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
-        return simplify(parents, scopes, {
+        return simplify(getParent, getBinding, {
             ...type,
-            members: type.members.filter(member => subsumes(parents, scopes, fit, member))
+            members: type.members.filter(member => subsumes(getParent, getBinding, fit, member))
         })
     } else { // TODO: There's probably more we can do here
         return type
@@ -754,25 +592,126 @@ const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right:
     // },
 }
 
+function resolveRefinements(getParent: GetParent, epxr: Expression|StoreMember): Refinement[] {
+    const refinements: Refinement[] = []
+
+    for (let [current, parent] = [epxr, getParent(epxr)] as [AST, AST|undefined]; parent != null;) {
+
+        switch (current.kind) {
+            case 'case': {
+
+                // Type refinement
+                if (parent?.kind === "if-else-expression") {
+                    if (current.condition.kind === "binary-operator" && current.condition.ops[0][0].op === "!=") {
+                        const targetExpression = 
+                            current.condition.ops[0][1].kind === 'nil-literal' ? current.condition.base :
+                            current.condition.base.kind === "nil-literal" ? current.condition.ops[0][1] :
+                            undefined;
+
+                        if (targetExpression != null) {
+                            refinements.push({ kind: "subtraction", type: NIL_TYPE, targetExpression })
+                        }
+                    }
+
+                    if (current.condition.kind === "binary-operator" && current.condition.ops[0][0].op === "==") {
+                        const bits = (
+                            current.condition.base.kind === "invocation" && current.condition.base.subject.kind === "local-identifier" && current.condition.base.subject.name === "typeof" 
+                            && current.condition.ops[0][1].kind === "string-literal" && typeof current.condition.ops[0][1].segments[0] === "string" ? [current.condition.base.args[0], current.condition.ops[0][1].segments[0]] as const :
+                            current.condition.base.kind === "string-literal" && typeof current.condition.base.segments[0] === "string"
+                            && current.condition.ops[0][1].kind === "invocation" && current.condition.ops[0][1].subject.kind === "local-identifier" && current.condition.ops[0][1].subject.name === "typeof" ? [current.condition.ops[0][1].args[0], current.condition.base.segments[0]] as const :
+                            undefined
+                        )
+                        
+                        if (bits) {
+                            const [targetExpression, typeofStr] = bits
+        
+                            const refinedType = typeFromTypeof(typeofStr)
+                            
+                            if (refinedType) {
+                                refinements.push({ kind: "narrowing", type: refinedType, targetExpression })
+                            }
+                        }
+                        
+                    }
+                } else if (parent?.kind === "switch-expression") {
+                    if (parent.value.kind === "invocation" &&
+                        parent.value.subject.kind === "local-identifier" &&
+                        parent.value.subject.name === "typeof" &&
+                        current.condition.kind === "string-literal" &&
+                        current.condition.segments.length === 1 &&
+                        typeof current.condition.segments[0] === 'string') {
+                        
+                        const targetExpression = parent.value.args[0]
+                        const typeofStr = current.condition.segments[0]
+
+                        const refinedType = typeFromTypeof(typeofStr)
+
+                        if (refinedType) {
+                            refinements.push({ kind: "narrowing", type: refinedType, targetExpression })
+                        }
+                    }
+                }
+            }
+        }
+
+        current = parent
+        parent = getParent(parent)
+    }
+
+    return refinements
+}
+
+function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
+    return (
+        typeofStr === "string" ? STRING_TYPE :
+        typeofStr === "number" ? NUMBER_TYPE :
+        typeofStr === "boolean" ? BOOLEAN_TYPE :
+        typeofStr === "nil" ? NIL_TYPE :
+        typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, mutability: "readonly", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "object" ? { kind: "indexer-type", keyType: ANY_TYPE, valueType: ANY_TYPE, mutability: "readonly", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined } :
+        // TODO
+        // type.value === "set" ?
+        // type.value === "class-instance" ?
+        undefined
+    )
+}
+
 export function propertiesOf(
-    reportError: (error: BagelError) => void,
-    getModule: (module: string) => Module|undefined,
-    parents: AllParents,
-    scopes: AllScopes,
+    reportError: ReportError,
+    getModule: GetModule,
+    getParent: GetParent,
+    getBinding: GetBinding,
     type: TypeExpression
 ): readonly Attribute[] | undefined {
 
     switch (type.kind) {
+        case "named-type": {
+            const binding = getBinding(reportError, type.name)
+
+            if (binding?.kind !== 'type-binding') {
+                reportError(miscError(type.name, `Can't find type ${type.name.name}`))
+                return undefined
+            } else {
+                return propertiesOf(reportError, getModule, getParent, getBinding, binding.type)
+            }
+
+        }
         case "object-type": {
             const attrs = [...type.entries]
 
             for (const spread of type.spreads) {
-                const resolved = resolve(reportError, getModule, [parents, scopes], spread)
+                const resolved = getBinding(reportError, spread.name)
         
-                if (resolved.kind !== "object-type") {
-                    reportError(miscError(spread, `${displayForm(resolved)} is not an object type; can only spread object types into object types`))
+                if (resolved != null && resolved.kind === 'type-binding' && resolved.type.kind === 'object-type') {
+                    attrs.push(...(propertiesOf(reportError, getModule, getParent, getBinding, resolved.type) ?? []))
                 } else {
-                    attrs.push(...(propertiesOf(reportError, getModule, parents, scopes, resolved) ?? []))
+                    if (resolved != null) {
+                        if (resolved.kind !== 'type-binding') {
+                            reportError(miscError(spread, `${spread.name.name} is not a type`))
+                        } else if (resolved.type.kind !== 'object-type') {
+                            reportError(miscError(spread, `${displayForm(resolved.type)} is not an object type; can only spread object types into object types`))
+                        }
+                    }
                 }
             }
 
@@ -795,12 +734,10 @@ export function propertiesOf(
                     typeParams: [],
                     args: [{
                         kind: "arg",
-                        name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
+                        name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
                         type: type.element,
-                        id: Symbol(),
                         ...AST_NOISE
                     }],
-                    id: Symbol(),
                     ...TYPE_AST_NOISE
                 }))
             }
@@ -813,7 +750,7 @@ export function propertiesOf(
 
                 const memberType = memberDeclaredType(member) && memberDeclaredType(member)?.kind !== "func-type"
                     ? memberDeclaredType(member) as TypeExpression
-                    : inferType(reportError, getModule, parents, scopes, member.value);
+                    : inferType(reportError, getModule, getParent, getBinding, member.value);
 
                 const mutability = (
                     memberType.mutability == null ? undefined :
@@ -825,7 +762,6 @@ export function propertiesOf(
                     kind: "attribute",
                     name: member.name,
                     type: { ...memberType, mutability } as TypeExpression,
-                    id: member.id,
                     ...TYPE_AST_NOISE
                 }
             }
@@ -849,73 +785,62 @@ export function propertiesOf(
                     typeParams: [],
                     args: [{
                         kind: "arg",
-                        name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
+                        name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
                         type: {
                             kind: "func-type",
                             typeParams: [],
                             args: [{
                                 kind: "arg",
-                                name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
+                                name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
                                 type: itemType,
-                                id: Symbol(),
                                 ...AST_NOISE
                             }],
                             returnType: BOOLEAN_TYPE,
-                            id: Symbol(),
                             ...TYPE_AST_NOISE
                         },
-                        id: Symbol(),
                         ...AST_NOISE
                     }],
                     returnType: {
                         kind: "iterator-type",
                         itemType,
-                        id: Symbol(),
                         ...TYPE_AST_NOISE
                     },
-                    id: Symbol(),
                     ...TYPE_AST_NOISE
                 }),
                 attribute("map", {
                     kind: "func-type",
                     typeParams: [
-                        { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }
+                        { kind: "plain-identifier", name: "R", ...AST_NOISE }
                     ],
                     args: [{
                         kind: "arg",
-                        name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
+                        name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
                         type: {
                             kind: "func-type",
                             args: [{
                                 kind: "arg",
-                                name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
+                                name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
                                 type: itemType,
-                                id: Symbol(),
                                 ...AST_NOISE
                             }],
-                            returnType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
+                            returnType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, ...TYPE_AST_NOISE },
                             typeParams: [],
-                            id: Symbol(),
                             ...TYPE_AST_NOISE
                         },
-                        id: Symbol(),
                         ...AST_NOISE
                     }],
                     returnType: {
                         kind: "iterator-type",
-                        itemType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
-                        id: Symbol(),
+                        itemType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, ...TYPE_AST_NOISE },
                         ...TYPE_AST_NOISE
                     },
-                    id: Symbol(),
                     ...TYPE_AST_NOISE
                 }),
                 attribute("array", {
                     kind: "func-type",
                     typeParams: [],
                     args: [],
-                    returnType: { kind: "array-type", element: itemType, mutability: "mutable", id: Symbol(), ...AST_NOISE },
-                    id: Symbol(),
+                    returnType: { kind: "array-type", element: itemType, mutability: "mutable", ...AST_NOISE },
                     ...TYPE_AST_NOISE
                 }),
             ]
@@ -930,35 +855,30 @@ export function propertiesOf(
                 attribute("then", {
                     kind: "func-type",
                     typeParams: [
-                        { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }
+                        { kind: "plain-identifier", name: "R", ...AST_NOISE }
                     ],
                     args: [{
                         kind: "arg",
-                        name: { kind: "plain-identifier", name: "fn", id: Symbol(), ...AST_NOISE },
+                        name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
                         type: {
                             kind: "func-type",
                             args: [{
                                 kind: "arg",
-                                name: { kind: "plain-identifier", name: "el", id: Symbol(), ...AST_NOISE },
+                                name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
                                 type: resultType,
-                                id: Symbol(),
                                 ...TYPE_AST_NOISE
                             }],
-                            returnType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
+                            returnType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, ...TYPE_AST_NOISE },
                             typeParams: [],
-                            id: Symbol(),
                             ...TYPE_AST_NOISE
                         },
-                        id: Symbol(),
                         ...TYPE_AST_NOISE
                     }],
                     returnType: {
                         kind: "plan-type",
-                        resultType: { kind: "named-type", id: Symbol(), name: { kind: "plain-identifier", name: "R", id: Symbol(), ...AST_NOISE }, ...TYPE_AST_NOISE },
-                        id: Symbol(),
+                        resultType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, ...TYPE_AST_NOISE },
                         ...TYPE_AST_NOISE
                     },
-                    id: Symbol(),
                     ...TYPE_AST_NOISE
                 }),
             ]
@@ -971,20 +891,19 @@ export function propertiesOf(
 function attribute(name: string, type: TypeExpression): Attribute {
     return {
         kind: "attribute",
-        name: { kind: "plain-identifier", name, id: Symbol(), ...AST_NOISE },
+        name: { kind: "plain-identifier", name, ...AST_NOISE },
         type,
-        id: Symbol(),
         ...TYPE_AST_NOISE
     }
 }
 
-const AST_NOISE = { code: undefined, startIndex: undefined, endIndex: undefined }
+const AST_NOISE = { module: undefined, code: undefined, startIndex: undefined, endIndex: undefined }
 const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
 
 export function fitTemplate(
-    reportError: (error: BagelError) => void, 
-    parents: AllParents,
-    scopes: AllScopes,
+    reportError: ReportError, 
+    getParent: GetParent,
+    getBinding: GetBinding,
     parameterized: TypeExpression, 
     reified: TypeExpression, 
     params: readonly string[]
@@ -1002,8 +921,8 @@ export function fitTemplate(
     if (parameterized.kind === "func-type" && reified.kind === "func-type") {
         const matchGroups = [
             ...parameterized.args.map((arg, index) =>
-                fitTemplate(reportError, parents, scopes, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE, params)),
-            // fitTemplate(reportError, parents, scopes, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE, params)
+                fitTemplate(reportError, getParent, getBinding, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE, params)),
+            // fitTemplate(reportError, getParent, getBinding, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE, params)
         ]
 
         const matches = new Map<string, TypeExpression>();
@@ -1012,13 +931,12 @@ export function fitTemplate(
             for (const [key, value] of map.entries()) {
                 const existing = matches.get(key)
                 if (existing) {
-                    if (!subsumes(parents, scopes, existing, value)) {
-                        matches.set(key, simplify(parents, scopes, {
+                    if (!subsumes(getParent, getBinding, existing, value)) {
+                        matches.set(key, simplify(getParent, getBinding, {
                             kind: "union-type",
                             members: [value, existing],
-                            id: Symbol(),
                             mutability: undefined,
-                            code: undefined, startIndex: undefined, endIndex: undefined
+                            module: undefined, code: undefined, startIndex: undefined, endIndex: undefined
                         }))
                     }
                 } else {
@@ -1031,7 +949,7 @@ export function fitTemplate(
     }
 
     if (parameterized.kind === "array-type" && reified.kind === "array-type") {
-        return fitTemplate(reportError, parents, scopes, parameterized.element, reified.element, params);
+        return fitTemplate(reportError, getParent, getBinding, parameterized.element, reified.element, params);
     }
 
     if (parameterized.kind === "union-type") {
@@ -1056,12 +974,11 @@ export function fitTemplate(
             if (parameterizedMembersRemaining.length === 1 && isGenericParam(parameterizedMembersRemaining[0])) {
                 const matches = new Map<string, TypeExpression>();
 
-                matches.set(parameterizedMembersRemaining[0].name.name, simplify(parents, scopes, {
+                matches.set(parameterizedMembersRemaining[0].name.name, simplify(getParent, getBinding, {
                     kind: "union-type",
                     members: reifiedMembersRemaining,
-                    id: Symbol(),
                     mutability: undefined,
-                    code: undefined, startIndex: undefined, endIndex: undefined
+                    module: undefined, code: undefined, startIndex: undefined, endIndex: undefined
                 }))
                 
                 return matches;

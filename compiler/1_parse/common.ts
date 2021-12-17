@@ -1,6 +1,6 @@
 import { withoutSourceInfo } from "../debugging.ts";
 import { BagelError, isError } from "../errors.ts";
-import { memoize2, memoize3 } from "../utils.ts";
+import { memoize2, memoize3, ModuleName } from "../utils.ts";
 import { AST } from "../_model/ast.ts";
 import { KEYWORDS, PlainIdentifier } from "../_model/common.ts";
 
@@ -99,12 +99,12 @@ export function isSymbolic(ch: string, index: number): boolean {
 
 export type ParseResult<T> = { parsed: T, newIndex: number };
 
-export function parseSeries<T, D extends AST>(code: string, index: number, itemParseFn: ParseFunction<T>, delimiter:  ParseFunction<D>,        options?: Partial<SeriesOptions>):      ParseResult<(T|D)[]>|BagelError;
-export function parseSeries<T>(   code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string,                  options?: Partial<SeriesOptions>):      ParseResult<T[]>|BagelError;
-export function parseSeries<T, D extends AST>(code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string|ParseFunction<D>, options:  Partial<SeriesOptions> = {}): ParseResult<(T|D)[]>|BagelError {
+export function parseSeries<T, D extends AST>(module: ModuleName, code: string, index: number, itemParseFn: ParseFunction<T>, delimiter:  ParseFunction<D>,        options?: Partial<SeriesOptions>):      ParseResult<(T|D)[]>|BagelError;
+export function parseSeries<T>(module: ModuleName, code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string, options?: Partial<SeriesOptions>):      ParseResult<T[]>|BagelError;
+export function parseSeries<T, D extends AST>(module: ModuleName, code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string|ParseFunction<D>, options:  Partial<SeriesOptions> = {}): ParseResult<(T|D)[]>|BagelError {
     const delimiterFn: ParseFunction<D|undefined>|undefined = (
         typeof delimiter === "function" ? delimiter : 
-        typeof delimiter === "string" ? ((code, index) => given(consume(code, index, delimiter), newIndex => ({ parsed: undefined, newIndex })))
+        typeof delimiter === "string" ? ((_module, code, index) => given(consume(code, index, delimiter), newIndex => ({ parsed: undefined, newIndex })))
         : undefined
     )
     const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], newIndex: index };
@@ -113,7 +113,7 @@ export function parseSeries<T, D extends AST>(code: string, index: number, itemP
     const parsed: (T|D)[] = [];
 
     if (delimiterFn != null && (leadingDelimiter === "required" || leadingDelimiter === "optional")) {
-        const res = delimiterFn(code, index);
+        const res = delimiterFn(module, code, index);
 
         if (isError(res)) {
             return res
@@ -133,7 +133,7 @@ export function parseSeries<T, D extends AST>(code: string, index: number, itemP
 
     if (whitespace === "optional") index = consumeWhitespace(code, index);
 
-    let itemResult = itemParseFn(code, index);
+    let itemResult = itemParseFn(module, code, index);
     while (itemResult != null) {
         if (isError(itemResult)) {
             return itemResult;
@@ -148,7 +148,7 @@ export function parseSeries<T, D extends AST>(code: string, index: number, itemP
         if (whitespace === "optional") index = consumeWhitespace(code, index);
 
         if (delimiterFn != null) {
-            const res = delimiterFn(code, index)
+            const res = delimiterFn(module, code, index)
 
             if (isError(res)) {
                 return res
@@ -162,10 +162,10 @@ export function parseSeries<T, D extends AST>(code: string, index: number, itemP
                 }
                 if (whitespace === "optional") index = consumeWhitespace(code, index);
                 
-                itemResult = itemParseFn(code, index);
+                itemResult = itemParseFn(module, code, index);
             }
         } else {
-            itemResult = itemParseFn(code, index);
+            itemResult = itemParseFn(module, code, index);
         }
 
         if (whitespace === "optional") index = consumeWhitespace(code, index);
@@ -193,8 +193,8 @@ const DEFAULT_SERIES_OPTIONS: SeriesOptions = {
     whitespace: "optional",
 }
 
-export function parseOptional<T>(code: string, index: number, parseFn: ParseFunction<T>): Partial<ParseResult<T>> | BagelError {
-    const result = parseFn(code, index);
+export function parseOptional<T>(module: ModuleName, code: string, index: number, parseFn: ParseFunction<T>): Partial<ParseResult<T>> | BagelError {
+    const result = parseFn(module, code, index);
 
     if (isError(result)) {
         return result;
@@ -206,7 +206,7 @@ export function parseOptional<T>(code: string, index: number, parseFn: ParseFunc
     }
 }
 
-export const parseExact = <K extends string>(str: K): ParseFunction<K> => (code, index) => {
+export const parseExact = <K extends string>(str: K): ParseFunction<K> => (_module, code, index) => {
     return given(consume(code, index, str), index => ({ parsed: str, newIndex: index }))
 }
 
@@ -233,14 +233,14 @@ export function err(code: string|undefined, index: number|undefined, expected: s
     return { kind: "bagel-syntax-error", ast: undefined, code, index, message: `${expected} expected`, stack: undefined };
 }
 
-export type ParseFunction<T> = (code: string, index: number) => ParseResult<T> | BagelError | undefined;
+export type ParseFunction<T> = (module: ModuleName, code: string, index: number) => ParseResult<T> | BagelError | undefined;
 
-export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize2((code, startIndex) => 
+export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize3((module, code, startIndex) => 
     given(identifierSegment(code, startIndex), ({ segment: name, newIndex: index }) => ({
         parsed: {
             kind: "plain-identifier",
             name,
-            id: Symbol(),
+            module,
             code,
             startIndex,
             endIndex: index,

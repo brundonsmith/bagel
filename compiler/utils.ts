@@ -82,6 +82,10 @@ export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: A
                 yield* iterateParseTree(ast.type, ast)
             }
             yield* iterateParseTree(ast.value, ast)
+
+            if (ast.next) {
+                yield* iterateParseTree(ast.next, ast)
+            }
         } break;
         case "store-declaration": {
             yield* iterateParseTree(ast.name, ast)
@@ -109,13 +113,6 @@ export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: A
         case "proc":
         case "func": {
             yield* iterateParseTree(ast.type, ast)
-
-            if (ast.kind === "func") {
-                for (const c of ast.consts) {
-                    yield* iterateParseTree(c, ast)
-                }
-            }
-            
             yield* iterateParseTree(ast.body, ast)
         } break;
         case "inline-const":
@@ -124,6 +121,7 @@ export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: A
                 yield* iterateParseTree(ast.type, ast)
             }
             yield* iterateParseTree(ast.value, ast)
+            yield* iterateParseTree(ast.next, ast)
             break;
         case "pipe":
         case "invocation": {
@@ -226,6 +224,7 @@ export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: A
         case "const-declaration-statement": {
             yield* iterateParseTree(ast.name, ast)
             yield* iterateParseTree(ast.value, ast)
+            yield* iterateParseTree(ast.next, ast)
         } break;
         case "assignment": {
             yield* iterateParseTree(ast.target, ast)

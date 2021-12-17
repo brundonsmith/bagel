@@ -2,10 +2,10 @@ import { displayForm } from "./3_checking/typecheck.ts";
 import { AST } from "./_model/ast.ts";
 import { PlainIdentifier } from "./_model/common.ts";
 import { ImportDeclaration,ImportItem } from "./_model/declarations.ts";
-import { LocalIdentifier } from "./_model/expressions.ts";
+import { ExactStringLiteral, LocalIdentifier } from "./_model/expressions.ts";
 import { TypeExpression } from "./_model/type-expressions.ts";
 import { Colors } from "./deps.ts";
-import { given, ModuleName } from "./utils.ts";
+import { deepEquals, given, ModuleName } from "./utils.ts";
 
 export type BagelError =
     | BagelSyntaxError
@@ -51,7 +51,7 @@ export type BagelMiscTypeError = {
 
 export type BagelCannotFindModuleError = {
     kind: "bagel-cannot-find-module-error",
-    ast: ImportDeclaration
+    ast: ExactStringLiteral
 }
 
 export type BagelCannotFindExportError = {
@@ -75,6 +75,10 @@ export function isError(x: unknown): x is BagelError {
     return x != null && typeof x === "object" && ALL_ERROR_TYPES[x.kind] === null;
 }
 
+export function errorsEquivalent(a: BagelError, b: BagelError): boolean {
+    return deepEquals(a, b)
+}
+
 export function errorMessage(error: BagelError): string {
     switch (error.kind) {
         case "bagel-syntax-error":
@@ -88,7 +92,7 @@ export function errorMessage(error: BagelError): string {
         case "bagel-misc-type-error":
             return error.message;
         case "bagel-cannot-find-module-error":
-            return `Failed to resolve module '${error.ast.path.value}'`
+            return `Failed to resolve module '${error.ast.value}'`
         case "bagel-cannot-find-export-error":
             return `Module "${error.importDeclaration.path.value}" has no export named ${error.ast.name.name}`
     }
@@ -110,7 +114,7 @@ export function miscError(ast: AST|undefined, message: string): BagelMiscTypeErr
     return { kind: "bagel-misc-type-error", ast, message }
 }
 
-export function cannotFindModule(ast: ImportDeclaration): BagelCannotFindModuleError {
+export function cannotFindModule(ast: ExactStringLiteral): BagelCannotFindModuleError {
     return { kind: "bagel-cannot-find-module-error", ast }
 }
 

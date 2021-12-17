@@ -1,5 +1,5 @@
 import { AST, Debug } from "./ast.ts";
-import { Block, Identifier, PlainIdentifier, SourceInfo } from "./common.ts";
+import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
 import { FuncType, ProcType, TypeExpression } from "./type-expressions.ts";
 
 export type Expression = 
@@ -26,57 +26,58 @@ export type Expression =
     | ExactStringLiteral
     | NumberLiteral
     | ElementTag
+    | InlineConst
 
-export type JavascriptEscape = SourceInfo & Identifier & {
+export type JavascriptEscape = SourceInfo & {
     readonly kind: "javascript-escape",
     readonly js: string,
 }
 
-export type Pipe = SourceInfo & Identifier & {
+export type Pipe = SourceInfo & {
     readonly kind: "pipe",
     readonly subject: Expression,
     readonly args: [Expression],
 }
   
-export type Func = SourceInfo & Identifier & {
+export type Func = SourceInfo & {
     readonly kind: "func",
     readonly type: FuncType,
-    readonly consts: readonly InlineConst[],
     readonly body: Expression,
 }
 
-export type InlineConst = SourceInfo & Identifier & {
+export type InlineConst = SourceInfo & {
     readonly kind: "inline-const",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly value: Expression
+    readonly next: Expression
 }
 
-export type Proc = SourceInfo & Identifier & {
+export type Proc = SourceInfo & {
     readonly kind: "proc",
     readonly type: ProcType,
     readonly body: Block,
 }
 
-export type Range = SourceInfo & Identifier & {
+export type Range = SourceInfo & {
     readonly kind: "range",
     readonly start: number,
     readonly end: number,
 }
 
-export type BinaryOperator = SourceInfo & Identifier & {
+export type BinaryOperator = SourceInfo & {
     readonly kind: "binary-operator",
     readonly base: Expression,
     readonly ops: readonly [readonly [Operator, Expression], ...readonly [Operator, Expression][]],
     // TODO: Once generics are fully functional, create a `type: FuncType` property
 }
 
-export type NegationOperator = SourceInfo & Identifier & {
+export type NegationOperator = SourceInfo & {
     readonly kind: "negation-operator",
     readonly base: Expression,
 }
 
-export type Operator = SourceInfo & Identifier & {
+export type Operator = SourceInfo & {
     readonly kind: "operator",
     readonly op: BinaryOp,
 }
@@ -97,90 +98,90 @@ export function isBinaryOp(str: string): str is BinaryOp {
     return (ALL_BINARY_OPS as readonly string[]).includes(str);
 }
 
-export type Invocation = SourceInfo & Identifier & {
+export type Invocation = SourceInfo & {
     readonly kind: "invocation",
     readonly subject: Expression,
     readonly args: readonly Expression[],
     readonly typeArgs: readonly TypeExpression[],
 }
 
-export type Indexer = SourceInfo & Identifier & {
+export type Indexer = SourceInfo & {
     readonly kind: "indexer",
     readonly subject: Expression,
     readonly indexer: Expression,
 }
 
-export type PropertyAccessor = SourceInfo & Identifier & {
+export type PropertyAccessor = SourceInfo & {
     readonly kind: "property-accessor",
     readonly subject: Expression,
     readonly property: PlainIdentifier,
     readonly optional: boolean,
 }
 
-export type ParenthesizedExpression = SourceInfo & Identifier & {
+export type ParenthesizedExpression = SourceInfo & {
     readonly kind: "parenthesized-expression",
     readonly inner: Expression,
 }
 
-export type LocalIdentifier = SourceInfo & Identifier & {
+export type LocalIdentifier = SourceInfo & {
     readonly kind: "local-identifier",
     readonly name: string,
 }
 
-export type IfElseExpression = SourceInfo & Identifier & {
+export type IfElseExpression = SourceInfo & {
     readonly kind: "if-else-expression",
     readonly cases: readonly Case[],
     readonly defaultCase?: Expression
 }
 
-export type SwitchExpression = SourceInfo & Identifier & {
+export type SwitchExpression = SourceInfo & {
     readonly kind: "switch-expression",
     readonly value: Expression,
     readonly cases: readonly Case[],
     readonly defaultCase?: Expression
 }
 
-export type Case = SourceInfo & Identifier & {
+export type Case = SourceInfo & {
     readonly kind: "case",
     readonly condition: Expression,
     readonly outcome: Expression,
 }
 
-export type BooleanLiteral = SourceInfo & Identifier & {
+export type BooleanLiteral = SourceInfo & {
     readonly kind: "boolean-literal",
     readonly value: boolean,
 }
 
-export type NilLiteral = SourceInfo & Identifier & {
+export type NilLiteral = SourceInfo & {
     readonly kind: "nil-literal",
 }
 
-export type ObjectLiteral = SourceInfo & Identifier & {
+export type ObjectLiteral = SourceInfo & {
     readonly kind: "object-literal",
     readonly entries: readonly (readonly [PlainIdentifier, Expression])[],
 }
 
-export type ArrayLiteral = SourceInfo & Identifier & {
+export type ArrayLiteral = SourceInfo & {
     readonly kind: "array-literal",
     readonly entries: readonly Expression[],
 }
 
-export type StringLiteral = SourceInfo & Identifier & {
+export type StringLiteral = SourceInfo & {
     readonly kind: "string-literal",
     readonly segments: readonly (string|Expression)[],
 }
 
-export type ExactStringLiteral = SourceInfo & Identifier & {
+export type ExactStringLiteral = SourceInfo & {
     readonly kind: "exact-string-literal",
     readonly value: string,
 }
 
-export type NumberLiteral = SourceInfo & Identifier & {
+export type NumberLiteral = SourceInfo & {
     readonly kind: "number-literal",
     readonly value: number,
 }
 
-export type ElementTag = SourceInfo & Identifier & {
+export type ElementTag = SourceInfo & {
     readonly kind: "element-tag",
     readonly tagName: PlainIdentifier,
     readonly attributes: readonly (readonly [PlainIdentifier, Expression])[],
@@ -211,6 +212,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "nil-literal": undefined,
     "javascript-escape": undefined,
     "debug": undefined,
+    "inline-const": undefined,
 };
 
 export function isExpression(ast: AST): ast is Expression {

@@ -1,5 +1,5 @@
 import { AST } from "./ast.ts";
-import { Identifier, PlainIdentifier, SourceInfo } from "./common.ts";
+import { PlainIdentifier, SourceInfo } from "./common.ts";
 import { StoreDeclaration } from "./declarations.ts";
 import { BooleanLiteral, ExactStringLiteral, NumberLiteral } from "./expressions.ts";
 
@@ -26,26 +26,26 @@ export type TypeExpression =
     | AnyType
     | JavascriptEscapeType
 
-export type UnionType = SourceInfo & Identifier & {
+export type UnionType = SourceInfo & {
     readonly kind: "union-type",
     readonly members: readonly TypeExpression[],
     readonly mutability: undefined,
 }
 
-export type NamedType = SourceInfo & Identifier & {
+export type NamedType = SourceInfo & {
     readonly kind: "named-type",
     readonly name: PlainIdentifier,
     readonly mutability: undefined,
 }
 
-export type ProcType = SourceInfo & Identifier & {
+export type ProcType = SourceInfo & {
     readonly kind: "proc-type",
     readonly typeParams: readonly PlainIdentifier[],
     readonly args: readonly Arg[],
     readonly mutability: undefined,
 }
 
-export type FuncType = SourceInfo & Identifier & {
+export type FuncType = SourceInfo & {
     readonly kind: "func-type",
     readonly typeParams: PlainIdentifier[],
     readonly args: readonly Arg[],
@@ -53,44 +53,44 @@ export type FuncType = SourceInfo & Identifier & {
     readonly mutability: undefined,
 }
 
-export type Arg = SourceInfo & Identifier & {
+export type Arg = SourceInfo & {
     readonly kind: "arg",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression
 }
 
-export type ElementType = SourceInfo & Identifier & {
+export type ElementType = SourceInfo & {
     readonly kind: "element-type",
     // tagName: PlainIdentifier,
     // attributes: [PlainIdentifier, Expression][],
     readonly mutability: undefined,
 }
 
-export type ObjectType = SourceInfo & Identifier & Mutability & {
+export type ObjectType = SourceInfo & Mutability & {
     readonly kind: "object-type",
     readonly spreads: readonly NamedType[],
     readonly entries: readonly Attribute[],
 }
 
-export type Attribute = SourceInfo & Identifier & {
+export type Attribute = SourceInfo & {
     readonly kind: "attribute",
     readonly name: PlainIdentifier,
     readonly type: TypeExpression,
     readonly mutability: undefined,
 }
 
-export type IndexerType = SourceInfo & Identifier & Mutability & {
+export type IndexerType = SourceInfo & Mutability & {
     readonly kind: "indexer-type",
     readonly keyType: TypeExpression,
     readonly valueType: TypeExpression,
 }
 
-export type ArrayType = SourceInfo & Identifier & Mutability & {
+export type ArrayType = SourceInfo & Mutability & {
     readonly kind: "array-type",
     readonly element: TypeExpression,
 }
 
-export type TupleType = SourceInfo & Identifier & Mutability & {
+export type TupleType = SourceInfo & Mutability & {
     readonly kind: "tuple-type",
     readonly members: readonly TypeExpression[],
 }
@@ -102,69 +102,69 @@ export type PrimitiveType =
     | NilType
     | UnknownType
 
-export type StringType = SourceInfo & Identifier & {
+export type StringType = SourceInfo & {
     readonly kind: "string-type",
     readonly mutability: undefined,
 }
 
-export type NumberType = SourceInfo & Identifier & {
+export type NumberType = SourceInfo & {
     readonly kind: "number-type",
     readonly mutability: undefined,
 }
 
-export type BooleanType = SourceInfo & Identifier & {
+export type BooleanType = SourceInfo & {
     readonly kind: "boolean-type",
     readonly mutability: undefined,
 }
 
-export type NilType = SourceInfo & Identifier & {
+export type NilType = SourceInfo & {
     readonly kind: "nil-type",
     readonly mutability: undefined,
 }
 
-export type LiteralType = SourceInfo & Identifier & {
+export type LiteralType = SourceInfo & {
     readonly kind: "literal-type",
     readonly value: ExactStringLiteral | NumberLiteral | BooleanLiteral,
     readonly mutability: undefined,
 }
 
-export type StoreType = SourceInfo & Identifier & Mutability & {
+export type StoreType = SourceInfo & Mutability & {
     readonly kind: "store-type",
     readonly store: StoreDeclaration,
     readonly internal: boolean,
 }
 
-export type NominalType = SourceInfo & Identifier & {
+export type NominalType = SourceInfo & {
     readonly kind: "nominal-type",
     readonly name: string,
     readonly inner: TypeExpression,
     readonly mutability: undefined,
 }
 
-export type IteratorType = SourceInfo & Identifier & {
+export type IteratorType = SourceInfo & {
     readonly kind: "iterator-type",
     readonly itemType: TypeExpression,
     readonly mutability: undefined,
 }
 
-export type PlanType = SourceInfo & Identifier & {
+export type PlanType = SourceInfo & {
     readonly kind: "plan-type",
     readonly resultType: TypeExpression,
     readonly mutability: undefined,
 }
 
-export type UnknownType = SourceInfo & Identifier & {
+export type UnknownType = SourceInfo & {
     readonly kind: "unknown-type",
     readonly mutability: undefined,
 }
 
 // Internal use only!
-export type AnyType = SourceInfo & Identifier & {
+export type AnyType = SourceInfo & {
     readonly kind: "any-type",
     readonly mutability: undefined,
 }
 
-export type JavascriptEscapeType = SourceInfo & Identifier & {
+export type JavascriptEscapeType = SourceInfo & {
     readonly kind: "javascript-escape-type",
     readonly mutability: undefined,
 }
@@ -174,7 +174,7 @@ export type Mutability = { readonly mutability: "immutable"|"readonly"|"mutable"
 export const STRING_TYPE: StringType = {
     kind: "string-type",
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -182,7 +182,7 @@ export const STRING_TYPE: StringType = {
 export const NUMBER_TYPE: NumberType = {
     kind: "number-type",
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -190,7 +190,7 @@ export const NUMBER_TYPE: NumberType = {
 export const BOOLEAN_TYPE: BooleanType = {
     kind: "boolean-type",
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -198,7 +198,7 @@ export const BOOLEAN_TYPE: BooleanType = {
 export const NIL_TYPE: NilType = {
     kind: "nil-type",
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -206,7 +206,7 @@ export const NIL_TYPE: NilType = {
 export const UNKNOWN_TYPE: UnknownType = {
     kind: "unknown-type",
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -214,7 +214,7 @@ export const UNKNOWN_TYPE: UnknownType = {
 export const ANY_TYPE: AnyType = {
     kind: "any-type",
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -222,7 +222,7 @@ export const ANY_TYPE: AnyType = {
 export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
     kind: "javascript-escape-type",
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -231,7 +231,7 @@ export const ITERATOR_OF_NUMBERS_TYPE: IteratorType = {
     kind: "iterator-type",
     itemType: NUMBER_TYPE,
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -240,7 +240,7 @@ export const ITERATOR_OF_ANY: IteratorType = {
     kind: "iterator-type",
     itemType: ANY_TYPE,
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -253,7 +253,7 @@ export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
         BOOLEAN_TYPE,
     ],
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -264,7 +264,7 @@ export const REACTION_DATA_TYPE: TypeExpression = {
     returnType: UNKNOWN_TYPE,
     typeParams: [],
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -274,15 +274,15 @@ export const REACTION_EFFECT_TYPE: TypeExpression = {
     typeParams: [],
     args: [{
         kind: "arg",
-        name: { kind: "plain-identifier", name: "_", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+        name: { kind: "plain-identifier", name: "_", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
         type: UNKNOWN_TYPE,
-        id: Symbol(),
+        module: undefined,
         code: undefined,
         startIndex: undefined,
         endIndex: undefined,
     }],
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
@@ -293,24 +293,24 @@ export const ELEMENT_TAG_CHILD_TYPE: TypeExpression = {
         STRING_TYPE,
         NUMBER_TYPE,
         NIL_TYPE,
-        { kind: "element-type", mutability: undefined, id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+        { kind: "element-type", mutability: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
         { kind: "array-type", element: {
             kind: "union-type",
             members: [
                 STRING_TYPE,
                 NUMBER_TYPE,
                 NIL_TYPE,
-                { kind: "element-type", mutability: undefined, id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined },
+                { kind: "element-type", mutability: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
             ],
             code: undefined,
-            id: Symbol(),
+            module: undefined,
             startIndex: undefined,
             endIndex: undefined,
             mutability: undefined,
-        }, mutability: "immutable", id: Symbol(), code: undefined, startIndex: undefined, endIndex: undefined}
+        }, mutability: "immutable", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined}
     ],
     mutability: undefined,
-    id: Symbol(),
+    module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,

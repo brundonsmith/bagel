@@ -1,10 +1,7 @@
-import { parse } from "../compiler/1_parse/index.ts";
-import { reshape } from "../compiler/2_reshape/index.ts";
-import { getParentsMap, scopescan } from "../compiler/3_checking/scopescan.ts";
 import { compile } from "../compiler/4_compile/index.ts";
-import { BagelError, prettyError } from "../compiler/errors.ts";
+import { prettyError } from "../compiler/errors.ts";
+import Store from "../compiler/store.ts";
 import { ModuleName } from "../compiler/utils.ts";
-import { and, ParentsMap } from "../compiler/_model/common.ts";
 
 Deno.test({
   name: "Simple func declaration",
@@ -20,8 +17,8 @@ Deno.test({
   name: "Abbreviated func",
   fn() {
     testCompile(
-      `const fn = a => '12345'`,
-      `const fn = (a) => \`12345\`;`,
+      `const fn = a => a`,
+      `const fn = (a) => a;`,
     );
   },
 });
@@ -31,7 +28,7 @@ Deno.test({
   fn() {
     testCompile(
       `func memo uid() => '12345'`,
-      `const uid = ___computedFn(() => \`12345\`);`,
+      `const uid = ___computedFn(() => \`12345\`, { requiresReaction: false });`,
     );
   },
 });
@@ -54,11 +51,10 @@ Deno.test({
         const double = 2 * n,
         const ten = 5 * double,
         ten`,
-      `const uid = (n: number) => {
-        const double = (2 * n);
-        const ten = (5 * double);
-        return ten;
-      };`,
+      `const uid = (n: number) =>
+        ___withConst((2 * n), double =>
+        ___withConst((5 * double), ten =>
+          ten));`,
     );
   },
 });
@@ -165,6 +161,18 @@ Deno.test({
               4
             }`,
       `const merge = () => ((arr1.length <= 0) ? 2 : (arr1.length <= 1) ? 3 : 4);`,
+    );
+  },
+});
+
+Deno.test({
+  name: "Empty proc",
+  fn() {
+    testCompile(
+      `proc foo() {
+            }`,
+      `const foo = (): void => {
+      };`,
     );
   },
 });
@@ -429,17 +437,20 @@ Deno.test({
 
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>' as ModuleName
-  const errors: BagelError[] = [];
-  function reportError(err: BagelError) {
-    errors.push(err);
-  }
 
-  const ast = reshape(parse(code, reportError));
-  // console.log(JSON.stringify(withoutSourceInfo(ast), null, 2))
-  const parents = and<ParentsMap>(new Set(), getParentsMap(ast))
-  const scopes = scopescan(reportError, parents, ast);
-
-  const compiled = compile(parents, and(new Set(), scopes), ast, moduleName);
+  Store.initializeFromSource({
+    [moduleName]: code
+  }, {
+    entryFileOrDir: moduleName,
+    singleEntry: true,
+    bundle: false,
+    watch: false,
+    includeTests: false,
+    emit: false
+  })
+  
+  const { ast, errors } = Store.parsed(moduleName, code)
+  const compiled = compile(Store.getBinding, ast, moduleName)
 
   if (errors.length > 0) {
     throw `\n${code}\nFailed to parse:\n` +

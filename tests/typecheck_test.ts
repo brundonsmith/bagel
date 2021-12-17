@@ -1,9 +1,8 @@
-import { getParentsMap, scopescan } from "../compiler/3_checking/scopescan.ts";
 import { typecheck } from "../compiler/3_checking/typecheck.ts";
-import { parse } from "../compiler/1_parse/index.ts";
 import { BagelError,prettyError } from "../compiler/errors.ts";
-import { and } from "../compiler/_model/common.ts";
-import { ModuleName } from "../compiler/utils.ts";
+import { given, ModuleName } from "../compiler/utils.ts";
+import Store, { canonicalModuleName } from "../compiler/store.ts";
+import { log } from "../compiler/debugging.ts";
 
 Deno.test({
   name: "Basic constant",
@@ -172,7 +171,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Basic explicit generic",
+  name: "Basic explicit genericz",
   fn() {
     testTypecheck(
       `
@@ -882,24 +881,32 @@ Deno.test({
 // TODO: if/else/switch
 
 function testTypecheck(code: string, shouldFail: boolean): void {
+  const moduleName = "<test>" as ModuleName
   const errors: BagelError[] = [];
   function reportError(err: BagelError) {
     errors.push(err);
   }
 
-  const parsed = parse(code, reportError);
+  Store.initializeFromSource({
+    [moduleName]: code
+  }, {
+    entryFileOrDir: moduleName,
+    singleEntry: true,
+    bundle: false,
+    watch: false,
+    includeTests: false,
+    emit: false
+  })
+  
+  const { ast: parsed, errors: parseErrors } = Store.parsed(moduleName, code)
 
-  const parents = getParentsMap(parsed)
-  const scopes = scopescan(
-    reportError, 
-    and(new Set(), parents),
-    parsed
-  );
+  errors.push(...parseErrors)
+
   typecheck(
     reportError, 
     () => undefined, 
-    and(new Set(), parents), 
-    and(new Set(), scopes),
+    Store.getParent, 
+    Store.getBinding,
     parsed
   );
 
@@ -912,31 +919,25 @@ function testTypecheck(code: string, shouldFail: boolean): void {
 }
 
 function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: boolean): void {
+  modules = Object.fromEntries(Object.entries(modules).map(([key, value]) => [canonicalModuleName(key as ModuleName, key), value]))
+
   const errors: BagelError[] = [];
-  function reportError(err: BagelError) {
-    errors.push(err);
-  }
 
-  const parsed = Object.entries(modules).map(([module, code]) => [module, parse(code, reportError)] as const);
+  Store.initializeFromSource(modules, {
+    entryFileOrDir: 'foo' as ModuleName,
+    singleEntry: true,
+    bundle: false,
+    watch: false,
+    includeTests: false,
+    emit: false
+  })
+  
+  for (const module of Object.keys(modules) as ModuleName[]) {
+    const { ast: parsed, errors: parseErrors } = Store.parsed(module, modules[module])
+    errors.push(...parseErrors)
 
-  const parents = new Set(parsed.map(([_, ast]) => getParentsMap(ast)))
-
-  const scopes = new Set(parsed.map(([_, ast]) =>
-    scopescan(
-      reportError,
-      parents,
-      ast
-    )
-  ));
-
-  for (let i = 0; i < parsed.length; i++) {
-    typecheck(
-      reportError, 
-      name => parsed.find(m => m[0] === name)?.[1],
-      parents, 
-      scopes, 
-      parsed[i][1]
-    );
+    const typeErrors = Store.typeerrors(module, parsed)
+    errors.push(...typeErrors)
   }
 
   if (!shouldFail && errors.length > 0) {
