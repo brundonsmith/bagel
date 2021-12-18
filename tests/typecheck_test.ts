@@ -821,6 +821,35 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Literal type",
+  fn() {
+    testTypecheck(
+      `
+      const foo: 'bar' = 'bar'`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "As-casting success",
+  fn() {
+    testTypecheck(`
+    func foo(val: number): number|string => val as number|string`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "As-casting failure",
+  fn() {
+    testTypecheck(`
+    func foo(val: number|string): number => val as number`,
+    true)
+  }
+})
+
+Deno.test({
   name: "Immutability test 1",
   fn() {
     testTypecheck(`
@@ -898,7 +927,7 @@ Deno.test({
     const obj = { foo: 'bar' }
 
     proc foo(param: { foo: string }) {
-      let alias = obj;
+      let alias = obj as const { foo: string };
       alias = { foo: 'other' };
     }`,
     false)

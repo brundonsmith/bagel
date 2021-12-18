@@ -433,11 +433,20 @@ const inferTypeInner = memoize5((
         case "store-function":
         case "store-procedure": return (ast.kind === "store-property" ? ast.type : undefined) ?? inferType(reportError, getModule, getParent, getBinding, ast.value);
         case "string-literal": return STRING_TYPE;
-        case "exact-string-literal": return STRING_TYPE;
-        case "number-literal": return NUMBER_TYPE;
-        case "boolean-literal": return BOOLEAN_TYPE;
+        case "exact-string-literal":
+        case "number-literal":
+        case "boolean-literal": return {
+            kind: 'literal-type',
+            value: ast,
+            mutability: undefined,
+            module: ast.module,
+            code: ast.code,
+            startIndex: ast.startIndex,
+            endIndex: ast.endIndex,
+        };
         case "nil-literal": return NIL_TYPE;
         case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
+        case "as-cast": return ast.type;
         default:
             // @ts-expect-error
             throw Error(ast.kind)

@@ -4,7 +4,7 @@ import { memoize, memoize2, memoize3, ModuleName } from "../utils.ts";
 import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, ReportError, SourceInfo } from "../_model/common.ts";
 import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
@@ -1157,6 +1157,26 @@ const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => 
         : undefined
     )))
 
+
+const asCast: ParseFunction<AsCast> = (module, code, startIndex) =>
+    given(beneath(asCast)(module, code, startIndex), ({ parsed: inner, newIndex: index }) =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(consume(code, index, "as"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(typeExpression(module, code, index), err(code, index, '"Type expression"'), ({ parsed: type, newIndex: index }) => ({
+        parsed: {
+            kind: "as-cast",
+            inner,
+            type,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        newIndex: index
+    }))))))
+
+
 const negationOperator: ParseFunction<NegationOperator> = memoize3((module, code, startIndex) => 
     given(consume(code, startIndex, "!"), index =>
     expec(beneath(negationOperator)(module, code, index), err(code, index, "Boolean expression"), ({ parsed: base, newIndex: index }) => ({
@@ -1602,7 +1622,7 @@ const arrayLiteral: ParseFunction<ArrayLiteral> = (module, code, startIndex) =>
         newIndex: index,
     }))))
 
-const stringLiteral: ParseFunction<StringLiteral> = (module, code, startIndex) => {
+const stringLiteral: ParseFunction<StringLiteral|ExactStringLiteral> = (module, code, startIndex) => {
     const segments: (string|Expression)[] = [];
     let index = startIndex;
 
@@ -1644,16 +1664,30 @@ const stringLiteral: ParseFunction<StringLiteral> = (module, code, startIndex) =
         } else {
             segments.push(code.substring(currentSegmentStart, index));
 
-            return {
-                parsed: {
-                    kind: "string-literal",
-                    segments,
-                    module,
-                    code,
-                    startIndex,
-                    endIndex: index + 1,
-                },
-                newIndex: index + 1,
+            if (segments.length === 1 && typeof segments[0] === 'string') {
+                return {
+                    parsed: {
+                        kind: "exact-string-literal",
+                        value: segments[0],
+                        module,
+                        code,
+                        startIndex,
+                        endIndex: index + 1,
+                    },
+                    newIndex: index + 1,
+                }
+            } else {
+                return {
+                    parsed: {
+                        kind: "string-literal",
+                        segments,
+                        module,
+                        code,
+                        startIndex,
+                        endIndex: index + 1,
+                    },
+                    newIndex: index + 1,
+                }
             }
         }
     }
@@ -1661,16 +1695,9 @@ const stringLiteral: ParseFunction<StringLiteral> = (module, code, startIndex) =
 
 const exactStringLiteral: ParseFunction<ExactStringLiteral> = (module, code, startIndex) =>
     given(stringLiteral(module, code, startIndex), ({ parsed: literal, newIndex: index }) =>
-        literal.segments.length === 1 && typeof literal.segments[0] === 'string' ?
+        literal.kind === 'exact-string-literal' ?
             {
-                parsed: {
-                    kind: "exact-string-literal",
-                    value: literal.segments[0],
-                    module,
-                    code,
-                    startIndex,
-                    endIndex: index
-                },
+                parsed: literal,
                 newIndex: index
             }
         : undefined)
@@ -1789,6 +1816,7 @@ const debug: ParseFunction<Debug> = (module, code, startIndex) =>
 const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
     [ debug, javascriptEscape, pipe, elementTag ],
     [ func, proc, range ],
+    [ asCast ],
     [ binaryOperator(0) ],
     [ binaryOperator(1) ],
     [ binaryOperator(2) ],

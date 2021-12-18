@@ -178,6 +178,7 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                 }
             } break;
             case "string-literal": {
+                // check that all template insertions are allowed to be inserted
                 for (const segment of current.segments) {
                     if (typeof segment !== "string") {
                         const segmentType = inferType(reportError, getModule, getParent, getBinding, segment);
@@ -188,8 +189,13 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                     }
                 }
             } break;
-
-            // not expressions, but should have their contents checked
+            case "as-cast": {
+                const innerType = inferType(reportError, getModule, getParent, getBinding, current.inner)
+                
+                if (!subsumes(getParent, getBinding, current.type, innerType)) {
+                    reportError(miscError(current, `Expression of type ${displayForm(innerType)} cannot be expanded to type ${displayForm(current.type)}`))
+                }
+            } break;
             case "reaction": {
                 const dataType = inferType(reportError, getModule, getParent, getBinding, current.data);
                 const effectType = inferType(reportError, getModule, getParent, getBinding, current.effect);

@@ -27,6 +27,7 @@ export type Expression =
     | NumberLiteral
     | ElementTag
     | InlineConst
+    | AsCast
 
 export type JavascriptEscape = SourceInfo & {
     readonly kind: "javascript-escape",
@@ -188,6 +189,12 @@ export type ElementTag = SourceInfo & {
     readonly children: readonly Expression[],
 }
 
+export type AsCast = SourceInfo & {
+    readonly kind: "as-cast",
+    readonly inner: Expression,
+    readonly type: TypeExpression,
+}
+
 const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "proc": undefined,
     "func": undefined,
@@ -213,6 +220,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "javascript-escape": undefined,
     "debug": undefined,
     "inline-const": undefined,
+    "as-cast": undefined,
 };
 
 export function isExpression(ast: AST): ast is Expression {
