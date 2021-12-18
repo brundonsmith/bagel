@@ -71,13 +71,23 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                                 if (subjectType.typeParams.length !== current.typeArgs.length) {
                                     reportError(miscError(current, `Expected ${subjectType.typeParams.length} type arguments, but got ${current.typeArgs.length}`))
                                 }
-    
+
                                 subjectType = parameterizedGenericType(
                                     reportError, 
                                     getBinding, 
                                     subjectType, 
                                     current.typeArgs
                                 )
+
+                                // check that type args satisfy any `extends` clauses
+                                for (let i = 0; i < subjectType.typeParams.length; i++) {
+                                    const typeParam = subjectType.typeParams[i]
+                                    const typeArg = current.typeArgs[i] as TypeExpression
+
+                                    if (typeParam.extends && !subsumes(getParent, getBinding, typeParam.extends, typeArg)) {
+                                        reportError(assignmentError(typeArg, typeParam.extends, typeArg))
+                                    }
+                                }
                             } else {
                                 const invocationSubjectType: FuncType|ProcType = {
                                     ...subjectType,
@@ -85,7 +95,7 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                                 }
         
                                 // attempt to infer params for generic
-                                const inferredBindings = fitTemplate(reportError, getParent, getBinding, subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name));
+                                const inferredBindings = fitTemplate(reportError, getParent, getBinding, subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name.name));
         
                                 if (inferredBindings.size === subjectType.typeParams.length) {
                                     subjectType = parameterizedGenericType(
@@ -93,7 +103,7 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                                         getBinding, 
                                         subjectType, 
                                         subjectType.typeParams.map(param =>
-                                            inferredBindings.get(param.name) ?? UNKNOWN_TYPE)
+                                            inferredBindings.get(param.name.name) ?? UNKNOWN_TYPE)
                                     )
                                 } else {
                                     reportError(miscError(current, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))

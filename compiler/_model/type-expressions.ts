@@ -48,14 +48,14 @@ export type GenericParamType = SourceInfo & {
 
 export type ProcType = SourceInfo & {
     readonly kind: "proc-type",
-    readonly typeParams: readonly PlainIdentifier[],
+    readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
     readonly args: readonly Arg[],
     readonly mutability: undefined,
 }
 
 export type FuncType = SourceInfo & {
     readonly kind: "func-type",
-    readonly typeParams: PlainIdentifier[],
+    readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
     readonly args: readonly Arg[],
     readonly returnType?: TypeExpression,
     readonly mutability: undefined,

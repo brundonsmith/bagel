@@ -355,9 +355,9 @@ const funcType: ParseFunction<FuncType> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(consume(code, index, "<"), index =>
         given(consumeWhitespace(code, index), index =>
-        expec(parseSeries(module, code, index, plainIdentifier, ','), err(code, index, "Type parameters"), ({ parsed: typeParams, newIndex: index }) =>
+        expec(parseSeries(module, code, index, _typeParam, ','), err(code, index, "Type parameters"), ({ parsed: typeParams, newIndex: index }) =>
         given(consumeWhitespace(code, index), index => 
-        given(consume(code, index, ">"), index => ({ parsed: typeParams, newIndex: index }))))))), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
+        expec(consume(code, index, ">"), err(code, index, '">"'), index => ({ parsed: typeParams, newIndex: index }))))))), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
     given(consume(code, indexAfterTypeParams ?? startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, arg, ","), ({ parsed: args, newIndex: index }) =>
@@ -401,6 +401,20 @@ const procType: ParseFunction<FuncType|ProcType> = (module, code, startIndex) =>
         },
         newIndex: index
     }))))))))
+
+const _typeParam: ParseFunction<{ name: PlainIdentifier, extends: TypeExpression|undefined }> = (module, code, startIndex) =>
+    given(plainIdentifier(module, code, startIndex), ({ parsed: name, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(parseOptional(module, code, index, (module, code, index) =>
+        given(consume(code, index, "extends"), index =>
+        given(consumeWhitespaceRequired(code, index), index =>
+        expec(typeExpression(module, code, index), err(code, index, 'Type expression (extends constraint)'), res => res)))), ({ parsed: extendz, newIndex: indexAfterExtends }) => ({
+        parsed: {
+            name,
+            extends: extendz
+        },
+        newIndex: indexAfterExtends ?? index
+    }))))
 
 const iteratorType: ParseFunction<IteratorType> = (module, code, startIndex) =>
     given(consume(code, startIndex, "Iterator<"), index =>
@@ -995,7 +1009,7 @@ const func: ParseFunction<Func> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(consume(code, index, "<"), index =>
         given(consumeWhitespace(code, index), index =>
-        expec(parseSeries(module, code, index, plainIdentifier, ','), err(code, index, "Type parameters"), ({ parsed: typeParams, newIndex: index }) =>
+        expec(parseSeries(module, code, index, _typeParam, ','), err(code, index, "Type parameters"), ({ parsed: typeParams, newIndex: index }) =>
         given(consumeWhitespace(code, index), index => 
         given(consume(code, index, ">"), index => ({ parsed: typeParams, newIndex: index }))))))), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
     given(_args(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, newIndex: index }) =>

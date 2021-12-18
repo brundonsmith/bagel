@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-fallthrough
-import { GetParent, GetBinding, ReportError, GetModule, Refinement, PlainIdentifier } from "../_model/common.ts";
+import { GetParent, GetBinding, ReportError, GetModule, Refinement } from "../_model/common.ts";
 import { BinaryOp, Expression, InlineConst, isExpression } from "../_model/expressions.ts";
 import { ANY_TYPE, Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, mapParseTree, memoize5 } from "../utils.ts";
@@ -137,7 +137,7 @@ const inferTypeInner = memoize5((
                             const inferredBindings = fitTemplate(reportError, getParent, getBinding, 
                                 subjectType, 
                                 invocationSubjectType, 
-                                subjectType.typeParams.map(param => param.name)
+                                subjectType.typeParams.map(param => param.name.name)
                             );
     
                             if (inferredBindings.size === subjectType.typeParams.length) {
@@ -146,7 +146,7 @@ const inferTypeInner = memoize5((
                                     getBinding, 
                                     subjectType, 
                                     subjectType.typeParams.map(param =>
-                                        inferredBindings.get(param.name) ?? UNKNOWN_TYPE)
+                                        inferredBindings.get(param.name.name) ?? UNKNOWN_TYPE)
                                 )
                             } else {
                                 reportError(miscError(ast, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
@@ -409,8 +409,9 @@ const inferTypeInner = memoize5((
 
             return {
                 kind: "array-type",
-                element: uniqueEntryTypes.length === 1
-                    ? uniqueEntryTypes[0]
+                element: (
+                    uniqueEntryTypes.length === 1 ? uniqueEntryTypes[0]
+                    : uniqueEntryTypes.length === 0 ? UNKNOWN_TYPE
                     : {
                         kind: "union-type",
                         members: uniqueEntryTypes,
@@ -419,7 +420,8 @@ const inferTypeInner = memoize5((
                         code: undefined,
                         startIndex: undefined,
                         endIndex: undefined,
-                    },
+                    }
+                ),
                 mutability: "mutable",
                 module: undefined,
                 code: undefined,
@@ -448,7 +450,7 @@ export function parameterizedGenericType<T extends FuncType|ProcType>(reportErro
         const typeParam = generic.typeParams[i]
         const typeArg = typeArgs[i] as TypeExpression
 
-        bindings[typeParam.name] = typeArg
+        bindings[typeParam.name.name] = typeArg
     }
 
     return mapParseTree(generic, ast => {
@@ -719,7 +721,9 @@ export function propertiesOf(
             } else {
                 return propertiesOf(reportError, getModule, getParent, getBinding, binding.type)
             }
-
+        }
+        case "generic-param-type": {
+            return  propertiesOf(reportError, getModule, getParent, getBinding, type.extends ?? UNKNOWN_TYPE)
         }
         case "object-type": {
             const attrs = [...type.entries]
@@ -835,7 +839,7 @@ export function propertiesOf(
                 attribute("map", {
                     kind: "func-type",
                     typeParams: [
-                        { kind: "plain-identifier", name: "R", ...AST_NOISE }
+                        { name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined }
                     ],
                     args: [{
                         kind: "arg",
@@ -880,7 +884,7 @@ export function propertiesOf(
                 attribute("then", {
                     kind: "func-type",
                     typeParams: [
-                        { kind: "plain-identifier", name: "R", ...AST_NOISE }
+                        { name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined }
                     ],
                     args: [{
                         kind: "arg",

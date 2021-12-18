@@ -90,18 +90,17 @@ export function resolveLazy(reportError: ReportError, getModule: GetModule, getP
             
             // add any generic type parameters to scope
             for (const typeParam of parent.type.typeParams) {
-                if (typeParam.name === name.name) {
+                if (typeParam.name.name === name.name) {
                     if (resolved) {
-                        reportError(alreadyDeclared(typeParam))
+                        reportError(alreadyDeclared(typeParam.name))
                     }
 
                     resolved = {
                         kind: 'type-binding',
                         type: {
                             kind: "generic-param-type",
-                            name: typeParam,
-                            // TODO: Use `extends` keyword to give these more meaningful types in context
-                            extends: undefined,
+                            name: typeParam.name,
+                            extends: typeParam.extends,
                             module: undefined,
                             code: undefined,
                             startIndex: undefined,

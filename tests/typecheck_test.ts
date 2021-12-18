@@ -195,6 +195,42 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Basic explicit generic with extends",
+  fn() {
+    testTypecheck(
+      `
+      func other<T extends { foo: number }>(a: T): number => a.foo
+      const c: number = other<{ foo: number, bar: string }>({ foo: 12, bar: 'stuff' })`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Basic explicit generic with outside extends mismatch",
+  fn() {
+    testTypecheck(
+      `
+      func other<T extends { foo: number }>(a: T): number => a.foo
+      const c: number = other<{ foo: string, bar: string }>({ foo: 'stuff', bar: 13 })`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Basic explicit generic with inside extends mismatch",
+  fn() {
+    testTypecheck(
+      `
+      func other<T extends { foo: number }>(a: T): number => a
+      const c: number = other<{ foo: number, bar: string }>({ foo: 12, bar: 'stuff' })`,
+      true,
+    );
+  },
+});
+
+Deno.test({
   name: "Basic explicit generic mismatch return",
   fn() {
     testTypecheck(
@@ -351,6 +387,23 @@ Deno.test({
 //       func other<T>(a: T|nil): T|nil => a
 //       const c: number = other(12)`,
 //       true
+//     )
+//   }
+// })
+
+// Deno.test({
+//   name: "Virtual property type resolution when using named type",
+//   fn() {
+//     testTypecheck(
+//       `
+//       type TodoItem = {
+//         text: string,
+//         done: boolean
+//       }
+    
+//       func renderApp(iter: Iterator<TodoItem>) =>
+//         iter.map<string>(item => item.text).array()`,
+//       false
 //     )
 //   }
 // })
