@@ -2,7 +2,7 @@ import { typecheck } from "../compiler/3_checking/typecheck.ts";
 import { BagelError,prettyError } from "../compiler/errors.ts";
 import { given, ModuleName } from "../compiler/utils.ts";
 import Store, { canonicalModuleName } from "../compiler/store.ts";
-import { log } from "../compiler/debugging.ts";
+import { log, withoutSourceInfo } from "../compiler/debugging.ts";
 
 Deno.test({
   name: "Basic constant",
@@ -171,7 +171,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Basic explicit genericz",
+  name: "Basic explicit generic",
   fn() {
     testTypecheck(
       `
@@ -856,7 +856,6 @@ Deno.test({
   name: "Immutability test 8",
   fn() {
     testTypecheck(`
-
     proc foo(param: { foo: string }) {
       const obj = param;
     }`,
@@ -868,7 +867,6 @@ Deno.test({
   name: "Immutability test 9",
   fn() {
     testTypecheck(`
-
     proc foo(param: { foo: string }) {
       const obj = param;
       obj.foo = 'other';
@@ -898,6 +896,7 @@ function testTypecheck(code: string, shouldFail: boolean): void {
     emit: false
   })
   
+  // console.log(JSON.stringify(withoutSourceInfo(Store.parsed(moduleName, code).ast), null, 2))
   const { ast: parsed, errors: parseErrors } = Store.parsed(moduleName, code)
 
   errors.push(...parseErrors)

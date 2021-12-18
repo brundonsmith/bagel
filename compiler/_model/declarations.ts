@@ -53,7 +53,6 @@ export type ConstDeclaration = SourceInfo & Exported & {
     readonly name: PlainIdentifier,
     readonly type: TypeExpression|undefined,
     readonly value: Expression,
-    readonly next?: ConstDeclaration,
 }
 
 export type StoreDeclaration = SourceInfo & Exported & {
@@ -95,15 +94,15 @@ export function memberDeclaredType(m: StoreMember): TypeExpression|undefined {
 }
 
 export type TestExprDeclaration = SourceInfo & {
-    kind: "test-expr-declaration",
-    name: ExactStringLiteral,
-    expr: Expression,
+    readonly kind: "test-expr-declaration",
+    readonly name: ExactStringLiteral,
+    readonly expr: Expression,
 }
 
 export type TestBlockDeclaration = SourceInfo & {
-    kind: "test-block-declaration",
-    name: ExactStringLiteral,
-    block: Block,
+    readonly kind: "test-block-declaration",
+    readonly name: ExactStringLiteral,
+    readonly block: Block,
 }
 
 // TODO: ClassReaction

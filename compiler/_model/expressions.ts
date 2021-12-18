@@ -36,7 +36,7 @@ export type JavascriptEscape = SourceInfo & {
 export type Pipe = SourceInfo & {
     readonly kind: "pipe",
     readonly subject: Expression,
-    readonly args: [Expression],
+    readonly args: readonly [Expression],
 }
   
 export type Func = SourceInfo & {
@@ -49,7 +49,7 @@ export type InlineConst = SourceInfo & {
     readonly kind: "inline-const",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
-    readonly value: Expression
+    readonly value: Expression,
     readonly next: Expression
 }
 

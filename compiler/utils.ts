@@ -53,303 +53,333 @@ export function deepEquals(a: BasicData, b: BasicData, ignorePropNames: string[]
     return false;
 }
 
+const NON_AST_PROPERTIES = new Set(["kind", "mutability", "module", "code", "startIndex", "endIndex"])
+
+// very HACKy but needed!
 export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: AST, current: AST }> {
     yield { parent, current: ast }
 
-    switch(ast.kind) {
-        case "module": {
-            for (const declaration of ast.declarations) {
-                yield* iterateParseTree(declaration, ast)
-            }
-        } break;
-        case "block": {
-            for(const statement of ast.statements) {
-                yield* iterateParseTree(statement, ast)
-            }
-        } break;
-        case "type-declaration": {
-            yield* iterateParseTree(ast.name, ast)
-            yield* iterateParseTree(ast.type, ast)
-        } break;
-        case "func-declaration":
-        case "proc-declaration": {
-            yield* iterateParseTree(ast.name, ast)
-            yield* iterateParseTree(ast.value, ast)
-        } break;
-        case "const-declaration": {
-            yield* iterateParseTree(ast.name, ast)
-            if (ast.type) {
-                yield* iterateParseTree(ast.type, ast)
-            }
-            yield* iterateParseTree(ast.value, ast)
+    for (const key in ast) {
+        if (!NON_AST_PROPERTIES.has(key)) {
+            // @ts-ignore
+            const prop = ast[key] as AST|AST[]|[AST, AST][]|undefined|string|number|boolean|null
 
-            if (ast.next) {
-                yield* iterateParseTree(ast.next, ast)
-            }
-        } break;
-        case "store-declaration": {
-            yield* iterateParseTree(ast.name, ast)
-            for(const member of ast.members) {
-                yield* iterateParseTree(member, ast)
-            }
-        } break;
-        case "store-property":
-        case "store-function":
-        case "store-procedure": {
-            yield* iterateParseTree(ast.name, ast)
-            if (ast.kind === "store-property" && ast.type) {
-                yield* iterateParseTree(ast.type, ast)
-            }
-            yield* iterateParseTree(ast.value, ast)
-        } break;
-        case "test-expr-declaration": {
-            yield* iterateParseTree(ast.name, ast)
-            yield* iterateParseTree(ast.expr, ast)
-        } break;
-        case "test-block-declaration": {
-            yield* iterateParseTree(ast.name, ast)
-            yield* iterateParseTree(ast.block, ast)
-        } break;
-        case "proc":
-        case "func": {
-            yield* iterateParseTree(ast.type, ast)
-            yield* iterateParseTree(ast.body, ast)
-        } break;
-        case "inline-const":
-            yield* iterateParseTree(ast.name, ast)
-            if (ast.type) {
-                yield* iterateParseTree(ast.type, ast)
-            }
-            yield* iterateParseTree(ast.value, ast)
-            yield* iterateParseTree(ast.next, ast)
-            break;
-        case "pipe":
-        case "invocation": {
-            yield* iterateParseTree(ast.subject, ast)
+            if (typeof prop === 'object' && prop != null) {
+                if (Array.isArray(prop)) {
+                    const tuplesArray = Array.isArray(prop[0])
 
-            if (ast.kind === "invocation" && ast.typeArgs) {
-                for (const arg of ast.typeArgs) {
-                    yield* iterateParseTree(arg, ast)
+                    if (tuplesArray) {
+                        for (const [a, b] of (prop as [AST, AST][])) {
+                            yield* iterateParseTree(a, ast)
+                            yield* iterateParseTree(b, ast)
+                        }
+                    } else {
+                        for (const el of prop as AST[]) {
+                            yield* iterateParseTree(el, ast)
+                        }
+                    }
+                } else {
+                    yield* iterateParseTree(prop, ast)
                 }
             }
-
-            for (const arg of ast.args) {
-                yield* iterateParseTree(arg, ast)
-            }
-        } break;
-        case "binary-operator": {
-            yield* iterateParseTree(ast.base, ast)
-            for (const [op, expr] of ast.ops) {
-                yield* iterateParseTree(op, ast)
-                yield* iterateParseTree(expr, ast)
-            }
-        } break;
-        case "negation-operator": {
-            yield* iterateParseTree(ast.base, ast)
-        } break;
-        case "element-tag": {
-            for (const [name, value] of ast.attributes) {
-                yield* iterateParseTree(name, ast)
-                yield* iterateParseTree(value, ast)
-            }
-            for (const child of ast.children) {
-                yield* iterateParseTree(child, ast)
-            }
-        } break;
-        case "indexer": {
-            yield* iterateParseTree(ast.subject, ast)
-            yield* iterateParseTree(ast.indexer, ast)
-        } break;
-        case "if-else-statement": {
-            for (const { condition, outcome } of ast.cases) {
-                yield* iterateParseTree(condition, ast)
-                yield* iterateParseTree(outcome, ast)
-            }
-            if (ast.defaultCase != null) {
-                yield* iterateParseTree(ast.defaultCase, ast)
-            }
-
-        } break;
-        case "if-else-expression":
-        case "switch-expression": {
-            if (ast.kind === "switch-expression") {
-                yield* iterateParseTree(ast.value, ast)
-            }
-            for (const c of ast.cases) {
-                yield* iterateParseTree(c, ast)
-            }
-            if (ast.defaultCase != null) {
-                yield* iterateParseTree(ast.defaultCase, ast)
-            }
-        } break;
-        case "case": {
-            yield* iterateParseTree(ast.condition, ast)
-            yield* iterateParseTree(ast.outcome, ast)
-        } break;
-        case "parenthesized-expression":
-        case "debug": {
-            yield* iterateParseTree(ast.inner, ast)
-        } break;
-        case "property-accessor": {
-            yield* iterateParseTree(ast.subject, ast)
-            yield* iterateParseTree(ast.property, ast)
-        } break;
-        case "object-literal": {
-            for (const [key, value] of ast.entries) {
-                yield* iterateParseTree(key, ast)
-                yield* iterateParseTree(value, ast)
-            }
-        } break;
-        case "array-literal": {
-            for (const element of ast.entries) {
-                yield* iterateParseTree(element, ast)
-            }
-        } break;
-        case "string-literal": {
-            for (const segment of ast.segments) {
-                if (typeof segment !== "string") {
-                    yield* iterateParseTree(segment, ast)
-                }
-            }
-        } break;
-
-        case "reaction": {
-            yield* iterateParseTree(ast.data, ast)
-            yield* iterateParseTree(ast.effect, ast)
-            if (ast.until) {
-                yield* iterateParseTree(ast.until, ast)
-            }
-        } break;
-        case "let-declaration":
-        case "const-declaration-statement": {
-            yield* iterateParseTree(ast.name, ast)
-            yield* iterateParseTree(ast.value, ast)
-            yield* iterateParseTree(ast.next, ast)
-        } break;
-        case "assignment": {
-            yield* iterateParseTree(ast.target, ast)
-            yield* iterateParseTree(ast.value, ast)
-        } break;
-        case "for-loop": {
-            yield* iterateParseTree(ast.itemIdentifier, ast)
-            yield* iterateParseTree(ast.iterator, ast)
-            yield* iterateParseTree(ast.body, ast)
-        } break;
-        case "while-loop": {
-            yield* iterateParseTree(ast.condition, ast)
-            yield* iterateParseTree(ast.body, ast)
-        } break;
-        case "import-declaration": {
-            yield* iterateParseTree(ast.path, ast)
-            for (const i of ast.imports) {
-                yield* iterateParseTree(i, ast)
-            }
-        } break;
-        case "import-item": {
-            yield* iterateParseTree(ast.name)
-            if (ast.alias) {
-                yield* iterateParseTree(ast.alias, ast)
-            }
-
-        } break;
-
-        // types
-        case "union-type": {
-            for (const m of ast.members) {
-                yield* iterateParseTree(m, ast)
-            }
-        } break;
-        case "named-type": {
-            yield* iterateParseTree(ast.name, ast)
-        } break;
-        case "proc-type":
-        case "func-type": {
-            for (const m of ast.typeParams) {
-                yield* iterateParseTree(m, ast)
-            }
-            for (const arg of ast.args) {
-                yield* iterateParseTree(arg.name, ast)
-                if (arg.type) {
-                    yield* iterateParseTree(arg.type, ast)
-                }
-            }
-
-            if (ast.kind === "func-type" && ast.returnType) {
-                yield* iterateParseTree(ast.returnType, ast)
-            }
-        } break;
-        case "arg": {
-            yield* iterateParseTree(ast.name, ast)
-
-            if (ast.type) {
-                yield* iterateParseTree(ast.type, ast)
-            }
-        } break;
-        case "object-type": {
-            for (const spread of ast.spreads) {
-                yield* iterateParseTree(spread, ast)
-            }
-            for (const attribute of ast.entries) {
-                yield* iterateParseTree(attribute, ast)
-            }
-        } break;
-        case "attribute": {
-            yield* iterateParseTree(ast.name, ast)
-            yield* iterateParseTree(ast.type, ast)
-        } break;
-        case "indexer-type": {
-            yield* iterateParseTree(ast.keyType, ast)
-            yield* iterateParseTree(ast.valueType, ast)
-        } break;
-        case "array-type": {
-            yield* iterateParseTree(ast.element, ast)
-        } break;
-        case "tuple-type": {
-            for (const m of ast.members) {
-                yield* iterateParseTree(m, ast)
-            }
-        } break;
-        case "literal-type": {
-            yield* iterateParseTree(ast.value, ast)
-        } break;
-        case "nominal-type": {
-            yield* iterateParseTree(ast.inner, ast)
-        } break;
-        case "iterator-type": {
-            yield* iterateParseTree(ast.itemType, ast)
-        } break;
-        case "plan-type": {
-            yield* iterateParseTree(ast.resultType, ast)
-        } break;
-        case "store-type": {
-            yield* iterateParseTree(ast.store, ast)
-        } break;
-
-        // atomic
-        case "plain-identifier":
-        case "range":
-        case "local-identifier":
-        case "number-literal":
-        case "boolean-literal":
-        case "exact-string-literal":
-        case "nil-literal":
-        case "javascript-escape":
-        case "element-type":
-        case "string-type":
-        case "number-type":
-        case "boolean-type":
-        case "nil-type":
-        case "unknown-type":
-        case "any-type":
-        case "javascript-escape-type":
-        case "operator":
-            break;
-
-        default:
-            // @ts-expect-error
-            throw Error("Need to add walk clause for AST node type " + ast.kind)
+        }
     }
 }
+
+export function mapParseTree(ast: AST, transform: (ast: AST) => AST): AST {
+    const newAst = {...ast}
+
+    for (const key in newAst) {
+        if (!NON_AST_PROPERTIES.has(key)) {
+            // @ts-ignore
+            const prop = newAst[key] as AST|AST[]|[AST, AST][]|undefined|string|number|boolean|null
+
+            if (typeof prop === 'object' && prop != null) {
+                if (Array.isArray(prop)) {
+                    const isTuplesArray = Array.isArray(prop[0])
+
+                    if (isTuplesArray) {
+                        (newAst as any)[key] = (prop as [AST, AST][]).map(([a, b]) => [
+                            mapParseTree(a, transform),
+                            mapParseTree(b, transform)
+                        ])
+                    } else {
+                        (newAst as any)[key] = (prop as AST[]).map(el => 
+                            mapParseTree(el, transform))
+                    }
+                } else {
+                    (newAst as any)[key] = mapParseTree(prop, transform)
+                }
+            }
+        }
+    }
+
+    return transform(newAst)
+}
+
+// export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: AST, current: AST }> {
+//     yield { parent, current: ast }
+
+//     switch(ast.kind) {
+//         case "module": {
+//             for (const declaration of ast.declarations) {
+//                 yield* iterateParseTree(declaration, ast)
+//             }
+//         } break;
+//         case "block": {
+//             for(const statement of ast.statements) {
+//                 yield* iterateParseTree(statement, ast)
+//             }
+//         } break;
+//         case "type-declaration":
+//         case "attribute":
+//         case "arg": {
+//             yield* iterateParseTree(ast.name, ast)
+//             if (ast.type) {
+//                 yield* iterateParseTree(ast.type, ast)
+//             }
+//         } break;
+//         case "const-declaration":
+//         case "let-declaration":
+//         case "const-declaration-statement":
+//         case "inline-const": {
+//             yield* iterateParseTree(ast.name, ast)
+//             if (ast.type) {
+//                 yield* iterateParseTree(ast.type, ast)
+//             }
+//             yield* iterateParseTree(ast.value, ast)
+//             if (ast.next) {
+//                 yield* iterateParseTree(ast.next, ast)
+//             }
+//         } break;
+//         case "store-declaration": {
+//             yield* iterateParseTree(ast.name, ast)
+//             for(const member of ast.members) {
+//                 yield* iterateParseTree(member, ast)
+//             }
+//         } break;
+//         case "func-declaration":
+//         case "proc-declaration":
+//         case "store-property":
+//         case "store-function":
+//         case "store-procedure": {
+//             yield* iterateParseTree(ast.name, ast)
+//             if (ast.kind === "store-property" && ast.type) {
+//                 yield* iterateParseTree(ast.type, ast)
+//             }
+//             yield* iterateParseTree(ast.value, ast)
+//         } break;
+//         case "test-expr-declaration": {
+//             yield* iterateParseTree(ast.name, ast)
+//             yield* iterateParseTree(ast.expr, ast)
+//         } break;
+//         case "test-block-declaration": {
+//             yield* iterateParseTree(ast.name, ast)
+//             yield* iterateParseTree(ast.block, ast)
+//         } break;
+//         case "proc":
+//         case "func": {
+//             yield* iterateParseTree(ast.type, ast)
+//             yield* iterateParseTree(ast.body, ast)
+//         } break;
+//         case "pipe":
+//         case "invocation": {
+//             yield* iterateParseTree(ast.subject, ast)
+
+//             if (ast.kind === "invocation" && ast.typeArgs) {
+//                 for (const arg of ast.typeArgs) {
+//                     yield* iterateParseTree(arg, ast)
+//                 }
+//             }
+
+//             for (const arg of ast.args) {
+//                 yield* iterateParseTree(arg, ast)
+//             }
+//         } break;
+//         case "binary-operator": {
+//             yield* iterateParseTree(ast.base, ast)
+//             for (const [op, expr] of ast.ops) {
+//                 yield* iterateParseTree(op, ast)
+//                 yield* iterateParseTree(expr, ast)
+//             }
+//         } break;
+//         case "negation-operator": {
+//             yield* iterateParseTree(ast.base, ast)
+//         } break;
+//         case "element-tag": {
+//             for (const [name, value] of ast.attributes) {
+//                 yield* iterateParseTree(name, ast)
+//                 yield* iterateParseTree(value, ast)
+//             }
+//             for (const child of ast.children) {
+//                 yield* iterateParseTree(child, ast)
+//             }
+//         } break;
+//         case "indexer": {
+//             yield* iterateParseTree(ast.subject, ast)
+//             yield* iterateParseTree(ast.indexer, ast)
+//         } break;
+//         case "if-else-statement":
+//         case "if-else-expression":
+//         case "switch-expression": {
+//             if (ast.kind === "switch-expression") {
+//                 yield* iterateParseTree(ast.value, ast)
+//             }
+//             for (const c of ast.cases) {
+//                 yield* iterateParseTree(c, ast)
+//             }
+//             if (ast.defaultCase != null) {
+//                 yield* iterateParseTree(ast.defaultCase, ast)
+//             }
+//         } break;
+//         case "case":
+//         case "case-block": {
+//             yield* iterateParseTree(ast.condition, ast)
+//             yield* iterateParseTree(ast.outcome, ast)
+//         } break;
+//         case "parenthesized-expression":
+//         case "debug":
+//         case "nominal-type": {
+//             yield* iterateParseTree(ast.inner, ast)
+//         } break;
+//         case "property-accessor": {
+//             yield* iterateParseTree(ast.subject, ast)
+//             yield* iterateParseTree(ast.property, ast)
+//         } break;
+//         case "object-literal": {
+//             for (const [key, value] of ast.entries) {
+//                 yield* iterateParseTree(key, ast)
+//                 yield* iterateParseTree(value, ast)
+//             }
+//         } break;
+//         case "array-literal": {
+//             for (const element of ast.entries) {
+//                 yield* iterateParseTree(element, ast)
+//             }
+//         } break;
+//         case "string-literal": {
+//             for (const segment of ast.segments) {
+//                 if (typeof segment !== "string") {
+//                     yield* iterateParseTree(segment, ast)
+//                 }
+//             }
+//         } break;
+//         case "reaction": {
+//             yield* iterateParseTree(ast.data, ast)
+//             yield* iterateParseTree(ast.effect, ast)
+//             if (ast.until) {
+//                 yield* iterateParseTree(ast.until, ast)
+//             }
+//         } break;
+//         case "assignment": {
+//             yield* iterateParseTree(ast.target, ast)
+//             yield* iterateParseTree(ast.value, ast)
+//         } break;
+//         case "for-loop": {
+//             yield* iterateParseTree(ast.itemIdentifier, ast)
+//             yield* iterateParseTree(ast.iterator, ast)
+//             yield* iterateParseTree(ast.body, ast)
+//         } break;
+//         case "while-loop": {
+//             yield* iterateParseTree(ast.condition, ast)
+//             yield* iterateParseTree(ast.body, ast)
+//         } break;
+//         case "import-declaration": {
+//             yield* iterateParseTree(ast.path, ast)
+//             for (const i of ast.imports) {
+//                 yield* iterateParseTree(i, ast)
+//             }
+//         } break;
+//         case "import-item": {
+//             yield* iterateParseTree(ast.name)
+//             if (ast.alias) {
+//                 yield* iterateParseTree(ast.alias, ast)
+//             }
+//         } break;
+//         case "union-type":
+//         case "tuple-type": {
+//             for (const m of ast.members) {
+//                 yield* iterateParseTree(m, ast)
+//             }
+//         } break;
+//         case "named-type": {
+//             yield* iterateParseTree(ast.name, ast)
+//         } break;
+//         case "generic-param-type": {
+//             yield* iterateParseTree(ast.name, ast)
+//             if (ast.extends) {
+//                 yield* iterateParseTree(ast.extends, ast)
+//             }
+//         } break;
+//         case "proc-type":
+//         case "func-type": {
+//             for (const m of ast.typeParams) {
+//                 yield* iterateParseTree(m, ast)
+//             }
+//             for (const arg of ast.args) {
+//                 yield* iterateParseTree(arg.name, ast)
+//                 if (arg.type) {
+//                     yield* iterateParseTree(arg.type, ast)
+//                 }
+//             }
+
+//             if (ast.kind === "func-type" && ast.returnType) {
+//                 yield* iterateParseTree(ast.returnType, ast)
+//             }
+//         } break;
+//         case "object-type": {
+//             for (const spread of ast.spreads) {
+//                 yield* iterateParseTree(spread, ast)
+//             }
+//             for (const attribute of ast.entries) {
+//                 yield* iterateParseTree(attribute, ast)
+//             }
+//         } break;
+//         case "indexer-type": {
+//             yield* iterateParseTree(ast.keyType, ast)
+//             yield* iterateParseTree(ast.valueType, ast)
+//         } break;
+//         case "array-type": {
+//             yield* iterateParseTree(ast.element, ast)
+//         } break;
+//         case "literal-type": {
+//             yield* iterateParseTree(ast.value, ast)
+//         } break;
+//         case "iterator-type": {
+//             yield* iterateParseTree(ast.itemType, ast)
+//         } break;
+//         case "plan-type": {
+//             yield* iterateParseTree(ast.resultType, ast)
+//         } break;
+//         case "store-type": {
+//             yield* iterateParseTree(ast.store, ast)
+//         } break;
+
+//         // atomic
+//         case "plain-identifier":
+//         case "range":
+//         case "local-identifier":
+//         case "number-literal":
+//         case "boolean-literal":
+//         case "exact-string-literal":
+//         case "nil-literal":
+//         case "javascript-escape":
+//         case "element-type":
+//         case "string-type":
+//         case "number-type":
+//         case "boolean-type":
+//         case "nil-type":
+//         case "unknown-type":
+//         case "any-type":
+//         case "javascript-escape-type":
+//         case "operator":
+//             break;
+
+//         default:
+//             // @ts-expect-error
+//             throw Error("Need to add walk clause for AST node type " + ast.kind)
+//     }
+// }
 
 export function sOrNone(num: number): string {
     return num > 1 ? 's' : '';

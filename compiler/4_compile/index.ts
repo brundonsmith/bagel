@@ -46,13 +46,13 @@ function compileOne(getBinding: GetBinding, module: string, ast: AST): string {
         case "type-declaration":  return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileOne(getBinding, module, ast.type)};`;
         case "proc-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(getBinding, module, ast.value) + ';';
         case "func-declaration":  return compileFuncDeclaration(getBinding, module, ast)
-        case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(getBinding, module, ast.name)}${ast.type ? `: ${compileOne(getBinding, module, ast.type)}` : ''} = ${compileOne(getBinding, module, ast.value)};\n${ast.next ? compileOne(getBinding, module, ast.next) : ''}`;
+        case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(getBinding, module, ast.name)}${ast.type ? `: ${compileOne(getBinding, module, ast.type)}` : ''} = ${compileOne(getBinding, module, ast.value)};`;
         case "store-declaration": return compileStoreDeclaration(getBinding, module, ast);
         case "store-property": return  compileStoreProperty(getBinding, module, ast)
         case "store-procedure": return `    ${ast.access} readonly ${ast.name.name} = ${compileOne(getBinding, module, ast.value)}`
         case "store-function": return  '    ' + compileFuncDeclaration(getBinding, module, ast)
-        case "let-declaration":  return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(getBinding, module, ast.value)};\n${blockContents(getBinding, module, ast.next)}`;
-        case "const-declaration-statement": return `const ${ast.name.name} = ${compileOne(getBinding, module, ast.value)};\n${blockContents(getBinding, module, ast.next)}`;
+        case "let-declaration":  return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(getBinding, module, ast.value)}`;
+        case "const-declaration-statement": return `const ${ast.name.name} = ${compileOne(getBinding, module, ast.value)}`;
         case "assignment": return `${compileOne(getBinding, module, ast.target)} = ${compileOne(getBinding, module, ast.value)}`;
         case "if-else-statement": return 'if ' + ast.cases
             .map(({ condition, outcome }) => 

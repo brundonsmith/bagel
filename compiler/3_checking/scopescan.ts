@@ -1,15 +1,16 @@
-import { alreadyDeclared, cannotFindExport, cannotFindModule, cannotFindName } from "../errors.ts";
+import { alreadyDeclared, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
 import { AST } from "../_model/ast.ts";
-import { GetParent, PlainIdentifier, ReportError, Binding, GetModule, Refinement, areSame } from "../_model/common.ts";
+import { GetParent, PlainIdentifier, ReportError, Binding, GetModule, areSame } from "../_model/common.ts";
 import { LocalIdentifier } from "../_model/expressions.ts";
-import { ANY_TYPE, BOOLEAN_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { GenericParamType, NamedType } from "../_model/type-expressions.ts";
 
-export function resolveLazy(reportError: ReportError, getModule: GetModule, getParent: GetParent, identifier: LocalIdentifier|PlainIdentifier, from: AST): Binding|undefined {
+export function resolveLazy(reportError: ReportError, getModule: GetModule, getParent: GetParent, identifier: LocalIdentifier|PlainIdentifier|NamedType|GenericParamType, from: AST): Binding|undefined {
+    const name = identifier.kind === 'named-type' || identifier.kind === 'generic-param-type' ? identifier.name : identifier
 
     const parent = getParent(from)
 
     if (parent == null) {
-        reportError(cannotFindName(identifier))
+        reportError(cannotFindName(name))
         return undefined;
     }
 
@@ -17,54 +18,70 @@ export function resolveLazy(reportError: ReportError, getModule: GetModule, getP
 
     switch (parent.kind) {
         case "module": {
+            for (let declarationIndex = 0; declarationIndex < parent.declarations.length; declarationIndex++) {
+                const declaration = parent.declarations[declarationIndex]
 
-            // add all declarations except consts to scope
-            for (const declaration of parent.declarations) {
-                if (declaration.kind === "type-declaration") {
-                    if (declaration.name.name === identifier.name) {
-                        if (resolved) {
-                            reportError(alreadyDeclared(declaration.name))
-                        }
-
-                        resolved = {
-                            kind: 'type-binding',
-                            type: declaration.type,
-                            isGenericParameter: false,
-                        }
-                    }
-                } else if (declaration.kind === "func-declaration" || declaration.kind === "proc-declaration" || declaration.kind === "store-declaration") {
-                    if (declaration.name.name === identifier.name) {
-                        if (resolved) {
-                            reportError(alreadyDeclared(declaration.name))
-                        }
-
-                        resolved = {
-                            kind: "basic",
-                            ast: declaration
-                        }
-                    }
-                } else if (declaration.kind === "import-declaration") {
-                    for (const importItem of declaration.imports) {
-                        const nameAst = importItem.alias ?? importItem.name
-
-                        if (nameAst.name === identifier.name) {
+                switch (declaration.kind) {
+                    case "type-declaration": {
+                        if (declaration.name.name === name.name) {
                             if (resolved) {
-                                reportError(alreadyDeclared(nameAst))
+                                reportError(alreadyDeclared(declaration.name))
                             }
+    
+                            resolved = {
+                                kind: 'type-binding',
+                                type: declaration.type,
+                            }
+                        }
+                    } break;
+                    case "func-declaration":
+                    case "proc-declaration":
+                    case "store-declaration":
+                    case "const-declaration": {
+                        if (declaration.name.name === name.name) {
+                            if (resolved) {
+                                reportError(alreadyDeclared(declaration.name))
+                            }
+    
+                            if (declaration.kind === 'const-declaration') { 
+                                const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
+    
+                                if (comingFromIndex < declarationIndex) {
+                                    reportError(miscError(identifier, `Can't reference "${identifier.name}" before initialization`))
+                                } else if (comingFromIndex === declarationIndex) {
+                                    reportError(miscError(identifier, `Can't reference "${identifier.name}" in its own initialization`))
+                                }
+                            }
+    
+                            resolved = {
+                                kind: "basic",
+                                ast: declaration
+                            }
+                        }
+                    } break;
+                    case "import-declaration": {
+                        for (const importItem of declaration.imports) {
+                            const nameAst = importItem.alias ?? importItem.name
 
-                            const otherModule = getModule(declaration.path.value)
+                            if (nameAst.name === name.name) {
+                                if (resolved) {
+                                    reportError(alreadyDeclared(nameAst))
+                                }
 
-                            if (otherModule == null) {
-                                reportError(cannotFindModule(declaration.path))
-                            } else {
-                                resolved = resolveLazy(reportError, getModule, getParent, importItem.name, otherModule.declarations[0]) // HACK
+                                const otherModule = getModule(declaration.path.value)
 
-                                if (resolved == null) {
-                                    reportError(cannotFindExport(importItem, declaration));
+                                if (otherModule == null) {
+                                    reportError(cannotFindModule(declaration.path))
+                                } else {
+                                    resolved = resolveLazy(reportError, getModule, getParent, importItem.name, otherModule.declarations[0]) // HACK
+
+                                    if (resolved == null) {
+                                        reportError(cannotFindExport(importItem, declaration));
+                                    }
                                 }
                             }
                         }
-                    }
+                    } break;
                 }
             }
         } break;
@@ -73,16 +90,24 @@ export function resolveLazy(reportError: ReportError, getModule: GetModule, getP
             
             // add any generic type parameters to scope
             for (const typeParam of parent.type.typeParams) {
-                if (typeParam.name === identifier.name) {
+                if (typeParam.name === name.name) {
                     if (resolved) {
                         reportError(alreadyDeclared(typeParam))
                     }
 
-                    // TODO: Use `extends` to give these more meaningful types in context
                     resolved = {
                         kind: 'type-binding',
-                        type: UNKNOWN_TYPE,
-                        isGenericParameter: true
+                        type: {
+                            kind: "generic-param-type",
+                            name: typeParam,
+                            // TODO: Use `extends` keyword to give these more meaningful types in context
+                            extends: undefined,
+                            module: undefined,
+                            code: undefined,
+                            startIndex: undefined,
+                            endIndex: undefined,
+                            mutability: undefined,
+                        }
                     }
                 }
             }
@@ -91,7 +116,7 @@ export function resolveLazy(reportError: ReportError, getModule: GetModule, getP
             for (let i = 0; i < parent.type.args.length; i++) {
                 const arg = parent.type.args[i]
 
-                if (arg.name.name === identifier.name) {
+                if (arg.name.name === name.name) {
                     if (resolved) {
                         reportError(alreadyDeclared(arg.name))
                     }
@@ -105,11 +130,36 @@ export function resolveLazy(reportError: ReportError, getModule: GetModule, getP
             }
         } break;
         case "block":
-            // TODO?
+            for (let statementIndex = 0; statementIndex < parent.statements.length; statementIndex++) {
+                const statement = parent.statements[statementIndex]
+
+                switch (statement.kind) {
+                    case "let-declaration":
+                    case "const-declaration-statement": {
+                        if (statement.name.name === name.name) {
+                            if (resolved) {
+                                reportError(alreadyDeclared(statement.name))
+                            }
+                            
+                            const comingFromIndex = parent.statements.findIndex(other => areSame(other, from))
+
+                            if (comingFromIndex < statementIndex) {
+                                reportError(miscError(identifier, `Can't reference "${identifier.name}" before initialization`))
+                            } else if (comingFromIndex === statementIndex) {
+                                reportError(miscError(identifier, `Can't reference "${identifier.name}" in its own initialization`))
+                            }
+    
+                            resolved = {
+                                kind: "basic",
+                                ast: statement
+                            }
+                        }
+                    } break;
+                }
+            }
             break;
         case "for-loop": {
-            // add loop element to scope
-            if (parent.itemIdentifier.name === identifier.name) {
+            if (parent.itemIdentifier.name === name.name) {
                 resolved = {
                     kind: "iterator",
                     iterator: parent.iterator,
@@ -117,20 +167,15 @@ export function resolveLazy(reportError: ReportError, getModule: GetModule, getP
             }
         } break;
         case "store-declaration":
-            if ("this" === identifier.name) {
+            if ("this" === name.name) {
                 resolved = {
                     kind: "this",
                     store: parent
                 }
             }
             break;
-        case "invocation":
-            break;
-        case "const-declaration":
         case "inline-const":
-        case "let-declaration":
-        case "const-declaration-statement":
-            if (parent.name.name === identifier.name) {
+            if (parent.name.name === name.name) {
                 resolved = {
                     kind: "basic",
                     ast: parent

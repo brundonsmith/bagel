@@ -6,6 +6,7 @@ import { BooleanLiteral, ExactStringLiteral, NumberLiteral } from "./expressions
 export type TypeExpression =
     | UnionType
     | NamedType
+    | GenericParamType
     | ProcType
     | FuncType
     | ElementType
@@ -35,6 +36,13 @@ export type UnionType = SourceInfo & {
 export type NamedType = SourceInfo & {
     readonly kind: "named-type",
     readonly name: PlainIdentifier,
+    readonly mutability: undefined,
+}
+
+export type GenericParamType = SourceInfo & {
+    readonly kind: "generic-param-type",
+    readonly name: PlainIdentifier,
+    readonly extends: TypeExpression|undefined,
     readonly mutability: undefined,
 }
 
@@ -319,6 +327,7 @@ export const ELEMENT_TAG_CHILD_TYPE: TypeExpression = {
 const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } = {
     "union-type": undefined,
     "named-type": undefined,
+    "generic-param-type": undefined,
     "proc-type": undefined,
     "func-type": undefined,
     "element-type": undefined,

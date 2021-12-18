@@ -1,8 +1,8 @@
 import { Module } from "../_model/ast.ts";
-import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, NIL_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, NIL_TYPE, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, iterateParseTree } from "../utils.ts";
 import { assignmentError,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, parameterizedGenericType, fitTemplate } from "./typeinfer.ts";
 import { getBindingMutability, GetParent, GetBinding, ReportError, GetModule } from "../_model/common.ts";
 import { display } from "../debugging.ts";
 
@@ -62,54 +62,46 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
             case "invocation": {
                 
                 let subjectType = inferType(reportError, getModule, getParent, getBinding, current.subject);
-                // if (current.kind === "invocation") {
-                //     const scopeWithGenerics = extendScope(scope)
+                if (current.kind === "invocation") {
 
-                //     // bind type-args for this invocation
-                //     if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
-                //         if (subjectType.typeParams.length > 0) {
-                //             if (current.typeArgs.length > 0) {
-                //                 if (subjectType.typeParams.length !== current.typeArgs.length) {
-                //                     reportError(miscError(current, `Expected ${subjectType.typeParams.length} type arguments, but got ${current.typeArgs.length}`))
-                //                 }
+                    // bind type-args for this invocation
+                    if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
+                        if (subjectType.typeParams.length > 0) {
+                            if (current.typeArgs.length > 0) { // explicit type arguments
+                                if (subjectType.typeParams.length !== current.typeArgs.length) {
+                                    reportError(miscError(current, `Expected ${subjectType.typeParams.length} type arguments, but got ${current.typeArgs.length}`))
+                                }
     
-                //                 for (let i = 0; i < subjectType.typeParams.length; i++) {
-                //                     const typeParam = subjectType.typeParams[i]
-                //                     const typeArg = current.typeArgs?.[i] ?? UNKNOWN_TYPE
-    
-                //                     scopeWithGenerics.types.set(typeParam.name, {
-                //                         type: typeArg,
-                //                         isGenericParameter: false,
-                //                     })
-                //                 }
-                //             } else {
-                //                 const invocationSubjectType: FuncType|ProcType = {
-                //                     ...subjectType,
-                //                     args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(reportError, getModule, getParent, getBinding, current.args[index]) }))
-                //                 }
+                                subjectType = parameterizedGenericType(
+                                    reportError, 
+                                    getBinding, 
+                                    subjectType, 
+                                    current.typeArgs
+                                )
+                            } else {
+                                const invocationSubjectType: FuncType|ProcType = {
+                                    ...subjectType,
+                                    args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(reportError, getModule, getParent, getBinding, current.args[index]) }))
+                                }
         
-                //                 // attempt to infer params for generic
-                //                 const inferredBindings = fitTemplate(reportError, getParent, getBinding, subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name));
+                                // attempt to infer params for generic
+                                const inferredBindings = fitTemplate(reportError, getParent, getBinding, subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name));
         
-                //                 if (inferredBindings.size === subjectType.typeParams.length) {
-                //                     for (let i = 0; i < subjectType.typeParams.length; i++) {
-                //                         const typeParam = subjectType.typeParams[i]
-                //                         const typeArg = inferredBindings.get(typeParam.name) ?? UNKNOWN_TYPE
-            
-                //                         scopeWithGenerics.types.set(typeParam.name, {
-                //                             type: typeArg,
-                //                             isGenericParameter: false,
-                //                         })
-                //                     }
-                //                 } else {
-                //                     reportError(miscError(current, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
-                //                 }
-                //             }
-                //         }
-                //     }
-
-                //     subjectType = resolveType(reportError, getModule, scopeWithGenerics, subjectType);
-                // }
+                                if (inferredBindings.size === subjectType.typeParams.length) {
+                                    subjectType = parameterizedGenericType(
+                                        reportError, 
+                                        getBinding, 
+                                        subjectType, 
+                                        subjectType.typeParams.map(param =>
+                                            inferredBindings.get(param.name) ?? UNKNOWN_TYPE)
+                                    )
+                                } else {
+                                    reportError(miscError(current, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
+                                }
+                            }
+                        }
+                    }
+                }
 
                 if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {  // check that subject is callable
                     reportError(miscError(current.subject, "Expression must be a function or procedure to be called"));
@@ -271,27 +263,13 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
     }
 }
 
-function resolveType(getBinding: GetBinding, type: TypeExpression) {
-    if (type.kind === 'named-type') {
-        const resolved = getBinding(() => {}, type.name)
-
-        if (resolved?.kind === 'type-binding') {
-            return resolved.type
-        }
-    }
-
-    return type
-}
-
 export function subsumes(getParent: GetParent, getBinding: GetBinding, destination: TypeExpression, value: TypeExpression): boolean {
     if (destination === value) {
         return true;
     }
 
-    // console.log('subsumes?\n', { destination: display(destination), value: display(value) })
     const resolvedDestination = resolveType(getBinding, destination)
     const resolvedValue = resolveType(getBinding, value)
-    // console.log('subsumes (resolved)?\n', { resolvedDestination: display(resolvedDestination), resolvedValue: display(resolvedValue) })
 
     // constants can't be assigned to mutable slots
     if (resolvedDestination.mutability === "mutable" && resolvedValue.mutability !== "mutable") {
@@ -350,9 +328,25 @@ export function subsumes(getParent: GetParent, getBinding: GetBinding, destinati
         return subsumes(getParent, getBinding, resolvedDestination.itemType, resolvedValue.itemType);
     } else if (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") {
         return subsumes(getParent, getBinding, resolvedDestination.resultType, resolvedValue.resultType);
+    } else if (resolvedDestination.kind === "generic-param-type") {
+        return subsumes(getParent, getBinding, resolvedDestination.extends ?? UNKNOWN_TYPE, resolvedValue)
+    } else if (resolvedValue.kind === "generic-param-type") {
+        return subsumes(getParent, getBinding, resolvedDestination, resolvedValue.extends ?? UNKNOWN_TYPE)
     }
 
     return false;
+}
+
+function resolveType(getBinding: GetBinding, type: TypeExpression) {
+    if (type.kind === 'named-type') {
+        const resolved = getBinding(() => {}, type.name)
+
+        if (resolved?.kind === 'type-binding') {
+            return resolved.type
+        }
+    }
+
+    return type
 }
 
 export function typesEqual(a: TypeExpression, b: TypeExpression): boolean {
@@ -364,7 +358,8 @@ export function displayForm(typeExpression: TypeExpression): string {
 
     switch (typeExpression.kind) {
         case "union-type": str = '(' + typeExpression.members.map(displayForm).join(" | ") + ')'; break;
-        case "named-type": str = typeExpression.name.name; break;
+        case "named-type":
+        case "generic-param-type": str = typeExpression.name.name; break;
         case "proc-type": str = `${typeExpression.typeParams.length > 0 ? `<${typeExpression.typeParams.map(p => p.name).join(',')}>` : ''}(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) {}`; break;
         case "func-type": str = `${typeExpression.typeParams.length > 0 ? `<${typeExpression.typeParams.map(p => p.name).join(',')}>` : ''}(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) => ${displayForm(typeExpression.returnType ?? UNKNOWN_TYPE)}`; break;
         case "object-type": str = `{${typeExpression.spreads.map(s => '...' + displayForm(s)).concat(typeExpression.entries.map(({ name, type }) => `${name.name}: ${displayForm(type)}`)).join(', ')}}`; break;

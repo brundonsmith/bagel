@@ -1,6 +1,6 @@
 import { StoreMember, Declaration, ImportItem } from "./declarations.ts";
 import { Case, Expression, Operator } from "./expressions.ts";
-import { Statement } from "./statements.ts";
+import { CaseBlock, Statement } from "./statements.ts";
 import { Arg, Attribute, TypeExpression } from "./type-expressions.ts";
 import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
 
@@ -17,6 +17,7 @@ export type AST = (
     | Operator
     | Debug
     | Case
+    | CaseBlock
     | Arg
     | ImportItem
 )

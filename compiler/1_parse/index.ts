@@ -5,7 +5,7 @@ import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, ReportError, SourceInfo } from "../_model/common.ts";
 import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator } from "../_model/expressions.ts";
-import { Assignment, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
+import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
@@ -786,22 +786,19 @@ const letDeclaration: ParseFunction<LetDeclaration> = (module, code, startIndex)
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Expression'), ({ parsed: value, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ";"), err(code, index, '";"'), index =>
-    given(consumeWhitespace(code, index), index =>
-    given(parseBlockWithoutBraces(module, code, index), ({ parsed: next, newIndex: index }) => ({
+    expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
             parsed: {
                 kind: "let-declaration",
                 name,
                 value,
                 type,
-                next,
                 module,
                 code,
                 startIndex,
                 endIndex: index,
             },
             newIndex: index,
-        }))))))))))))))
+        }))))))))))))
 
 const constDeclarationStatement: ParseFunction<ConstDeclarationStatement> = (module, code, startIndex) => 
     given(consume(code, startIndex, "const"), index =>
@@ -816,22 +813,19 @@ const constDeclarationStatement: ParseFunction<ConstDeclarationStatement> = (mod
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Expression'), ({ parsed: value, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ";"), err(code, index, '";"'), index =>
-    given(consumeWhitespace(code, index), index =>
-    given(parseBlockWithoutBraces(module, code, index), ({ parsed: next, newIndex: index }) => ({
+    expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
             parsed: {
                 kind: "const-declaration-statement",
                 name,
                 value,
                 type,
-                next,
                 module,
                 code,
                 startIndex,
                 endIndex: index,
             },
             newIndex: index,
-        }))))))))))))))
+        }))))))))))))
 
 const assignment: ParseFunction<Assignment> = (module, code, startIndex) =>
     given(invocationAccessorChain(module, code, startIndex) ?? localIdentifier(module, code, startIndex), ({ parsed: target, newIndex: index }) =>
@@ -902,7 +896,7 @@ const ifElseStatement: ParseFunction<IfElseStatement> = (module, code, startInde
         }
     }))
 
-const _conditionAndOutcomeBlock: ParseFunction<{ readonly condition: Expression, readonly outcome: Block }> = (module, code, startIndex) =>
+const _conditionAndOutcomeBlock: ParseFunction<CaseBlock> = (module, code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
     given(expression(module, code, index), ({ parsed: condition, newIndex: index }) =>
@@ -911,8 +905,13 @@ const _conditionAndOutcomeBlock: ParseFunction<{ readonly condition: Expression,
     given(consumeWhitespace(code, index), index =>
     expec(parseBlock(module, code, index), err(code, index, 'Block for if clause'), ({ parsed: outcome, newIndex: index }) => ({
         parsed: {
+            kind: "case-block",
             condition,
-            outcome
+            outcome,
+            module,
+            code,
+            startIndex,
+            endIndex: index
         },
         newIndex: index
     }))))))))

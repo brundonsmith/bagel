@@ -18,7 +18,6 @@ export type LetDeclaration = SourceInfo & {
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly value: Expression,
-    readonly next: Block,
 }
 
 export type ConstDeclarationStatement = SourceInfo & {
@@ -26,13 +25,18 @@ export type ConstDeclarationStatement = SourceInfo & {
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly value: Expression,
-    readonly next: Block,
 }
 
 export type IfElseStatement = SourceInfo & {
     readonly kind: "if-else-statement",
-    readonly cases: readonly { readonly condition: Expression, readonly outcome: Block }[],
+    readonly cases: readonly CaseBlock[],
     readonly defaultCase?: Block
+}
+
+export type CaseBlock = SourceInfo & {
+    readonly kind: "case-block",
+    readonly condition: Expression,
+    readonly outcome: Block,
 }
 
 export type ForLoop = SourceInfo & {

@@ -13,6 +13,8 @@ export function withoutSourceInfo(ast: AST) {
 
     for (const { current } of iterateParseTree(clone)) {
         // @ts-ignore
+        delete current.module
+        // @ts-ignore
         delete current.code
         // @ts-ignore
         delete current.startIndex

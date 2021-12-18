@@ -1,8 +1,8 @@
 // deno-lint-ignore-file no-fallthrough
 import { AST, Module } from "./ast.ts";
 import { ConstDeclarationStatement, LetDeclaration, Statement } from "./statements.ts";
-import { TypeExpression } from "./type-expressions.ts";
-import { ConstDeclaration, FuncDeclaration, ImportDeclaration, ImportItem, ProcDeclaration, StoreDeclaration } from "./declarations.ts";
+import { GenericParamType, NamedType, TypeExpression } from "./type-expressions.ts";
+import { ConstDeclaration, FuncDeclaration, ProcDeclaration, StoreDeclaration } from "./declarations.ts";
 import { Expression, Func, InlineConst, LocalIdentifier, Proc } from "./expressions.ts";
 import { withoutSourceInfo, display } from "../debugging.ts";
 import { deepEquals, ModuleName } from "../utils.ts";
@@ -43,7 +43,7 @@ export function areSame(a: AST, b: AST) {
 
 export type GetModule = (module: string) => Module|undefined
 export type GetParent = (ast: AST) => AST|undefined
-export type GetBinding = (reportError: ReportError, identifier: LocalIdentifier|PlainIdentifier) => Binding|undefined
+export type GetBinding = (reportError: ReportError, identifier: LocalIdentifier|PlainIdentifier|NamedType|GenericParamType) => Binding|undefined
 export type ReportError = (error: BagelError) => void
 
 export type Binding = ValueBinding|TypeBinding
@@ -56,7 +56,6 @@ export type ValueBinding =
 
 export type TypeBinding = {
     readonly kind: 'type-binding',
-    readonly isGenericParameter: boolean,
     readonly type: TypeExpression,
 }
 

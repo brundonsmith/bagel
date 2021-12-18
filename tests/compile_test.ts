@@ -381,18 +381,6 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Top-level const reordering",
-  fn() {
-    testCompile(
-      `const a = 12
-            func foo() => 13`,
-      `const foo = () => 13;
-            const a = 12;`,
-    );
-  },
-});
-
-Deno.test({
   name: "Comment test line",
   fn() {
     testCompile(

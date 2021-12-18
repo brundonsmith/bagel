@@ -1,8 +1,8 @@
 // deno-lint-ignore-file no-fallthrough
-import { GetParent, GetBinding, ReportError, GetModule, Refinement } from "../_model/common.ts";
+import { GetParent, GetBinding, ReportError, GetModule, Refinement, PlainIdentifier } from "../_model/common.ts";
 import { BinaryOp, Expression, InlineConst, isExpression } from "../_model/expressions.ts";
 import { ANY_TYPE, Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, given, memoize5 } from "../utils.ts";
+import { deepEquals, given, mapParseTree, memoize5 } from "../utils.ts";
 import { displayForm, subsumes, typesEqual } from "./typecheck.ts";
 import { StoreMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
 import { assignmentError, cannotFindName, miscError } from "../errors.ts";
@@ -110,56 +110,51 @@ const inferTypeInner = memoize5((
             let subjectType = inferType(reportError, getModule, getParent, getBinding, ast.subject);
 
             // bind type-args for this invocation
-            // if (ast.kind === "invocation") {    
-            //     if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
-            //         if (subjectType.typeParams.length > 0) {
-            //             if (ast.typeArgs.length > 0) { // explicit type arguments
-            //                 if (subjectType.typeParams.length !== ast.typeArgs.length) {
-            //                     reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
-            //                 }
+            if (ast.kind === "invocation") {    
+                if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
+                    if (subjectType.typeParams.length > 0) {
+                        if (ast.typeArgs.length > 0) { // explicit type arguments
+                            if (subjectType.typeParams.length !== ast.typeArgs.length) {
+                                reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
+                            }
 
-            //                 for (let i = 0; i < subjectType.typeParams.length; i++) {
-            //                     const typeParam = subjectType.typeParams[i]
-            //                     const typeArg = ast.typeArgs?.[i] ?? UNKNOWN_TYPE
-
-            //                     scopeWithGenerics.types.set(typeParam.name, {
-            //                         type: typeArg,
-            //                         isGenericParameter: false,
-            //                     })
-            //                 }
-            //             } else { // no type arguments (try to infer)
-            //                 const invocationSubjectType: FuncType|ProcType = {
-            //                     ...subjectType,
-            //                     args: subjectType.args.map((arg, index) => ({
-            //                         ...arg,
-            //                         type: inferType(reportError, getModule, getParent, getBinding, ast.args[index])
-            //                     }))
-            //                 }
+                            subjectType = parameterizedGenericType(
+                                reportError, 
+                                getBinding, 
+                                subjectType, 
+                                ast.typeArgs
+                            )
+                        } else { // no type arguments (try to infer)
+                            const invocationSubjectType: FuncType|ProcType = {
+                                ...subjectType,
+                                args: subjectType.args.map((arg, index) => ({
+                                    ...arg,
+                                    type: inferType(reportError, getModule, getParent, getBinding, ast.args[index])
+                                }))
+                            }
     
-            //                 // attempt to infer params for generic
-            //                 const inferredBindings = fitTemplate(reportError, getParent, getBinding, 
-            //                     subjectType, 
-            //                     invocationSubjectType, 
-            //                     subjectType.typeParams.map(param => param.name)
-            //                 );
+                            // attempt to infer params for generic
+                            const inferredBindings = fitTemplate(reportError, getParent, getBinding, 
+                                subjectType, 
+                                invocationSubjectType, 
+                                subjectType.typeParams.map(param => param.name)
+                            );
     
-            //                 if (inferredBindings.size === subjectType.typeParams.length) {
-            //                     for (let i = 0; i < subjectType.typeParams.length; i++) {
-            //                         const typeParam = subjectType.typeParams[i]
-            //                         const typeArg = inferredBindings.get(typeParam.name) ?? UNKNOWN_TYPE
-        
-            //                         scopeWithGenerics.types.set(typeParam.name, {
-            //                             type: typeArg,
-            //                             isGenericParameter: false,
-            //                         })
-            //                     }
-            //                 } else {
-            //                     reportError(miscError(ast, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
+                            if (inferredBindings.size === subjectType.typeParams.length) {
+                                subjectType = parameterizedGenericType(
+                                    reportError, 
+                                    getBinding, 
+                                    subjectType, 
+                                    subjectType.typeParams.map(param =>
+                                        inferredBindings.get(param.name) ?? UNKNOWN_TYPE)
+                                )
+                            } else {
+                                reportError(miscError(ast, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
+                            }
+                        }
+                    }
+                }
+            }
 
             if (subjectType.kind === "func-type") {
                 return subjectType.returnType ?? UNKNOWN_TYPE;
@@ -439,6 +434,28 @@ const inferTypeInner = memoize5((
     }
 })
 
+export function parameterizedGenericType<T extends FuncType|ProcType>(reportError: ReportError, getBinding: GetBinding, generic: T, typeArgs: readonly TypeExpression[]): T {
+    const bindings: Record<string, TypeExpression> = {}
+    for (let i = 0; i < generic.typeParams.length; i++) {
+        const typeParam = generic.typeParams[i]
+        const typeArg = typeArgs[i] as TypeExpression
+
+        bindings[typeParam.name] = typeArg
+    }
+
+    return mapParseTree(generic, ast => {
+        if (ast.kind === 'named-type') {
+            const resolved = getBinding(reportError, ast)
+
+            if (resolved?.kind === 'type-binding' && resolved.type.kind === 'generic-param-type' && bindings[resolved.type.name.name]) {
+                return bindings[resolved.type.name.name]
+            }
+        }
+
+        return ast
+    }) as T
+}
+
 export function simplify(getParent: GetParent, getBinding: GetBinding, type: TypeExpression): TypeExpression {
     return handleSingletonUnion(
         distillUnion(getParent, getBinding,
@@ -686,7 +703,7 @@ export function propertiesOf(
 
     switch (type.kind) {
         case "named-type": {
-            const binding = getBinding(reportError, type.name)
+            const binding = getBinding(reportError, type)
 
             if (binding?.kind !== 'type-binding') {
                 reportError(miscError(type.name, `Can't find type ${type.name.name}`))
@@ -700,8 +717,8 @@ export function propertiesOf(
             const attrs = [...type.entries]
 
             for (const spread of type.spreads) {
-                const resolved = getBinding(reportError, spread.name)
-        
+                const resolved = getBinding(reportError, spread)
+
                 if (resolved != null && resolved.kind === 'type-binding' && resolved.type.kind === 'object-type') {
                     attrs.push(...(propertiesOf(reportError, getModule, getParent, getBinding, resolved.type) ?? []))
                 } else {
