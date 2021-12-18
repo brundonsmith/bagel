@@ -94,38 +94,39 @@ autorun(() => {
     }
 })
 
-// print errors as they occur
-autorun(() => {
-    const config = Store.config
+/**
+ * Print list of errors
+ */
+function printErrors(errors: Map<ModuleName, BagelError[]>, watch?: boolean) {
+    if (watch) {
+        console.clear()
+    }
 
-    if (config != null && !Store.modulesOutstanding) {
-        const allErrors = new Map<ModuleName, BagelError[]>()
-        
-        for (const module of Store.modules) {
-            allErrors.set(module, [])
-        }
+    let totalErrors = 0;
 
-        for (const module of Store.modules) {
-            const source = Store.modulesSource.get(module)
+    const modulesWithErrors = new Array(...errors.values()).filter(errs => errs.length > 0).length
 
-            if (source) {
-                const { ast, errors: parseErrors } = Store.parsed(module, source)
+    if (modulesWithErrors === 0) {
+        console.log('No errors')
+    } else {
+        console.log()
 
-                for (const err of parseErrors) {
-                    const errorModule = given(err.ast, Store.getModuleFor) ?? module;
-                    (allErrors.get(errorModule) as BagelError[]).push(err)
-                }
+        for (const [module, errs] of errors.entries()) {
+            totalErrors += errs.length;
 
-                const typecheckErrors = Store.typeerrors(module, ast)
-                
-                for (const err of typecheckErrors) {
-                    const errorModule = given(err.ast, Store.getModuleFor) ?? module;
-                    (allErrors.get(errorModule) as BagelError[]).push(err)
-                }
+            for (const err of errs) {
+                console.log(prettyError(module, err))
             }
         }
 
-        printErrors(allErrors, config.watch)
+        console.log(`Found ${totalErrors} error${sOrNone(totalErrors)} across ${modulesWithErrors} module${sOrNone(modulesWithErrors)}`)
+    }
+}
+    
+// print errors as they occur
+autorun(() => {
+    if (Store.config != null && !Store.modulesOutstanding) {
+        printErrors(Store.allErrors, Store.config?.watch)
     }
 })
 
@@ -246,33 +247,6 @@ function test() {
     }, 1000)
 }
 
-/**
- * Print list of errors
- */
-const printErrors = (errors: Map<ModuleName, BagelError[]>, watch?: boolean) => {
-    if (watch) {
-        console.clear()
-    }
-
-    let totalErrors = 0;
-
-    if (errors.size === 0) {
-        console.log('No errors')
-    } else {
-        console.log()
-
-        for (const [module, errs] of errors.entries()) {
-            totalErrors += errs.length;
-
-            for (const err of errs) {
-                console.log(prettyError(module, err))
-            }
-        }
-
-        console.log(`Found ${totalErrors} error${sOrNone(totalErrors)} across ${errors.size} module${sOrNone(errors.size)}`)
-    }
-}
-    
 const bundleOutput = async (entryFile: ModuleName) => {
     const bundleFile = bagelFileToJsBundleFile(entryFile)
 

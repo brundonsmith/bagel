@@ -3,8 +3,9 @@ import { reshape } from "./2_reshape/index.ts";
 import { resolveLazy } from "./3_checking/scopescan.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
 import { compile, INT } from "./4_compile/index.ts";
+import { withoutSourceInfo } from "./debugging.ts";
 import { path } from "./deps.ts";
-import { BagelError, miscError } from "./errors.ts";
+import { BagelError, errorsEquivalent, miscError } from "./errors.ts";
 import { computedFn, makeAutoObservable } from "./mobx.ts";
 import { given, iterateParseTree, ModuleName, pathIsRemote } from "./utils.ts";
 import { AST, Module } from "./_model/ast.ts";
@@ -84,6 +85,30 @@ class _Store {
             return [ ...errors, miscError(ast, e.toString()) ]
         }
     }, { requiresReaction: false })
+
+    get allErrors() {
+        const allErrors = new Map<ModuleName, BagelError[]>()
+        
+        for (const module of this.modules) {
+            allErrors.set(module, [])
+        }
+
+        for (const module of this.modules) {
+            const source = this.modulesSource.get(module)
+
+            if (source) {
+                const { ast, errors: parseErrors } = this.parsed(module, source)
+                const typecheckErrors = this.typeerrors(module, ast)
+
+                for (const err of [...parseErrors, ...typecheckErrors].filter((err, index, arr) => arr.findIndex(other => errorsEquivalent(err, other)) === index)) {
+                    const errorModule = err.ast?.module ?? module;
+                    (allErrors.get(errorModule) as BagelError[]).push(err)
+                }
+            }
+        }
+
+        return allErrors
+    }
 
     readonly compiled = computedFn((module: ModuleName, ast: Module): string => {
         try {

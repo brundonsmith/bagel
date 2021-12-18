@@ -306,11 +306,19 @@ const inferTypeInner = memoize5((
                             mutability
                         } as TypeExpression
                     }
-                    // case 'store-declaration':
-                    //     return ast.
+                    case 'store-declaration':
+                        return {
+                            kind: "store-type",
+                            store: decl,
+                            internal: false,
+                            module: decl.module,
+                            code: decl.code,
+                            startIndex: decl.startIndex,
+                            endIndex: decl.endIndex,
+                            mutability: 'mutable',
+                        }
                     default:
-                        // @ts-expect-error
-                        throw Error('Unreachable!' + binding.ast.kind)
+                        throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
                 }
             }
     
@@ -840,7 +848,7 @@ export function propertiesOf(
                                 type: itemType,
                                 ...AST_NOISE
                             }],
-                            returnType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, ...TYPE_AST_NOISE },
+                            returnType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
                             typeParams: [],
                             ...TYPE_AST_NOISE
                         },
@@ -848,7 +856,7 @@ export function propertiesOf(
                     }],
                     returnType: {
                         kind: "iterator-type",
-                        itemType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, ...TYPE_AST_NOISE },
+                        itemType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
                         ...TYPE_AST_NOISE
                     },
                     ...TYPE_AST_NOISE
@@ -885,7 +893,7 @@ export function propertiesOf(
                                 type: resultType,
                                 ...TYPE_AST_NOISE
                             }],
-                            returnType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, ...TYPE_AST_NOISE },
+                            returnType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
                             typeParams: [],
                             ...TYPE_AST_NOISE
                         },
@@ -893,7 +901,7 @@ export function propertiesOf(
                     }],
                     returnType: {
                         kind: "plan-type",
-                        resultType: { kind: "named-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, ...TYPE_AST_NOISE },
+                        resultType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
                         ...TYPE_AST_NOISE
                     },
                     ...TYPE_AST_NOISE

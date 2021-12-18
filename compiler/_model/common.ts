@@ -33,12 +33,12 @@ export function moreSpecificThan(a: Partial<SourceInfo>, b: Partial<SourceInfo>)
 }
 
 // HACK
-export function areSame(a: AST, b: AST) {
-    return a.kind === b.kind &&
-        a.module === b.module && a.module != null &&
-        a.code === b.code && a.code != null && 
-        a.startIndex === b.startIndex && a.startIndex != null && 
-        a.endIndex === b.endIndex && a.endIndex != null
+export function areSame(a: AST|undefined, b: AST|undefined) {
+    return a?.kind === b?.kind &&
+        a?.module === b?.module && a?.module != null &&
+        a?.code === b?.code && a?.code != null && 
+        a?.startIndex === b?.startIndex && a?.startIndex != null && 
+        a?.endIndex === b?.endIndex && a?.endIndex != null
 }
 
 export type GetModule = (module: string) => Module|undefined

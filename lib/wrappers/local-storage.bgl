@@ -1,5 +1,5 @@
 
-class LocalStorage {
+export store LocalStorage {
 
     public func getItem(key: string): string|nil =>
         js#window.localStorage.getItem(key)#js
@@ -8,5 +8,3 @@ class LocalStorage {
         js#window.localStorage.setItem(key, value)#js
     }
 }
-
-export const localStorage = new LocalStorage()

@@ -1450,7 +1450,7 @@ const _oneGetToInvocationOrAccess = (subject: Expression, get: InvocationArgs|Pr
 type InvocationArgs = SourceInfo & { kind: "invocation-args", exprs: Expression[], typeArgs: TypeExpression[] }
 
 const _invocationArgs: ParseFunction<InvocationArgs> = (module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, (startIndex, code, index) =>
+    given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(consume(code, index, "<"), index =>
         given(consumeWhitespace(code, index), index =>
         given(parseSeries(module, code, index, typeExpression, ','), ({ parsed: typeArgs, newIndex: index }) =>

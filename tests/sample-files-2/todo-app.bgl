@@ -1,6 +1,6 @@
 
 from '../../lib/wrappers/core' import { iter, logf, logp }
-from '../../lib/wrappers/local-storage' import { localStorage }
+from '../../lib/wrappers/local-storage' import { LocalStorage }
 from '../../lib/wrappers/json' import { parse, stringify }
 from '../../lib/wrappers/html' import { render, Event }
 
@@ -42,8 +42,8 @@ func itemValid(item: TodoItem) => item.text.length > 3
 store AppStore {
     
     visible items: TodoItem[] = (
-        if (logf(localStorage.getItem(lsKey)) != nil) {
-            parse(localStorage.getItem(lsKey))
+        if (logf(LocalStorage.getItem(lsKey)) != nil) {
+            parse(LocalStorage.getItem(lsKey))
         } else {
             []
         }
@@ -64,7 +64,7 @@ proc main() {
     observe () => stringify(AppStore.items, 0)
     triggering (json) {
         logp('setting ' + lsKey);
-        // localStorage.setItem(lsKey, json);
+        // LocalStorage.setItem(lsKey, json);
     }
     forever;
 

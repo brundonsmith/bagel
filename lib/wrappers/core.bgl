@@ -10,7 +10,7 @@ export proc logp(x: unknown) {
 export func logf<T>(x: T): T => 
     js# (() => { console.log(x); return x })() #js
 
-export func iter<T>(x: T[]): Iterator<T> =>
+export func iter<T>(x: const T[]): Iterator<T> =>
     js# ___iter(x) #js
 
 // export func typeof(val: unknown): 'string'|'number'|'boolean'|'nil'|'object'|'array'|'set'|'class-instance' =>
