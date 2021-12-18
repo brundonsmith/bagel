@@ -375,19 +375,32 @@ const inferTypeInner = memoize5((
             };
         }
         case "object-literal": {
-            const entries: Attribute[] = ast.entries.map(([name, value]) => {
-                const type = inferType(reportError, getModule, getParent, getBinding, value);
-                return {
-                    kind: "attribute",
-                    name,
-                    type, 
-                    mutability: undefined,
-                    module: undefined,
-                    code: undefined,
-                    startIndex: undefined,
-                    endIndex: undefined,
+            const entries = ast.entries.map(entry => {
+                if (Array.isArray(entry)) {
+                    const [name, value] = entry
+
+                    const type = inferType(reportError, getModule, getParent, getBinding, value);
+                    return {
+                        kind: "attribute",
+                        name,
+                        type, 
+                        mutability: undefined,
+                        module: undefined,
+                        code: undefined,
+                        startIndex: undefined,
+                        endIndex: undefined,
+                    }
+                } else {
+                    const spreadObjType = inferType(reportError, getModule, getParent, getBinding, entry as Expression);
+
+                    if (spreadObjType.kind !== 'object-type') {
+                        reportError(miscError(entry as Expression, `Can only spread objects into an object; found a ${displayForm(spreadObjType)}`))
+                        return undefined
+                    } else {
+                        return spreadObjType.entries
+                    }
                 }
-            });
+            }).filter(el => el != null).flat() as Attribute[]
 
             return {
                 kind: "object-type",

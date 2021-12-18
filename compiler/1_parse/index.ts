@@ -207,7 +207,7 @@ const objectType: ParseFunction<ObjectType> = (module, code, startIndex) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: constant, newIndex: index })))), ({ parsed: constant, newIndex: indexAfterConstant }) =>
     given(consume(code, indexAfterConstant ?? startIndex, "{"), index =>
     given(consumeWhitespace(code, index), index =>
-    given(parseSeries(module, code, index, _spreadOrEntry, ","), ({ parsed: entries, newIndex: index }) =>
+    given(parseSeries(module, code, index, _typeSpreadOrEntry, ","), ({ parsed: entries, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
         parsed: {
@@ -223,7 +223,7 @@ const objectType: ParseFunction<ObjectType> = (module, code, startIndex) =>
         newIndex: index,
     })))))))
 
-const _spreadOrEntry: ParseFunction<NamedType|Attribute> = (module, code, startIndex) => 
+const _typeSpreadOrEntry: ParseFunction<NamedType|Attribute> = (module, code, startIndex) => 
     _objectTypeEntry(module, code, startIndex) ?? _objectTypeSpread(module, code, startIndex)
 
 const _objectTypeSpread: ParseFunction<NamedType> = (module, code, startIndex) =>
@@ -1584,7 +1584,7 @@ const _elementEmbeddedExpression: ParseFunction<Expression> = (module, code, sta
 
 export const objectLiteral: ParseFunction<ObjectLiteral> = (module, code, startIndex) =>
     given(consume(code, startIndex, "{"), index =>
-    given(parseSeries(module, code, index, _objectEntry, ","), ({ parsed: entries, newIndex: index }) =>
+    given(parseSeries(module, code, index, _spreadOrEntry, ","), ({ parsed: entries, newIndex: index }) =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
         parsed: {
             kind: "object-literal",
@@ -1596,6 +1596,17 @@ export const objectLiteral: ParseFunction<ObjectLiteral> = (module, code, startI
         },
         newIndex: index,
     }))))
+
+const _spreadOrEntry: ParseFunction<[PlainIdentifier, Expression]|Expression> = (module, code, startIndex) =>
+    _objectSpread(module, code, startIndex)
+    ?? _objectEntry(module, code, startIndex)
+
+const _objectSpread = (module: ModuleName, code: string, index: number): ParseResult<Expression> | BagelError | undefined =>
+    given(consume(code, index, '...'), index =>
+    expec(expression(module, code, index), err(code, index, 'Expression'), ({ parsed: expr, newIndex: index }) => ({
+        parsed: expr,
+        newIndex: index,
+    })))
 
 const _objectEntry = (module: ModuleName, code: string, index: number): ParseResult<[PlainIdentifier, Expression]> | BagelError | undefined =>
     given(plainIdentifier(module, code, index), ({ parsed: key, newIndex: index }) =>

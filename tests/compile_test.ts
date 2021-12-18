@@ -204,6 +204,20 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Object literal with spread",
+  fn() {
+    testCompile(
+      `
+      const a = { foo: 'stuff' }
+      const b = { ...a, bar: 'other' }`,
+      `
+      const a = {foo: "stuff"};
+      const b = {...a, bar: "other"};`
+    )
+  }
+})
+
+Deno.test({
   name: "Indexer expression",
   fn() {
     testCompile(

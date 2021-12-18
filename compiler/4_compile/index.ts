@@ -111,7 +111,7 @@ ${given(ast.until, until => compileOne(getBinding, module, until))})`;
         case "indexer": return `${compileOne(getBinding, module, ast.subject)}[${compileOne(getBinding, module, ast.indexer)}]`;
         case "block": return `{ ${blockContents(getBinding, module, ast)}; }`;
         case "element-tag": return `${INT}h('${ast.tagName.name}',{${
-            objectEntries(getBinding, module, (ast.attributes as [PlainIdentifier, Expression|Expression[]][]))}}, ${ast.children.map(c => compileOne(getBinding, module, c)).join(', ')})`;
+            objectEntries(getBinding, module, (ast.attributes as ([PlainIdentifier, Expression|Expression[]] | Expression)[]))}}, ${ast.children.map(c => compileOne(getBinding, module, c)).join(', ')})`;
         case "union-type": return ast.members.map(m => compileOne(getBinding, module, m)).join(" | ");
         case "named-type": return ast.name.name;
         case "proc-type": return `(${compileArgs(getBinding, module, ast.args)}) => void`;
@@ -147,9 +147,15 @@ function blockContents(getBinding: GetBinding, module: string, block: Block) {
     return block.statements.map(s => compileOne(getBinding, module, s)).join("; ")
 }
 
-function objectEntries(getBinding: GetBinding, module: string, entries: readonly (readonly [PlainIdentifier, Expression | readonly Expression[]])[]): string {
+function objectEntries(getBinding: GetBinding, module: string, entries: readonly (readonly [PlainIdentifier, Expression | readonly Expression[]]|Expression)[]): string {
     return entries
-        .map(([ key, value ]) => `${compileOne(getBinding, module, key)}: ${Array.isArray(value) ? value.map(c => compileOne(getBinding, module, c)) : compileOne(getBinding, module, value as Expression)}`)
+        .map(entry => 
+            Array.isArray(entry)
+                ? `${compileOne(getBinding, module, entry[0])}: ${
+                    Array.isArray(entry[1]) 
+                        ? entry[1].map(c => compileOne(getBinding, module, c)) 
+                        : compileOne(getBinding, module, entry[1] as Expression)}`
+                : `...${compileOne(getBinding, module, entry as Expression)}`)
         .join(", ")
 }
 

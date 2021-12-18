@@ -115,6 +115,30 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Object literal with spread",
+  fn() {
+    testTypecheck(
+      `
+      const a = { foo: 'stuff' }
+      const b: { foo: string, bar: string } = { ...a, bar: 'other' }`,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Object literal with spread",
+  fn() {
+    testTypecheck(
+      `
+      const a = { foo: 'stuff' }
+      const b: { foo: number, bar: string } = { ...a, bar: 'other' }`,
+      true
+    )
+  }
+})
+
+Deno.test({
   name: "Object type",
   fn() {
     testTypecheck(
