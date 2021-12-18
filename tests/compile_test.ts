@@ -8,7 +8,7 @@ Deno.test({
   fn() {
     testCompile(
       `func uid() => '12345'`,
-      `const uid = () => \`12345\`;`,
+      `const uid = () => "12345";`,
     );
   },
 });
@@ -28,7 +28,7 @@ Deno.test({
   fn() {
     testCompile(
       `func memo uid() => '12345'`,
-      `const uid = ___computedFn(() => \`12345\`, { requiresReaction: false });`,
+      `const uid = ___computedFn(() => "12345", { requiresReaction: false });`,
     );
   },
 });
@@ -192,11 +192,11 @@ Deno.test({
             }`,
       `const foo = (): void => {
         if (true) {
-          log(\`true\`);
+          log("true");
         } else if (false) {
-          log(\`false\`);
+          log("false");
         } else {
-          log(\`other\`);
+          log("other");
         };
       };`,
     );
@@ -307,7 +307,7 @@ Deno.test({
   fn() {
     testCompile(
       `const foo: FooType = 'stuff'`,
-      `const foo: FooType = \`stuff\`;`,
+      `const foo: FooType = "stuff";`,
     );
   },
 });
