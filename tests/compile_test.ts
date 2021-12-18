@@ -218,6 +218,20 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Array literal with spread",
+  fn() {
+    testCompile(
+      `
+      const a = [1, 2, 3]
+      const b = [...a, 4]`,
+      `
+      const a = [1, 2, 3];
+      const b = [...a, 4];`
+    )
+  }
+})
+
+Deno.test({
   name: "Indexer expression",
   fn() {
     testCompile(

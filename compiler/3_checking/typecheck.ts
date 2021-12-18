@@ -1,5 +1,5 @@
 import { Module } from "../_model/ast.ts";
-import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, NIL_TYPE, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, iterateParseTree } from "../utils.ts";
 import { assignmentError,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, parameterizedGenericType, fitTemplate } from "./typeinfer.ts";
@@ -157,8 +157,20 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                     if (!subsumes(getParent, getBinding,  baseType.keyType, indexerType)) {
                         reportError(assignmentError(current.indexer, baseType.keyType, indexerType));
                     }
+                } else if (baseType.kind === "array-type") {
+                    if (!subsumes(getParent, getBinding,  NUMBER_TYPE, indexerType)) {
+                        reportError(miscError(current.indexer, `Expression of type '${displayForm(indexerType)}' can't be used to index type '${displayForm(baseType)}'`));
+                    }
+                } else if (baseType.kind === "tuple-type") {
+                    if (!subsumes(getParent, getBinding,  NUMBER_TYPE, indexerType)) {
+                        reportError(miscError(current.indexer, `Expression of type '${displayForm(indexerType)}' can't be used to index type '${displayForm(baseType)}'`));
+                    } else if (indexerType.kind === 'literal-type' && indexerType.value.kind === 'number-literal') {
+                        if (indexerType.value.value < 0 || indexerType.value.value >= baseType.members.length) {
+                            reportError(miscError(current.indexer, `Index ${indexerType.value.value} is out of range on type '${displayForm(baseType)}'`));
+                        }
+                    }
                 } else {
-                    reportError(miscError(current.indexer, `Expression of type '${indexerType}' can't be used to index type '${displayForm(baseType)}'`));
+                    reportError(miscError(current.indexer, `Expression of type '${displayForm(indexerType)}' can't be used to index type '${displayForm(baseType)}'`));
                 }
             } break;
             case "property-accessor": {
@@ -317,7 +329,8 @@ export function subsumes(getParent: GetParent, getBinding: GetBinding, destinati
                 subsumes(getParent, getBinding, member, resolvedValue));
         }
     } else if (resolvedValue.kind === "union-type") {
-        return false;
+        return resolvedValue.members.every(member =>
+            subsumes(getParent, getBinding, resolvedDestination, member));
     } else if(typesEqual(resolvedDestination, resolvedValue)) {
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
@@ -329,8 +342,14 @@ export function subsumes(getParent: GetParent, getBinding: GetBinding, destinati
             // NOTE: Value and destination are flipped on purpose for args!
             && resolvedDestination.args.every((_, i) => subsumes(getParent, getBinding, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))) {
         return true;
-    } else if (resolvedDestination.kind === "array-type" && resolvedValue.kind === "array-type") {
-        return subsumes(getParent, getBinding, resolvedDestination.element, resolvedValue.element)
+    } else if (resolvedDestination.kind === "array-type") {
+        if (resolvedValue.kind === "array-type") {
+            return subsumes(getParent, getBinding, resolvedDestination.element, resolvedValue.element)
+        }
+        if (resolvedValue.kind === 'tuple-type') {
+            return resolvedValue.members.every(member =>
+                subsumes(getParent, getBinding, resolvedDestination.element, member))
+        }
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
         const destinationEntries = propertiesOf(() => {}, () => undefined, getParent, getBinding, resolvedDestination)
         const valueEntries =       propertiesOf(() => {}, () => undefined, getParent, getBinding, resolvedValue)

@@ -115,7 +115,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Object literal with spread",
+  name: "Object literal with spread success",
   fn() {
     testTypecheck(
       `
@@ -127,12 +127,60 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Object literal with spread",
+  name: "Object literal with spread mismatch",
   fn() {
     testTypecheck(
       `
       const a = { foo: 'stuff' }
       const b: { foo: number, bar: string } = { ...a, bar: 'other' }`,
+      true
+    )
+  }
+})
+
+Deno.test({
+  name: "Array literal with spread success 1",
+  fn() {
+    testTypecheck(
+      `
+      const a = [1, 2, 3]
+      const b: number[] = [...a, 4]`,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Array literal with spread success 2",
+  fn() {
+    testTypecheck(
+      `
+      const a = [1, 2, 3]
+      const b: number = [...a, '4'][2]`,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Array literal with spread mismatch 1",
+  fn() {
+    testTypecheck(
+      `
+      const a = 12
+      const b = [...a, 4]`,
+      true
+    )
+  }
+})
+
+Deno.test({
+  name: "Array literal with spread mismatch 1",
+  fn() {
+    testTypecheck(
+      `
+      const a = ['1', '2', '3']
+      const b: number[] = [...a, 4]`,
       true
     )
   }

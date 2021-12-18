@@ -4,7 +4,7 @@ import { memoize, memoize2, memoize3, ModuleName } from "../utils.ts";
 import { Module, Debug } from "../_model/ast.ts";
 import { Block, PlainIdentifier, ReportError, SourceInfo } from "../_model/common.ts";
 import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
@@ -1597,16 +1597,9 @@ export const objectLiteral: ParseFunction<ObjectLiteral> = (module, code, startI
         newIndex: index,
     }))))
 
-const _spreadOrEntry: ParseFunction<[PlainIdentifier, Expression]|Expression> = (module, code, startIndex) =>
-    _objectSpread(module, code, startIndex)
+const _spreadOrEntry: ParseFunction<[PlainIdentifier, Expression]|Spread> = (module, code, startIndex) =>
+    spread(module, code, startIndex)
     ?? _objectEntry(module, code, startIndex)
-
-const _objectSpread = (module: ModuleName, code: string, index: number): ParseResult<Expression> | BagelError | undefined =>
-    given(consume(code, index, '...'), index =>
-    expec(expression(module, code, index), err(code, index, 'Expression'), ({ parsed: expr, newIndex: index }) => ({
-        parsed: expr,
-        newIndex: index,
-    })))
 
 const _objectEntry = (module: ModuleName, code: string, index: number): ParseResult<[PlainIdentifier, Expression]> | BagelError | undefined =>
     given(plainIdentifier(module, code, index), ({ parsed: key, newIndex: index }) =>
@@ -1620,7 +1613,7 @@ const _objectEntry = (module: ModuleName, code: string, index: number): ParseRes
 
 const arrayLiteral: ParseFunction<ArrayLiteral> = (module, code, startIndex) =>
     given(consume(code, startIndex, "["), index =>
-    given(parseSeries(module, code, index, expression, ","), ({ parsed: entries, newIndex: index }) =>
+    given(parseSeries(module, code, index, _expressionOrSpread, ","), ({ parsed: entries, newIndex: index }) =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index => ({
         parsed: {
             kind: "array-literal",
@@ -1632,6 +1625,26 @@ const arrayLiteral: ParseFunction<ArrayLiteral> = (module, code, startIndex) =>
         },
         newIndex: index,
     }))))
+
+const _expressionOrSpread: ParseFunction<Expression|Spread> = (module, code, startIndex) =>
+    spread(module, code, startIndex)
+    ?? expression(module, code, startIndex)
+
+const spread: ParseFunction<Spread> = (module, code, startIndex) =>
+    given(consume(code, startIndex, '...'), index =>
+    expec(expression(module, code, index), err(code, index, 'Spread array'), ({ parsed: expr, newIndex: index }) => ({
+        parsed: {
+            kind: 'spread',
+            expr,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+
+        },
+        newIndex: index
+    })))
+
 
 const stringLiteral: ParseFunction<StringLiteral|ExactStringLiteral> = (module, code, startIndex) => {
     const segments: (string|Expression)[] = [];

@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-fallthrough
 import { GetParent, GetBinding, ReportError, GetModule, Refinement } from "../_model/common.ts";
-import { BinaryOp, Expression, InlineConst, isExpression } from "../_model/expressions.ts";
-import { ANY_TYPE, Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BinaryOp, Expression, InlineConst, isExpression, Spread } from "../_model/expressions.ts";
+import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, mapParseTree, memoize5 } from "../utils.ts";
 import { displayForm, subsumes, typesEqual } from "./typecheck.ts";
 import { StoreMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
@@ -185,8 +185,30 @@ const inferTypeInner = memoize5((
                         endIndex: undefined,
                     };
                 }
-            } else if (baseType.kind === "array-type" && indexerType.kind === "number-type") {
-                return baseType.element;
+            } else if (baseType.kind === "array-type" && subsumes(getParent, getBinding, NUMBER_TYPE, indexerType)) {
+                return {
+                    kind: "union-type",
+                    members: [ baseType.element, NIL_TYPE ],
+                    mutability: undefined,
+                    module: undefined,
+                    code: undefined,
+                    startIndex: undefined,
+                    endIndex: undefined,
+                }
+            } else if (baseType.kind === "tuple-type" && subsumes(getParent, getBinding, NUMBER_TYPE, indexerType)) {
+                if (indexerType.kind === 'literal-type' && indexerType.value.kind === 'number-literal') {
+                    return baseType.members[indexerType.value.value] ?? NIL_TYPE
+                } else {
+                    return {
+                        kind: "union-type",
+                        members: [ ...baseType.members, NIL_TYPE ],
+                        mutability: undefined,
+                        module: undefined,
+                        code: undefined,
+                        startIndex: undefined,
+                        endIndex: undefined,
+                    }
+                }
             }
 
             return UNKNOWN_TYPE;
@@ -391,10 +413,11 @@ const inferTypeInner = memoize5((
                         endIndex: undefined,
                     }
                 } else {
-                    const spreadObjType = inferType(reportError, getModule, getParent, getBinding, entry as Expression);
+                    const spreadObj = (entry as Spread).expr
+                    const spreadObjType = inferType(reportError, getModule, getParent, getBinding, spreadObj);
 
                     if (spreadObjType.kind !== 'object-type') {
-                        reportError(miscError(entry as Expression, `Can only spread objects into an object; found a ${displayForm(spreadObjType)}`))
+                        reportError(miscError(spreadObj, `Can only spread objects into an object; found ${displayForm(spreadObjType)}`))
                         return undefined
                     } else {
                         return spreadObjType.entries
@@ -414,33 +437,55 @@ const inferTypeInner = memoize5((
             };
         }
         case "array-literal": {
-            const entries = ast.entries.map(entry => inferType(reportError, getModule, getParent, getBinding, entry));
+            const memberTypes: TypeExpression[] = []
+            const arraySpreads: ArrayType[] = []
 
-            // NOTE: This could be slightly better where different element types overlap each other
-            const uniqueEntryTypes = entries.filter((el, index, arr) => 
-                arr.findIndex(other => deepEquals(el, other)) === index);
+            for (const entry of ast.entries) {
+                if (entry.kind === 'spread') {
+                    const spreadType = inferType(reportError, getModule, getParent, getBinding, entry.expr)
 
-            return {
-                kind: "array-type",
-                element: (
-                    uniqueEntryTypes.length === 1 ? uniqueEntryTypes[0]
-                    : uniqueEntryTypes.length === 0 ? UNKNOWN_TYPE
-                    : {
+                    if (spreadType.kind === 'array-type') {
+                        arraySpreads.push(spreadType)
+                    } else if (spreadType.kind === 'tuple-type') {
+                        memberTypes.push(...spreadType.members)
+                    } else {
+                        reportError(miscError(entry.expr, `Can only spread arrays into an array; found ${displayForm(spreadType)}`))
+                        memberTypes.push(UNKNOWN_TYPE)
+                    }
+                } else {
+                    memberTypes.push(inferType(reportError, getModule, getParent, getBinding, entry))
+                }
+            }
+
+            if (arraySpreads.length === 0) {
+                return {
+                    kind: "tuple-type",
+                    members: memberTypes,
+                    mutability: "mutable",
+                    module: undefined,
+                    code: undefined,
+                    startIndex: undefined,
+                    endIndex: undefined,
+                }
+            } else {
+                return {
+                    kind: "array-type",
+                    element: simplify(getParent, getBinding, {
                         kind: "union-type",
-                        members: uniqueEntryTypes,
+                        members: [...memberTypes, ...arraySpreads.map(t => t.element)],
                         mutability: undefined,
                         module: undefined,
                         code: undefined,
                         startIndex: undefined,
                         endIndex: undefined,
-                    }
-                ),
-                mutability: "mutable",
-                module: undefined,
-                code: undefined,
-                startIndex: undefined,
-                endIndex: undefined,
-            };
+                    }),
+                    mutability: "mutable",
+                    module: undefined,
+                    code: undefined,
+                    startIndex: undefined,
+                    endIndex: undefined,
+                }
+            }
         }
         case "store-property":
         case "store-function":
@@ -563,11 +608,16 @@ function distillUnion(getParent: GetParent, getBinding: GetBinding, type: TypeEx
  * If union only has one member, putting it in a union-type is redundant
  */
  function handleSingletonUnion(type: TypeExpression): TypeExpression {
-    if (type.kind === "union-type" && type.members.length === 1) {
-        return type.members[0];
-    } else {
-        return type;
+    if (type.kind === "union-type") {
+        if (type.members.length === 1) {
+            return type.members[0];
+        }
+        if (type.members.length === 0) {
+            return UNKNOWN_TYPE
+        }
     }
+    
+    return type;
 }
 
 export function subtract(getParent: GetParent, getBinding: GetBinding, type: TypeExpression, without: TypeExpression): TypeExpression {

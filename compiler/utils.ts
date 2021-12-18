@@ -66,15 +66,12 @@ export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: A
 
             if (typeof prop === 'object' && prop != null) {
                 if (Array.isArray(prop)) {
-                    const tuplesArray = Array.isArray(prop[0])
-
-                    if (tuplesArray) {
-                        for (const [a, b] of (prop as [AST, AST][])) {
-                            yield* iterateParseTree(a, ast)
-                            yield* iterateParseTree(b, ast)
-                        }
-                    } else {
-                        for (const el of prop as AST[]) {
+                    for (const el of prop) {
+                        if (Array.isArray(el)) {
+                            for (const x of el) {
+                                yield* iterateParseTree(x, ast)
+                            }
+                        } else {
                             yield* iterateParseTree(el, ast)
                         }
                     }
@@ -96,17 +93,10 @@ export function mapParseTree(ast: AST, transform: (ast: AST) => AST): AST {
 
             if (typeof prop === 'object' && prop != null) {
                 if (Array.isArray(prop)) {
-                    const isTuplesArray = Array.isArray(prop[0])
-
-                    if (isTuplesArray) {
-                        (newAst as any)[key] = (prop as [AST, AST][]).map(([a, b]) => [
-                            mapParseTree(a, transform),
-                            mapParseTree(b, transform)
-                        ])
-                    } else {
-                        (newAst as any)[key] = (prop as AST[]).map(el => 
-                            mapParseTree(el, transform))
-                    }
+                    (newAst as any)[key] = prop.map(el => 
+                        Array.isArray(el)
+                            ? el.map(x => mapParseTree(x, transform))
+                            : mapParseTree(el, transform))
                 } else {
                     (newAst as any)[key] = mapParseTree(prop, transform)
                 }

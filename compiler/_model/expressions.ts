@@ -159,12 +159,17 @@ export type NilLiteral = SourceInfo & {
 
 export type ObjectLiteral = SourceInfo & {
     readonly kind: "object-literal",
-    readonly entries: readonly (readonly [PlainIdentifier, Expression]|Expression)[],
+    readonly entries: readonly (readonly [PlainIdentifier, Expression]|Spread)[],
 }
 
 export type ArrayLiteral = SourceInfo & {
     readonly kind: "array-literal",
-    readonly entries: readonly Expression[],
+    readonly entries: readonly (Expression | Spread)[],
+}
+
+export type Spread = SourceInfo & {
+    readonly kind: "spread",
+    readonly expr: Expression,
 }
 
 export type StringLiteral = SourceInfo & {

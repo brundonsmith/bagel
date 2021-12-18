@@ -1,5 +1,5 @@
 import { StoreMember, Declaration, ImportItem } from "./declarations.ts";
-import { Case, Expression, Operator } from "./expressions.ts";
+import { Case, Expression, Operator, Spread } from "./expressions.ts";
 import { CaseBlock, Statement } from "./statements.ts";
 import { Arg, Attribute, TypeExpression } from "./type-expressions.ts";
 import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
@@ -20,6 +20,7 @@ export type AST = (
     | CaseBlock
     | Arg
     | ImportItem
+    | Spread
 )
 
 export type Module = SourceInfo & {
