@@ -71,21 +71,17 @@ class _Store {
 
     readonly typeerrors = computedFn((module: ModuleName, ast: Module): BagelError[] => {
         const errors: BagelError[] = []
-        try {
-            typecheck(
-                {
-                    reportError: err => errors.push(err),
-                    getModule: imported => 
-                        given(module, module => this.getModuleByName(module, imported)), 
-                    getParent: this.getParent,
-                    getBinding: this.getBinding
-                }, 
-                ast
-            )
-            return errors
-        } catch (e) {
-            return [ ...errors, miscError(ast, e.toString()) ]
-        }
+        typecheck(
+            {
+                reportError: err => errors.push(err),
+                getModule: imported => 
+                    given(module, module => this.getModuleByName(module, imported)), 
+                getParent: this.getParent,
+                getBinding: this.getBinding
+            }, 
+            ast
+        )
+        return errors
     }, { requiresReaction: false })
 
     get allErrors() {
@@ -113,21 +109,16 @@ class _Store {
     }
 
     readonly compiled = computedFn((module: ModuleName, ast: Module): string => {
-        try {
-            return (
-                LIB_IMPORTS + 
-                (ast.hasMain ? MOBX_CONFIGURE : '') + 
-                compile(
-                    this.getBinding, 
-                    ast, 
-                    module, 
-                    this.config?.includeTests
-                )
+        return (
+            LIB_IMPORTS + 
+            (ast.hasMain ? MOBX_CONFIGURE : '') + 
+            compile(
+                this.getBinding, 
+                ast, 
+                module, 
+                this.config?.includeTests
             )
-        } catch (e) {
-            console.error(e)
-            return '';
-        }
+        )
     }, { requiresReaction: false })
 
     readonly getModuleByName = computedFn((importer: ModuleName, imported: string) => {
