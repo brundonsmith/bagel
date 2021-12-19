@@ -415,7 +415,5 @@ export function displayForm(typeExpression: TypeExpression): string {
         case "store-type": str = typeExpression.store.name.name; break;
     }
 
-    const metaStr = typeExpression.mutability == null ? '' : ` [${typeExpression.mutability[0]}]`
-
-    return str + metaStr
+    return (typeExpression.mutability === 'immutable' || typeExpression.mutability === 'readonly' ? 'const ' : '') + str
 }
