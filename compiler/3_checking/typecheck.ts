@@ -2,20 +2,22 @@ import { Module } from "../_model/ast.ts";
 import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, iterateParseTree } from "../utils.ts";
 import { assignmentError,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, parameterizedGenericType, fitTemplate, unpackGeneric } from "./typeinfer.ts";
-import { getBindingMutability, GetParent, GetBinding, ReportError, GetModule } from "../_model/common.ts";
+import { propertiesOf, inferType, subtract, parameterizedGenericType, fitTemplate } from "./typeinfer.ts";
+import { getBindingMutability, Passthrough } from "../_model/common.ts";
 import { display } from "../debugging.ts";
 
 
-export function typecheck(reportError: ReportError, getModule: GetModule, getParent: GetParent, getBinding: GetBinding, ast: Module) {
+export function typecheck(passthrough: Passthrough, ast: Module) {
+    const { reportError, getBinding } = passthrough
+
     for (const { current } of iterateParseTree(ast)) {
 
         switch(current.kind) {
             case "const-declaration": {
 
                 // make sure value fits declared type, if there is one
-                const valueType = inferType(reportError, getModule, getParent, getBinding, current.value);
-                if (current.type != null && !subsumes(getParent, getBinding,  current.type, valueType)) {
+                const valueType = inferType(passthrough, current.value);
+                if (current.type != null && !subsumes(passthrough,  current.type, valueType)) {
                     reportError(assignmentError(current.value, current.type, valueType));
                 }
 
@@ -37,15 +39,15 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
             case "test-expr-declaration": {
 
                 // make sure test value is a boolean
-                const valueType = inferType(reportError, getModule, getParent, getBinding, current.expr);
-                if (!subsumes(getParent, getBinding,  BOOLEAN_TYPE, valueType)) {
+                const valueType = inferType(passthrough, current.expr);
+                if (!subsumes(passthrough,  BOOLEAN_TYPE, valueType)) {
                     reportError(assignmentError(current.expr, BOOLEAN_TYPE, valueType));
                 }
             } break;
             case "func": {
                 // make sure body expression fits declared return type, if there is one
-                const bodyType = inferType(reportError, getModule, getParent, getBinding, current.body);
-                if (current.type.returnType != null && !subsumes(getParent, getBinding,  current.type.returnType, bodyType)) {
+                const bodyType = inferType(passthrough, current.body);
+                if (current.type.returnType != null && !subsumes(passthrough,  current.type.returnType, bodyType)) {
                     reportError(assignmentError(current.body, current.type.returnType, bodyType));
                 }
             } break;
@@ -53,15 +55,15 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                 // This gets checked in typeinfer
             } break;
             case "negation-operator": {
-                const baseType = inferType(reportError, getModule, getParent, getBinding, current.base);
-                if (!subsumes(getParent, getBinding,  BOOLEAN_TYPE, baseType)) {
+                const baseType = inferType(passthrough, current.base);
+                if (!subsumes(passthrough,  BOOLEAN_TYPE, baseType)) {
                     reportError(assignmentError(current.base, BOOLEAN_TYPE, baseType));
                 }
             } break;
             case "pipe":
             case "invocation": {
                 
-                let subjectType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, current.subject))
+                let subjectType = resolveType(passthrough, inferType(passthrough, current.subject))
                 if (current.kind === "invocation") {
 
                     // bind type-args for this invocation
@@ -84,18 +86,18 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                                     const typeParam = subjectType.typeParams[i]
                                     const typeArg = current.typeArgs[i] as TypeExpression
 
-                                    if (typeParam.extends && !subsumes(getParent, getBinding, typeParam.extends, typeArg)) {
+                                    if (typeParam.extends && !subsumes(passthrough, typeParam.extends, typeArg)) {
                                         reportError(assignmentError(typeArg, typeParam.extends, typeArg))
                                     }
                                 }
                             } else {
                                 const invocationSubjectType: FuncType|ProcType = {
                                     ...subjectType,
-                                    args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(reportError, getModule, getParent, getBinding, current.args[index]) }))
+                                    args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(passthrough, current.args[index]) }))
                                 }
         
                                 // attempt to infer params for generic
-                                const inferredBindings = fitTemplate(reportError, getParent, getBinding, subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name.name));
+                                const inferredBindings = fitTemplate(passthrough, subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name.name));
         
                                 if (inferredBindings.size === subjectType.typeParams.length) {
                                     subjectType = parameterizedGenericType(
@@ -123,8 +125,8 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                         const arg = current.args[i]
                         const subjectArgType = subjectType.args[i].type ?? UNKNOWN_TYPE
 
-                        const argValueType = inferType(reportError, getModule, getParent, getBinding, arg)
-                        if (!subsumes(getParent, getBinding,  subjectArgType, argValueType)) {
+                        const argValueType = inferType(passthrough, arg)
+                        if (!subsumes(passthrough,  subjectArgType, argValueType)) {
                             reportError(assignmentError(arg, subjectArgType, argValueType));
                         }
                     }
@@ -133,35 +135,35 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
             case "if-else-expression":
             case "if-else-statement":
             case "switch-expression": {
-                const valueType = current.kind === "if-else-expression" || current.kind === "if-else-statement" ? BOOLEAN_TYPE : inferType(reportError, getModule, getParent, getBinding, current.value);
+                const valueType = current.kind === "if-else-expression" || current.kind === "if-else-statement" ? BOOLEAN_TYPE : inferType(passthrough, current.value);
 
                 for (const { condition } of current.cases) {
-                    const conditionType = inferType(reportError, getModule, getParent, getBinding, condition);
-                    if (!subsumes(getParent, getBinding,  valueType, conditionType)) {
+                    const conditionType = inferType(passthrough, condition);
+                    if (!subsumes(passthrough,  valueType, conditionType)) {
                         reportError(assignmentError(condition, valueType, conditionType));
                     }
                 }
             } break;
             case "indexer": {
-                const baseType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, current.subject))
-                const indexerType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, current.indexer))
+                const baseType = resolveType(passthrough, inferType(passthrough, current.subject))
+                const indexerType = resolveType(passthrough, inferType(passthrough, current.indexer))
                 
                 if (baseType.kind === "object-type" && indexerType.kind === "literal-type") {
                     const key = indexerType.value.value;
-                    const valueType = propertiesOf(reportError, getModule, getParent, getBinding, baseType)?.find(entry => entry.name.name === key)?.type;
+                    const valueType = propertiesOf(passthrough, baseType)?.find(entry => entry.name.name === key)?.type;
                     if (valueType == null) {
                         reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${displayForm(baseType)}'`));
                     }
                 } else if (baseType.kind === "indexer-type") {
-                    if (!subsumes(getParent, getBinding,  baseType.keyType, indexerType)) {
+                    if (!subsumes(passthrough,  baseType.keyType, indexerType)) {
                         reportError(assignmentError(current.indexer, baseType.keyType, indexerType));
                     }
                 } else if (baseType.kind === "array-type") {
-                    if (!subsumes(getParent, getBinding,  NUMBER_TYPE, indexerType)) {
+                    if (!subsumes(passthrough,  NUMBER_TYPE, indexerType)) {
                         reportError(miscError(current.indexer, `Expression of type '${displayForm(indexerType)}' can't be used to index type '${displayForm(baseType)}'`));
                     }
                 } else if (baseType.kind === "tuple-type") {
-                    if (!subsumes(getParent, getBinding,  NUMBER_TYPE, indexerType)) {
+                    if (!subsumes(passthrough,  NUMBER_TYPE, indexerType)) {
                         reportError(miscError(current.indexer, `Expression of type '${displayForm(indexerType)}' can't be used to index type '${displayForm(baseType)}'`));
                     } else if (indexerType.kind === 'literal-type' && indexerType.value.kind === 'number-literal') {
                         if (indexerType.value.value < 0 || indexerType.value.value >= baseType.members.length) {
@@ -173,10 +175,10 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                 }
             } break;
             case "property-accessor": {
-                const subjectType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, current.subject))
+                const subjectType = resolveType(passthrough, inferType(passthrough, current.subject))
                 const subjectProperties = current.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-                    ? propertiesOf(reportError, getModule, getParent, getBinding, subtract(getParent, getBinding, subjectType, NIL_TYPE))
-                    : propertiesOf(reportError, getModule, getParent, getBinding, subjectType)
+                    ? propertiesOf(passthrough, subtract(passthrough, subjectType, NIL_TYPE))
+                    : propertiesOf(passthrough, subjectType)
 
                 if (subjectProperties == null) {
                     reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${displayForm(subjectType)}")`));
@@ -192,22 +194,22 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                 // check that all template insertions are allowed to be inserted
                 for (const segment of current.segments) {
                     if (typeof segment !== "string") {
-                        const segmentType = inferType(reportError, getModule, getParent, getBinding, segment);
-                        if (!subsumes(getParent, getBinding,  STRING_TEMPLATE_INSERT_TYPE, segmentType)) {
+                        const segmentType = inferType(passthrough, segment);
+                        if (!subsumes(passthrough,  STRING_TEMPLATE_INSERT_TYPE, segmentType)) {
                             reportError(assignmentError(segment, STRING_TEMPLATE_INSERT_TYPE, segmentType));
                         }
                     }
                 }
             } break;
             case "as-cast": {
-                const innerType = inferType(reportError, getModule, getParent, getBinding, current.inner)
-                if (!subsumes(getParent, getBinding, current.type, innerType)) {
+                const innerType = inferType(passthrough, current.inner)
+                if (!subsumes(passthrough, current.type, innerType)) {
                     reportError(miscError(current, `Expression of type ${displayForm(innerType)} cannot be expanded to type ${displayForm(current.type)}`))
                 }
             } break;
             case "reaction": {
-                const dataType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, current.data))
-                const effectType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, current.effect))
+                const dataType = resolveType(passthrough, inferType(passthrough, current.data))
+                const effectType = resolveType(passthrough, inferType(passthrough, current.effect))
 
                 if (dataType.kind !== "func-type") {
                     reportError(miscError(current.data, `Expected function in observe clause`));
@@ -219,13 +221,13 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
                     reportError(miscError(current.effect, `Expected procedure in effect clause`));
                 } else if (effectType.args.length > 1) {
                     reportError(miscError(current.data, `Effect procedure should take exactly one argument; provided procedure expects ${effectType.args.length}`));
-                } else if (dataType.kind === "func-type" && !subsumes(getParent, getBinding, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE)) {
+                } else if (dataType.kind === "func-type" && !subsumes(passthrough, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE)) {
                     reportError(assignmentError(current.effect, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE));
                 }
 
                 if (current.until) {
-                    const untilType = inferType(reportError, getModule, getParent, getBinding, current.until);
-                    if (!subsumes(getParent, getBinding,  BOOLEAN_TYPE, untilType)) {
+                    const untilType = inferType(passthrough, current.until);
+                    if (!subsumes(passthrough,  BOOLEAN_TYPE, untilType)) {
                         reportError(miscError(current.until, `Expected boolean expression in until clause`));
                     }
                 }
@@ -238,8 +240,8 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
             case "let-declaration":
             case "const-declaration-statement": {
                 if (current.type != null) {
-                const valueType = inferType(reportError, getModule, getParent, getBinding, current.value);
-                    if (!subsumes(getParent, getBinding,  current.type, valueType)) {
+                const valueType = inferType(passthrough, current.value);
+                    if (!subsumes(passthrough,  current.type, valueType)) {
                         reportError(assignmentError(current.value, current.type, valueType));
                     }
                 }
@@ -252,34 +254,34 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
 
 
                 if (current.target.kind === "property-accessor") {
-                    const subjectType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, current.target.subject))
+                    const subjectType = resolveType(passthrough, inferType(passthrough, current.target.subject))
                     if (subjectType.mutability !== "mutable") {
                         reportError(miscError(current.target, `Cannot assign to property '${current.target.property.name}' because the target object is constant`));
                     }
                 }
 
-                const targetType = inferType(reportError, getModule, getParent, getBinding, current.target);
-                const valueType = inferType(reportError, getModule, getParent, getBinding, current.value);
-                if (!subsumes(getParent, getBinding,  targetType, valueType)) {
+                const targetType = inferType(passthrough, current.target);
+                const valueType = inferType(passthrough, current.value);
+                if (!subsumes(passthrough,  targetType, valueType)) {
                     reportError(assignmentError(current.value, targetType, valueType));
                 }
             } break;
             case "for-loop": {
-                const iteratorType = inferType(reportError, getModule, getParent, getBinding, current.iterator);
-                if (!subsumes(getParent, getBinding,  ITERATOR_OF_ANY, iteratorType)) {
+                const iteratorType = inferType(passthrough, current.iterator);
+                if (!subsumes(passthrough,  ITERATOR_OF_ANY, iteratorType)) {
                     reportError(miscError(current.iterator, `Expected iterator after "of" in for loop`));
                 }
             } break;
             case "while-loop": {
-                const conditionType = inferType(reportError, getModule, getParent, getBinding, current.condition);
+                const conditionType = inferType(passthrough, current.condition);
                 if (conditionType.kind !== "boolean-type") {
                     reportError(miscError(current.condition, `Condition for while loop must be boolean`));
                 }
             } break;
             case "element-tag": {
                 for (const child of current.children) {
-                    const childType = inferType(reportError, getModule, getParent, getBinding, child);
-                    if (!subsumes(getParent, getBinding, ELEMENT_TAG_CHILD_TYPE, childType)) {
+                    const childType = inferType(passthrough, child);
+                    if (!subsumes(passthrough, ELEMENT_TAG_CHILD_TYPE, childType)) {
                         reportError(assignmentError(child, ELEMENT_TAG_CHILD_TYPE, childType));
                     }
                 }
@@ -288,13 +290,13 @@ export function typecheck(reportError: ReportError, getModule: GetModule, getPar
     }
 }
 
-export function subsumes(getParent: GetParent, getBinding: GetBinding, destination: TypeExpression, value: TypeExpression): boolean {
+export function subsumes(passthrough: Passthrough, destination: TypeExpression, value: TypeExpression): boolean {
     if (destination === value) {
         return true;
     }
 
-    const resolvedDestination = resolveType(getBinding, destination)
-    const resolvedValue = resolveType(getBinding, value)
+    const resolvedDestination = resolveType(passthrough, destination)
+    const resolvedValue = resolveType(passthrough, value)
 
     // constants can't be assigned to mutable slots
     if (resolvedDestination.mutability === "mutable" && resolvedValue.mutability !== "mutable") {
@@ -320,57 +322,59 @@ export function subsumes(getParent: GetParent, getBinding: GetBinding, destinati
         if (resolvedValue.kind === "union-type") {
             return resolvedValue.members.every(valueMember => 
                 resolvedDestination.members.some(destinationMember => 
-                    subsumes(getParent, getBinding, destinationMember, valueMember)));
+                    subsumes(passthrough, destinationMember, valueMember)));
         } else {
             return resolvedDestination.members.some(member => 
-                subsumes(getParent, getBinding, member, resolvedValue));
+                subsumes(passthrough, member, resolvedValue));
         }
     } else if (resolvedValue.kind === "union-type") {
         return resolvedValue.members.every(member =>
-            subsumes(getParent, getBinding, resolvedDestination, member));
+            subsumes(passthrough, resolvedDestination, member));
     } else if(typesEqual(resolvedDestination, resolvedValue)) {
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
             // NOTE: Value and destination are flipped on purpose for args!
-            && resolvedDestination.args.every((_, i) => subsumes(getParent, getBinding, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))
-            && subsumes(getParent, getBinding, resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)) {
+            && resolvedDestination.args.every((_, i) => subsumes(passthrough, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))
+            && subsumes(passthrough, resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)) {
         return true;
     } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" 
             // NOTE: Value and destination are flipped on purpose for args!
-            && resolvedDestination.args.every((_, i) => subsumes(getParent, getBinding, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))) {
+            && resolvedDestination.args.every((_, i) => subsumes(passthrough, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))) {
         return true;
     } else if (resolvedDestination.kind === "array-type") {
         if (resolvedValue.kind === "array-type") {
-            return subsumes(getParent, getBinding, resolvedDestination.element, resolvedValue.element)
+            return subsumes(passthrough, resolvedDestination.element, resolvedValue.element)
         }
         if (resolvedValue.kind === 'tuple-type') {
             return resolvedValue.members.every(member =>
-                subsumes(getParent, getBinding, resolvedDestination.element, member))
+                subsumes(passthrough, resolvedDestination.element, member))
         }
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
-        const destinationEntries = propertiesOf(() => {}, () => undefined, getParent, getBinding, resolvedDestination)
-        const valueEntries =       propertiesOf(() => {}, () => undefined, getParent, getBinding, resolvedValue)
+        const destinationEntries = propertiesOf(passthrough, resolvedDestination)
+        const valueEntries =       propertiesOf(passthrough, resolvedValue)
 
         return (
             !!destinationEntries?.every(({ name: key, type: destinationValue }) => 
                 given(valueEntries?.find(e => e.name.name === key.name)?.type, value =>
-                    subsumes(getParent, getBinding,  destinationValue, value)))
+                    subsumes(passthrough,  destinationValue, value)))
         );
     } else if (resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") {
-        return subsumes(getParent, getBinding, resolvedDestination.itemType, resolvedValue.itemType);
+        return subsumes(passthrough, resolvedDestination.itemType, resolvedValue.itemType);
     } else if (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") {
-        return subsumes(getParent, getBinding, resolvedDestination.resultType, resolvedValue.resultType);
+        return subsumes(passthrough, resolvedDestination.resultType, resolvedValue.resultType);
     }
 
     return false;
 }
 
-export function resolveType(getBinding: GetBinding, type: TypeExpression): TypeExpression {
+export function resolveType(passthrough: Passthrough, type: TypeExpression): TypeExpression {
+    const { reportError, getBinding } = passthrough
+
     let resolved: TypeExpression|undefined = type
 
     while (resolved?.kind === 'named-type' || resolved?.kind === 'generic-param-type') {
         if (resolved.kind === 'named-type') {
-            const binding = getBinding(() => {}, resolved.name)
+            const binding = getBinding(reportError, resolved.name)
 
             resolved = binding?.kind === 'type-binding' ? binding.type : undefined
         }

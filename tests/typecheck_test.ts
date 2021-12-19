@@ -1,6 +1,5 @@
-import { typecheck } from "../compiler/3_checking/typecheck.ts";
 import { BagelError,prettyError } from "../compiler/errors.ts";
-import { given, ModuleName } from "../compiler/utils.ts";
+import { ModuleName } from "../compiler/utils.ts";
 import Store, { canonicalModuleName } from "../compiler/store.ts";
 import { log, withoutSourceInfo } from "../compiler/debugging.ts";
 
@@ -1071,9 +1070,6 @@ Deno.test({
 function testTypecheck(code: string, shouldFail: boolean): void {
   const moduleName = "<test>" as ModuleName
   const errors: BagelError[] = [];
-  function reportError(err: BagelError) {
-    errors.push(err);
-  }
 
   Store.initializeFromSource({
     [moduleName]: code
@@ -1088,16 +1084,10 @@ function testTypecheck(code: string, shouldFail: boolean): void {
   
   // console.log(JSON.stringify(withoutSourceInfo(Store.parsed(moduleName, code).ast), null, 2))
   const { ast: parsed, errors: parseErrors } = Store.parsed(moduleName, code)
-
   errors.push(...parseErrors)
 
-  typecheck(
-    reportError, 
-    () => undefined, 
-    Store.getParent, 
-    Store.getBinding,
-    parsed
-  );
+  const typeErrors = Store.typeerrors(moduleName, parsed)
+  errors.push(...typeErrors)
 
   if (!shouldFail && errors.length > 0) {
     throw `\n${code}\n\nType check should have succeeded but failed with errors\n` +

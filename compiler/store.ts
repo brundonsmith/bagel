@@ -73,11 +73,13 @@ class _Store {
         const errors: BagelError[] = []
         try {
             typecheck(
-                err => errors.push(err),
-                imported => 
-                    given(module, module => this.getModuleByName(module, imported)), 
-                this.getParent,
-                this.getBinding, 
+                {
+                    reportError: err => errors.push(err),
+                    getModule: imported => 
+                        given(module, module => this.getModuleByName(module, imported)), 
+                    getParent: this.getParent,
+                    getBinding: this.getBinding
+                }, 
                 ast
             )
             return errors
@@ -154,10 +156,12 @@ class _Store {
         const currentModule = this.getModuleForNode(identifier)
 
         return resolveLazy(
-            reportError, 
-            imported => 
-                given(currentModule, module => this.getModuleByName(module, imported)), 
-            this.getParent, 
+            {
+                reportError,
+                getModule: imported => 
+                    given(currentModule, module => this.getModuleByName(module, imported)), 
+                getParent: this.getParent
+            },
             identifier,
             identifier
         )

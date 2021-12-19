@@ -1,8 +1,8 @@
 // deno-lint-ignore-file no-fallthrough
-import { GetParent, GetBinding, ReportError, GetModule, Refinement } from "../_model/common.ts";
+import { GetParent, GetBinding, ReportError, Refinement, Passthrough } from "../_model/common.ts";
 import { BinaryOp, Expression, InlineConst, isExpression, Spread } from "../_model/expressions.ts";
 import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, given, mapParseTree, memoize5 } from "../utils.ts";
+import { given, mapParseTree, memoize2 } from "../utils.ts";
 import { displayForm, resolveType, subsumes, typesEqual } from "./typecheck.ts";
 import { StoreMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
 import { assignmentError, cannotFindName, miscError } from "../errors.ts";
@@ -11,13 +11,11 @@ import { AST } from "../_model/ast.ts";
 import { LetDeclaration,ConstDeclarationStatement } from "../_model/statements.ts";
 
 export function inferType(
-    reportError: ReportError,
-    getModule: GetModule,
-    getParent: GetParent,
-    getBinding: GetBinding,
+    passthrough: Passthrough,
     ast: Expression|StoreMember,
 ): TypeExpression {
-    const baseType = inferTypeInner(reportError, getModule, getParent, getBinding, ast)
+    const { getParent } = passthrough
+    const baseType = inferTypeInner(passthrough, ast)
 
     let refinedType = baseType
     {
@@ -26,25 +24,23 @@ export function inferType(
         for (const refinement of refinements ?? []) {
             switch (refinement.kind) {
                 case "subtraction": {
-                    refinedType = subtract(getParent, getBinding, refinedType, refinement.type)
+                    refinedType = subtract(passthrough, refinedType, refinement.type)
                 } break;
                 case "narrowing": {
-                    refinedType = narrow(getParent, getBinding, refinedType, refinement.type)
+                    refinedType = narrow(passthrough, refinedType, refinement.type)
                 } break;
             }
         }
     }
 
-    return simplify(getParent, getBinding, refinedType)
+    return simplify(passthrough, refinedType)
 }
 
-const inferTypeInner = memoize5((
-    reportError: ReportError,
-    getModule: GetModule, 
-    getParent: GetParent,
-    getBinding: GetBinding,
+const inferTypeInner = memoize2((
+    passthrough: Passthrough,
     ast: Expression|StoreMember,
 ): TypeExpression => {
+    const { reportError, getParent, getBinding } = passthrough
     switch(ast.kind) {
         case "proc":
             return ast.type
@@ -55,7 +51,7 @@ const inferTypeInner = memoize5((
                 const parent = getParent(ast)
 
                 if (parent?.kind === "invocation") {
-                    const parentSubjectType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, parent.subject))
+                    const parentSubjectType = resolveType(passthrough, inferType(passthrough, parent.subject))
                     const thisArgIndex = parent.args.findIndex(a => a === ast)
 
                     if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
@@ -70,7 +66,7 @@ const inferTypeInner = memoize5((
 
             // if no return-type is declared, try inferring the type from the inner expression
             const returnType = ast.type.returnType ??
-                inferType(reportError, getModule, getParent, getBinding, ast.body)
+                inferType(passthrough, ast.body)
 
             return {
                 ...ast.type,
@@ -79,13 +75,13 @@ const inferTypeInner = memoize5((
 
         }
         case "binary-operator": {
-            let leftType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, ast.base))
+            let leftType = resolveType(passthrough, inferType(passthrough, ast.base))
 
             for (const [op, expr] of ast.ops) {
-                const rightType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, expr))
+                const rightType = resolveType(passthrough, inferType(passthrough, expr))
 
                 const types = BINARY_OPERATOR_TYPES[op.op].find(({ left, right }) =>
-                    subsumes(getParent, getBinding, left, leftType) && subsumes(getParent, getBinding, right, rightType))
+                    subsumes(passthrough, left, leftType) && subsumes(passthrough, right, rightType))
 
                 if (types == null) {
                     reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
@@ -107,7 +103,7 @@ const inferTypeInner = memoize5((
         case "invocation": {
             // const scope = getScope(ast)
 
-            let subjectType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, ast.subject))
+            let subjectType = resolveType(passthrough, inferType(passthrough, ast.subject))
 
             // bind type-args for this invocation
             if (ast.kind === "invocation") {    
@@ -129,12 +125,13 @@ const inferTypeInner = memoize5((
                                 ...subjectType,
                                 args: subjectType.args.map((arg, index) => ({
                                     ...arg,
-                                    type: inferType(reportError, getModule, getParent, getBinding, ast.args[index])
+                                    type: inferType(passthrough, ast.args[index])
                                 }))
                             }
     
                             // attempt to infer params for generic
-                            const inferredBindings = fitTemplate(reportError, getParent, getBinding, 
+                            const inferredBindings = fitTemplate(
+                                passthrough, 
                                 subjectType, 
                                 invocationSubjectType, 
                                 subjectType.typeParams.map(param => param.name.name)
@@ -163,16 +160,16 @@ const inferTypeInner = memoize5((
             }
         }
         case "indexer": {
-            const baseType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, ast.subject));
-            const indexerType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, ast.indexer));
+            const baseType = resolveType(passthrough, inferType(passthrough, ast.subject));
+            const indexerType = resolveType(passthrough, inferType(passthrough, ast.indexer));
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "exact-string-literal") {
                 const key = indexerType.value.value;
-                const valueType = propertiesOf(reportError, getModule, getParent, getBinding, baseType)?.find(entry => entry.name.name === key)?.type;
+                const valueType = propertiesOf(passthrough, baseType)?.find(entry => entry.name.name === key)?.type;
 
                 return valueType ?? UNKNOWN_TYPE;
             } else if (baseType.kind === "indexer-type") {
-                if (!subsumes(getParent, getBinding, baseType.keyType, indexerType)) {
+                if (!subsumes(passthrough, baseType.keyType, indexerType)) {
                     return UNKNOWN_TYPE;
                 } else {
                     return {
@@ -185,7 +182,7 @@ const inferTypeInner = memoize5((
                         endIndex: undefined,
                     };
                 }
-            } else if (baseType.kind === "array-type" && subsumes(getParent, getBinding, NUMBER_TYPE, indexerType)) {
+            } else if (baseType.kind === "array-type" && subsumes(passthrough, NUMBER_TYPE, indexerType)) {
                 return {
                     kind: "union-type",
                     members: [ baseType.element, NIL_TYPE ],
@@ -195,7 +192,7 @@ const inferTypeInner = memoize5((
                     startIndex: undefined,
                     endIndex: undefined,
                 }
-            } else if (baseType.kind === "tuple-type" && subsumes(getParent, getBinding, NUMBER_TYPE, indexerType)) {
+            } else if (baseType.kind === "tuple-type" && subsumes(passthrough, NUMBER_TYPE, indexerType)) {
                 if (indexerType.kind === 'literal-type' && indexerType.value.kind === 'number-literal') {
                     return baseType.members[indexerType.value.value] ?? NIL_TYPE
                 } else {
@@ -215,10 +212,10 @@ const inferTypeInner = memoize5((
         }
         case "if-else-expression":
         case "switch-expression": {
-            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, getModule, getParent, getBinding, ast.value)
+            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(passthrough, ast.value)
 
             const caseTypes = ast.cases.map(({ outcome }) => 
-                inferType(reportError, getModule, getParent, getBinding, outcome))
+                inferType(passthrough, outcome))
 
             const unionType: UnionType = {
                 kind: "union-type",
@@ -230,13 +227,13 @@ const inferTypeInner = memoize5((
                 endIndex: undefined,
             };
 
-            if (!subsumes(getParent, getBinding, unionType, valueType)) {
+            if (!subsumes(passthrough, unionType, valueType)) {
                 return {
                     ...unionType,
                     members: [
                         ...unionType.members,
                         ast.defaultCase 
-                            ? inferType(reportError, getModule, getParent, getBinding, ast.defaultCase) 
+                            ? inferType(passthrough, ast.defaultCase) 
                             : NIL_TYPE
                     ]
                 }
@@ -247,7 +244,7 @@ const inferTypeInner = memoize5((
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
         case "debug": {
             if (isExpression(ast.inner)) {
-                const type = inferType(reportError, getModule, getParent, getBinding, ast.inner)
+                const type = inferType(passthrough, ast.inner)
                 console.log(JSON.stringify({
                     bgl: given(ast.inner.code, code =>
                         given(ast.inner.startIndex, startIndex =>
@@ -261,15 +258,15 @@ const inferTypeInner = memoize5((
             }
         }
         case "parenthesized-expression":
-            return inferType(reportError, getModule, getParent, getBinding, ast.inner);
+            return inferType(passthrough, ast.inner);
         case "inline-const":
-            return inferType(reportError, getModule, getParent, getBinding, ast.next);
+            return inferType(passthrough, ast.next);
         case "property-accessor": {
-            const subjectType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, ast.subject));
+            const subjectType = resolveType(passthrough, inferType(passthrough, ast.subject));
             const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-                ? subtract(getParent, getBinding, subjectType, NIL_TYPE)
+                ? subtract(passthrough, subjectType, NIL_TYPE)
                 : subjectType;
-            const propertyType = propertiesOf(reportError, getModule, getParent, getBinding, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)?.type
+            const propertyType = propertiesOf(passthrough, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)?.type
 
             if (ast.optional && propertyType) {
                 return {
@@ -303,7 +300,7 @@ const inferTypeInner = memoize5((
                     case 'const-declaration':
                     case 'let-declaration':
                     case 'const-declaration-statement': {
-                        const baseType = decl.type ?? inferType(reportError, getModule, getParent, getBinding, decl.value)
+                        const baseType = decl.type ?? inferType(passthrough, decl.value)
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
                             decl.kind === 'const-declaration' || decl.kind === 'const-declaration-statement'
                                 ? 'immutable'
@@ -317,7 +314,7 @@ const inferTypeInner = memoize5((
                     case 'func-declaration':
                     case 'proc-declaration':
                     case 'inline-const': {
-                        const baseType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, decl.value))
+                        const baseType = resolveType(passthrough, inferType(passthrough, decl.value))
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
                             decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
                                 ? 'immutable'
@@ -351,14 +348,14 @@ const inferTypeInner = memoize5((
                     case 'basic': return getDeclType(resolution.ast)
                     case 'arg': {
                         return resolution.holder.type.args[resolution.argIndex].type 
-                            ?? (inferType(reportError, getModule, getParent, getBinding, resolution.holder) as FuncType|ProcType)
+                            ?? (inferType(passthrough, resolution.holder) as FuncType|ProcType)
                                 .args[resolution.argIndex].type
                             ?? UNKNOWN_TYPE
                     }
                     case 'iterator': {
-                        const iteratorType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, resolution.iterator))
+                        const iteratorType = resolveType(passthrough, inferType(passthrough, resolution.iterator))
     
-                        if (!subsumes(getParent, getBinding, ITERATOR_OF_ANY, iteratorType)) {
+                        if (!subsumes(passthrough, ITERATOR_OF_ANY, iteratorType)) {
                             reportError(assignmentError(resolution.iterator, ITERATOR_OF_ANY, iteratorType))
                         }
     
@@ -401,7 +398,7 @@ const inferTypeInner = memoize5((
                 if (Array.isArray(entry)) {
                     const [name, value] = entry
 
-                    const type = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, value));
+                    const type = resolveType(passthrough, inferType(passthrough, value));
                     return {
                         kind: "attribute",
                         name,
@@ -414,7 +411,7 @@ const inferTypeInner = memoize5((
                     }
                 } else {
                     const spreadObj = (entry as Spread).expr
-                    const spreadObjType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, spreadObj));
+                    const spreadObjType = resolveType(passthrough, inferType(passthrough, spreadObj));
 
                     if (spreadObjType.kind !== 'object-type') {
                         reportError(miscError(spreadObj, `Can only spread objects into an object; found ${displayForm(spreadObjType)}`))
@@ -442,7 +439,7 @@ const inferTypeInner = memoize5((
 
             for (const entry of ast.entries) {
                 if (entry.kind === 'spread') {
-                    const spreadType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, entry.expr))
+                    const spreadType = resolveType(passthrough, inferType(passthrough, entry.expr))
 
                     if (spreadType.kind === 'array-type') {
                         arraySpreads.push(spreadType)
@@ -453,7 +450,7 @@ const inferTypeInner = memoize5((
                         memberTypes.push(UNKNOWN_TYPE)
                     }
                 } else {
-                    memberTypes.push(inferType(reportError, getModule, getParent, getBinding, entry))
+                    memberTypes.push(inferType(passthrough, entry))
                 }
             }
 
@@ -470,7 +467,7 @@ const inferTypeInner = memoize5((
             } else {
                 return {
                     kind: "array-type",
-                    element: simplify(getParent, getBinding, {
+                    element: simplify(passthrough, {
                         kind: "union-type",
                         members: [...memberTypes, ...arraySpreads.map(t => t.element)],
                         mutability: undefined,
@@ -489,7 +486,7 @@ const inferTypeInner = memoize5((
         }
         case "store-property":
         case "store-function":
-        case "store-procedure": return (ast.kind === "store-property" ? ast.type : undefined) ?? inferType(reportError, getModule, getParent, getBinding, ast.value);
+        case "store-procedure": return (ast.kind === "store-property" ? ast.type : undefined) ?? inferType(passthrough, ast.value);
         case "string-literal": return STRING_TYPE;
         case "exact-string-literal":
         case "number-literal":
@@ -541,9 +538,9 @@ export function parameterizedGenericType<T extends FuncType|ProcType>(reportErro
     }) as T
 }
 
-export function simplify(getParent: GetParent, getBinding: GetBinding, type: TypeExpression): TypeExpression {
+export function simplify(passthrough: Passthrough, type: TypeExpression): TypeExpression {
     return handleSingletonUnion(
-        distillUnion(getParent, getBinding,
+        distillUnion(passthrough,
             flattenUnions(type)));
 }
 
@@ -579,7 +576,7 @@ function flattenUnions(type: TypeExpression): TypeExpression {
 /**
  * Remove redundant members in union type (members subsumed by other members)
  */
-function distillUnion(getParent: GetParent, getBinding: GetBinding, type: TypeExpression): TypeExpression {
+function distillUnion(passthrough: Passthrough, type: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         const indicesToDrop = new Set<number>();
 
@@ -589,7 +586,7 @@ function distillUnion(getParent: GetParent, getBinding: GetBinding, type: TypeEx
                     const a = type.members[i];
                     const b = type.members[j];
 
-                    if (subsumes(getParent, getBinding, b, a) && !indicesToDrop.has(j) && resolveType(getBinding, b).kind !== 'unknown-type') {
+                    if (subsumes(passthrough, b, a) && !indicesToDrop.has(j) && resolveType(passthrough, b).kind !== 'unknown-type') {
                         indicesToDrop.add(i);
                     }
                 }
@@ -628,25 +625,25 @@ function distillUnion(getParent: GetParent, getBinding: GetBinding, type: TypeEx
     return type;
 }
 
-export function subtract(getParent: GetParent, getBinding: GetBinding, type: TypeExpression, without: TypeExpression): TypeExpression {
-    type = resolveType(getBinding, type)
-    without = resolveType(getBinding, without)
+export function subtract(passthrough: Passthrough, type: TypeExpression, without: TypeExpression): TypeExpression {
+    type = resolveType(passthrough, type)
+    without = resolveType(passthrough, without)
 
     if (type.kind === "union-type") {
-        return simplify(getParent, getBinding, {
+        return simplify(passthrough, {
             ...type,
-            members: type.members.filter(member => !subsumes(getParent, getBinding, without, member))
+            members: type.members.filter(member => !subsumes(passthrough, without, member))
         })
     } else { // TODO: There's probably more we can do here
         return type
     }
 }
 
-function narrow(getParent: GetParent, getBinding: GetBinding, type: TypeExpression, fit: TypeExpression): TypeExpression {
+function narrow(passthrough: Passthrough, type: TypeExpression, fit: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
-        return simplify(getParent, getBinding, {
+        return simplify(passthrough, {
             ...type,
-            members: type.members.filter(member => subsumes(getParent, getBinding, fit, member))
+            members: type.members.filter(member => subsumes(passthrough, fit, member))
         })
     } else { // TODO: There's probably more we can do here
         return type
@@ -787,12 +784,10 @@ function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
 }
 
 export function propertiesOf(
-    reportError: ReportError,
-    getModule: GetModule,
-    getParent: GetParent,
-    getBinding: GetBinding,
+    passthrough: Passthrough,
     type: TypeExpression
 ): readonly Attribute[] | undefined {
+    const { reportError, getBinding } = passthrough
 
     switch (type.kind) {
         case "named-type": {
@@ -802,11 +797,11 @@ export function propertiesOf(
                 reportError(miscError(type.name, `Can't find type ${type.name.name}`))
                 return undefined
             } else {
-                return propertiesOf(reportError, getModule, getParent, getBinding, binding.type)
+                return propertiesOf(passthrough, binding.type)
             }
         }
         case "generic-param-type": {
-            return  propertiesOf(reportError, getModule, getParent, getBinding, type.extends ?? UNKNOWN_TYPE)
+            return  propertiesOf(passthrough, type.extends ?? UNKNOWN_TYPE)
         }
         case "object-type": {
             const attrs = [...type.entries]
@@ -815,7 +810,7 @@ export function propertiesOf(
                 const resolved = getBinding(reportError, spread)
 
                 if (resolved != null && resolved.kind === 'type-binding' && resolved.type.kind === 'object-type') {
-                    attrs.push(...(propertiesOf(reportError, getModule, getParent, getBinding, resolved.type) ?? []))
+                    attrs.push(...(propertiesOf(passthrough, resolved.type) ?? []))
                 } else {
                     if (resolved != null) {
                         if (resolved.kind !== 'type-binding') {
@@ -862,7 +857,7 @@ export function propertiesOf(
 
                 const memberType = memberDeclaredType(member) && memberDeclaredType(member)?.kind !== "func-type"
                     ? memberDeclaredType(member) as TypeExpression
-                    : inferType(reportError, getModule, getParent, getBinding, member.value);
+                    : inferType(passthrough, member.value);
 
                 const mutability = (
                     memberType.mutability == null ? undefined :
@@ -1013,9 +1008,7 @@ const AST_NOISE = { module: undefined, code: undefined, startIndex: undefined, e
 const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
 
 export function fitTemplate(
-    reportError: ReportError, 
-    getParent: GetParent,
-    getBinding: GetBinding,
+    passthrough: Passthrough,
     parameterized: TypeExpression, 
     reified: TypeExpression, 
     params: readonly string[]
@@ -1033,7 +1026,7 @@ export function fitTemplate(
     if (parameterized.kind === "func-type" && reified.kind === "func-type") {
         const matchGroups = [
             ...parameterized.args.map((arg, index) =>
-                fitTemplate(reportError, getParent, getBinding, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE, params)),
+                fitTemplate(passthrough, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE, params)),
             // fitTemplate(reportError, getParent, getBinding, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE, params)
         ]
 
@@ -1043,8 +1036,8 @@ export function fitTemplate(
             for (const [key, value] of map.entries()) {
                 const existing = matches.get(key)
                 if (existing) {
-                    if (!subsumes(getParent, getBinding, existing, value)) {
-                        matches.set(key, simplify(getParent, getBinding, {
+                    if (!subsumes(passthrough, existing, value)) {
+                        matches.set(key, simplify(passthrough, {
                             kind: "union-type",
                             members: [value, existing],
                             mutability: undefined,
@@ -1061,7 +1054,7 @@ export function fitTemplate(
     }
 
     if (parameterized.kind === "array-type" && reified.kind === "array-type") {
-        return fitTemplate(reportError, getParent, getBinding, parameterized.element, reified.element, params);
+        return fitTemplate(passthrough, parameterized.element, reified.element, params);
     }
 
     if (parameterized.kind === "union-type") {
@@ -1086,7 +1079,7 @@ export function fitTemplate(
             if (parameterizedMembersRemaining.length === 1 && isGenericParam(parameterizedMembersRemaining[0])) {
                 const matches = new Map<string, TypeExpression>();
 
-                matches.set(parameterizedMembersRemaining[0].name.name, simplify(getParent, getBinding, {
+                matches.set(parameterizedMembersRemaining[0].name.name, simplify(passthrough, {
                     kind: "union-type",
                     members: reifiedMembersRemaining,
                     mutability: undefined,

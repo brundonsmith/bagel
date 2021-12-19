@@ -41,6 +41,13 @@ export function areSame(a: AST|undefined, b: AST|undefined) {
         a?.endIndex === b?.endIndex && a?.endIndex != null
 }
 
+export type Passthrough = {
+    readonly reportError: ReportError,
+    readonly getModule: GetModule,
+    readonly getParent: GetParent,
+    readonly getBinding: GetBinding,
+}
+
 export type GetModule = (module: string) => Module|undefined
 export type GetParent = (ast: AST) => AST|undefined
 export type GetBinding = (reportError: ReportError, identifier: LocalIdentifier|PlainIdentifier|NamedType|GenericParamType) => Binding|undefined

@@ -1,10 +1,12 @@
 import { alreadyDeclared, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
 import { AST } from "../_model/ast.ts";
-import { GetParent, PlainIdentifier, ReportError, Binding, GetModule, areSame } from "../_model/common.ts";
+import { PlainIdentifier, Binding, areSame, Passthrough } from "../_model/common.ts";
 import { LocalIdentifier } from "../_model/expressions.ts";
 import { GenericParamType, NamedType } from "../_model/type-expressions.ts";
 
-export function resolveLazy(reportError: ReportError, getModule: GetModule, getParent: GetParent, identifier: LocalIdentifier|PlainIdentifier|NamedType|GenericParamType, from: AST): Binding|undefined {
+export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getParent'|'getModule'>, identifier: LocalIdentifier|PlainIdentifier|NamedType|GenericParamType, from: AST): Binding|undefined {
+    const { reportError, getParent, getModule } = passthough
+    
     const name = identifier.kind === 'named-type' || identifier.kind === 'generic-param-type' ? identifier.name : identifier
 
     const parent = getParent(from)
@@ -77,7 +79,7 @@ export function resolveLazy(reportError: ReportError, getModule: GetModule, getP
                                 if (otherModule == null) {
                                     reportError(cannotFindModule(declaration.path))
                                 } else {
-                                    resolved = resolveLazy(reportError, getModule, getParent, importItem.name, otherModule.declarations[0]) // HACK
+                                    resolved = resolveLazy(passthough, importItem.name, otherModule.declarations[0]) // HACK
 
                                     if (resolved == null) {
                                         reportError(cannotFindExport(importItem, declaration));
@@ -187,5 +189,5 @@ export function resolveLazy(reportError: ReportError, getModule: GetModule, getP
             break;
     }
 
-    return resolved ?? resolveLazy(reportError, getModule, getParent, identifier, parent)
+    return resolved ?? resolveLazy(passthough, identifier, parent)
 }
