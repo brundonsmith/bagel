@@ -9,6 +9,7 @@ export type TypeExpression =
     | GenericParamType
     | ProcType
     | FuncType
+    | GenericType
     | ElementType
     | ObjectType
     | IndexerType
@@ -48,16 +49,21 @@ export type GenericParamType = SourceInfo & {
 
 export type ProcType = SourceInfo & {
     readonly kind: "proc-type",
-    readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
     readonly args: readonly Arg[],
     readonly mutability: undefined,
 }
 
 export type FuncType = SourceInfo & {
     readonly kind: "func-type",
-    readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
     readonly args: readonly Arg[],
     readonly returnType?: TypeExpression,
+    readonly mutability: undefined,
+}
+
+export type GenericType = SourceInfo & {
+    readonly kind: "generic-type",
+    readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
+    readonly inner: TypeExpression,
     readonly mutability: undefined,
 }
 
@@ -270,7 +276,6 @@ export const REACTION_DATA_TYPE: TypeExpression = {
     kind: "func-type",
     args: [],
     returnType: UNKNOWN_TYPE,
-    typeParams: [],
     mutability: undefined,
     module: undefined,
     code: undefined,
@@ -279,7 +284,6 @@ export const REACTION_DATA_TYPE: TypeExpression = {
 }
 export const REACTION_EFFECT_TYPE: TypeExpression = {
     kind: "proc-type",
-    typeParams: [],
     args: [{
         kind: "arg",
         name: { kind: "plain-identifier", name: "_", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
@@ -330,6 +334,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "generic-param-type": undefined,
     "proc-type": undefined,
     "func-type": undefined,
+    "generic-type": undefined,
     "element-type": undefined,
     "object-type": undefined,
     "indexer-type": undefined,

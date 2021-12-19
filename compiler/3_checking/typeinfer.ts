@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-fallthrough
 import { GetParent, GetBinding, ReportError, Refinement, Passthrough } from "../_model/common.ts";
-import { BinaryOp, Expression, InlineConst, isExpression, Spread } from "../_model/expressions.ts";
-import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BinaryOp, Expression, InlineConst, Invocation, isExpression, Spread } from "../_model/expressions.ts";
+import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given, mapParseTree, memoize2 } from "../utils.ts";
 import { displayForm, resolveType, subsumes, typesEqual } from "./typecheck.ts";
 import { StoreMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
@@ -15,6 +15,7 @@ export function inferType(
     ast: Expression|StoreMember,
 ): TypeExpression {
     const { getParent } = passthrough
+
     const baseType = inferTypeInner(passthrough, ast)
 
     let refinedType = baseType
@@ -41,6 +42,7 @@ const inferTypeInner = memoize2((
     ast: Expression|StoreMember,
 ): TypeExpression => {
     const { reportError, getParent, getBinding } = passthrough
+
     switch(ast.kind) {
         case "proc":
             return ast.type
@@ -65,14 +67,27 @@ const inferTypeInner = memoize2((
             }
 
             // if no return-type is declared, try inferring the type from the inner expression
-            const returnType = ast.type.returnType ??
-                inferType(passthrough, ast.body)
-
-            return {
-                ...ast.type,
-                returnType,
+            if (ast.type.kind === 'generic-type') {
+                const funcType = ast.type.inner as FuncType
+                const returnType = funcType.returnType ??
+                    inferType(passthrough, ast.body)
+    
+                return {
+                    ...ast.type,
+                    inner: {
+                        ...funcType,
+                        returnType
+                    },
+                }
+            } else {
+                const returnType = ast.type.returnType ??
+                    inferType(passthrough, ast.body)
+    
+                return {
+                    ...ast.type,
+                    returnType,
+                }
             }
-
         }
         case "binary-operator": {
             let leftType = resolveType(passthrough, inferType(passthrough, ast.base))
@@ -101,57 +116,9 @@ const inferTypeInner = memoize2((
         case "negation-operator": return BOOLEAN_TYPE;
         case "pipe":
         case "invocation": {
-            // const scope = getScope(ast)
-
-            let subjectType = resolveType(passthrough, inferType(passthrough, ast.subject))
-
-            // bind type-args for this invocation
-            if (ast.kind === "invocation") {    
-                if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
-                    if (subjectType.typeParams.length > 0) {
-                        if (ast.typeArgs.length > 0) { // explicit type arguments
-                            if (subjectType.typeParams.length !== ast.typeArgs.length) {
-                                reportError(miscError(ast, `Expected ${subjectType.typeParams.length} type arguments, but got ${ast.typeArgs.length}`))
-                            }
-
-                            subjectType = parameterizedGenericType(
-                                reportError, 
-                                getBinding, 
-                                subjectType, 
-                                ast.typeArgs
-                            )
-                        } else { // no type arguments (try to infer)
-                            const invocationSubjectType: FuncType|ProcType = {
-                                ...subjectType,
-                                args: subjectType.args.map((arg, index) => ({
-                                    ...arg,
-                                    type: inferType(passthrough, ast.args[index])
-                                }))
-                            }
-    
-                            // attempt to infer params for generic
-                            const inferredBindings = fitTemplate(
-                                passthrough, 
-                                subjectType, 
-                                invocationSubjectType, 
-                                subjectType.typeParams.map(param => param.name.name)
-                            );
-    
-                            if (inferredBindings.size === subjectType.typeParams.length) {
-                                subjectType = parameterizedGenericType(
-                                    reportError, 
-                                    getBinding, 
-                                    subjectType, 
-                                    subjectType.typeParams.map(param =>
-                                        inferredBindings.get(param.name.name) ?? UNKNOWN_TYPE)
-                                )
-                            } else {
-                                reportError(miscError(ast, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
-                            }
-                        }
-                    }
-                }
-            }
+            const subjectType = ast.kind === "invocation"
+                ? bindInvocationGenericArgs(passthrough, ast)
+                : resolveType(passthrough, inferType(passthrough, ast.subject))
 
             if (subjectType.kind === "func-type") {
                 return subjectType.returnType ?? UNKNOWN_TYPE;
@@ -341,29 +308,30 @@ const inferTypeInner = memoize2((
                 }
             }
     
-            const resolution = getBinding(reportError, ast)
+            const binding = getBinding(reportError, ast)
 
-            if (resolution != null) {
-                switch (resolution.kind) {
-                    case 'basic': return getDeclType(resolution.ast)
+            if (binding != null) {
+                switch (binding.kind) {
+                    case 'basic': return getDeclType(binding.ast)
                     case 'arg': {
-                        return resolution.holder.type.args[resolution.argIndex].type 
-                            ?? (inferType(passthrough, resolution.holder) as FuncType|ProcType)
-                                .args[resolution.argIndex].type
+                        const funcOrProcType = binding.holder.type.kind === 'generic-type' ? binding.holder.type.inner as FuncType|ProcType : binding.holder.type as FuncType|ProcType
+                        return funcOrProcType.args[binding.argIndex].type 
+                            ?? (inferType(passthrough, binding.holder) as FuncType|ProcType)
+                                .args[binding.argIndex].type
                             ?? UNKNOWN_TYPE
                     }
                     case 'iterator': {
-                        const iteratorType = resolveType(passthrough, inferType(passthrough, resolution.iterator))
+                        const iteratorType = resolveType(passthrough, inferType(passthrough, binding.iterator))
     
                         if (!subsumes(passthrough, ITERATOR_OF_ANY, iteratorType)) {
-                            reportError(assignmentError(resolution.iterator, ITERATOR_OF_ANY, iteratorType))
+                            reportError(assignmentError(binding.iterator, ITERATOR_OF_ANY, iteratorType))
                         }
     
                         return iteratorType.kind === 'iterator-type' ? iteratorType.itemType : UNKNOWN_TYPE
                     }
                     case 'this': return {
                         kind: "store-type",
-                        store: resolution.store,
+                        store: binding.store,
                         internal: true,
                         mutability: "mutable",
                         module: undefined,
@@ -374,7 +342,7 @@ const inferTypeInner = memoize2((
                     case 'type-binding': break;
                     default:
                         // @ts-expect-error
-                        throw Error('Unreachable!' + resolution.kind)
+                        throw Error('Unreachable!' + binding.kind)
                 }
             }
 
@@ -516,7 +484,62 @@ export function unpackGeneric(type: TypeExpression): TypeExpression {
     return type
 }
 
-export function parameterizedGenericType<T extends FuncType|ProcType>(reportError: ReportError, getBinding: GetBinding, generic: T, typeArgs: readonly TypeExpression[]): T {
+export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: Invocation): FuncType|ProcType {
+    const { reportError, getBinding } = passthrough
+
+    let subjectType = resolveType(passthrough, inferType(passthrough, invocation.subject))
+
+    if (subjectType.kind === 'generic-type' && (subjectType.inner.kind === "func-type" || subjectType.inner.kind === "proc-type")) {
+        if (subjectType.typeParams.length > 0) {
+            if (invocation.typeArgs.length > 0) { // explicit type arguments
+                if (subjectType.typeParams.length !== invocation.typeArgs.length) {
+                    reportError(miscError(invocation, `Expected ${subjectType.typeParams.length} type arguments, but got ${invocation.typeArgs.length}`))
+                }
+
+                subjectType = parameterizedGenericType(
+                    reportError, 
+                    getBinding, 
+                    subjectType, 
+                    invocation.typeArgs
+                )
+            } else { // no type arguments (try to infer)
+                const funcOrProcType = subjectType.inner as FuncType|ProcType
+
+                const invocationSubjectType: FuncType|ProcType = {
+                    ...funcOrProcType,
+                    args: funcOrProcType.args.map((arg, index) => ({
+                        ...arg,
+                        type: inferType(passthrough, invocation.args[index])
+                    }))
+                }
+
+                // attempt to infer params for generic
+                const inferredBindings = fitTemplate(
+                    passthrough, 
+                    funcOrProcType, 
+                    invocationSubjectType, 
+                    subjectType.typeParams.map(param => param.name.name)
+                );
+
+                if (inferredBindings.size === subjectType.typeParams.length) {
+                    subjectType = parameterizedGenericType(
+                        reportError, 
+                        getBinding, 
+                        subjectType, 
+                        subjectType.typeParams.map(param =>
+                            inferredBindings.get(param.name.name) ?? UNKNOWN_TYPE)
+                    )
+                } else {
+                    reportError(miscError(invocation, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
+                }
+            }
+        }
+    }
+
+    return subjectType as FuncType|ProcType
+}
+
+function parameterizedGenericType(reportError: ReportError, getBinding: GetBinding, generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
     const bindings: Record<string, TypeExpression> = {}
     for (let i = 0; i < generic.typeParams.length; i++) {
         const typeParam = generic.typeParams[i]
@@ -525,7 +548,7 @@ export function parameterizedGenericType<T extends FuncType|ProcType>(reportErro
         bindings[typeParam.name.name] = typeArg
     }
 
-    return mapParseTree(generic, ast => {
+    return mapParseTree(generic.inner, ast => {
         if (ast.kind === 'named-type') {
             const resolved = getBinding(reportError, ast)
 
@@ -535,7 +558,7 @@ export function parameterizedGenericType<T extends FuncType|ProcType>(reportErro
         }
 
         return ast
-    }) as T
+    }) as TypeExpression
 }
 
 export function simplify(passthrough: Passthrough, type: TypeExpression): TypeExpression {
@@ -801,7 +824,7 @@ export function propertiesOf(
             }
         }
         case "generic-param-type": {
-            return  propertiesOf(passthrough, type.extends ?? UNKNOWN_TYPE)
+            return propertiesOf(passthrough, type.extends ?? UNKNOWN_TYPE)
         }
         case "object-type": {
             const attrs = [...type.entries]
@@ -838,7 +861,6 @@ export function propertiesOf(
             if (type.mutability === "mutable") {
                 props.push(attribute("push", {
                     kind: "proc-type",
-                    typeParams: [],
                     args: [{
                         kind: "arg",
                         name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
@@ -889,13 +911,11 @@ export function propertiesOf(
             const iteratorProps: readonly Attribute[] = [
                 attribute("filter", {
                     kind: "func-type",
-                    typeParams: [],
                     args: [{
                         kind: "arg",
                         name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
                         type: {
                             kind: "func-type",
-                            typeParams: [],
                             args: [{
                                 kind: "arg",
                                 name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
@@ -915,37 +935,39 @@ export function propertiesOf(
                     ...TYPE_AST_NOISE
                 }),
                 attribute("map", {
-                    kind: "func-type",
+                    kind: "generic-type",
                     typeParams: [
                         { name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined }
                     ],
-                    args: [{
-                        kind: "arg",
-                        name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
-                        type: {
-                            kind: "func-type",
-                            args: [{
-                                kind: "arg",
-                                name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
-                                type: itemType,
-                                ...AST_NOISE
-                            }],
-                            returnType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
-                            typeParams: [],
+                    inner: {
+                        kind: "func-type",
+                        args: [{
+                            kind: "arg",
+                            name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
+                            type: {
+                                kind: "func-type",
+                                args: [{
+                                    kind: "arg",
+                                    name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
+                                    type: itemType,
+                                    ...AST_NOISE
+                                }],
+                                returnType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
+                                ...TYPE_AST_NOISE
+                            },
+                            ...AST_NOISE
+                        }],
+                        returnType: {
+                            kind: "iterator-type",
+                            itemType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
                             ...TYPE_AST_NOISE
                         },
-                        ...AST_NOISE
-                    }],
-                    returnType: {
-                        kind: "iterator-type",
-                        itemType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
                         ...TYPE_AST_NOISE
                     },
                     ...TYPE_AST_NOISE
                 }),
                 attribute("array", {
                     kind: "func-type",
-                    typeParams: [],
                     args: [],
                     returnType: { kind: "array-type", element: itemType, mutability: "mutable", ...AST_NOISE },
                     ...TYPE_AST_NOISE
@@ -960,30 +982,33 @@ export function propertiesOf(
 
             const planProps: readonly Attribute[] = [
                 attribute("then", {
-                    kind: "func-type",
+                    kind: "generic-type",
                     typeParams: [
                         { name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined }
                     ],
-                    args: [{
-                        kind: "arg",
-                        name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
-                        type: {
-                            kind: "func-type",
-                            args: [{
-                                kind: "arg",
-                                name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
-                                type: resultType,
+                    inner: {
+                        kind: "func-type",
+                        args: [{
+                            kind: "arg",
+                            name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
+                            type: {
+                                kind: "func-type",
+                                args: [{
+                                    kind: "arg",
+                                    name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
+                                    type: resultType,
+                                    ...TYPE_AST_NOISE
+                                }],
+                                returnType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
                                 ...TYPE_AST_NOISE
-                            }],
-                            returnType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
-                            typeParams: [],
+                            },
+                            ...TYPE_AST_NOISE
+                        }],
+                        returnType: {
+                            kind: "plan-type",
+                            resultType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
                             ...TYPE_AST_NOISE
                         },
-                        ...TYPE_AST_NOISE
-                    }],
-                    returnType: {
-                        kind: "plan-type",
-                        resultType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
                         ...TYPE_AST_NOISE
                     },
                     ...TYPE_AST_NOISE

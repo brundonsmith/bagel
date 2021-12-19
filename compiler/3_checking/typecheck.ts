@@ -1,8 +1,8 @@
 import { Module } from "../_model/ast.ts";
-import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, iterateParseTree } from "../utils.ts";
 import { assignmentError,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, parameterizedGenericType, fitTemplate } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs } from "./typeinfer.ts";
 import { getBindingMutability, Passthrough } from "../_model/common.ts";
 import { display } from "../debugging.ts";
 
@@ -45,10 +45,12 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
                 }
             } break;
             case "func": {
+                const funcType = current.type.kind === 'generic-type' ? current.type.inner as FuncType : current.type
+
                 // make sure body expression fits declared return type, if there is one
                 const bodyType = inferType(passthrough, current.body);
-                if (current.type.returnType != null && !subsumes(passthrough,  current.type.returnType, bodyType)) {
-                    reportError(assignmentError(current.body, current.type.returnType, bodyType));
+                if (funcType.returnType != null && !subsumes(passthrough,  funcType.returnType, bodyType)) {
+                    reportError(assignmentError(current.body, funcType.returnType, bodyType));
                 }
             } break;
             case "binary-operator": {
@@ -62,54 +64,21 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
             } break;
             case "pipe":
             case "invocation": {
+                const subjectType = current.kind === "invocation"
+                    ? bindInvocationGenericArgs(passthrough, current)
+                    : resolveType(passthrough, inferType(passthrough, current.subject))
                 
-                let subjectType = resolveType(passthrough, inferType(passthrough, current.subject))
+                // check that type args satisfy any `extends` clauses
                 if (current.kind === "invocation") {
+                    const resolvedSubject = resolveType(passthrough, inferType(passthrough, current.subject))
 
-                    // bind type-args for this invocation
-                    if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
-                        if (subjectType.typeParams.length > 0) {
-                            if (current.typeArgs.length > 0) { // explicit type arguments
-                                if (subjectType.typeParams.length !== current.typeArgs.length) {
-                                    reportError(miscError(current, `Expected ${subjectType.typeParams.length} type arguments, but got ${current.typeArgs.length}`))
-                                }
+                    if (resolvedSubject.kind === 'generic-type' && resolvedSubject.typeParams.length === current.typeArgs.length) {
+                        for (let i = 0; i < resolvedSubject.typeParams.length; i++) {
+                            const typeParam = resolvedSubject.typeParams[i]
+                            const typeArg = current.typeArgs[i]
 
-                                subjectType = parameterizedGenericType(
-                                    reportError, 
-                                    getBinding, 
-                                    subjectType, 
-                                    current.typeArgs
-                                )
-
-                                // check that type args satisfy any `extends` clauses
-                                for (let i = 0; i < subjectType.typeParams.length; i++) {
-                                    const typeParam = subjectType.typeParams[i]
-                                    const typeArg = current.typeArgs[i] as TypeExpression
-
-                                    if (typeParam.extends && !subsumes(passthrough, typeParam.extends, typeArg)) {
-                                        reportError(assignmentError(typeArg, typeParam.extends, typeArg))
-                                    }
-                                }
-                            } else {
-                                const invocationSubjectType: FuncType|ProcType = {
-                                    ...subjectType,
-                                    args: subjectType.args.map((arg, index) => ({ ...arg, type: inferType(passthrough, current.args[index]) }))
-                                }
-        
-                                // attempt to infer params for generic
-                                const inferredBindings = fitTemplate(passthrough, subjectType, invocationSubjectType, subjectType.typeParams.map(param => param.name.name));
-        
-                                if (inferredBindings.size === subjectType.typeParams.length) {
-                                    subjectType = parameterizedGenericType(
-                                        reportError, 
-                                        getBinding, 
-                                        subjectType, 
-                                        subjectType.typeParams.map(param =>
-                                            inferredBindings.get(param.name.name) ?? UNKNOWN_TYPE)
-                                    )
-                                } else {
-                                    reportError(miscError(current, `Failed to infer generic type parameters; ${subjectType.typeParams.length} type arguments should be specified explicitly`))
-                                }
+                            if (typeParam.extends && !subsumes(passthrough, typeParam.extends, typeArg)) {
+                                reportError(assignmentError(typeArg, typeParam.extends, typeArg))
                             }
                         }
                     }
@@ -397,8 +366,9 @@ export function displayForm(typeExpression: TypeExpression): string {
         case "union-type": str = '(' + typeExpression.members.map(displayForm).join(" | ") + ')'; break;
         case "named-type":
         case "generic-param-type": str = typeExpression.name.name; break;
-        case "proc-type": str = `${typeExpression.typeParams.length > 0 ? `<${typeExpression.typeParams.map(p => p.name).join(',')}>` : ''}(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) {}`; break;
-        case "func-type": str = `${typeExpression.typeParams.length > 0 ? `<${typeExpression.typeParams.map(p => p.name).join(',')}>` : ''}(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) => ${displayForm(typeExpression.returnType ?? UNKNOWN_TYPE)}`; break;
+        case "generic-type": str = `<${typeExpression.typeParams.map(p => p.name).join(',')}>${displayForm(typeExpression.inner)}`; break;
+        case "proc-type": str = `(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) {}`; break;
+        case "func-type": str = `(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) => ${displayForm(typeExpression.returnType ?? UNKNOWN_TYPE)}`; break;
         case "object-type": str = `{${typeExpression.spreads.map(s => '...' + displayForm(s)).concat(typeExpression.entries.map(({ name, type }) => `${name.name}: ${displayForm(type)}`)).join(', ')}}`; break;
         case "indexer-type": str = `{ [${displayForm(typeExpression.keyType)}]: ${displayForm(typeExpression.valueType)} }`; break;
         case "array-type": str = `${displayForm(typeExpression.element)}[]`; break;

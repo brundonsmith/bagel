@@ -1,6 +1,6 @@
 import { AST, Debug } from "./ast.ts";
 import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
-import { FuncType, ProcType, TypeExpression } from "./type-expressions.ts";
+import { FuncType, GenericType, ProcType, TypeExpression } from "./type-expressions.ts";
 
 export type Expression = 
     | JavascriptEscape
@@ -42,7 +42,7 @@ export type Pipe = SourceInfo & {
   
 export type Func = SourceInfo & {
     readonly kind: "func",
-    readonly type: FuncType,
+    readonly type: FuncType|GenericType,
     readonly body: Expression,
 }
 
@@ -56,7 +56,7 @@ export type InlineConst = SourceInfo & {
 
 export type Proc = SourceInfo & {
     readonly kind: "proc",
-    readonly type: ProcType,
+    readonly type: ProcType|GenericType,
     readonly body: Block,
 }
 

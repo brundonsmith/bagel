@@ -2,7 +2,7 @@ import { alreadyDeclared, cannotFindExport, cannotFindModule, cannotFindName, mi
 import { AST } from "../_model/ast.ts";
 import { PlainIdentifier, Binding, areSame, Passthrough } from "../_model/common.ts";
 import { LocalIdentifier } from "../_model/expressions.ts";
-import { GenericParamType, NamedType } from "../_model/type-expressions.ts";
+import { FuncType, GenericParamType, NamedType, ProcType } from "../_model/type-expressions.ts";
 
 export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getParent'|'getModule'>, identifier: LocalIdentifier|PlainIdentifier|NamedType|GenericParamType, from: AST): Binding|undefined {
     const { reportError, getParent, getModule } = passthough
@@ -95,31 +95,34 @@ export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getPare
         case "proc": {
             
             // add any generic type parameters to scope
-            for (const typeParam of parent.type.typeParams) {
-                if (typeParam.name.name === name.name) {
-                    if (resolved) {
-                        reportError(alreadyDeclared(typeParam.name))
-                    }
+            if (parent.type.kind === 'generic-type') {
+                for (const typeParam of parent.type.typeParams) {
+                    if (typeParam.name.name === name.name) {
+                        if (resolved) {
+                            reportError(alreadyDeclared(typeParam.name))
+                        }
 
-                    resolved = {
-                        kind: 'type-binding',
-                        type: {
-                            kind: "generic-param-type",
-                            name: typeParam.name,
-                            extends: typeParam.extends,
-                            module: undefined,
-                            code: undefined,
-                            startIndex: undefined,
-                            endIndex: undefined,
-                            mutability: undefined,
+                        resolved = {
+                            kind: 'type-binding',
+                            type: {
+                                kind: "generic-param-type",
+                                name: typeParam.name,
+                                extends: typeParam.extends,
+                                module: undefined,
+                                code: undefined,
+                                startIndex: undefined,
+                                endIndex: undefined,
+                                mutability: undefined,
+                            }
                         }
                     }
                 }
             }
 
             // add func/proc arguments to scope
-            for (let i = 0; i < parent.type.args.length; i++) {
-                const arg = parent.type.args[i]
+            const funcOrProcType = parent.type.kind === 'generic-type' ? (parent.type.inner as FuncType|ProcType) : parent.type
+            for (let i = 0; i < funcOrProcType.args.length; i++) {
+                const arg = funcOrProcType.args[i]
 
                 if (arg.name.name === name.name) {
                     if (resolved) {

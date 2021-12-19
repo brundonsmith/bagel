@@ -5,7 +5,7 @@ import { Block, GetBinding, getBindingMutability, PlainIdentifier } from "../_mo
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, StoreDeclaration, StoreFunction, StoreProperty } from "../_model/declarations.ts";
 import { Expression, Proc, Func, Spread } from "../_model/expressions.ts";
 import { LetDeclaration } from "../_model/statements.ts";
-import { Arg, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { Arg, FuncType, ProcType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
 export function compile(getBinding: GetBinding, module: Module, modulePath: ModuleName, includeTests?: boolean): string {
@@ -172,9 +172,12 @@ const LOCALS_OBJ = INT + "locals";
 function compileProc(getBinding: GetBinding, module: string, proc: Proc): string {
     const letDeclarations = proc.body.statements.filter(s => s.kind === "let-declaration") as LetDeclaration[]
 
+    const typeParams = proc.type.kind === 'generic-type'
+        ? `<${proc.type.typeParams.map(p => p.name).join(',')}>`
+        : ''
+    const procType = proc.type.kind === 'generic-type' ? proc.type.inner as ProcType : proc.type
 
-    return (proc.type.typeParams.length > 0 ? `<${proc.type.typeParams.map(p => p.name).join(',')}>` : '')
-        + `(${compileArgs(getBinding, module, proc.type.args)}): void => {
+    return typeParams + `(${compileArgs(getBinding, module, procType.args)}): void => {
     ${letDeclarations.length > 0 ? // TODO: Handle ___locals for parent closures
 `    const ${LOCALS_OBJ}: {${
         letDeclarations
@@ -211,8 +214,12 @@ const compileFunc = (getBinding: GetBinding, module: string, func: Func): string
 }
 
 const compileFuncSignature = (getBinding: GetBinding, module: string, func: Func): string => {
-    return (func.type.typeParams.length > 0 ? `<${func.type.typeParams.map(p => p.name).join(',')}>` : '')
-        + `(${compileArgs(getBinding, module, func.type.args)})${func.type.returnType != null ? `: ${compileOne(getBinding, module, func.type.returnType)}` : ''}`;
+    const typeParams = func.type.kind === 'generic-type'
+        ? `<${func.type.typeParams.map(p => p.name).join(',')}>`
+        : ''
+    const funcType = func.type.kind === 'generic-type' ? func.type.inner as FuncType : func.type
+    
+    return typeParams + `(${compileArgs(getBinding, module, funcType.args)})${funcType.returnType != null ? `: ${compileOne(getBinding, module, funcType.returnType)}` : ''}`;
 }
 
 // TODO: Bring this back as an optimization
