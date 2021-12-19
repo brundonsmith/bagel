@@ -52,6 +52,10 @@ export function resolveLazy(reportError: ReportError, getModule: GetModule, getP
                                     reportError(miscError(identifier, `Can't reference "${identifier.name}" in its own initialization`))
                                 }
                             }
+
+                            if (declaration.kind === 'store-declaration' && from.kind === 'const-declaration') {
+                                reportError(miscError(identifier, `Stores cannot be referenced when initializing constants`))
+                            }
     
                             resolved = {
                                 kind: "basic",
