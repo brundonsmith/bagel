@@ -451,6 +451,30 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Complex generic",
+  fn() {
+    testTypecheck(
+      `
+      func foo<T>(val: { prop: T }) => [val.prop]
+      const x: number[] = foo<number>({ prop: 12 })`,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Complex generic mismatch",
+  fn() {
+    testTypecheck(
+      `
+      func foo<T>(val: { prop: T }) => [val.prop]
+      const x: string[] = foo<number>({ prop: 12 })`,
+      true
+    )
+  }
+})
+
 // Deno.test({
 //   name: "Complex generic param inference",
 //   fn() {
