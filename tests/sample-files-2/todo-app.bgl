@@ -1,5 +1,5 @@
 
-from '../../lib/wrappers/core' import { iter, logf, logp }
+// from '../../lib/wrappers/core' import { iter, logf, logp }
 from '../../lib/wrappers/local-storage' import { LocalStorage }
 from '../../lib/wrappers/json' import { parse, stringify }
 from '../../lib/wrappers/html' import { render, Event }
@@ -11,68 +11,71 @@ type TodoItem = {
     done: boolean
 }
 
-func renderApp() =>
-    <div>
-        {iter<TodoItem>(AppStore.items)
-            .map<Element>(renderTodoItem)
-            .array()}
+func renderApp(iter: Iterator<TodoItem>) =>
+    iter.map<string>(item => item.text).array()
 
-        <button onClick={AppStore.addItem}>{'Add'}</button>
-        <button onClick={AppStore.clearDone}>{'Clear done'}</button>
-    </div>
+// func renderApp() =>
+//     <div>
+//         {iter(AppStore.items)
+//             .map(renderTodoItem)
+//             .array()}
 
-func memo renderTodoItem(item: TodoItem) =>
-    <div>
-        <input value={item.text} onChange={handleItemTextChange(item)}></input>
-        <input type={'checkbox'} checked={item.done} onChange={handleItemDoneChange(item)}></input>
-    </div>
+//         <button onClick={AppStore.addItem}>{'Add'}</button>
+//         <button onClick={AppStore.clearDone}>{'Clear done'}</button>
+//     </div>
 
-func memo handleItemTextChange(item: TodoItem) =>
-    (e: Event) {
-        item.text = e.target.value;
-    }
+// func memo renderTodoItem(item: TodoItem) =>
+//     <div>
+//         <input value={item.text} onChange={handleItemTextChange(item)}></input>
+//         <input type={'checkbox'} checked={item.done} onChange={handleItemDoneChange(item)}></input>
+//     </div>
 
-func memo handleItemDoneChange(item: TodoItem) =>
-    (e: Event) {
-        item.done = e.target.checked;
-    }
+// func memo handleItemTextChange(item: TodoItem) =>
+//     (e: Event) {
+//         item.text = e.target.value;
+//     }
 
-func itemValid(item: TodoItem) => item.text.length > 3
+// func memo handleItemDoneChange(item: TodoItem) =>
+//     (e: Event) {
+//         item.done = e.target.checked;
+//     }
 
-store AppStore {
+// func itemValid(item: TodoItem) => item.text.length > 3
+
+// store AppStore {
     
-    visible items: TodoItem[] = (
-        if (logf(LocalStorage.getItem(lsKey)) != nil) {
-            parse(LocalStorage.getItem(lsKey))
-        } else {
-            []
-        }
-    )
+//     visible items: TodoItem[] = (
+//         if (logf(LocalStorage.getItem(lsKey)) != nil) {
+//             parse(LocalStorage.getItem(lsKey))
+//         } else {
+//             []
+//         }
+//     )
 
-    func allValid() => iter<TodoItem>(this.items)//.every(itemValid)
+//     func allValid() => iter<TodoItem>(this.items)//.every(itemValid)
 
-    public proc addItem() {
-        this.items.push({ text: '', done: false });
-    }
+//     public proc addItem() {
+//         this.items.push({ text: '', done: false });
+//     }
 
-    public proc clearDone() {
-        this.items = iter(this.items).filter(item => item.done == false).array();
-    }
-}
+//     public proc clearDone() {
+//         this.items = iter(this.items).filter(item => item.done == false).array();
+//     }
+// }
 
-proc main() {
-    observe () => stringify(AppStore.items, 0)
-    triggering (json) {
-        logp('setting ' + lsKey);
-        // LocalStorage.setItem(lsKey, json);
-    }
-    forever;
+// proc main() {
+//     observe () => stringify(AppStore.items, 0)
+//     triggering (json) {
+//         logp('setting ' + lsKey);
+//         // LocalStorage.setItem(lsKey, json);
+//     }
+//     forever;
 
-    observe () => renderApp()
-    triggering (content: Element) {
-        render(content);
-    }
-    forever;
-}
+//     observe () => renderApp()
+//     triggering (content: Element) {
+//         render(content);
+//     }
+//     forever;
+// }
 
 // shared namespace (parent object? module?) for all global/system/browser/externalities?

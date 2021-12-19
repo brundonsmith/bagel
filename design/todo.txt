@@ -1,40 +1,35 @@
 MVP:
-- more helpful error messages
-    - Type errors
-    - "error productions" for common errors; ESPECIALLY things that are different from JS
+- "error productions" for common errors; ESPECIALLY things that are different from JS
 - error handling system for procs
-- hoisting (types and declarations)
-- reactivity
+- result monad?
 - parsing
-    - "JSX"
-    - classes
-    - comments
     - string escapes
-    - template strings
-    - spread/destructuring
-    - types
-        - nominal types
-        - iterator types
-        - promise types
+    - destructuring
     - dynamic property definition/access (square brackets)
     - anonymous blocks
 - "typeof X" in type expressions
 - "typeof X" at runtime (add "array" return value, to avoid Array.isArray(), as well as class-name possibility)
-- array indexing (and slicing? (into iterators??))
-- JS interop
-- config file (bagel.config.json)
+- config file (bagel.config.json)? bagel.config.bgl??
     - allowIOInFunctions
     - allowJSInFunctions
-
-Ideas:
-- named arguments?
-- optional object properties (types)?
-- "with" declarations inside functions?
-- other numeric types like hex?
+- Fix generic virtual members!!
+    - Implement arbitrary named generics for internal use only?
+- javascript funcs and procs
+- Nominal types
+- Named arguments
+- convert all tuples in AST to objects?
+- Automatically identify redundant checks, comparisons, etc
+- Continue trying to better-follow Bagel architecture
+- numeric range types? string template literal types?
+- suite of type refinements
+- optional object-type properties
+- alternate number syntaxes like hex?
+- array slices?
+- tail recursion?
+- flesh out type-expression parsing
+    - precedence
+    - parens
 
 Long-term:
 - full build system
 - language server
-- package manager
-- tail recursion?
-- proper slices?
