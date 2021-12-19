@@ -3,7 +3,7 @@ import { GetParent, GetBinding, ReportError, GetModule, Refinement } from "../_m
 import { BinaryOp, Expression, InlineConst, isExpression, Spread } from "../_model/expressions.ts";
 import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { deepEquals, given, mapParseTree, memoize5 } from "../utils.ts";
-import { displayForm, subsumes, typesEqual } from "./typecheck.ts";
+import { displayForm, resolveType, subsumes, typesEqual } from "./typecheck.ts";
 import { StoreMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
 import { assignmentError, cannotFindName, miscError } from "../errors.ts";
 import { withoutSourceInfo } from "../debugging.ts";
@@ -55,7 +55,7 @@ const inferTypeInner = memoize5((
                 const parent = getParent(ast)
 
                 if (parent?.kind === "invocation") {
-                    const parentSubjectType = inferType(reportError, getModule, getParent, getBinding, parent.subject)
+                    const parentSubjectType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, parent.subject))
                     const thisArgIndex = parent.args.findIndex(a => a === ast)
 
                     if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
@@ -79,10 +79,10 @@ const inferTypeInner = memoize5((
 
         }
         case "binary-operator": {
-            let leftType = inferType(reportError, getModule, getParent, getBinding, ast.base);
+            let leftType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, ast.base))
 
             for (const [op, expr] of ast.ops) {
-                const rightType = inferType(reportError, getModule, getParent, getBinding, expr);
+                const rightType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, expr))
 
                 const types = BINARY_OPERATOR_TYPES[op.op].find(({ left, right }) =>
                     subsumes(getParent, getBinding, left, leftType) && subsumes(getParent, getBinding, right, rightType))
@@ -107,7 +107,7 @@ const inferTypeInner = memoize5((
         case "invocation": {
             // const scope = getScope(ast)
 
-            let subjectType = inferType(reportError, getModule, getParent, getBinding, ast.subject);
+            let subjectType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, ast.subject))
 
             // bind type-args for this invocation
             if (ast.kind === "invocation") {    
@@ -163,8 +163,8 @@ const inferTypeInner = memoize5((
             }
         }
         case "indexer": {
-            const baseType = inferType(reportError, getModule, getParent, getBinding, ast.subject);
-            const indexerType = inferType(reportError, getModule, getParent, getBinding, ast.indexer);
+            const baseType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, ast.subject));
+            const indexerType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, ast.indexer));
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "exact-string-literal") {
                 const key = indexerType.value.value;
@@ -265,7 +265,7 @@ const inferTypeInner = memoize5((
         case "inline-const":
             return inferType(reportError, getModule, getParent, getBinding, ast.next);
         case "property-accessor": {
-            const subjectType = inferType(reportError, getModule, getParent, getBinding, ast.subject);
+            const subjectType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, ast.subject));
             const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
                 ? subtract(getParent, getBinding, subjectType, NIL_TYPE)
                 : subjectType;
@@ -317,7 +317,7 @@ const inferTypeInner = memoize5((
                     case 'func-declaration':
                     case 'proc-declaration':
                     case 'inline-const': {
-                        const baseType = inferType(reportError, getModule, getParent, getBinding, decl.value)
+                        const baseType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, decl.value))
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
                             decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
                                 ? 'immutable'
@@ -356,7 +356,7 @@ const inferTypeInner = memoize5((
                             ?? UNKNOWN_TYPE
                     }
                     case 'iterator': {
-                        const iteratorType = inferType(reportError, getModule, getParent, getBinding, resolution.iterator)
+                        const iteratorType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, resolution.iterator))
     
                         if (!subsumes(getParent, getBinding, ITERATOR_OF_ANY, iteratorType)) {
                             reportError(assignmentError(resolution.iterator, ITERATOR_OF_ANY, iteratorType))
@@ -401,7 +401,7 @@ const inferTypeInner = memoize5((
                 if (Array.isArray(entry)) {
                     const [name, value] = entry
 
-                    const type = inferType(reportError, getModule, getParent, getBinding, value);
+                    const type = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, value));
                     return {
                         kind: "attribute",
                         name,
@@ -414,7 +414,7 @@ const inferTypeInner = memoize5((
                     }
                 } else {
                     const spreadObj = (entry as Spread).expr
-                    const spreadObjType = inferType(reportError, getModule, getParent, getBinding, spreadObj);
+                    const spreadObjType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, spreadObj));
 
                     if (spreadObjType.kind !== 'object-type') {
                         reportError(miscError(spreadObj, `Can only spread objects into an object; found ${displayForm(spreadObjType)}`))
@@ -442,7 +442,7 @@ const inferTypeInner = memoize5((
 
             for (const entry of ast.entries) {
                 if (entry.kind === 'spread') {
-                    const spreadType = inferType(reportError, getModule, getParent, getBinding, entry.expr)
+                    const spreadType = resolveType(getBinding, inferType(reportError, getModule, getParent, getBinding, entry.expr))
 
                     if (spreadType.kind === 'array-type') {
                         arraySpreads.push(spreadType)
@@ -510,6 +510,14 @@ const inferTypeInner = memoize5((
             throw Error(ast.kind)
     }
 })
+
+export function unpackGeneric(type: TypeExpression): TypeExpression {
+    if (type.kind === 'generic-param-type') {
+        return type.extends ?? UNKNOWN_TYPE
+    }
+
+    return type
+}
 
 export function parameterizedGenericType<T extends FuncType|ProcType>(reportError: ReportError, getBinding: GetBinding, generic: T, typeArgs: readonly TypeExpression[]): T {
     const bindings: Record<string, TypeExpression> = {}
@@ -581,7 +589,7 @@ function distillUnion(getParent: GetParent, getBinding: GetBinding, type: TypeEx
                     const a = type.members[i];
                     const b = type.members[j];
 
-                    if (subsumes(getParent, getBinding, b, a) && !indicesToDrop.has(j)) {
+                    if (subsumes(getParent, getBinding, b, a) && !indicesToDrop.has(j) && resolveType(getBinding, b).kind !== 'unknown-type') {
                         indicesToDrop.add(i);
                     }
                 }
@@ -621,6 +629,9 @@ function distillUnion(getParent: GetParent, getBinding: GetBinding, type: TypeEx
 }
 
 export function subtract(getParent: GetParent, getBinding: GetBinding, type: TypeExpression, without: TypeExpression): TypeExpression {
+    type = resolveType(getBinding, type)
+    without = resolveType(getBinding, without)
+
     if (type.kind === "union-type") {
         return simplify(getParent, getBinding, {
             ...type,

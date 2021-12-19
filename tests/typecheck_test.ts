@@ -163,6 +163,18 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Function return type inference with generic",
+  fn() {
+    testTypecheck(
+      `
+      func getThird<T extends string[]>(arr: T) => arr[2]
+      const third: string|nil = getThird(['one', 'two', 'three'])`,
+      false
+    )
+  }
+})
+
+Deno.test({
   name: "Array literal with spread mismatch 1",
   fn() {
     testTypecheck(
