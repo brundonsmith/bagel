@@ -1,4 +1,4 @@
-import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
+import { SourceInfo,PlainIdentifier,Block } from "./ast.ts";
 import { Expression, Invocation, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions.ts";
 import { TypeExpression } from "./type-expressions.ts";
 

@@ -1,15 +1,15 @@
 import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
-import { resolveLazy } from "./3_checking/scopescan.ts";
+import { resolve } from "./3_checking/resolve.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
 import { compile, INT } from "./4_compile/index.ts";
-import { withoutSourceInfo } from "./debugging.ts";
 import { path } from "./deps.ts";
-import { BagelError, errorsEquivalent, miscError } from "./errors.ts";
+import { BagelError, errorsEquivalent } from "./errors.ts";
 import { computedFn, makeAutoObservable } from "./mobx.ts";
-import { given, iterateParseTree, ModuleName, pathIsRemote } from "./utils.ts";
+import { given, pathIsRemote } from "./utils/misc.ts";
 import { AST, Module } from "./_model/ast.ts";
-import { areSame, GetParent, GetBinding } from "./_model/common.ts";
+import { GetParent, GetBinding, ModuleName } from "./_model/common.ts";
+import { areSame, iterateParseTree } from "./utils/ast.ts";
 
 type Config = {
     readonly entryFileOrDir: ModuleName,
@@ -51,7 +51,7 @@ class _Store {
         const errors: BagelError[] = []
         const ast = reshape(parse(module, source, err => errors.push(err)))
         return { ast, errors }
-    }, { requiresReaction: false })
+    })
 
     readonly getModuleForNode = computedFn((ast: AST): ModuleName|undefined => {
         for (const moduleName of this.modulesSource.keys()) {
@@ -67,7 +67,7 @@ class _Store {
                 }
             }
         }
-    }, { requiresReaction: false })
+    })
 
     readonly typeerrors = computedFn((module: ModuleName, ast: Module): BagelError[] => {
         const errors: BagelError[] = []
@@ -82,7 +82,7 @@ class _Store {
             ast
         )
         return errors
-    }, { requiresReaction: false })
+    })
 
     get allErrors() {
         const allErrors = new Map<ModuleName, BagelError[]>()
@@ -119,14 +119,14 @@ class _Store {
                 this.config?.includeTests
             )
         )
-    }, { requiresReaction: false })
+    })
 
     readonly getModuleByName = computedFn((importer: ModuleName, imported: string) => {
         const importedModuleName = canonicalModuleName(importer, imported)
 
         return given(this.modulesSource.get(importedModuleName), source =>
             this.parsed(importedModuleName, source).ast)
-    }, { requiresReaction: false })
+    })
 
     readonly getParent: GetParent = computedFn((ast) => {
         for (const [moduleName, source] of this.modulesSource.entries()) {
@@ -141,12 +141,12 @@ class _Store {
         }
 
         return undefined
-    }, { requiresReaction: false })
+    })
     
     readonly getBinding: GetBinding = computedFn((reportError, identifier) => {
         const currentModule = this.getModuleForNode(identifier)
 
-        return resolveLazy(
+        return resolve(
             {
                 reportError,
                 getModule: imported => 
@@ -156,7 +156,7 @@ class _Store {
             identifier,
             identifier
         )
-    }, { requiresReaction: false })
+    })
 
 }
 const Store = new _Store()

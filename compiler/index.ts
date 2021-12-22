@@ -1,11 +1,11 @@
 import { Colors, path, fs } from "./deps.ts";
 
 import { BagelError, prettyError } from "./errors.ts";
-import { all, cacheDir, cachedModulePath, esOrNone, given, ModuleName, on, pathIsRemote, sOrNone } from "./utils.ts";
+import { all, cacheDir, cachedModulePath, esOrNone, on, pathIsRemote, sOrNone } from "./utils/misc.ts";
 
-import { autorun, configure, runInAction } from "./mobx.ts";
+import { autorun, configure } from "./mobx.ts";
 import Store from "./store.ts";
-import { display } from "./debugging.ts";
+import { ModuleName } from "./_model/common.ts";
 
 configure({
     enforceActions: "never",

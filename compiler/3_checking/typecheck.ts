@@ -1,12 +1,14 @@
 import { Module } from "../_model/ast.ts";
 import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { deepEquals, given, iterateParseTree } from "../utils.ts";
+import { given } from "../utils/misc.ts";
 import { assignmentError,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs } from "./typeinfer.ts";
 import { getBindingMutability, Passthrough } from "../_model/common.ts";
-import { display } from "../debugging.ts";
+import { displayAST, displayType, iterateParseTree, typesEqual } from "../utils/ast.ts";
 
-
+/**
+ * Walk an entire AST and report all issues that we find
+ */
 export function typecheck(passthrough: Passthrough, ast: Module) {
     const { reportError, getBinding } = passthrough
 
@@ -24,7 +26,7 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
                 // forbid top-level const from being a func (should be a real func declaration) TODO: procs too
                 if (current.value.kind === "func") {
                     const maxPreviewLength = 8
-                    const fn = display(current.value)
+                    const fn = displayAST(current.value)
                     const sample = fn.substr(0, maxPreviewLength)
                     const truncated = fn.length > maxPreviewLength
                     reportError(miscError(current, `Top-level const functions should be actual func declarations: func ${current.name.name}${sample}${truncated ? '...' : ''}`))
@@ -121,7 +123,7 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
                     const key = indexerType.value.value;
                     const valueType = propertiesOf(passthrough, baseType)?.find(entry => entry.name.name === key)?.type;
                     if (valueType == null) {
-                        reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${displayForm(baseType)}'`));
+                        reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${displayType(baseType)}'`));
                     }
                 } else if (baseType.kind === "indexer-type") {
                     if (!subsumes(passthrough,  baseType.keyType, indexerType)) {
@@ -129,18 +131,18 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
                     }
                 } else if (baseType.kind === "array-type") {
                     if (!subsumes(passthrough,  NUMBER_TYPE, indexerType)) {
-                        reportError(miscError(current.indexer, `Expression of type '${displayForm(indexerType)}' can't be used to index type '${displayForm(baseType)}'`));
+                        reportError(miscError(current.indexer, `Expression of type '${displayType(indexerType)}' can't be used to index type '${displayType(baseType)}'`));
                     }
                 } else if (baseType.kind === "tuple-type") {
                     if (!subsumes(passthrough,  NUMBER_TYPE, indexerType)) {
-                        reportError(miscError(current.indexer, `Expression of type '${displayForm(indexerType)}' can't be used to index type '${displayForm(baseType)}'`));
+                        reportError(miscError(current.indexer, `Expression of type '${displayType(indexerType)}' can't be used to index type '${displayType(baseType)}'`));
                     } else if (indexerType.kind === 'literal-type' && indexerType.value.kind === 'number-literal') {
                         if (indexerType.value.value < 0 || indexerType.value.value >= baseType.members.length) {
-                            reportError(miscError(current.indexer, `Index ${indexerType.value.value} is out of range on type '${displayForm(baseType)}'`));
+                            reportError(miscError(current.indexer, `Index ${indexerType.value.value} is out of range on type '${displayType(baseType)}'`));
                         }
                     }
                 } else {
-                    reportError(miscError(current.indexer, `Expression of type '${displayForm(indexerType)}' can't be used to index type '${displayForm(baseType)}'`));
+                    reportError(miscError(current.indexer, `Expression of type '${displayType(indexerType)}' can't be used to index type '${displayType(baseType)}'`));
                 }
             } break;
             case "property-accessor": {
@@ -150,12 +152,12 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
                     : propertiesOf(passthrough, subjectType)
 
                 if (subjectProperties == null) {
-                    reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${displayForm(subjectType)}")`));
+                    reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${displayType(subjectType)}")`));
                 } else if (!subjectProperties.some(property => property.name.name === current.property.name)) {
                     if (subjectType.kind === "store-type") {
                         reportError(miscError(current.property, `Property '${current.property.name}' does not exist on store '${subjectType.store.name.name}'`));
                     } else {
-                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${displayForm(subjectType)}'`));
+                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${displayType(subjectType)}'`));
                     }
                 }
             } break;
@@ -173,7 +175,7 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
             case "as-cast": {
                 const innerType = inferType(passthrough, current.inner)
                 if (!subsumes(passthrough, current.type, innerType)) {
-                    reportError(miscError(current, `Expression of type ${displayForm(innerType)} cannot be expanded to type ${displayForm(current.type)}`))
+                    reportError(miscError(current, `Expression of type ${displayType(innerType)} cannot be expanded to type ${displayType(current.type)}`))
                 }
             } break;
             case "reaction": {
@@ -259,6 +261,10 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
     }
 }
 
+/**
+ * Determine whether `value` can "fit into" `destination`. Used for verifying 
+ * values passed to consts, arguments, etc, but for other things too.
+ */
 export function subsumes(passthrough: Passthrough, destination: TypeExpression, value: TypeExpression): boolean {
     if (destination === value) {
         return true;
@@ -353,41 +359,4 @@ export function resolveType(passthrough: Passthrough, type: TypeExpression): Typ
     }
 
     return resolved ?? UNKNOWN_TYPE
-}
-
-export function typesEqual(a: TypeExpression, b: TypeExpression): boolean {
-    return deepEquals(a, b, ["module", "code", "startIndex", "endIndex"])
-}
-
-export function displayForm(typeExpression: TypeExpression): string {
-    let str: string;
-
-    switch (typeExpression.kind) {
-        case "union-type": str = '(' + typeExpression.members.map(displayForm).join(" | ") + ')'; break;
-        case "named-type":
-        case "generic-param-type": str = typeExpression.name.name; break;
-        case "generic-type": str = `<${typeExpression.typeParams.map(p => p.name).join(',')}>${displayForm(typeExpression.inner)}`; break;
-        case "proc-type": str = `(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) {}`; break;
-        case "func-type": str = `(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayForm(arg.type)}` : '')).join(', ')}) => ${displayForm(typeExpression.returnType ?? UNKNOWN_TYPE)}`; break;
-        case "object-type": str = `{${typeExpression.spreads.map(s => '...' + displayForm(s)).concat(typeExpression.entries.map(({ name, type }) => `${name.name}: ${displayForm(type)}`)).join(', ')}}`; break;
-        case "indexer-type": str = `{ [${displayForm(typeExpression.keyType)}]: ${displayForm(typeExpression.valueType)} }`; break;
-        case "array-type": str = `${displayForm(typeExpression.element)}[]`; break;
-        case "tuple-type": str = `[${typeExpression.members.map(displayForm).join(", ")}]`; break;
-        case "string-type": str = `string`; break;
-        case "number-type": str = `number`; break;
-        case "boolean-type": str = `boolean`; break;
-        case "nil-type": str = `nil`; break;
-        case "literal-type": str = JSON.stringify(typeExpression.value.value).replaceAll('"', "'"); break;
-        case "nominal-type": str = typeExpression.name; break;
-        case "iterator-type": str = `Iterator<${displayForm(typeExpression.itemType)}>`; break;
-        case "plan-type": str = `Plan<${displayForm(typeExpression.resultType)}>`; break;
-        case "unknown-type": str = "unknown"; break;
-        case "any-type": str = "any"; break;
-        case "element-type": str = `Element`; break;
-        // case "element-type": str = `<${typeExpression.tagName}>`;
-        case "javascript-escape-type": str = "<js escape>"; break;
-        case "store-type": str = typeExpression.store.name.name; break;
-    }
-
-    return (typeExpression.mutability === 'immutable' || typeExpression.mutability === 'readonly' ? 'const ' : '') + str
 }

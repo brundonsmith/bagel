@@ -1,8 +1,8 @@
-import { log, withoutSourceInfo } from "../debugging.ts";
+import { log, withoutSourceInfo } from "../utils/debugging.ts";
 import { BagelError, isError } from "../errors.ts";
-import { memoize, memoize2, memoize3, ModuleName } from "../utils.ts";
-import { Module, Debug } from "../_model/ast.ts";
-import { Block, PlainIdentifier, ReportError, SourceInfo } from "../_model/common.ts";
+import { memoize, memoize3 } from "../utils/misc.ts";
+import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
+import { ModuleName,ReportError } from "../_model/common.ts";
 import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";

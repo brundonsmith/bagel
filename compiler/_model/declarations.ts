@@ -1,5 +1,4 @@
-import { Debug } from "./ast.ts";
-import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
+import { Block, Debug, PlainIdentifier, SourceInfo } from "./ast.ts";
 import { ExactStringLiteral, Expression, Func, JavascriptEscape, Proc } from "./expressions.ts";
 import { TypeExpression } from "./type-expressions.ts";
 

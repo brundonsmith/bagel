@@ -1,7 +1,7 @@
 import { path } from "../deps.ts";
-import { cachedModulePath, given, ModuleName, pathIsRemote } from "../utils.ts";
-import { Module, AST } from "../_model/ast.ts";
-import { Block, GetBinding, getBindingMutability, PlainIdentifier } from "../_model/common.ts";
+import { cachedModulePath, given, pathIsRemote } from "../utils/misc.ts";
+import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
+import { GetBinding, getBindingMutability, ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, StoreDeclaration, StoreFunction, StoreProperty } from "../_model/declarations.ts";
 import { Expression, Proc, Func, Spread } from "../_model/expressions.ts";
 import { LetDeclaration } from "../_model/statements.ts";
@@ -200,7 +200,7 @@ const compileFuncDeclaration = (getBinding: GetBinding, module: string, decl: Fu
         : (decl.access + ' readonly')
 
     if (decl.memo) {
-        return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ', { requiresReaction: false });';
+        return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ');';
     } else {
         return `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
     }

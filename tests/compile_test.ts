@@ -1,7 +1,7 @@
 import { compile } from "../compiler/4_compile/index.ts";
 import { prettyError } from "../compiler/errors.ts";
 import Store from "../compiler/store.ts";
-import { ModuleName } from "../compiler/utils.ts";
+import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
   name: "Simple func declaration",
@@ -28,7 +28,7 @@ Deno.test({
   fn() {
     testCompile(
       `func memo uid() => '12345'`,
-      `const uid = ___computedFn(() => "12345", { requiresReaction: false });`,
+      `const uid = ___computedFn(() => "12345");`,
     );
   },
 });

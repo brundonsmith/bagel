@@ -1,8 +1,7 @@
-import { withoutSourceInfo } from "../debugging.ts";
 import { BagelError, isError } from "../errors.ts";
-import { memoize2, memoize3, ModuleName } from "../utils.ts";
-import { AST } from "../_model/ast.ts";
-import { KEYWORDS, PlainIdentifier } from "../_model/common.ts";
+import { memoize2, memoize3 } from "../utils/misc.ts";
+import { AST, KEYWORDS, PlainIdentifier } from "../_model/ast.ts";
+import { ModuleName } from "../_model/common.ts";
 
 export const consume = memoize3((code: string, index: number, segment: string): number|undefined => {
     for (let i = 0; i < segment.length; i++) {

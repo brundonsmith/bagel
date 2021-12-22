@@ -1,11 +1,11 @@
-import { displayForm } from "./3_checking/typecheck.ts";
-import { AST } from "./_model/ast.ts";
-import { PlainIdentifier } from "./_model/common.ts";
+import { displayType } from "./utils/ast.ts";
+import { AST, PlainIdentifier } from "./_model/ast.ts";
 import { ImportDeclaration,ImportItem } from "./_model/declarations.ts";
 import { ExactStringLiteral, LocalIdentifier } from "./_model/expressions.ts";
 import { TypeExpression } from "./_model/type-expressions.ts";
 import { Colors } from "./deps.ts";
-import { deepEquals, given, ModuleName } from "./utils.ts";
+import { deepEquals, given } from "./utils/misc.ts";
+import { ModuleName } from "./_model/common.ts";
 
 export type BagelError =
     | BagelSyntaxError
@@ -84,7 +84,7 @@ export function errorMessage(error: BagelError): string {
         case "bagel-syntax-error":
             return error.message
         case "bagel-assignable-to-error":
-            return `Type "${displayForm(error.value)}" is not assignable to type "${displayForm(error.destination)}"`;
+            return `Type "${displayType(error.value)}" is not assignable to type "${displayType(error.destination)}"`;
         case "bagel-cannot-find-name-error":
             return `Cannot find name "${error.ast.name}"`;
         case "bagel-already-declared-error":

@@ -1,5 +1,5 @@
-import { AST } from "./ast.ts";
-import { PlainIdentifier, SourceInfo } from "./common.ts";
+import { deepEquals } from "../utils/misc.ts";
+import { AST, PlainIdentifier, SourceInfo } from "./ast.ts";
 import { StoreDeclaration } from "./declarations.ts";
 import { BooleanLiteral, ExactStringLiteral, NumberLiteral } from "./expressions.ts";
 

@@ -1,16 +1,21 @@
 import { alreadyDeclared, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
-import { AST } from "../_model/ast.ts";
-import { PlainIdentifier, Binding, areSame, Passthrough } from "../_model/common.ts";
+import { areSame } from "../utils/ast.ts";
+import { AST, PlainIdentifier } from "../_model/ast.ts";
+import { Binding, Passthrough } from "../_model/common.ts";
 import { LocalIdentifier } from "../_model/expressions.ts";
 import { FuncType, GenericParamType, NamedType, ProcType } from "../_model/type-expressions.ts";
 
-export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getParent'|'getModule'>, identifier: LocalIdentifier|PlainIdentifier|NamedType|GenericParamType, from: AST): Binding|undefined {
+/**
+ * Given some identifier and some AST context, look upwards until a binding is
+ * found for the identifier (or the root is reached)
+ */
+export function resolve(passthough: Pick<Passthrough, 'reportError'|'getParent'|'getModule'>, identifier: LocalIdentifier|PlainIdentifier|NamedType|GenericParamType, from: AST): Binding|undefined {
     const { reportError, getParent, getModule } = passthough
     
     const name = identifier.kind === 'named-type' || identifier.kind === 'generic-param-type' ? identifier.name : identifier
-
     const parent = getParent(from)
 
+    // if we've reached the root of the AST, there's no binding
     if (parent == null) {
         reportError(cannotFindName(name))
         return undefined;
@@ -45,6 +50,7 @@ export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getPare
                                 reportError(alreadyDeclared(declaration.name))
                             }
     
+                            // detect const being referenced before it's available
                             if (declaration.kind === 'const-declaration') { 
                                 const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
     
@@ -55,6 +61,7 @@ export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getPare
                                 }
                             }
 
+                            // detect store being referenced in const initialization
                             if (declaration.kind === 'store-declaration' && from.kind === 'const-declaration') {
                                 reportError(miscError(identifier, `Stores cannot be referenced when initializing constants`))
                             }
@@ -79,7 +86,7 @@ export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getPare
                                 if (otherModule == null) {
                                     reportError(cannotFindModule(declaration.path))
                                 } else {
-                                    resolved = resolveLazy(passthough, importItem.name, otherModule.declarations[0]) // HACK
+                                    resolved = resolve(passthough, importItem.name, otherModule.declarations[0]) // HACK
 
                                     if (resolved == null) {
                                         reportError(cannotFindExport(importItem, declaration));
@@ -94,7 +101,7 @@ export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getPare
         case "func":
         case "proc": {
             
-            // add any generic type parameters to scope
+            // resolve generic type parameters
             if (parent.type.kind === 'generic-type') {
                 for (const typeParam of parent.type.typeParams) {
                     if (typeParam.name.name === name.name) {
@@ -119,7 +126,7 @@ export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getPare
                 }
             }
 
-            // add func/proc arguments to scope
+            // resolve func or proc arguments
             const funcOrProcType = parent.type.kind === 'generic-type' ? (parent.type.inner as FuncType|ProcType) : parent.type
             for (let i = 0; i < funcOrProcType.args.length; i++) {
                 const arg = funcOrProcType.args[i]
@@ -149,8 +156,8 @@ export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getPare
                                 reportError(alreadyDeclared(statement.name))
                             }
                             
+                            // detect variable or const being referenced before it's available
                             const comingFromIndex = parent.statements.findIndex(other => areSame(other, from))
-
                             if (comingFromIndex < statementIndex) {
                                 reportError(miscError(identifier, `Can't reference "${identifier.name}" before initialization`))
                             } else if (comingFromIndex === statementIndex) {
@@ -192,5 +199,6 @@ export function resolveLazy(passthough: Pick<Passthrough, 'reportError'|'getPare
             break;
     }
 
-    return resolved ?? resolveLazy(passthough, identifier, parent)
+    // if not resolved, recurse upward to the next AST node
+    return resolved ?? resolve(passthough, identifier, parent)
 }

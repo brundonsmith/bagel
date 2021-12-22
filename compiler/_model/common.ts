@@ -1,45 +1,14 @@
 // deno-lint-ignore-file no-fallthrough
-import { AST, Module } from "./ast.ts";
-import { ConstDeclarationStatement, LetDeclaration, Statement } from "./statements.ts";
+import { AST, Module, PlainIdentifier } from "./ast.ts";
+import { ConstDeclarationStatement, LetDeclaration } from "./statements.ts";
 import { GenericParamType, NamedType, TypeExpression } from "./type-expressions.ts";
 import { ConstDeclaration, FuncDeclaration, ProcDeclaration, StoreDeclaration } from "./declarations.ts";
 import { Expression, Func, InlineConst, LocalIdentifier, Proc } from "./expressions.ts";
-import { withoutSourceInfo, display } from "../debugging.ts";
-import { deepEquals, ModuleName } from "../utils.ts";
 import { BagelError } from "../errors.ts";
+import { NominalType } from "../utils/misc.ts";
 
-export type SourceInfo = {
-    readonly module: ModuleName|undefined,
-    readonly code: string|undefined,
-    readonly startIndex: number|undefined,
-    readonly endIndex: number|undefined,
-}
-
-export function moreSpecificThan(a: Partial<SourceInfo>, b: Partial<SourceInfo>): boolean {
-    const missingInA = a.code == null
-    const missingInB = b.code == null
-
-    if (!missingInA && missingInB) {
-        return true
-    } else if (missingInA && !missingInB) {
-        return false
-    } else if (missingInA && missingInB) {
-        return false
-    } else if ((a.startIndex as number) === (b.startIndex as number) && (a.endIndex as number) === (b.endIndex as number)) {
-        return false
-    }
-
-    return (a.startIndex as number) >= (b.startIndex as number) && (a.endIndex as number) <= (b.endIndex as number)
-}
-
-// HACK
-export function areSame(a: AST|undefined, b: AST|undefined) {
-    return a?.kind === b?.kind &&
-        a?.module === b?.module && a?.module != null &&
-        a?.code === b?.code && a?.code != null && 
-        a?.startIndex === b?.startIndex && a?.startIndex != null && 
-        a?.endIndex === b?.endIndex && a?.endIndex != null
-}
+const MODULE_NAME = Symbol('MODULE_NAME')
+export type ModuleName = NominalType<string, typeof MODULE_NAME>
 
 export type Passthrough = {
     readonly reportError: ReportError,
@@ -65,7 +34,6 @@ export type TypeBinding = {
     readonly kind: 'type-binding',
     readonly type: TypeExpression,
 }
-
 
 export function getBindingMutability(binding: ValueBinding): "immutable"|"readonly"|"mutable"|"assignable" {
     switch (binding.kind) {
@@ -98,24 +66,3 @@ export function getBindingMutability(binding: ValueBinding): "immutable"|"readon
 export type Refinement =
     | { kind: "subtraction", type: TypeExpression, targetExpression: Expression }
     | { kind: "narrowing",   type: TypeExpression, targetExpression: Expression }
-
-export function equivalent(a: Expression, b: Expression): boolean {
-    return deepEquals(withoutSourceInfo(a), withoutSourceInfo(b))
-}
-
-export type PlainIdentifier = SourceInfo & {
-    readonly kind: "plain-identifier",
-    readonly name: string,
-}
-
-export type Block = SourceInfo & {
-    readonly kind: "block",
-    readonly statements: readonly Statement[],
-}
-
-export const KEYWORDS = [ "func", "proc", "if", "else", "switch", "case",
-//"type", 
-"class", "let", "const", "for", "while", 
-"of", "nil", "public", "visible", "private", "reaction", 
-"triggers", "until", "true", "false", "import", "export", "from", "as", "test",
-"expr", "block" ] as const;

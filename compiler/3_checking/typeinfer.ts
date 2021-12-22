@@ -1,14 +1,15 @@
-// deno-lint-ignore-file no-fallthrough
-import { GetParent, GetBinding, ReportError, Refinement, Passthrough } from "../_model/common.ts";
+import { GetParent, Refinement, Passthrough } from "../_model/common.ts";
 import { BinaryOp, Expression, InlineConst, Invocation, isExpression, Spread } from "../_model/expressions.ts";
 import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { given, mapParseTree, memoize2 } from "../utils.ts";
-import { displayForm, resolveType, subsumes, typesEqual } from "./typecheck.ts";
+import { given } from "../utils/misc.ts";
+import { resolveType, subsumes } from "./typecheck.ts";
 import { StoreMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
 import { assignmentError, cannotFindName, miscError } from "../errors.ts";
-import { withoutSourceInfo } from "../debugging.ts";
+import { withoutSourceInfo } from "../utils/debugging.ts";
 import { AST } from "../_model/ast.ts";
 import { LetDeclaration,ConstDeclarationStatement } from "../_model/statements.ts";
+import { computedFn } from "../mobx.ts";
+import { displayType,mapParseTree,typesEqual } from "../utils/ast.ts";
 
 export function inferType(
     passthrough: Passthrough,
@@ -34,10 +35,10 @@ export function inferType(
         }
     }
 
-    return simplify(passthrough, refinedType)
+    return simplifyUnions(passthrough, refinedType)
 }
 
-const inferTypeInner = memoize2((
+const inferTypeInner = computedFn((
     passthrough: Passthrough,
     ast: Expression|StoreMember,
 ): TypeExpression => {
@@ -99,7 +100,7 @@ const inferTypeInner = memoize2((
                     subsumes(passthrough, left, leftType) && subsumes(passthrough, right, rightType))
 
                 if (types == null) {
-                    reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayForm(leftType)}' and '${displayForm(rightType)}'`));
+                    reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayType(leftType)}' and '${displayType(rightType)}'`));
 
                     if (BINARY_OPERATOR_TYPES[op.op].length === 1) {
                         return BINARY_OPERATOR_TYPES[op.op][0].output
@@ -382,7 +383,7 @@ const inferTypeInner = memoize2((
                     const spreadObjType = resolveType(passthrough, inferType(passthrough, spreadObj));
 
                     if (spreadObjType.kind !== 'object-type') {
-                        reportError(miscError(spreadObj, `Can only spread objects into an object; found ${displayForm(spreadObjType)}`))
+                        reportError(miscError(spreadObj, `Can only spread objects into an object; found ${displayType(spreadObjType)}`))
                         return undefined
                     } else {
                         return spreadObjType.entries
@@ -414,7 +415,7 @@ const inferTypeInner = memoize2((
                     } else if (spreadType.kind === 'tuple-type') {
                         memberTypes.push(...spreadType.members)
                     } else {
-                        reportError(miscError(entry.expr, `Can only spread arrays into an array; found ${displayForm(spreadType)}`))
+                        reportError(miscError(entry.expr, `Can only spread arrays into an array; found ${displayType(spreadType)}`))
                         memberTypes.push(UNKNOWN_TYPE)
                     }
                 } else {
@@ -435,7 +436,7 @@ const inferTypeInner = memoize2((
             } else {
                 return {
                     kind: "array-type",
-                    element: simplify(passthrough, {
+                    element: simplifyUnions(passthrough, {
                         kind: "union-type",
                         members: [...memberTypes, ...arraySpreads.map(t => t.element)],
                         mutability: undefined,
@@ -476,16 +477,14 @@ const inferTypeInner = memoize2((
     }
 })
 
-export function unpackGeneric(type: TypeExpression): TypeExpression {
-    if (type.kind === 'generic-param-type') {
-        return type.extends ?? UNKNOWN_TYPE
-    }
-
-    return type
-}
-
+/**
+ * Given some invocation,
+ * a) infer its subject's type
+ * b) if the subject is generic, bind its provided type args or try to infer 
+ *    them
+ */
 export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: Invocation): FuncType|ProcType {
-    const { reportError, getBinding } = passthrough
+    const { reportError } = passthrough
 
     let subjectType = resolveType(passthrough, inferType(passthrough, invocation.subject))
 
@@ -497,8 +496,7 @@ export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: 
                 }
 
                 subjectType = parameterizedGenericType(
-                    reportError, 
-                    getBinding, 
+                    passthrough, 
                     subjectType, 
                     invocation.typeArgs
                 )
@@ -517,14 +515,12 @@ export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: 
                 const inferredBindings = fitTemplate(
                     passthrough, 
                     funcOrProcType, 
-                    invocationSubjectType, 
-                    subjectType.typeParams.map(param => param.name.name)
+                    invocationSubjectType
                 );
 
                 if (inferredBindings.size === subjectType.typeParams.length) {
                     subjectType = parameterizedGenericType(
-                        reportError, 
-                        getBinding, 
+                        passthrough, 
                         subjectType, 
                         subjectType.typeParams.map(param =>
                             inferredBindings.get(param.name.name) ?? UNKNOWN_TYPE)
@@ -539,7 +535,9 @@ export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: 
     return subjectType as FuncType|ProcType
 }
 
-function parameterizedGenericType(reportError: ReportError, getBinding: GetBinding, generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
+function parameterizedGenericType(passthrough: Passthrough, generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
+    const { getBinding, reportError } = passthrough
+    
     const bindings: Record<string, TypeExpression> = {}
     for (let i = 0; i < generic.typeParams.length; i++) {
         const typeParam = generic.typeParams[i]
@@ -561,7 +559,10 @@ function parameterizedGenericType(reportError: ReportError, getBinding: GetBindi
     }) as TypeExpression
 }
 
-export function simplify(passthrough: Passthrough, type: TypeExpression): TypeExpression {
+/**
+ * Apply all union simplifications
+ */
+function simplifyUnions(passthrough: Passthrough, type: TypeExpression): TypeExpression {
     return handleSingletonUnion(
         distillUnion(passthrough,
             flattenUnions(type)));
@@ -653,7 +654,7 @@ export function subtract(passthrough: Passthrough, type: TypeExpression, without
     without = resolveType(passthrough, without)
 
     if (type.kind === "union-type") {
-        return simplify(passthrough, {
+        return simplifyUnions(passthrough, {
             ...type,
             members: type.members.filter(member => !subsumes(passthrough, without, member))
         })
@@ -664,62 +665,13 @@ export function subtract(passthrough: Passthrough, type: TypeExpression, without
 
 function narrow(passthrough: Passthrough, type: TypeExpression, fit: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
-        return simplify(passthrough, {
+        return simplifyUnions(passthrough, {
             ...type,
             members: type.members.filter(member => subsumes(passthrough, fit, member))
         })
     } else { // TODO: There's probably more we can do here
         return type
     }
-}
-
-const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
-    "+": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE },
-        { left: STRING_TYPE, right: STRING_TYPE, output: STRING_TYPE },
-        { left: NUMBER_TYPE, right: STRING_TYPE, output: STRING_TYPE },
-        { left: STRING_TYPE, right: NUMBER_TYPE, output: STRING_TYPE },
-    ],
-    "-": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
-    ],
-    "*": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
-    ],
-    "/": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
-    ],
-    "<": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    ">": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "<=": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    ">=": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "&&": [
-        { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "||": [
-        { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "==": [ // TODO: Should require left and right to be the same type, even though that type can be anything!
-        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "!=": [
-        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "??": [
-        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: UNKNOWN_TYPE }
-    ],
-    // "??": {
-    //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
-    //     output: BOOLEAN_TYPE
-    // },
 }
 
 function resolveRefinements(getParent: GetParent, epxr: Expression|StoreMember): Refinement[] {
@@ -806,10 +758,10 @@ function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
     )
 }
 
-export function propertiesOf(
+export const propertiesOf = computedFn((
     passthrough: Passthrough,
     type: TypeExpression
-): readonly Attribute[] | undefined {
+): readonly Attribute[] | undefined => {
     const { reportError, getBinding } = passthrough
 
     switch (type.kind) {
@@ -839,7 +791,7 @@ export function propertiesOf(
                         if (resolved.kind !== 'type-binding') {
                             reportError(miscError(spread, `${spread.name.name} is not a type`))
                         } else if (resolved.type.kind !== 'object-type') {
-                            reportError(miscError(spread, `${displayForm(resolved.type)} is not an object type; can only spread object types into object types`))
+                            reportError(miscError(spread, `${displayType(resolved.type)} is not an object type; can only spread object types into object types`))
                         }
                     }
                 }
@@ -1018,7 +970,7 @@ export function propertiesOf(
             return planProps
         }
     }
-}
+})
 
 function attribute(name: string, type: TypeExpression): Attribute {
     return {
@@ -1032,14 +984,25 @@ function attribute(name: string, type: TypeExpression): Attribute {
 const AST_NOISE = { module: undefined, code: undefined, startIndex: undefined, endIndex: undefined }
 const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
 
-export function fitTemplate(
+/**
+ * Given some type containing generic type params, and some other type intended
+ * to align with it, find a mapping from type params to possible bindings for 
+ * them. Used to infer generic args when not supplied.
+ */
+function fitTemplate(
     passthrough: Passthrough,
     parameterized: TypeExpression, 
     reified: TypeExpression, 
-    params: readonly string[]
 ): ReadonlyMap<string, TypeExpression> {
+    const { reportError, getBinding } = passthrough
+
     function isGenericParam(type: TypeExpression): type is NamedType {
-        return type.kind === "named-type" && params.includes(type.name.name)
+        if (type.kind === 'named-type') {
+            const binding = getBinding(reportError, type)
+            return binding?.kind === 'type-binding' && binding.type.kind === 'generic-param-type'
+        }
+
+        return false
     }
 
     if (isGenericParam(parameterized)) {
@@ -1051,8 +1014,8 @@ export function fitTemplate(
     if (parameterized.kind === "func-type" && reified.kind === "func-type") {
         const matchGroups = [
             ...parameterized.args.map((arg, index) =>
-                fitTemplate(passthrough, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE, params)),
-            // fitTemplate(reportError, getParent, getBinding, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE, params)
+                fitTemplate(passthrough, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE)),
+            // fitTemplate(reportError, getParent, getBinding, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE)
         ]
 
         const matches = new Map<string, TypeExpression>();
@@ -1062,7 +1025,7 @@ export function fitTemplate(
                 const existing = matches.get(key)
                 if (existing) {
                     if (!subsumes(passthrough, existing, value)) {
-                        matches.set(key, simplify(passthrough, {
+                        matches.set(key, simplifyUnions(passthrough, {
                             kind: "union-type",
                             members: [value, existing],
                             mutability: undefined,
@@ -1079,7 +1042,7 @@ export function fitTemplate(
     }
 
     if (parameterized.kind === "array-type" && reified.kind === "array-type") {
-        return fitTemplate(passthrough, parameterized.element, reified.element, params);
+        return fitTemplate(passthrough, parameterized.element, reified.element);
     }
 
     if (parameterized.kind === "union-type") {
@@ -1104,7 +1067,7 @@ export function fitTemplate(
             if (parameterizedMembersRemaining.length === 1 && isGenericParam(parameterizedMembersRemaining[0])) {
                 const matches = new Map<string, TypeExpression>();
 
-                matches.set(parameterizedMembersRemaining[0].name.name, simplify(passthrough, {
+                matches.set(parameterizedMembersRemaining[0].name.name, simplifyUnions(passthrough, {
                     kind: "union-type",
                     members: reifiedMembersRemaining,
                     mutability: undefined,
@@ -1124,27 +1087,54 @@ export function fitTemplate(
         }
     }
 
-    return EMPTY_MAP;
+    return new Map();
 }
 
-function declExported(declaration: Declaration): boolean|undefined {
-    if (declaration.kind !== "import-declaration" && 
-        declaration.kind !== "javascript-escape" && 
-        declaration.kind !== "debug" &&
-        declaration.kind !== "test-expr-declaration" &&
-        declaration.kind !== "test-block-declaration") {
-        return declaration.exported;
-    }
+const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
+    "+": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE },
+        { left: STRING_TYPE, right: STRING_TYPE, output: STRING_TYPE },
+        { left: NUMBER_TYPE, right: STRING_TYPE, output: STRING_TYPE },
+        { left: STRING_TYPE, right: NUMBER_TYPE, output: STRING_TYPE },
+    ],
+    "-": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
+    ],
+    "*": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
+    ],
+    "/": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
+    ],
+    "<": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
+    ],
+    ">": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "<=": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
+    ],
+    ">=": [
+        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "&&": [
+        { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "||": [
+        { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "==": [ // TODO: Should require left and right to be the same type, even though that type can be anything!
+        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "!=": [
+        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
+    ],
+    "??": [
+        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: UNKNOWN_TYPE }
+    ],
+    // "??": {
+    //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
+    //     output: BOOLEAN_TYPE
+    // },
 }
-
-function declName(declaration: Declaration): string|undefined {
-    if (declaration.kind !== "import-declaration" && 
-        declaration.kind !== "javascript-escape" && 
-        declaration.kind !== "debug" &&
-        declaration.kind !== "test-expr-declaration" &&
-        declaration.kind !== "test-block-declaration") {
-        return declaration.name.name;
-    }
-}
-
-const EMPTY_MAP: ReadonlyMap<string, TypeExpression> = new Map()

@@ -1,7 +1,6 @@
-import { BagelError,prettyError } from "../compiler/errors.ts";
-import { ModuleName } from "../compiler/utils.ts";
+import { BagelError, prettyError } from "../compiler/errors.ts";
 import Store, { canonicalModuleName } from "../compiler/store.ts";
-import { log, withoutSourceInfo } from "../compiler/debugging.ts";
+import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
   name: "Basic constant",

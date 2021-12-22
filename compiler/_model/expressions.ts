@@ -1,5 +1,4 @@
-import { AST, Debug } from "./ast.ts";
-import { Block, PlainIdentifier, SourceInfo } from "./common.ts";
+import { AST, Block, Debug, PlainIdentifier, SourceInfo } from "./ast.ts";
 import { FuncType, GenericType, ProcType, TypeExpression } from "./type-expressions.ts";
 
 export type Expression = 

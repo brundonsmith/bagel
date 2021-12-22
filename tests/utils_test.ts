@@ -1,4 +1,4 @@
-import { deepEquals } from "../compiler/utils.ts";
+import { deepEquals } from "../compiler/utils/misc.ts";
 import { UNKNOWN_TYPE } from "../compiler/_model/type-expressions.ts";
 
 Deno.test({
