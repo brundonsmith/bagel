@@ -115,15 +115,14 @@ const typeDeclaration: ParseFunction<TypeDeclaration> = (module, code, startInde
         newIndex: index,
     })))))))))
 
-const typeExpression: ParseFunction<TypeExpression> = (module, code, startIndex) =>
-    arrayType(module, code, startIndex)
-    ?? nonArrayType(module, code, startIndex)
+const typeExpression: ParseFunction<TypeExpression> =  memoize3((module, code, startIndex) =>
+    TYPE_PARSER.parseStartingFromTier(0)(module, code, startIndex))
 
 const arrayType: ParseFunction<ArrayType> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(parseExact("const")(module, code, index), ({ parsed: constant, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: constant, newIndex: index })))), ({ parsed: constant, newIndex: indexAfterConstant }) =>
-    given(nonArrayType(module, code, indexAfterConstant ?? startIndex), ({ parsed: element, newIndex: index }) =>
+    given(TYPE_PARSER.parseBeneath(module, code, indexAfterConstant ?? startIndex, arrayType), ({ parsed: element, newIndex: index }) =>
     given(consume(code, index, "[]"), index => ({
         parsed: {
             kind: "array-type",
@@ -137,14 +136,9 @@ const arrayType: ParseFunction<ArrayType> = (module, code, startIndex) =>
         newIndex: index,
     }))))
 
-// required because of the way arrayTypes are written
-const nonArrayType: ParseFunction<TypeExpression> = (module, code, startIndex) =>
-    unionType(module, code, startIndex)
-    ?? atomicType(module, code, startIndex)
-
 const unionType: ParseFunction<UnionType> = (module, code, startIndex) =>
     // TODO: Allow leading |
-    given(parseSeries(module, code, startIndex, atomicType, "|", { leadingDelimiter: "optional", trailingDelimiter: "forbidden" }), ({ parsed: members, newIndex: index }) =>
+    given(parseSeries(module, code, startIndex, TYPE_PARSER.beneath(unionType), "|", { leadingDelimiter: "optional", trailingDelimiter: "forbidden" }), ({ parsed: members, newIndex: index }) =>
         members.length >= 2
             ? {
                 parsed: {
@@ -159,21 +153,6 @@ const unionType: ParseFunction<UnionType> = (module, code, startIndex) =>
                 newIndex: index,
             }
             : undefined)
-
-const atomicType: ParseFunction<TypeExpression> = (module, code, startIndex) =>
-    primitiveType(module, code, startIndex)
-    ?? elementType(module, code, startIndex)
-    ?? funcType(module, code, startIndex)
-    ?? procType(module, code, startIndex)
-    ?? iteratorType(module, code, startIndex)
-    ?? planType(module, code, startIndex)
-    ?? literalType(module, code, startIndex)
-    ?? namedType(module, code, startIndex)
-    ?? objectType(module, code, startIndex)
-    ?? parenthesizedType(module, code, startIndex)
-    ?? indexerType(module, code, startIndex)
-    ?? tupleType(module, code, startIndex)
-    ?? unknownType(module, code, startIndex)
 
 const elementType: ParseFunction<ElementType> = (module, code, startIndex) =>
     given(consume(code, startIndex, "Element"), index => ({
@@ -705,7 +684,7 @@ const _accessModifierWithVisible: ParseFunction<'private'|'public'|'visible'> = 
         newIndex: index
     }))
 
-const _accessModifier: ParseFunction<'private'|'public'> = (module, code, startIndex) =>
+const _accessModifier: ParseFunction<'private'|'public'> = (_module, code, startIndex) =>
     given(consume(code, startIndex, "private"), index => ({
         parsed: "private",
         newIndex: index
@@ -1887,23 +1866,17 @@ const debug: ParseFunction<Debug> = (module, code, startIndex) =>
 
 type ParseTiers<T> = readonly ParseFunction<T>[][]
 
-const nextTierIndex = <T>(tiers: readonly ParseFunction<T>[][]) => {
-    const map = new Map<ParseFunction<T>, number>();
-
-    for (let i = 0; i < tiers.length; i++) {
-        for (const fn of tiers[i]) {
-            map.set(fn, i+1);
-        }
-    }
-
-    return map;
-}
-
 class TieredParser<T> {
     private readonly nextTierFor
 
     constructor(private readonly tiers: ParseTiers<T>) {
-        this.nextTierFor = nextTierIndex(this.tiers)
+        this.nextTierFor = new Map<ParseFunction<T>, number>();
+    
+        for (let i = 0; i < tiers.length; i++) {
+            for (const fn of tiers[i]) {
+                this.nextTierFor.set(fn, i+1);
+            }
+        }
     }
     
     public readonly parseStartingFromTier = (tier: number): ParseFunction<T> => (module, code, index) => {
@@ -1947,6 +1920,10 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
         stringLiteral, numberLiteral ],
 ])
 
-// const TYPE_PARSERS = new TieredParser<TypeExpression>([
-
-// ])
+const TYPE_PARSER = new TieredParser<TypeExpression>([
+    [ unionType ],
+    [ arrayType ],
+    [ primitiveType, elementType, funcType, procType, iteratorType, planType, 
+        literalType, namedType, objectType, parenthesizedType, indexerType, 
+        tupleType, unknownType ],
+])
