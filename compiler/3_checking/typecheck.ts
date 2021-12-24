@@ -347,7 +347,7 @@ export function resolveType(passthrough: Passthrough, type: TypeExpression): Typ
 
     let resolved: TypeExpression|undefined = type
 
-    while (resolved?.kind === 'named-type' || resolved?.kind === 'generic-param-type') {
+    while (resolved?.kind === 'named-type' || resolved?.kind === 'generic-param-type' || resolved?.kind === 'parenthesized-type') {
         if (resolved.kind === 'named-type') {
             const binding = getBinding(reportError, resolved.name)
 
@@ -355,6 +355,9 @@ export function resolveType(passthrough: Passthrough, type: TypeExpression): Typ
         }
         if (resolved?.kind === 'generic-param-type') {
             resolved = resolved.extends
+        }
+        if (resolved?.kind === 'parenthesized-type') {
+            resolved = resolved.inner
         }
     }
 

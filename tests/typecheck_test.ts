@@ -1063,6 +1063,24 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Parentehsized type success",
+  fn() {
+    testTypecheck(`
+    const foo: (string|number)[] = ['foo', 12, 14, 'bar']`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Parentehsized type failure",
+  fn() {
+    testTypecheck(`
+    const foo: (string|number)[] = ['foo', 12, true, 'bar']`,
+    true)
+  }
+})
+
 // TODO: Reactions
 // TODO: if/else/switch
 

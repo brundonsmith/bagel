@@ -138,7 +138,7 @@ ${given(ast.until, until => compileOne(getBinding, module, until))})`;
         case "string-type": return `string`;
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;
-        case "nil-type": return `null | undefined`;
+        case "nil-type": return `(null | undefined)`;
         case "unknown-type": return `unknown`;
 
         default:

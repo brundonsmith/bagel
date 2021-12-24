@@ -24,6 +24,7 @@ export type TypeExpression =
     | NominalType
     | IteratorType
     | PlanType
+    | ParenthesizedType
     | UnknownType
     | AnyType
     | JavascriptEscapeType
@@ -164,6 +165,12 @@ export type IteratorType = SourceInfo & {
 export type PlanType = SourceInfo & {
     readonly kind: "plan-type",
     readonly resultType: TypeExpression,
+    readonly mutability: undefined,
+}
+
+export type ParenthesizedType = SourceInfo & {
+    readonly kind: "parenthesized-type",
+    readonly inner: TypeExpression,
     readonly mutability: undefined,
 }
 
@@ -347,6 +354,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "any-type": undefined,
     "iterator-type": undefined,
     "plan-type": undefined,
+    "parenthesized-type": undefined,
     "literal-type": undefined,
     "tuple-type": undefined,
     "store-type": undefined,

@@ -409,6 +409,26 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Tricky type parse 1",
+  fn() {
+    testCompile(
+      `type Foo = string | number[]`,
+      `type Foo = string | number[];`
+    )
+  }
+})
+
+Deno.test({
+  name: "Tricky type parse 2",
+  fn() {
+    testCompile(
+      `type Foo = (a: string) => (b: number|boolean) => { foo: nil[] }`,
+      `type Foo = (a: string) => (b: number | boolean) => {foo: (null | undefined)[]};`
+    )
+  }
+})
+
+Deno.test({
   name: "Comment test line",
   fn() {
     testCompile(

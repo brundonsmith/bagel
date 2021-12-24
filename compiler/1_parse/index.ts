@@ -6,7 +6,7 @@ import { ModuleName,ReportError } from "../_model/common.ts";
 import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
-import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 
@@ -170,6 +170,7 @@ const atomicType: ParseFunction<TypeExpression> = (module, code, startIndex) =>
     ?? literalType(module, code, startIndex)
     ?? namedType(module, code, startIndex)
     ?? objectType(module, code, startIndex)
+    ?? parenthesizedType(module, code, startIndex)
     ?? indexerType(module, code, startIndex)
     ?? tupleType(module, code, startIndex)
     ?? unknownType(module, code, startIndex)
@@ -464,6 +465,24 @@ const planType: ParseFunction<PlanType> = (module, code, startIndex) =>
             code,
             startIndex,
             endIndex: index,
+        },
+        newIndex: index,
+    }))))))
+
+const parenthesizedType: ParseFunction<ParenthesizedType> = (module, code, startIndex) =>
+    given(consume(code, startIndex, "("), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(typeExpression(module, code, index), err(code, index, "Type"), ({ parsed: inner, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
+        parsed: {
+            kind: 'parenthesized-type',
+            inner,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+            mutability: undefined,
         },
         newIndex: index,
     }))))))
