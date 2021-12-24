@@ -1019,7 +1019,7 @@ const parseBlockWithoutBraces: ParseFunction<Block> = (module, code, startIndex)
     }))
 
 const expression: ParseFunction<Expression> = memoize3((module, code, startIndex) =>
-    parseStartingFromTier(0)(module, code, startIndex))
+    EXPRESSION_PARSER.parseStartingFromTier(0)(module, code, startIndex))
 
 const func: ParseFunction<Func> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, (module, code, index) =>
@@ -1151,7 +1151,7 @@ const inlineConst: ParseFunction<InlineConst> = (module, code, startIndex) =>
     }))))))))))))))
 
 const pipe: ParseFunction<Pipe> = (module, code, startIndex) => 
-    given(parseSeries(module, code, startIndex, parseStartingFromTier(NEXT_TIER_FOR.get(pipe) as number), "|>", { trailingDelimiter: "forbidden" }), ({ parsed: expressions, newIndex: index }) =>
+    given(parseSeries(module, code, startIndex, EXPRESSION_PARSER.beneath(pipe), "|>", { trailingDelimiter: "forbidden" }), ({ parsed: expressions, newIndex: index }) =>
         expressions.length >= 2
             ? {
                 parsed: expressions.slice(1).reduce((acc, expr) => ({
@@ -1169,7 +1169,7 @@ const pipe: ParseFunction<Pipe> = (module, code, startIndex) =>
 
 const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => memoize3((module, code, startIndex) => 
     given(parseSeries(module, code, startIndex, 
-        beneath(binaryOperator(tier)), 
+        EXPRESSION_PARSER.beneath(binaryOperator(tier)), 
         _binaryOperatorSymbol(tier), 
         { leadingDelimiter: "forbidden", trailingDelimiter: "forbidden" }
     ), ({ parsed: segments, newIndex: index }) => 
@@ -1191,7 +1191,7 @@ const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => 
 
 
 const asCast: ParseFunction<AsCast> = (module, code, startIndex) =>
-    given(beneath(asCast)(module, code, startIndex), ({ parsed: inner, newIndex: index }) =>
+    given(EXPRESSION_PARSER.beneath(asCast)(module, code, startIndex), ({ parsed: inner, newIndex: index }) =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(consume(code, index, "as"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
@@ -1211,7 +1211,7 @@ const asCast: ParseFunction<AsCast> = (module, code, startIndex) =>
 
 const negationOperator: ParseFunction<NegationOperator> = memoize3((module, code, startIndex) => 
     given(consume(code, startIndex, "!"), index =>
-    expec(beneath(negationOperator)(module, code, index), err(code, index, "Boolean expression"), ({ parsed: base, newIndex: index }) => ({
+    expec(EXPRESSION_PARSER.beneath(negationOperator)(module, code, index), err(code, index, "Boolean expression"), ({ parsed: base, newIndex: index }) => ({
         parsed: {
             kind: "negation-operator",
             base,
@@ -1283,7 +1283,7 @@ const _binaryOperatorSymbol = memoize((tier: number): ParseFunction<Operator> =>
 })
     
 const indexer: ParseFunction<Indexer> = (module, code, startIndex) =>
-    given(parseBeneath(module, code, startIndex, indexer), ({ parsed: base, newIndex: index }) =>
+    given(EXPRESSION_PARSER.parseBeneath(module, code, startIndex, indexer), ({ parsed: base, newIndex: index }) =>
     given(parseSeries(module, code, index, _indexerExpression), ({ parsed: indexers, newIndex: index }) => 
         indexers.length > 0 ? 
             {
@@ -1469,7 +1469,7 @@ const parenthesized: ParseFunction<ParenthesizedExpression> = (module, code, sta
     }))))))
 
 const invocationAccessorChain: ParseFunction<Invocation|PropertyAccessor> = (module, code, startIndex) =>
-    given(parseBeneath(module, code, startIndex, invocationAccessorChain), ({ parsed: subject, newIndex: index }) =>
+    given(EXPRESSION_PARSER.parseBeneath(module, code, startIndex, invocationAccessorChain), ({ parsed: subject, newIndex: index }) =>
     given(parseSeries<InvocationArgs|PropertyAccess>(module, code, index, (module, code, index) => 
         _invocationArgs(module, code, index) ?? _propertyAccess(module, code, index)), ({ parsed: gets, newIndex: index }) => 
         gets.length > 0 ? {
@@ -1815,21 +1815,17 @@ const booleanLiteral: ParseFunction<BooleanLiteral> = (module, code, startIndex)
     }
 }
 
-const nilLiteral: ParseFunction<NilLiteral> = (module, code, startIndex) => {
-    const index = consume(code, startIndex, "nil");
-    if (index != null) {
-        return {
-            parsed: {
-                kind: "nil-literal",
-                module,
-                code,
-                startIndex,
-                endIndex: index,
-            },
-            newIndex: index,
-        }
-    }
-}
+const nilLiteral: ParseFunction<NilLiteral> = (module, code, startIndex) => 
+    given(consume(code, startIndex, "nil"), index => ({
+        parsed: {
+            kind: "nil-literal",
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        newIndex: index,
+    }))
 
 const javascriptEscape: ParseFunction<JavascriptEscape> = (module, code, startIndex) =>
     given(consume(code, startIndex, "js#"), jsStartIndex => {
@@ -1869,7 +1865,50 @@ const debug: ParseFunction<Debug> = (module, code, startIndex) =>
         newIndex: index
     }))))))
 
-const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
+
+type ParseTiers<T> = readonly ParseFunction<T>[][]
+
+const nextTierIndex = <T>(tiers: readonly ParseFunction<T>[][]) => {
+    const map = new Map<ParseFunction<T>, number>();
+
+    for (let i = 0; i < tiers.length; i++) {
+        for (const fn of tiers[i]) {
+            map.set(fn, i+1);
+        }
+    }
+
+    return map;
+}
+
+class TieredParser<T> {
+    private readonly nextTierFor
+
+    constructor(private readonly tiers: ParseTiers<T>) {
+        this.nextTierFor = nextTierIndex(this.tiers)
+    }
+    
+    public readonly parseStartingFromTier = (tier: number): ParseFunction<T> => (module, code, index) => {
+        for (let i = tier; i < this.tiers.length; i++) {
+            for (const fn of this.tiers[i]) {
+                const result = fn(module, code, index)
+
+                if (result != null) {
+                    return result;
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    public readonly beneath = (fn: ParseFunction<T>): ParseFunction<T> => ((module: ModuleName, code: string, index: number) =>
+        this.parseStartingFromTier(this.nextTierFor.get(fn) as number)(module, code, index))
+
+    public readonly parseBeneath = (module: ModuleName, code: string, index: number, fn: ParseFunction<T>) =>
+        this.beneath(fn)(module, code, index)
+}
+
+const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ debug, javascriptEscape, pipe, elementTag ],
     [ func, proc, range ],
     [ asCast ],
@@ -1887,36 +1926,8 @@ const EXPRESSION_PRECEDENCE_TIERS: readonly ParseFunction<Expression>[][] = [
     [ localIdentifier ],
     [ ifElseExpression, switchExpression, inlineConst, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
         stringLiteral, numberLiteral ],
-];
+])
 
-const NEXT_TIER_FOR: Map<ParseFunction<Expression>, number> = (() => {
-    const map = new Map();
+// const TYPE_PARSERS = new TieredParser<TypeExpression>([
 
-    for (let i = 0; i < EXPRESSION_PRECEDENCE_TIERS.length; i++) {
-        for (const fn of EXPRESSION_PRECEDENCE_TIERS[i]) {
-            map.set(fn, i+1);
-        }
-    }
-
-    return map;
-})();
-
-const parseStartingFromTier = (tier: number): ParseFunction<Expression> => (module, code, index) => {
-    for (let i = tier; i < EXPRESSION_PRECEDENCE_TIERS.length; i++) {
-        for (const fn of EXPRESSION_PRECEDENCE_TIERS[i]) {
-            const result = fn(module, code, index)
-
-            if (result != null) {
-                return result;
-            }
-        }
-    }
-
-    return undefined;
-}
-
-const parseBeneath = (module: ModuleName, code: string, index: number, fn: ParseFunction<Expression>) =>
-    beneath(fn)(module, code, index)
-
-const beneath = (fn: ParseFunction<Expression>): ParseFunction<Expression> => ((module: ModuleName, code: string, index: number) =>
-    parseStartingFromTier(NEXT_TIER_FOR.get(fn) as number)(module, code, index))
+// ])
