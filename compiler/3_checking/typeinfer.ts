@@ -91,13 +91,15 @@ const inferTypeInner = computedFn((
             }
         }
         case "binary-operator": {
-            let leftType = resolveType(passthrough, inferType(passthrough, ast.base))
+            const leftType = inferType(passthrough, ast.base)
+            const leftTypeResolved = resolveType(passthrough, leftType)
 
             for (const [op, expr] of ast.ops) {
-                const rightType = resolveType(passthrough, inferType(passthrough, expr))
+                const rightType = inferType(passthrough, expr)
+                const rightTypeResolved = resolveType(passthrough, rightType)
 
                 const types = BINARY_OPERATOR_TYPES[op.op].find(({ left, right }) =>
-                    subsumes(passthrough, left, leftType) && subsumes(passthrough, right, rightType))
+                    subsumes(passthrough, left, leftTypeResolved) && subsumes(passthrough, right, rightTypeResolved))
 
                 if (types == null) {
                     reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayType(leftType)}' and '${displayType(rightType)}'`));
@@ -109,7 +111,7 @@ const inferTypeInner = computedFn((
                     }
                 }
 
-                leftType = types.output;
+                return types.output;
             }
 
             return leftType;

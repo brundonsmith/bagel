@@ -6,7 +6,7 @@ import { ModuleName,ReportError } from "../_model/common.ts";
 import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
-import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 
@@ -135,6 +135,21 @@ const arrayType: ParseFunction<ArrayType> = (module, code, startIndex) =>
         },
         newIndex: index,
     }))))
+
+const maybeType: ParseFunction<MaybeType> = (module, code, startIndex) =>
+    given(TYPE_PARSER.parseBeneath(module, code, startIndex, maybeType), ({ parsed: inner, newIndex: index }) =>
+    given(consume(code, index, "?"), index => ({
+        parsed: {
+            kind: "maybe-type",
+            inner,
+            mutability: undefined,
+            module,
+            code,
+            startIndex,
+            endIndex: index
+        },
+        newIndex: index
+    })))
 
 const unionType: ParseFunction<UnionType> = (module, code, startIndex) =>
     // TODO: Allow leading |
@@ -1922,6 +1937,7 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
 
 const TYPE_PARSER = new TieredParser<TypeExpression>([
     [ unionType ],
+    [ maybeType ],
     [ arrayType ],
     [ primitiveType, elementType, funcType, procType, iteratorType, planType, 
         literalType, namedType, objectType, parenthesizedType, indexerType, 

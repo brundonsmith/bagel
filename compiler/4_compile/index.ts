@@ -117,6 +117,7 @@ ${given(ast.until, until => compileOne(getBinding, module, until))})`;
         case "element-tag": return `${INT}h('${ast.tagName.name}',{${
             objectEntries(getBinding, module, (ast.attributes as ([PlainIdentifier, Expression|Expression[]] | Spread)[]))}}, ${ast.children.map(c => compileOne(getBinding, module, c)).join(', ')})`;
         case "union-type": return ast.members.map(m => compileOne(getBinding, module, m)).join(" | ");
+        case "maybe-type": return compileOne(getBinding, module, ast.inner) + '|null|undefined'
         case "named-type": return ast.name.name;
         case "proc-type": return `(${compileArgs(getBinding, module, ast.args)}) => void`;
         case "func-type": return `(${compileArgs(getBinding, module, ast.args)}) => ${compileOne(getBinding, module, ast.returnType ?? UNKNOWN_TYPE)}`;

@@ -347,7 +347,7 @@ export function resolveType(passthrough: Passthrough, type: TypeExpression): Typ
 
     let resolved: TypeExpression|undefined = type
 
-    while (resolved?.kind === 'named-type' || resolved?.kind === 'generic-param-type' || resolved?.kind === 'parenthesized-type') {
+    while (resolved?.kind === 'named-type' || resolved?.kind === 'generic-param-type' || resolved?.kind === 'parenthesized-type' || resolved?.kind === 'maybe-type') {
         if (resolved.kind === 'named-type') {
             const binding = getBinding(reportError, resolved.name)
 
@@ -358,6 +358,19 @@ export function resolveType(passthrough: Passthrough, type: TypeExpression): Typ
         }
         if (resolved?.kind === 'parenthesized-type') {
             resolved = resolved.inner
+        }
+        if (resolved?.kind === 'maybe-type') {
+            const { module, code, startIndex, endIndex } = resolved
+
+            resolved = {
+                kind: "union-type",
+                members: [
+                    resolved.inner,
+                    NIL_TYPE
+                ],
+                mutability: undefined,
+                module, code, startIndex, endIndex
+            }
         }
     }
 

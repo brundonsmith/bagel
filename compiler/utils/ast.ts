@@ -49,6 +49,7 @@ export function displayType(typeExpression: TypeExpression): string {
 
     switch (typeExpression.kind) {
         case "union-type": str = '(' + typeExpression.members.map(displayType).join(" | ") + ')'; break;
+        case "maybe-type": str = displayType(typeExpression.inner) + '?'; break;
         case "named-type":
         case "generic-param-type": str = typeExpression.name.name; break;
         case "generic-type": str = `<${typeExpression.typeParams.map(p => p.name).join(',')}>${displayType(typeExpression.inner)}`; break;

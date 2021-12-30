@@ -1,18 +1,3 @@
 
-from '../../lib/wrappers/core' import { logp }
-
-const a = 12
-
-store Foo {
-    prop = 12
-
-    public proc prn() {
-        logp(this.prop);
-    }
-}
-
-const b = 'other'
-
-proc main() {
-    Foo.prn();
-}
+func foo(val: number?): number|nil =>
+    2 * val

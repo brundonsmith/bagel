@@ -5,6 +5,7 @@ import { BooleanLiteral, ExactStringLiteral, NumberLiteral } from "./expressions
 
 export type TypeExpression =
     | UnionType
+    | MaybeType
     | NamedType
     | GenericParamType
     | ProcType
@@ -32,6 +33,12 @@ export type TypeExpression =
 export type UnionType = SourceInfo & {
     readonly kind: "union-type",
     readonly members: readonly TypeExpression[],
+    readonly mutability: undefined,
+}
+
+export type MaybeType = SourceInfo & {
+    readonly kind: "maybe-type",
+    readonly inner: TypeExpression,
     readonly mutability: undefined,
 }
 
@@ -337,6 +344,7 @@ export const ELEMENT_TAG_CHILD_TYPE: TypeExpression = {
 
 const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } = {
     "union-type": undefined,
+    "maybe-type": undefined,
     "named-type": undefined,
     "generic-param-type": undefined,
     "proc-type": undefined,
