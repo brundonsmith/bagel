@@ -940,11 +940,7 @@ const ifElseStatement: ParseFunction<IfElseStatement> = (module, code, startInde
     }))
 
 const _conditionAndOutcomeBlock: ParseFunction<CaseBlock> = (module, code, startIndex) =>
-    given(consume(code, startIndex, "("), index =>
-    given(consumeWhitespace(code, index), index =>
-    given(expression(module, code, index), ({ parsed: condition, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, ")"), index =>
+    given(expression(module, code, startIndex), ({ parsed: condition, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(parseBlock(module, code, index), err(code, index, 'Block for if clause'), ({ parsed: outcome, newIndex: index }) => ({
         parsed: {
@@ -957,7 +953,7 @@ const _conditionAndOutcomeBlock: ParseFunction<CaseBlock> = (module, code, start
             endIndex: index
         },
         newIndex: index
-    }))))))))
+    }))))
 
 const forLoop: ParseFunction<ForLoop> = (module, code, startIndex) =>
     given(consume(code, startIndex, "for"), index =>
@@ -1365,11 +1361,7 @@ const ifElseExpression: ParseFunction<IfElseExpression> = (module, code, startIn
     }))
 
 const _case: ParseFunction<Case> = (module, code, startIndex) =>
-    given(consume(code, startIndex, "("), index =>
-    given(consumeWhitespace(code, index), index =>
-    given(expression(module, code, index), ({ parsed: condition, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, ")"), index =>
+    given(expression(module, code, startIndex), ({ parsed: condition, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "{"), index =>
     given(consumeWhitespace(code, index), index =>
@@ -1386,7 +1378,7 @@ const _case: ParseFunction<Case> = (module, code, startIndex) =>
             endIndex: index
         },
         newIndex: index
-    }))))))))))))
+    }))))))))
 
 const switchExpression: ParseFunction<SwitchExpression> = (module, code, startIndex) =>
     given(consume(code, startIndex, "switch"), index =>

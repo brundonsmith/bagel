@@ -478,7 +478,7 @@ Deno.test({
 //   fn() {
 //     testTypecheck(
 //       `
-//       func given<T,R>(val: T|nil, fn: (val: T) => R): R|nil => if (val != nil) { fn(val) }
+//       func given<T,R>(val: T|nil, fn: (val: T) => R): R|nil => if val != nil { fn(val) }
 //       func double(n: number|nil): number|nil => given(n, x => x * 2)`,
 //       false
 //     )
@@ -619,7 +619,7 @@ Deno.test({
     testTypecheck(
       `
       const a: number|nil = 12
-      const b = if (a != nil) { a + 12 }`,
+      const b = if a != nil { a + 12 }`,
       false,
     );
   },
@@ -643,7 +643,7 @@ Deno.test({
     testTypecheck(
       `
       func foo(x: { bar: number|nil }): number|nil =>
-        if (x.bar != nil) {
+        if x.bar != nil {
           x.bar - 12
         }`,
       false,

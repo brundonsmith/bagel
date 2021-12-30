@@ -686,10 +686,12 @@ function resolveRefinements(getParent: GetParent, epxr: Expression|StoreMember):
 
                 // Type refinement
                 if (parent?.kind === "if-else-expression") {
-                    if (current.condition.kind === "binary-operator" && current.condition.ops[0][0].op === "!=") {
+                    const condition = current.condition.kind === 'parenthesized-expression' ? current.condition.inner : current.condition;
+
+                    if (condition.kind === "binary-operator" && condition.ops[0][0].op === "!=") {
                         const targetExpression = 
-                            current.condition.ops[0][1].kind === 'nil-literal' ? current.condition.base :
-                            current.condition.base.kind === "nil-literal" ? current.condition.ops[0][1] :
+                            condition.ops[0][1].kind === 'nil-literal' ? condition.base :
+                            condition.base.kind === "nil-literal" ? condition.ops[0][1] :
                             undefined;
 
                         if (targetExpression != null) {
@@ -697,12 +699,12 @@ function resolveRefinements(getParent: GetParent, epxr: Expression|StoreMember):
                         }
                     }
 
-                    if (current.condition.kind === "binary-operator" && current.condition.ops[0][0].op === "==") {
+                    if (condition.kind === "binary-operator" && condition.ops[0][0].op === "==") {
                         const bits = (
-                            current.condition.base.kind === "invocation" && current.condition.base.subject.kind === "local-identifier" && current.condition.base.subject.name === "typeof" 
-                            && current.condition.ops[0][1].kind === "string-literal" && typeof current.condition.ops[0][1].segments[0] === "string" ? [current.condition.base.args[0], current.condition.ops[0][1].segments[0]] as const :
-                            current.condition.base.kind === "string-literal" && typeof current.condition.base.segments[0] === "string"
-                            && current.condition.ops[0][1].kind === "invocation" && current.condition.ops[0][1].subject.kind === "local-identifier" && current.condition.ops[0][1].subject.name === "typeof" ? [current.condition.ops[0][1].args[0], current.condition.base.segments[0]] as const :
+                            condition.base.kind === "invocation" && condition.base.subject.kind === "local-identifier" && condition.base.subject.name === "typeof" 
+                            && condition.ops[0][1].kind === "string-literal" && typeof condition.ops[0][1].segments[0] === "string" ? [condition.base.args[0], condition.ops[0][1].segments[0]] as const :
+                            condition.base.kind === "string-literal" && typeof condition.base.segments[0] === "string"
+                            && condition.ops[0][1].kind === "invocation" && condition.ops[0][1].subject.kind === "local-identifier" && condition.ops[0][1].subject.name === "typeof" ? [condition.ops[0][1].args[0], condition.base.segments[0]] as const :
                             undefined
                         )
                         

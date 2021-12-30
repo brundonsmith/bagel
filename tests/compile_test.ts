@@ -138,7 +138,7 @@ Deno.test({
   fn() {
     testCompile(
       `func merge() =>
-            if (arr1.length <= 0) {
+            if arr1.length <= 0 {
                 2
             } else {
                 3
@@ -153,9 +153,9 @@ Deno.test({
   fn() {
     testCompile(
       `func merge() =>
-            if (arr1.length <= 0) {
+            if arr1.length <= 0 {
                 2
-            } else if (arr1.length <= 1) {
+            } else if arr1.length <= 1 {
                 3
             } else {
               4
@@ -182,9 +182,9 @@ Deno.test({
   fn() {
     testCompile(
       `proc foo() {
-              if (true) {
+              if true {
                 log('true');
-              } else if (false) {
+              } else if false {
                 log('false');
               } else {
                 log('other');
@@ -294,11 +294,11 @@ Deno.test({
             let count = 0;
 
             for (item of items) {
-                if (item.foo) {
+                if item.foo {
                     count = count + 1;
                 }
 
-                if (count > 12) {
+                if count > 12 {
                     console.log(items);
                 } else {
                     console.log(nil);
