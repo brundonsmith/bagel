@@ -1,3 +1,5 @@
 
-func foo(val: number?): number|nil =>
-    2 * val
+export nominal type USD(number)
+export nominal type EUR(number)
+
+export type Currency = USD | EUR

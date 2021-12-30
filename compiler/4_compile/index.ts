@@ -43,7 +43,14 @@ function compileOne(getBinding: GetBinding, module: string, ast: AST): string {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(getBinding, module, name) + (alias ? ` as ${compileOne(getBinding, module, alias)}` : ``)
         ).join(", ")} } from "${pathIsRemote(ast.path.value) ? (path.relative(path.dirname(module), cachedModulePath(ast.path.value as ModuleName)).replaceAll(/\\/g, '/') + '.ts') : (ast.path.value + '.bgl.ts')}";`;
-        case "type-declaration":  return (ast.exported ? `export ` : ``) + `type ${ast.name.name} = ${compileOne(getBinding, module, ast.type)};`;
+        case "type-declaration":  return (
+            (ast.type.kind === 'nominal-type' ?
+                `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n${ast.exported ? `export ` : ``}function ${ast.name.name}(value: ${compileOne(getBinding, module, ast.type.inner)}): ${ast.name.name} { return { name: ${INT}${ast.name.name}, value } }\n`
+            : '') +
+            `${ast.exported ? `export ` : ``}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
+                ? `{ name: typeof ${INT}${ast.name.name}, value: ${compileOne(getBinding, module, ast.type.inner)} }`
+                : compileOne(getBinding, module, ast.type)};`
+        );
         case "proc-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(getBinding, module, ast.value) + ';';
         case "func-declaration":  return compileFuncDeclaration(getBinding, module, ast)
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(getBinding, module, ast.name)}${ast.type ? `: ${compileOne(getBinding, module, ast.type)}` : ''} = ${compileOne(getBinding, module, ast.value)};`;

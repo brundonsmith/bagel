@@ -64,7 +64,7 @@ export function displayType(typeExpression: TypeExpression): string {
         case "boolean-type": str = `boolean`; break;
         case "nil-type": str = `nil`; break;
         case "literal-type": str = JSON.stringify(typeExpression.value.value).replaceAll('"', "'"); break;
-        case "nominal-type": str = typeExpression.name; break;
+        case "nominal-type": str = typeExpression.name.description ?? '<unnamed nominal>'; break;
         case "iterator-type": str = `Iterator<${displayType(typeExpression.itemType)}>`; break;
         case "plan-type": str = `Plan<${displayType(typeExpression.resultType)}>`; break;
         case "unknown-type": str = "unknown"; break;

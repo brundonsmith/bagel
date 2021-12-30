@@ -52,6 +52,7 @@ export function parse(module: ModuleName, code: string, reportError: ReportError
 const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     debug(module, code, startIndex)
     ?? importDeclaration(module, code, startIndex)
+    ?? _nominalTypeDeclaration(module, code, startIndex)
     ?? typeDeclaration(module, code, startIndex)
     ?? procDeclaration(module, code, startIndex)
     ?? funcDeclaration(module, code, startIndex)
@@ -95,7 +96,7 @@ const typeDeclaration: ParseFunction<TypeDeclaration> = (module, code, startInde
     given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(parseExact("export")(module, code, index), ({ parsed: exported, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
-    given(consume(code, indexAfterExport ?? startIndex, "type"), index => 
+    given(consume(code, indexAfterExport ?? startIndex, 'type'), index => 
     given(consumeWhitespaceRequired(code, index), index =>
     expec(plainIdentifier(module, code, index), err(code, index, 'Type name'), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -114,6 +115,44 @@ const typeDeclaration: ParseFunction<TypeDeclaration> = (module, code, startInde
         },
         newIndex: index,
     })))))))))
+
+const _nominalTypeDeclaration: ParseFunction<TypeDeclaration> = (module, code, startIndex) =>
+    given(parseOptional(module, code, startIndex, (module, code, index) =>
+        given(parseExact("export")(module, code, index), ({ parsed: exported, newIndex: index }) =>
+        given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
+    given(consume(code, indexAfterExport ?? startIndex, "nominal"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(consume(code, index, "type"), err(code, index, '"type"'), index => 
+    given(consumeWhitespaceRequired(code, index), startOfNameIndex =>
+    expec(plainIdentifier(module, code, startOfNameIndex), err(code, startOfNameIndex, 'Type name'), ({ parsed: name, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "("), err(code, index, '"("'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(typeExpression(module, code, index), err(code, index, 'Type expression'), ({ parsed: inner, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
+        parsed: {
+            kind: "type-declaration",
+            name,
+            type: {
+                kind:"nominal-type",
+                name: Symbol(name.name),
+                inner,
+                mutability: undefined,
+                module: inner.module,
+                code: inner.code,
+                startIndex: startOfNameIndex,
+                endIndex: index
+            },
+            exported: exported != null,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        newIndex: index,
+    })))))))))))))
+
 
 const typeExpression: ParseFunction<TypeExpression> =  memoize3((module, code, startIndex) =>
     TYPE_PARSER.parseStartingFromTier(0)(module, code, startIndex))
@@ -497,15 +536,6 @@ const literalType: ParseFunction<LiteralType> = (module, code, startIndex) =>
         },
         newIndex: index,
     }))
-
-// const nominalType: ParseFunction<NominalType> = (code, index) =>
-//     given(consume(code, index, "nominal"), index => 
-//     given(consumeWhitespace(code, index), index =>
-//     expec(typeExpression(module, code, index), ({ parsed: inner, newIndex: index }) => ({
-//         parsed: {
-//             kind: "nominal-type"
-//         }
-//     }))))
 
 const unknownType: ParseFunction<UnknownType> = (module, code, startIndex) =>
     given(consume(code, startIndex, "unknown"), index => ({

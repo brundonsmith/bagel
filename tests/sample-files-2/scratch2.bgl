@@ -1,0 +1,6 @@
+
+from './scratch' import { USD }
+
+func foo(amount: USD): number => 2 * amount.value
+
+const bar = foo(USD(12))

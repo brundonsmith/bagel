@@ -158,7 +158,7 @@ export type StoreType = SourceInfo & Mutability & {
 
 export type NominalType = SourceInfo & {
     readonly kind: "nominal-type",
-    readonly name: string,
+    readonly name: symbol,
     readonly inner: TypeExpression,
     readonly mutability: undefined,
 }

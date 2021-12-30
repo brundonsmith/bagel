@@ -66,6 +66,26 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
             } break;
             case "pipe":
             case "invocation": {
+                
+                // Creation of nominal values looks like/parses as function 
+                // invocation, but needs to be treated differently
+                if (current.kind === "invocation" && current.subject.kind === "local-identifier") {
+                    const binding = getBinding(() => {}, current.subject)
+                    if (binding?.kind === 'type-binding') {
+                        const resolvedType = resolveType(passthrough, binding.type)
+    
+                        if (resolvedType.kind === "nominal-type") {
+                            const argType = inferType(passthrough, current.args[0])
+    
+                            if (!subsumes(passthrough, resolvedType.inner, argType)) {
+                                reportError(assignmentError(current.args[0], resolvedType.inner, argType))
+                            }
+    
+                            return;
+                        }
+                    }
+                }
+
                 const subjectType = current.kind === "invocation"
                     ? bindInvocationGenericArgs(passthrough, current)
                     : resolveType(passthrough, inferType(passthrough, current.subject))
@@ -337,6 +357,8 @@ export function subsumes(passthrough: Passthrough, destination: TypeExpression, 
         return subsumes(passthrough, resolvedDestination.itemType, resolvedValue.itemType);
     } else if (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") {
         return subsumes(passthrough, resolvedDestination.resultType, resolvedValue.resultType);
+    } else if (resolvedDestination.kind === 'nominal-type' && resolvedValue.kind === 'nominal-type') {
+        return resolvedDestination.name === resolvedValue.name;
     }
 
     return false;

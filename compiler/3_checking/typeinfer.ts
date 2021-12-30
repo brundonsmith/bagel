@@ -119,6 +119,19 @@ const inferTypeInner = computedFn((
         case "negation-operator": return BOOLEAN_TYPE;
         case "pipe":
         case "invocation": {
+            // Creation of nominal values looks like/parses as function 
+            // invocation, but needs to be treated differently
+            if (ast.kind === "invocation" && ast.subject.kind === "local-identifier") {
+                const binding = getBinding(() => {}, ast.subject)
+                if (binding?.kind === 'type-binding') {
+                    const resolvedType = resolveType(passthrough, binding.type)
+
+                    if (resolvedType.kind === "nominal-type") {
+                        return resolvedType
+                    }
+                }
+            }
+
             const subjectType = ast.kind === "invocation"
                 ? bindInvocationGenericArgs(passthrough, ast)
                 : resolveType(passthrough, inferType(passthrough, ast.subject))
@@ -768,24 +781,23 @@ export const propertiesOf = computedFn((
 ): readonly Attribute[] | undefined => {
     const { reportError, getBinding } = passthrough
 
-    switch (type.kind) {
-        case "named-type": {
-            const binding = getBinding(reportError, type)
+    const resolvedType = resolveType(passthrough, type)
 
-            if (binding?.kind !== 'type-binding') {
-                reportError(miscError(type.name, `Can't find type ${type.name.name}`))
-                return undefined
-            } else {
-                return propertiesOf(passthrough, binding.type)
-            }
-        }
-        case "generic-param-type": {
-            return propertiesOf(passthrough, type.extends ?? UNKNOWN_TYPE)
+    switch (resolvedType.kind) {
+        case "nominal-type": {
+            return [
+                {
+                    kind: "attribute",
+                    name: { kind: "plain-identifier", name: "value", ...AST_NOISE },
+                    type: resolvedType.inner,
+                    ...TYPE_AST_NOISE
+                }
+            ]
         }
         case "object-type": {
-            const attrs = [...type.entries]
+            const attrs = [...resolvedType.entries]
 
-            for (const spread of type.spreads) {
+            for (const spread of resolvedType.spreads) {
                 const resolved = getBinding(reportError, spread)
 
                 if (resolved != null && resolved.kind === 'type-binding' && resolved.type.kind === 'object-type') {
@@ -814,13 +826,13 @@ export const propertiesOf = computedFn((
                 attribute("length", NUMBER_TYPE),
             ];
 
-            if (type.mutability === "mutable") {
+            if (resolvedType.mutability === "mutable") {
                 props.push(attribute("push", {
                     kind: "proc-type",
                     args: [{
                         kind: "arg",
                         name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
-                        type: type.element,
+                        type: resolvedType.element,
                         ...AST_NOISE
                     }],
                     ...TYPE_AST_NOISE
@@ -839,7 +851,7 @@ export const propertiesOf = computedFn((
 
                 const mutability = (
                     memberType.mutability == null ? undefined :
-                    memberType.mutability === "mutable" && member.kind === "store-property" && (type.internal || member.access !== "visible") ? "mutable"
+                    memberType.mutability === "mutable" && member.kind === "store-property" && (resolvedType.internal || member.access !== "visible") ? "mutable"
                     : "readonly"
                 )
 
@@ -851,17 +863,17 @@ export const propertiesOf = computedFn((
                 }
             }
 
-            if (type.internal) {
-                return type.store.members
+            if (resolvedType.internal) {
+                return resolvedType.store.members
                     .map(memberToAttribute)
             } else {
-                return type.store.members
+                return resolvedType.store.members
                     .filter(member => member.access !== "private")
                     .map(memberToAttribute)
             }
         }
         case "iterator-type": {
-            const { code: _, startIndex: _1, endIndex: _2, ...item } = type.itemType
+            const { code: _, startIndex: _1, endIndex: _2, ...item } = resolvedType.itemType
             const itemType = { ...item, ...AST_NOISE }
 
             const iteratorProps: readonly Attribute[] = [
@@ -933,7 +945,7 @@ export const propertiesOf = computedFn((
             return iteratorProps
         }
         case "plan-type": {
-            const { code: _, startIndex: _1, endIndex: _2, ...result } = type.resultType
+            const { code: _, startIndex: _1, endIndex: _2, ...result } = resolvedType.resultType
             const resultType = { ...result, ...AST_NOISE }
 
             const planProps: readonly Attribute[] = [
