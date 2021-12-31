@@ -3,9 +3,9 @@ import { BagelError, isError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
+import { AutorunDeclaration, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread } from "../_model/expressions.ts";
-import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Reaction, Statement, WhileLoop } from "../_model/statements.ts";
+import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
@@ -58,6 +58,7 @@ const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     ?? funcDeclaration(module, code, startIndex)
     ?? constDeclaration(module, code, startIndex)
     ?? storeDeclaration(module, code, startIndex)
+    ?? autorunDeclaration(module, code, startIndex)
     ?? testExprDeclaration(module, code, startIndex)
     ?? testBlockDeclaration(module, code, startIndex)
     ?? javascriptEscape(module, code, startIndex)
@@ -739,6 +740,21 @@ const _accessModifier: ParseFunction<'private'|'public'> = (_module, code, start
         newIndex: index
     }))
 
+const autorunDeclaration: ParseFunction<AutorunDeclaration> = (module, code, startIndex) =>
+    given(consume(code, startIndex, "autorun"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(expression(module, code, index), err(code, index, "Effect"), ({ parsed: effect, newIndex: index }) => ({
+        parsed: {
+            kind: "autorun-declaration",
+            effect,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        newIndex: index,
+    }))))
+
 const testExprDeclaration: ParseFunction<TestExprDeclaration> = (module, code, startIndex) =>
     given(consume(code, startIndex, 'test'), index =>
     given(consumeWhitespaceRequired(code, index), index =>
@@ -807,8 +823,7 @@ const proc: ParseFunction<Proc> = (module, code, startIndex) =>
     }))))
 
 const statement: ParseFunction<Statement> = (module, code, startIndex) =>
-    reaction(module, code, startIndex)
-    ?? javascriptEscape(module, code, startIndex)
+    javascriptEscape(module, code, startIndex)
     ?? letDeclaration(module, code, startIndex)
     ?? constDeclarationStatement(module, code, startIndex)
     ?? ifElseStatement(module, code, startIndex)
@@ -816,35 +831,6 @@ const statement: ParseFunction<Statement> = (module, code, startIndex) =>
     ?? whileLoop(module, code, startIndex)
     ?? assignment(module, code, startIndex)
     ?? procCall(module, code, startIndex)
-
-const reaction: ParseFunction<Reaction> = (module, code, startIndex) =>
-    given(consume(code, startIndex, "observe"), index =>
-    given(consumeWhitespaceRequired(code, index), index =>
-    expec(expression(module, code, index), err(code, index, "Observer function"), ({ parsed: data, newIndex: index }) => 
-    given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, "triggering"), index =>
-    given(consumeWhitespaceRequired(code, index), index =>
-    expec(expression(module, code, index), err(code, index, "Effect"), ({ parsed: effect, newIndex: index }) => 
-    given(consumeWhitespaceRequired(code, index), index =>
-    expec(
-        given(consume(code, index, "until"), index =>
-        expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
-        expec(expression(module, code, index), err(code, index, "Disposal condition"), res => res)))
-        ?? consume(code, index, "forever"), err(code, index, 'Reaction lifetime (either "until <func>" or "forever")'), lifetimeResult => 
-    given(consumeWhitespace(code, typeof lifetimeResult === 'number' ? lifetimeResult : lifetimeResult.newIndex), index =>
-    expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
-        parsed: {
-            kind: "reaction",
-            data,
-            effect,
-            until: typeof lifetimeResult === 'number' ? undefined : lifetimeResult.parsed,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        newIndex: index,
-    }))))))))))))
 
 const letDeclaration: ParseFunction<LetDeclaration> = (module, code, startIndex) =>
     given(consume(code, startIndex, "let"), index =>

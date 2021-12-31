@@ -162,14 +162,14 @@ class _Store {
 const Store = new _Store()
 export default Store
 
-const IMPORTED_ITEMS = [ 'reactionUntil',  'observable', 'computed', 'configure', 'makeObservable', 'h',
+export const IMPORTED_ITEMS = [ 'autorun',  'observable', 'computed', 'configure', 'makeObservable', 'h',
 'computedFn', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER', 'withConst'
-].map(s => `${s} as ${INT}${s}`).join(', ')
+]
 
 const LIB_IMPORTS = `
-import { ${IMPORTED_ITEMS} } from "../../lib/src/core.ts";
+import { ${IMPORTED_ITEMS.map(s => `${s} as ${INT}${s}`).join(', ')} } from "../../lib/src/core.ts";
 `
-const MOBX_CONFIGURE = `
+export const MOBX_CONFIGURE = `
 ${INT}configure({
     enforceActions: "never",
     computedRequiresReaction: false,

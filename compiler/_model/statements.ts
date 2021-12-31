@@ -11,7 +11,6 @@ export type Statement =
     | WhileLoop
     | Assignment
     | Invocation
-    | Reaction
 
 export type LetDeclaration = SourceInfo & {
     readonly kind: "let-declaration",
@@ -56,11 +55,4 @@ export type Assignment = SourceInfo & {
     readonly kind: "assignment",
     readonly target: LocalIdentifier | PropertyAccessor,
     readonly value: Expression,
-}
-
-export type Reaction = SourceInfo & {
-    readonly kind: "reaction",
-    readonly data: Expression,
-    readonly effect: Expression,
-    readonly until: Expression|undefined,
 }

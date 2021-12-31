@@ -46,6 +46,15 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
                     reportError(assignmentError(current.expr, BOOLEAN_TYPE, valueType));
                 }
             } break;
+            case "autorun-declaration": {
+                const effectType = resolveType(passthrough, inferType(passthrough, current.effect))
+
+                if (effectType.kind !== "proc-type") {
+                    reportError(miscError(current.effect, `Expected procedure`));
+                } else if (effectType.args.length > 0) {
+                    reportError(miscError(current.effect, `Effect procedure should not take any arguments; provided procedure expects ${effectType.args.length}`));
+                }
+            } break;
             case "func": {
                 const funcType = current.type.kind === 'generic-type' ? current.type.inner as FuncType : current.type
 
@@ -66,7 +75,7 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
             } break;
             case "pipe":
             case "invocation": {
-                
+
                 // Creation of nominal values looks like/parses as function 
                 // invocation, but needs to be treated differently
                 if (current.kind === "invocation" && current.subject.kind === "local-identifier") {
@@ -196,31 +205,6 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
                 const innerType = inferType(passthrough, current.inner)
                 if (!subsumes(passthrough, current.type, innerType)) {
                     reportError(miscError(current, `Expression of type ${displayType(innerType)} cannot be expanded to type ${displayType(current.type)}`))
-                }
-            } break;
-            case "reaction": {
-                const dataType = resolveType(passthrough, inferType(passthrough, current.data))
-                const effectType = resolveType(passthrough, inferType(passthrough, current.effect))
-
-                if (dataType.kind !== "func-type") {
-                    reportError(miscError(current.data, `Expected function in observe clause`));
-                } else if (dataType.args.length > 0) {
-                    reportError(miscError(current.data, `Observe function should take no arguments; provided function expects ${dataType.args.length}`));
-                }
-                
-                if (effectType.kind !== "proc-type") {
-                    reportError(miscError(current.effect, `Expected procedure in effect clause`));
-                } else if (effectType.args.length > 1) {
-                    reportError(miscError(current.data, `Effect procedure should take exactly one argument; provided procedure expects ${effectType.args.length}`));
-                } else if (dataType.kind === "func-type" && !subsumes(passthrough, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE)) {
-                    reportError(assignmentError(current.effect, effectType.args[0].type ?? UNKNOWN_TYPE, dataType.returnType ?? UNKNOWN_TYPE));
-                }
-
-                if (current.until) {
-                    const untilType = inferType(passthrough, current.until);
-                    if (!subsumes(passthrough,  BOOLEAN_TYPE, untilType)) {
-                        reportError(miscError(current.until, `Expected boolean expression in until clause`));
-                    }
                 }
             } break;
             case "local-identifier": {

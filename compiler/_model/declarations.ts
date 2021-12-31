@@ -10,6 +10,7 @@ export type Declaration =
     | FuncDeclaration
     | ConstDeclaration
     | StoreDeclaration
+    | AutorunDeclaration
     | TestExprDeclaration
     | TestBlockDeclaration
     | Debug
@@ -102,6 +103,11 @@ export type TestBlockDeclaration = SourceInfo & {
     readonly kind: "test-block-declaration",
     readonly name: ExactStringLiteral,
     readonly block: Block,
+}
+
+export type AutorunDeclaration = SourceInfo & {
+    readonly kind: "autorun-declaration",
+    readonly effect: Expression
 }
 
 // TODO: ClassReaction
