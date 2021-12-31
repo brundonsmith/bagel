@@ -273,7 +273,7 @@ Deno.test({
 
             console.log(count);
         }`,
-      `const doStuff = (items: ___Iter<number>): void => {
+      `const doStuff = (items: unknown): void => {
             const ___locals: {count?: any} = ___observable({});
         
             ___locals["count"] = 0;
@@ -307,7 +307,7 @@ Deno.test({
 
             console.log(count);
         }`,
-      `const doStuff = (items: ___Iter<number>): void => {
+      `const doStuff = (items: unknown): void => {
             const ___locals: {count?: any} = ___observable({});
         
             ___locals["count"] = 0;
