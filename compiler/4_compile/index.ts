@@ -128,6 +128,7 @@ function compileOne(getBinding: GetBinding, excludeTypes: boolean, module: strin
         case "maybe-type": return compileOne(getBinding, excludeTypes, module, ast.inner) + '|null|undefined'
         case "named-type": return ast.name.name;
         case "generic-type": return "unknown";
+        case "bound-generic-type": return `unknown`;
         case "proc-type": return `(${compileArgs(getBinding, excludeTypes, module, ast.args)}) => void`;
         case "func-type": return `(${compileArgs(getBinding, excludeTypes, module, ast.args)}) => ${compileOne(getBinding, excludeTypes, module, ast.returnType ?? UNKNOWN_TYPE)}`;
         case "element-type": return `unknown`;

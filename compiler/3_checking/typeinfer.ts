@@ -550,7 +550,7 @@ export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: 
     return subjectType as FuncType|ProcType
 }
 
-function parameterizedGenericType(passthrough: Passthrough, generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
+export function parameterizedGenericType(passthrough: Passthrough, generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
     const { getBinding, reportError } = passthrough
     
     const bindings: Record<string, TypeExpression> = {}

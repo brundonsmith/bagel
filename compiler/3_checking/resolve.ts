@@ -98,6 +98,29 @@ export function resolve(passthough: Pick<Passthrough, 'reportError'|'getParent'|
                 }
             }
         } break;
+        case "generic-type": {
+            for (const typeParam of parent.typeParams) {
+                if (typeParam.name.name === name.name) {
+                    if (resolved) {
+                        reportError(alreadyDeclared(typeParam.name))
+                    }
+
+                    resolved = {
+                        kind: 'type-binding',
+                        type: {
+                            kind: "generic-param-type",
+                            name: typeParam.name,
+                            extends: typeParam.extends,
+                            module: undefined,
+                            code: undefined,
+                            startIndex: undefined,
+                            endIndex: undefined,
+                            mutability: undefined,
+                        }
+                    }
+                }
+            }
+        } break;
         case "func":
         case "proc": {
             

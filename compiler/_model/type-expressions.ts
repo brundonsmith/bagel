@@ -11,6 +11,7 @@ export type TypeExpression =
     | ProcType
     | FuncType
     | GenericType
+    | BoundGenericType
     | ElementType
     | ObjectType
     | IndexerType
@@ -72,6 +73,13 @@ export type GenericType = SourceInfo & {
     readonly kind: "generic-type",
     readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
     readonly inner: TypeExpression,
+    readonly mutability: undefined,
+}
+
+export type BoundGenericType = SourceInfo & {
+    readonly kind: "bound-generic-type",
+    readonly typeArgs: readonly TypeExpression[],
+    readonly generic: TypeExpression,
     readonly mutability: undefined,
 }
 
@@ -350,6 +358,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "proc-type": undefined,
     "func-type": undefined,
     "generic-type": undefined,
+    "bound-generic-type": undefined,
     "element-type": undefined,
     "object-type": undefined,
     "indexer-type": undefined,
