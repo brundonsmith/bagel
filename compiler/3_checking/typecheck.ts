@@ -2,7 +2,7 @@ import { Module } from "../_model/ast.ts";
 import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { assignmentError,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType } from "./typeinfer.ts";
 import { getBindingMutability, Passthrough } from "../_model/common.ts";
 import { displayAST, displayType, iterateParseTree, typesEqual } from "../utils/ast.ts";
 
@@ -370,6 +370,16 @@ export function resolveType(passthrough: Passthrough, type: TypeExpression): Typ
                     NIL_TYPE
                 ],
                 mutability, module, code, startIndex, endIndex
+            }
+        }
+        case "bound-generic-type": {
+            const resolvedGeneric = resolveType(passthrough, type.generic)
+
+            if (resolvedGeneric.kind !== 'generic-type') {
+                reportError(miscError(type, 'Can only bind type arguments to a generic type'))
+                return UNKNOWN_TYPE
+            } else {
+                return resolveType(passthrough, parameterizedGenericType(passthrough, resolvedGeneric, type.typeArgs))
             }
         }
     }
