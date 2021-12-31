@@ -351,34 +351,28 @@ export function subsumes(passthrough: Passthrough, destination: TypeExpression, 
 export function resolveType(passthrough: Passthrough, type: TypeExpression): TypeExpression {
     const { reportError, getBinding } = passthrough
 
-    let resolved: TypeExpression|undefined = type
-
-    while (resolved?.kind === 'named-type' || resolved?.kind === 'generic-param-type' || resolved?.kind === 'parenthesized-type' || resolved?.kind === 'maybe-type') {
-        if (resolved.kind === 'named-type') {
-            const binding = getBinding(reportError, resolved.name)
-
-            resolved = binding?.kind === 'type-binding' ? binding.type : undefined
+    switch (type.kind) {
+        case "named-type": {
+            const binding = getBinding(reportError, type.name)
+            return resolveType(passthrough, binding?.kind === 'type-binding' ? binding.type : UNKNOWN_TYPE)
         }
-        if (resolved?.kind === 'generic-param-type') {
-            resolved = resolved.extends
-        }
-        if (resolved?.kind === 'parenthesized-type') {
-            resolved = resolved.inner
-        }
-        if (resolved?.kind === 'maybe-type') {
-            const { module, code, startIndex, endIndex } = resolved
+        case "generic-param-type":
+            return resolveType(passthrough, type.extends ?? UNKNOWN_TYPE)
+        case "parenthesized-type":
+            return resolveType(passthrough, type.inner)
+        case "maybe-type": {
+            const { mutability, module, code, startIndex, endIndex } = type
 
-            resolved = {
+            return {
                 kind: "union-type",
                 members: [
-                    resolved.inner,
+                    type.inner,
                     NIL_TYPE
                 ],
-                mutability: undefined,
-                module, code, startIndex, endIndex
+                mutability, module, code, startIndex, endIndex
             }
         }
     }
 
-    return resolved ?? UNKNOWN_TYPE
+    return type
 }
