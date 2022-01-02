@@ -50,7 +50,7 @@ const inferTypeInner = computedFn((
         case "func": {
             
             // infer callback type based on context
-            {
+            const typeDictatedByParent = (() => {
                 const parent = getParent(ast)
 
                 if (parent?.kind === "invocation") {
@@ -61,33 +61,33 @@ const inferTypeInner = computedFn((
                         const thisArgParentType = parentSubjectType.args[thisArgIndex]?.type
 
                         if (thisArgParentType && thisArgParentType.kind === ast.type.kind) {
-                            return thisArgParentType;
+                            return thisArgParentType.kind === 'generic-type' ? thisArgParentType.inner as FuncType : thisArgParentType;
                         }
                     }
                 }
-            }
+            })()
 
+            const funcType = ast.type.kind === 'generic-type' ? ast.type.inner as FuncType : ast.type
+
+            const inferredFuncType = {
+                ...funcType,
+                args: funcType.args.map((arg, index) =>
+                    ({ ...arg, type: arg.type ?? typeDictatedByParent?.args[index].type })),
+                returnType: (
+                    funcType.returnType ??
+                    typeDictatedByParent?.returnType ??
             // if no return-type is declared, try inferring the type from the inner expression
-            if (ast.type.kind === 'generic-type') {
-                const funcType = ast.type.inner as FuncType
-                const returnType = funcType.returnType ??
                     inferType(passthrough, ast.body)
+                )
+            }
     
+            if (ast.type.kind === 'generic-type') {
                 return {
                     ...ast.type,
-                    inner: {
-                        ...funcType,
-                        returnType
-                    },
+                    inner: inferredFuncType
                 }
             } else {
-                const returnType = ast.type.returnType ??
-                    inferType(passthrough, ast.body)
-    
-                return {
-                    ...ast.type,
-                    returnType,
-                }
+                return inferredFuncType
             }
         }
         case "binary-operator": {

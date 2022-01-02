@@ -56,7 +56,7 @@ export function typecheck(passthrough: Passthrough, ast: Module) {
                 }
             } break;
             case "func": {
-                const funcType = current.type.kind === 'generic-type' ? current.type.inner as FuncType : current.type
+                    const funcType = inferType(passthrough, current) as FuncType
 
                 // make sure body expression fits declared return type, if there is one
                 const bodyType = inferType(passthrough, current.body);
