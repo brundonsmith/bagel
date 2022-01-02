@@ -63,6 +63,53 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Function-as-argument inference 1",
+  fn() {
+    testTypecheck(
+      `
+      func foo(fn: (val: number) => boolean) => nil
+      const x = foo(n => n)`,
+      true
+    )
+  }
+})
+
+Deno.test({
+  name: "Function-as-argument inference 2",
+  fn() {
+    testTypecheck(
+      `
+      func foo(fn: (val: number) => boolean) => nil
+      const x = foo(n => n > 0)`,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Function-as-argument inference 3",
+  fn() {
+    testTypecheck(
+      `
+      func foo(fn: (val: number) => boolean) => nil
+      const x = foo((n: number) => n > 0)`,
+      false
+    )
+  }
+})
+Deno.test({
+  name: "Function-as-argument inference 4",
+  fn() {
+    testTypecheck(
+      `
+      func foo(fn: (val: number) => boolean) => nil
+      const x = foo((n: string) => n == 'foo')`,
+      true
+    )
+  }
+})
+
+Deno.test({
   name: "Basic constant inference",
   fn() {
     testTypecheck(
@@ -1117,7 +1164,8 @@ function testTypecheck(code: string, shouldFail: boolean): void {
 function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: boolean): void {
   modules = Object.fromEntries(Object.entries(modules).map(([key, value]) => [canonicalModuleName(key as ModuleName, key), value]))
 
-  const errors: BagelError[] = [];
+  const parseErrors: BagelError[] = [];
+  const typeErrors: BagelError[] = [];
 
   Store.initializeFromSource(modules, {
     entryFileOrDir: 'foo' as ModuleName,
@@ -1129,17 +1177,20 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
   })
   
   for (const module of Object.keys(modules) as ModuleName[]) {
-    const { ast: parsed, errors: parseErrors } = Store.parsed(module, modules[module])
-    errors.push(...parseErrors)
+    const { ast: parsed, errors: _parseErrors } = Store.parsed(module, modules[module])
+    parseErrors.push(..._parseErrors)
 
-    const typeErrors = Store.typeerrors(module, parsed)
-    errors.push(...typeErrors)
+    const _typeErrors = Store.typeerrors(module, parsed)
+    typeErrors.push(..._typeErrors)
   }
 
-  if (!shouldFail && errors.length > 0) {
+  if (parseErrors.length > 0) {
+    throw `Parsing should have succeeded\n\n` +
+      parseErrors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
+  } else if (!shouldFail && typeErrors.length > 0) {
     throw `Type check should have succeeded but failed with errors\n\n` +
-      errors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
-  } else if (shouldFail && errors.length === 0) {
+      typeErrors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
+  } else if (shouldFail && typeErrors.length === 0) {
     throw `Type check should have failed but succeeded`
   }
 }
