@@ -52,7 +52,7 @@ export function displayType(typeExpression: TypeExpression): string {
         case "maybe-type": str = displayType(typeExpression.inner) + '?'; break;
         case "named-type":
         case "generic-param-type": str = typeExpression.name.name; break;
-        case "generic-type": str = `<${typeExpression.typeParams.map(p => p.name).join(',')}>${displayType(typeExpression.inner)}`; break;
+        case "generic-type": str = `<${typeExpression.typeParams.map(p => p.name.name).join(',')}>${displayType(typeExpression.inner)}`; break;
         case "bound-generic-type": str = `${displayType(typeExpression.generic)}<${typeExpression.typeArgs.map(displayType).join(',')}>`; break;
         case "proc-type": str = `(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayType(arg.type)}` : '')).join(', ')}) {}`; break;
         case "func-type": str = `(${typeExpression.args.map(arg => arg.name.name + (arg.type ? `: ${displayType(arg.type)}` : '')).join(', ')}) => ${displayType(typeExpression.returnType ?? UNKNOWN_TYPE)}`; break;
