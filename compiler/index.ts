@@ -4,7 +4,7 @@ import { BagelError, prettyError } from "./errors.ts";
 import { all, cacheDir, cachedModulePath, esOrNone, on, pathIsRemote, sOrNone } from "./utils/misc.ts";
 
 import { autorun, configure } from "./mobx.ts";
-import Store from "./store.ts";
+import Store, { BGL_PRELUDE, moduleIsCore } from "./store.ts";
 import { ModuleName } from "./_model/common.ts";
 
 configure({
@@ -56,19 +56,19 @@ autorun(async () => {
                 const path = cachedModulePath(module)
                 if (await fs.exists(path)) {  // module has already been cached locally
                     const source = await Deno.readTextFile(path)
-                    Store.modulesSource.set(module, source)
+                    Store.modulesSource.set(module, (!moduleIsCore(module) ? BGL_PRELUDE : '') + source)
                 } else {  // need to download module before compiling
                     const res = await fetch(module)
 
                     if (res.status === 200) {
                         const source = await res.text()
                         await Deno.writeTextFile(path, source)
-                        Store.modulesSource.set(module, source)
+                        Store.modulesSource.set(module, (!moduleIsCore(module) ? BGL_PRELUDE : '') + source)
                     }
                 }
             } else {  // local disk import
                 const source = await Deno.readTextFile(module)
-                Store.modulesSource.set(module, source)
+                Store.modulesSource.set(module, (!moduleIsCore(module) ? BGL_PRELUDE : '') + source)
             }
         }
     }
@@ -172,7 +172,7 @@ autorun(() => {
                         const fileContents = await Deno.readTextFile(module);
 
                         if (fileContents && fileContents !== Store.modulesSource.get(module)) {
-                            Store.modulesSource.set(module, fileContents)
+                            Store.modulesSource.set(module, (!moduleIsCore(module) ? BGL_PRELUDE : '') + fileContents)
                         }
                     } catch (e) {
                         console.error("Failed to read module " + module + "\n")

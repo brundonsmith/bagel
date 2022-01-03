@@ -15,3 +15,13 @@ export func iter<T>(x: const T[]): Iterator<T> =>
 
 // export func typeof(val: unknown): 'string'|'number'|'boolean'|'nil'|'object'|'array'|'set'|'class-instance' =>
 //     js# ___typeof(val) #js
+
+export type Plan = <T>(const {
+    then: <R>(fn: (el: T) => R) => Plan<R>
+})
+
+export type Iterator = <T>(const {
+    map: <R>(fn: (el: T) => R) => Iterator<R>,
+    filter: (fn: (el: T) => boolean) => Iterator<T>,
+    array: () => T[],
+})

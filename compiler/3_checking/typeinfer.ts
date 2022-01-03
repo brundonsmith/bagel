@@ -1,4 +1,4 @@
-import { GetParent, Refinement, Passthrough } from "../_model/common.ts";
+import { GetParent, Refinement, Passthrough, TypeBinding } from "../_model/common.ts";
 import { BinaryOp, Expression, InlineConst, Invocation, isExpression, Spread } from "../_model/expressions.ts";
 import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
@@ -122,7 +122,7 @@ const inferTypeInner = computedFn((
             // Creation of nominal values looks like/parses as function 
             // invocation, but needs to be treated differently
             if (ast.kind === "invocation" && ast.subject.kind === "local-identifier") {
-                const binding = getBinding(() => {}, ast.subject)
+                const binding = getBinding(() => {}, ast.subject.name, ast.subject)
                 if (binding?.kind === 'type-binding') {
                     const resolvedType = resolveType(passthrough, binding.type)
 
@@ -324,7 +324,7 @@ const inferTypeInner = computedFn((
                 }
             }
     
-            const binding = getBinding(reportError, ast)
+            const binding = getBinding(reportError, ast.name, ast)
 
             if (binding != null) {
                 switch (binding.kind) {
@@ -343,7 +343,9 @@ const inferTypeInner = computedFn((
                             reportError(assignmentError(binding.iterator, ITERATOR_OF_ANY, iteratorType))
                         }
     
-                        return iteratorType.kind === 'iterator-type' ? iteratorType.itemType : UNKNOWN_TYPE
+                        return iteratorType.kind === 'bound-generic-type'
+                            ? iteratorType.typeArgs[0] ?? UNKNOWN_TYPE
+                            : UNKNOWN_TYPE
                     }
                     case 'this': return {
                         kind: "store-type",
@@ -553,6 +555,7 @@ export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: 
 export function parameterizedGenericType(passthrough: Passthrough, generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
     const { getBinding, reportError } = passthrough
     
+    // index bindings by name
     const bindings: Record<string, TypeExpression> = {}
     for (let i = 0; i < generic.typeParams.length; i++) {
         const typeParam = generic.typeParams[i]
@@ -562,8 +565,10 @@ export function parameterizedGenericType(passthrough: Passthrough, generic: Gene
     }
 
     return mapParseTree(generic.inner, ast => {
+
+        // if we've found one of the generic params, substitute it
         if (ast.kind === 'named-type') {
-            const resolved = getBinding(reportError, ast)
+            const resolved = getBinding(reportError, ast.name.name, ast)
 
             if (resolved?.kind === 'type-binding' && resolved.type.kind === 'generic-param-type' && bindings[resolved.type.name.name]) {
                 return bindings[resolved.type.name.name]
@@ -794,11 +799,25 @@ export const propertiesOf = computedFn((
                 }
             ]
         }
+        case "iterator-type":
+        case "plan-type": {
+            const generic = (getBinding(reportError, resolvedType.kind === 'iterator-type' ? 'Iterator' : 'Plan', resolvedType) as TypeBinding).type
+            return propertiesOf(passthrough, {
+                kind: "bound-generic-type",
+                generic,
+                typeArgs: [resolvedType.inner],
+                mutability: undefined,
+                module: resolvedType.module,
+                code: resolvedType.code,
+                startIndex: resolvedType.startIndex,
+                endIndex: resolvedType.endIndex,
+            })
+        }
         case "object-type": {
             const attrs = [...resolvedType.entries]
 
             for (const spread of resolvedType.spreads) {
-                const resolved = getBinding(reportError, spread)
+                const resolved = getBinding(reportError, spread.name.name, spread)
 
                 if (resolved != null && resolved.kind === 'type-binding' && resolved.type.kind === 'object-type') {
                     attrs.push(...(propertiesOf(passthrough, resolved.type) ?? []))
@@ -872,119 +891,6 @@ export const propertiesOf = computedFn((
                     .map(memberToAttribute)
             }
         }
-        case "iterator-type": {
-            const { code: _, startIndex: _1, endIndex: _2, ...item } = resolvedType.itemType
-            const itemType = { ...item, ...AST_NOISE }
-
-            const iteratorProps: readonly Attribute[] = [
-                attribute("filter", {
-                    kind: "func-type",
-                    args: [{
-                        kind: "arg",
-                        name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
-                        type: {
-                            kind: "func-type",
-                            args: [{
-                                kind: "arg",
-                                name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
-                                type: itemType,
-                                ...AST_NOISE
-                            }],
-                            returnType: BOOLEAN_TYPE,
-                            ...TYPE_AST_NOISE
-                        },
-                        ...AST_NOISE
-                    }],
-                    returnType: {
-                        kind: "iterator-type",
-                        itemType,
-                        ...TYPE_AST_NOISE
-                    },
-                    ...TYPE_AST_NOISE
-                }),
-                attribute("map", {
-                    kind: "generic-type",
-                    typeParams: [
-                        { name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined }
-                    ],
-                    inner: {
-                        kind: "func-type",
-                        args: [{
-                            kind: "arg",
-                            name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
-                            type: {
-                                kind: "func-type",
-                                args: [{
-                                    kind: "arg",
-                                    name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
-                                    type: itemType,
-                                    ...AST_NOISE
-                                }],
-                                returnType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
-                                ...TYPE_AST_NOISE
-                            },
-                            ...AST_NOISE
-                        }],
-                        returnType: {
-                            kind: "iterator-type",
-                            itemType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
-                            ...TYPE_AST_NOISE
-                        },
-                        ...TYPE_AST_NOISE
-                    },
-                    ...TYPE_AST_NOISE
-                }),
-                attribute("array", {
-                    kind: "func-type",
-                    args: [],
-                    returnType: { kind: "array-type", element: itemType, mutability: "mutable", ...AST_NOISE },
-                    ...TYPE_AST_NOISE
-                }),
-            ]
-
-            return iteratorProps
-        }
-        case "plan-type": {
-            const { code: _, startIndex: _1, endIndex: _2, ...result } = resolvedType.resultType
-            const resultType = { ...result, ...AST_NOISE }
-
-            const planProps: readonly Attribute[] = [
-                attribute("then", {
-                    kind: "generic-type",
-                    typeParams: [
-                        { name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined }
-                    ],
-                    inner: {
-                        kind: "func-type",
-                        args: [{
-                            kind: "arg",
-                            name: { kind: "plain-identifier", name: "fn", ...AST_NOISE },
-                            type: {
-                                kind: "func-type",
-                                args: [{
-                                    kind: "arg",
-                                    name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
-                                    type: resultType,
-                                    ...TYPE_AST_NOISE
-                                }],
-                                returnType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
-                                ...TYPE_AST_NOISE
-                            },
-                            ...TYPE_AST_NOISE
-                        }],
-                        returnType: {
-                            kind: "plan-type",
-                            resultType: { kind: "generic-param-type", name: { kind: "plain-identifier", name: "R", ...AST_NOISE }, extends: undefined, ...TYPE_AST_NOISE },
-                            ...TYPE_AST_NOISE
-                        },
-                        ...TYPE_AST_NOISE
-                    },
-                    ...TYPE_AST_NOISE
-                }),
-            ]
-
-            return planProps
-        }
     }
 })
 
@@ -1014,7 +920,7 @@ function fitTemplate(
 
     function isGenericParam(type: TypeExpression): type is NamedType {
         if (type.kind === 'named-type') {
-            const binding = getBinding(reportError, type)
+            const binding = getBinding(reportError, type.name.name, type)
             return binding?.kind === 'type-binding' && binding.type.kind === 'generic-param-type'
         }
 

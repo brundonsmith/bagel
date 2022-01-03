@@ -35,7 +35,8 @@ export type BagelAssignableToError = {
 
 export type BagelCannotFindNameError = {
     kind: "bagel-cannot-find-name-error",
-    ast: LocalIdentifier|PlainIdentifier,
+    name: string,
+    ast: AST,
 }
 
 export type BagelAlreadyDeclaredError = {
@@ -86,7 +87,7 @@ export function errorMessage(error: BagelError): string {
         case "bagel-assignable-to-error":
             return `Type "${displayType(error.value)}" is not assignable to type "${displayType(error.destination)}"`;
         case "bagel-cannot-find-name-error":
-            return `Cannot find name "${error.ast.name}"`;
+            return `Cannot find name "${error.name}"`;
         case "bagel-already-declared-error":
             return `Identifier "${error.ast.name}" has already been declared in this scope`;
         case "bagel-misc-type-error":
@@ -98,12 +99,18 @@ export function errorMessage(error: BagelError): string {
     }
 }
 
+export function syntaxError(code: string, index: number, message: string): BagelSyntaxError {
+    return { kind: "bagel-syntax-error", ast: undefined, code, index, message, stack: undefined }
+}
+
 export function assignmentError(ast: AST, destination: TypeExpression, value: TypeExpression): BagelAssignableToError {
     return { kind: "bagel-assignable-to-error", ast, destination, value, stack: undefined };
 }
 
-export function cannotFindName(ast: LocalIdentifier|PlainIdentifier): BagelCannotFindNameError {
-    return { kind: "bagel-cannot-find-name-error", ast };
+export function cannotFindName(ast: LocalIdentifier|PlainIdentifier): BagelCannotFindNameError;
+export function cannotFindName(ast: AST, name: string): BagelCannotFindNameError;
+export function cannotFindName(ast: AST, name: string|void): BagelCannotFindNameError {
+    return { kind: "bagel-cannot-find-name-error", ast, name: (ast.kind === 'local-identifier' || ast.kind === 'plain-identifier') ? ast.name : name as string };
 }
 
 export function alreadyDeclared(ast: PlainIdentifier): BagelAlreadyDeclaredError {

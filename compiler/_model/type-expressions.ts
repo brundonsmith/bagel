@@ -173,13 +173,13 @@ export type NominalType = SourceInfo & {
 
 export type IteratorType = SourceInfo & {
     readonly kind: "iterator-type",
-    readonly itemType: TypeExpression,
+    readonly inner: TypeExpression,
     readonly mutability: undefined,
 }
 
 export type PlanType = SourceInfo & {
     readonly kind: "plan-type",
-    readonly resultType: TypeExpression,
+    readonly inner: TypeExpression,
     readonly mutability: undefined,
 }
 
@@ -265,7 +265,7 @@ export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
 }
 export const ITERATOR_OF_NUMBERS_TYPE: IteratorType = {
     kind: "iterator-type",
-    itemType: NUMBER_TYPE,
+    inner: NUMBER_TYPE,
     mutability: undefined,
     module: undefined,
     code: undefined,
@@ -274,7 +274,7 @@ export const ITERATOR_OF_NUMBERS_TYPE: IteratorType = {
 }
 export const ITERATOR_OF_ANY: IteratorType = {
     kind: "iterator-type",
-    itemType: ANY_TYPE,
+    inner: ANY_TYPE,
     mutability: undefined,
     module: undefined,
     code: undefined,

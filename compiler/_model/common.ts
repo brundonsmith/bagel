@@ -1,9 +1,9 @@
 // deno-lint-ignore-file no-fallthrough
-import { AST, Module, PlainIdentifier } from "./ast.ts";
+import { AST, Module } from "./ast.ts";
 import { ConstDeclarationStatement, LetDeclaration } from "./statements.ts";
-import { GenericParamType, NamedType, TypeExpression } from "./type-expressions.ts";
+import { TypeExpression } from "./type-expressions.ts";
 import { ConstDeclaration, FuncDeclaration, ProcDeclaration, StoreDeclaration } from "./declarations.ts";
-import { Expression, Func, InlineConst, LocalIdentifier, Proc } from "./expressions.ts";
+import { Expression, Func, InlineConst, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
 
@@ -19,7 +19,7 @@ export type Passthrough = {
 
 export type GetModule = (module: string) => Module|undefined
 export type GetParent = (ast: AST) => AST|undefined
-export type GetBinding = (reportError: ReportError, identifier: LocalIdentifier|PlainIdentifier|NamedType|GenericParamType) => Binding|undefined
+export type GetBinding = (reportError: ReportError, name: string, context: AST) => Binding|undefined
 export type ReportError = (error: BagelError) => void
 
 export type Binding = ValueBinding|TypeBinding

@@ -1,12 +1,12 @@
 import { log, withoutSourceInfo } from "../utils/debugging.ts";
-import { BagelError, isError } from "../errors.ts";
+import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Statement, WhileLoop } from "../_model/statements.ts";
-import { ArrayType, FuncType, IndexerType, IteratorType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, PlanType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, IndexerType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 
@@ -478,58 +478,52 @@ const _typeParam: ParseFunction<{ name: PlainIdentifier, extends: TypeExpression
         newIndex: indexAfterExtends ?? index
     }))))
 
-const boundGenericType: ParseFunction<BoundGenericType> = (module, code, startIndex) =>
+const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType> = (module, code, startIndex) =>
     given(TYPE_PARSER.beneath(boundGenericType)(module, code, startIndex), ({ parsed: generic, newIndex: index }) =>
-    given(_typeArgs(module, code, index), ({ parsed: typeArgs, newIndex: index }) => ({
-        parsed: {
-            kind: "bound-generic-type",
-            generic,
-            typeArgs,
-            mutability: undefined,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        newIndex: index
-    })))
-
-
-const iteratorType: ParseFunction<IteratorType> = (module, code, startIndex) =>
-    given(consume(code, startIndex, "Iterator<"), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(typeExpression(module, code, index), err(code, index, "Iterator item type"), ({ parsed: itemType, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ">"), err(code, index, '">"'), index => ({
-        parsed: {
-            kind: "iterator-type",
-            itemType,
-            mutability: undefined,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        newIndex: index,
-    }))))))
-
-const planType: ParseFunction<PlanType> = (module, code, startIndex) =>
-    given(consume(code, startIndex, "Plan<"), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(typeExpression(module, code, index), err(code, index, "Plan result type"), ({ parsed: resultType, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ">"), err(code, index, '">"'), index => ({
-        parsed: {
-            kind: "plan-type",
-            resultType,
-            mutability: undefined,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        newIndex: index,
-    }))))))
+    given(_typeArgs(module, code, index), ({ parsed: typeArgs, newIndex: index }) => 
+        generic.kind === 'named-type' && generic.name.name === 'Iterator' ?
+            (typeArgs.length !== 1
+                ? syntaxError(code, index, `Iterator types must have exactly one type parameter; found ${typeArgs.length}`)
+                : {
+                    parsed: {
+                        kind: "iterator-type",
+                        inner: typeArgs[0],
+                        mutability: undefined,
+                        module,
+                        code,
+                        startIndex,
+                        endIndex: index,
+                    },
+                    newIndex: index
+                })
+        : generic.kind === 'named-type' && generic.name.name === 'Plan' ?
+            (typeArgs.length !== 1
+                ? syntaxError(code, index, `Plan types must have exactly one type parameter; found ${typeArgs.length}`)
+                : {
+                    parsed: {
+                        kind: "plan-type",
+                        inner: typeArgs[0],
+                        mutability: undefined,
+                        module,
+                        code,
+                        startIndex,
+                        endIndex: index,
+                    },
+                    newIndex: index
+                })
+        : {
+            parsed: {
+                kind: "bound-generic-type",
+                generic,
+                typeArgs,
+                mutability: undefined,
+                module,
+                code,
+                startIndex,
+                endIndex: index,
+            },
+            newIndex: index
+        }))
 
 const parenthesizedType: ParseFunction<ParenthesizedType> = (module, code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
@@ -1976,9 +1970,9 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
 ])
 
 const TYPE_PARSER = new TieredParser<TypeExpression>([
-    [ boundGenericType ],
     [ genericType ],
     [ unionType ],
+    [ boundGenericType ],
     [ maybeType ],
     [ arrayType ],
     [ primitiveType, elementType, funcType, procType, 

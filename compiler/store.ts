@@ -30,14 +30,16 @@ class _Store {
     modulesSource = new Map<ModuleName, string>()
 
     readonly initializeFromEntry = (modules: readonly ModuleName[], config: Config) => {
-        this.modules =new Set(modules)
+        this.modules = new Set(modules)
         this.config = config
     }
 
     readonly initializeFromSource = (modulesSource: Record<ModuleName, string>, config: Config) => {
         this.modulesSource = new Map()
+
         for (const [k, v] of Object.entries(modulesSource)) {
-            this.modulesSource.set(k as ModuleName, v)
+            const moduleName = k as ModuleName
+            this.modulesSource.set(moduleName, (!moduleIsCore(moduleName) ? BGL_PRELUDE : '') + v)
         }
 
         this.config = config
@@ -110,7 +112,7 @@ class _Store {
 
     readonly compiled = computedFn((module: ModuleName, ast: Module): string => {
         return (
-            LIB_IMPORTS + 
+            JS_PRELUDE + 
             (ast.hasMain ? MOBX_CONFIGURE : '') + 
             compile(
                 this.getBinding, 
@@ -133,7 +135,6 @@ class _Store {
             const { ast: module } = this.parsed(moduleName, source)
 
             for (const { parent, current } of iterateParseTree(module)) {
-                
                 if (areSame(current, ast)) {
                     return parent
                 }
@@ -143,8 +144,8 @@ class _Store {
         return undefined
     })
     
-    readonly getBinding: GetBinding = computedFn((reportError, identifier) => {
-        const currentModule = this.getModuleForNode(identifier)
+    readonly getBinding: GetBinding = computedFn((reportError, name, context) => {
+        const currentModule = this.getModuleForNode(context)
 
         return resolve(
             {
@@ -153,8 +154,9 @@ class _Store {
                     given(currentModule, module => this.getModuleByName(module, imported)), 
                 getParent: this.getParent
             },
-            identifier,
-            identifier
+            name,
+            context,
+            context
         )
     })
 
@@ -162,11 +164,16 @@ class _Store {
 const Store = new _Store()
 export default Store
 
+export const moduleIsCore = (module: ModuleName) => {
+    // NOTE: This can be made more robust later, probably screened by domain name or something
+    return module.includes('wrappers')
+}
+
 export const IMPORTED_ITEMS = [ 'autorun',  'observable', 'computed', 'configure', 'makeObservable', 'h',
 'computedFn', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER', 'withConst'
 ]
 
-const LIB_IMPORTS = `
+const JS_PRELUDE = `
 import { ${IMPORTED_ITEMS.map(s => `${s} as ${INT}${s}`).join(', ')} } from "../../lib/src/core.ts";
 `
 export const MOBX_CONFIGURE = `
@@ -176,6 +183,10 @@ ${INT}configure({
     reactionRequiresObservable: false,
     observableRequiresReaction: false,
 });`
+
+export const BGL_PRELUDE = `
+from '../../lib/wrappers/prelude' import { iter, logp, logf }
+`
 
 export function canonicalModuleName(importerModule: ModuleName, importPath: string): ModuleName {
     if (pathIsRemote(importPath)) {

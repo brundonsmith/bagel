@@ -1,5 +1,5 @@
 import { BagelError, prettyError } from "../compiler/errors.ts";
-import Store, { canonicalModuleName } from "../compiler/store.ts";
+import Store, { BGL_PRELUDE, canonicalModuleName } from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
@@ -143,7 +143,9 @@ Deno.test({
   name: "Basic function return inference",
   fn() {
     testTypecheck(
-      `func fn(_: string) => 'foo'\nconst y: string = fn('z')`,
+      `
+      func fn(_: string) => 'foo'
+      const y: string = fn('z')`,
       false,
     );
   },
@@ -153,7 +155,9 @@ Deno.test({
   name: "Basic function return inference mismatch",
   fn() {
     testTypecheck(
-      `func fn(_: string) => 'foo'\nconst y: number = fn('z')`,
+      `
+      func fn(_: string) => 'foo'
+      const y: number = fn('z')`,
       true,
     );
   },
@@ -1147,7 +1151,7 @@ function testTypecheck(code: string, shouldFail: boolean): void {
   })
   
   // console.log(JSON.stringify(withoutSourceInfo(Store.parsed(moduleName, code).ast), null, 2))
-  const { ast: parsed, errors: parseErrors } = Store.parsed(moduleName, code)
+  const { ast: parsed, errors: parseErrors } = Store.parsed(moduleName, BGL_PRELUDE + code)
   errors.push(...parseErrors)
 
   const typeErrors = Store.typeerrors(moduleName, parsed)
@@ -1162,7 +1166,11 @@ function testTypecheck(code: string, shouldFail: boolean): void {
 }
 
 function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: boolean): void {
-  modules = Object.fromEntries(Object.entries(modules).map(([key, value]) => [canonicalModuleName(key as ModuleName, key), value]))
+  modules = Object.fromEntries(Object.entries(modules).map(([key, value]) =>
+    [
+      canonicalModuleName(key as ModuleName, key),
+      value
+    ]))
 
   const parseErrors: BagelError[] = [];
   const typeErrors: BagelError[] = [];
@@ -1177,7 +1185,7 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
   })
   
   for (const module of Object.keys(modules) as ModuleName[]) {
-    const { ast: parsed, errors: _parseErrors } = Store.parsed(module, modules[module])
+    const { ast: parsed, errors: _parseErrors } = Store.parsed(module, BGL_PRELUDE + modules[module])
     parseErrors.push(..._parseErrors)
 
     const _typeErrors = Store.typeerrors(module, parsed)

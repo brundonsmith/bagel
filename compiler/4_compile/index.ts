@@ -97,7 +97,7 @@ function compileOne(getBinding: GetBinding, excludeTypes: boolean, module: strin
         case "property-accessor": return `${compileOne(getBinding, excludeTypes, module, ast.subject)}.${compileOne(getBinding, excludeTypes, module, ast.property)}`;
         case "plain-identifier": return ast.name;
         case "local-identifier": {
-            const binding = getBinding(() => {}, ast)
+            const binding = getBinding(() => {}, ast.name, ast)
 
             if (binding && binding.kind !== 'type-binding' && getBindingMutability(binding) === 'assignable') {
                 return `${LOCALS_OBJ}["${ast.name}"]`
@@ -143,8 +143,8 @@ function compileOne(getBinding: GetBinding, excludeTypes: boolean, module: strin
         case "indexer-type": return `{[key: ${compileOne(getBinding, excludeTypes, module, ast.keyType)}]: ${compileOne(getBinding, excludeTypes, module, ast.valueType)}}`;
         case "array-type": return `${compileOne(getBinding, excludeTypes, module, ast.element)}[]`;
         case "tuple-type": return `[${ast.members.map(m => compileOne(getBinding, excludeTypes, module, m)).join(", ")}]`;
-        case "iterator-type": return `${INT}Iter<${compileOne(getBinding, excludeTypes, module, ast.itemType)}>`;
-        case "plan-type": return `${INT}Plan<${compileOne(getBinding, excludeTypes, module, ast.resultType)}>`;
+        case "iterator-type": return `${INT}Iter<${compileOne(getBinding, excludeTypes, module, ast.inner)}>`;
+        case "plan-type": return `${INT}Plan<${compileOne(getBinding, excludeTypes, module, ast.inner)}>`;
         case "literal-type": return `${compileOne(getBinding, excludeTypes, module, ast.value)}`;
         case "string-type": return `string`;
         case "number-type": return `number`;
