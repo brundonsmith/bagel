@@ -1,17 +1,16 @@
 import { alreadyDeclared, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
-import { areSame, displayAST } from "../utils/ast.ts";
+import Store from "../store.ts";
+import { areSame } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
-import { Binding, Passthrough } from "../_model/common.ts";
+import { Binding, ModuleName, ReportError } from "../_model/common.ts";
 import { FuncType, ProcType } from "../_model/type-expressions.ts";
 
 /**
  * Given some identifier and some AST context, look upwards until a binding is
  * found for the identifier (or the root is reached)
  */
-export function resolve(passthough: Pick<Passthrough, 'reportError'|'getParent'|'getModule'>, name: string, from: AST, originator: AST): Binding|undefined {
-    const { reportError, getParent, getModule } = passthough
-
-    const parent = getParent(from)
+export function resolve(reportError: ReportError, name: string, from: AST, originator: AST): Binding|undefined {
+    const parent = Store.getParent(from)
 
     // if we've reached the root of the AST, there's no binding
     if (parent == null) {
@@ -80,13 +79,13 @@ export function resolve(passthough: Pick<Passthrough, 'reportError'|'getParent'|
                                     reportError(alreadyDeclared(nameAst))
                                 }
 
-                                const otherModule = getModule(declaration.path.value)
+                                const otherModule = Store.getModuleByName(declaration.module as ModuleName, declaration.path.value)
 
                                 if (otherModule == null) {
                                     // other module doesn't exist
                                     reportError(cannotFindModule(declaration.path))
                                 } else {
-                                    resolved = resolve(passthough, name, otherModule.declarations[0], originator) // HACK
+                                    resolved = resolve(reportError, name, otherModule.declarations[0], originator) // HACK
 
                                     if (resolved == null) {
                                         reportError(cannotFindExport(importItem, declaration));
@@ -223,5 +222,5 @@ export function resolve(passthough: Pick<Passthrough, 'reportError'|'getParent'|
     }
 
     // if not resolved, recurse upward to the next AST node
-    return resolved ?? resolve(passthough, name, parent, originator)
+    return resolved ?? resolve(reportError, name, parent, originator)
 }

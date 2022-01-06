@@ -2,13 +2,13 @@ import { parse } from "./1_parse/index.ts";
 import { reshape } from "./2_reshape/index.ts";
 import { resolve } from "./3_checking/resolve.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
-import { compile, INT } from "./4_compile/index.ts";
+import { compile } from "./4_compile/index.ts";
 import { path } from "./deps.ts";
 import { BagelError, errorsEquivalent } from "./errors.ts";
 import { computedFn, makeAutoObservable } from "./mobx.ts";
-import { given, pathIsRemote } from "./utils/misc.ts";
+import { pathIsRemote } from "./utils/misc.ts";
 import { AST, Module } from "./_model/ast.ts";
-import { GetParent, GetBinding, ModuleName } from "./_model/common.ts";
+import { ModuleName, ReportError } from "./_model/common.ts";
 import { areSame, iterateParseTree } from "./utils/ast.ts";
 
 type Config = {
@@ -26,61 +26,65 @@ class _Store {
     }
 
     config: undefined | Config = undefined
-    modules = new Set<ModuleName>()
-    modulesSource = new Map<ModuleName, string>()
+
+    public get modules(): ReadonlySet<ModuleName> {
+        return this._modules
+    }
+    private _modules = new Set<ModuleName>()
+
+    public get modulesSource(): ReadonlyMap<ModuleName, string> {
+        return this._modulesSource
+    }
+    private _modulesSource = new Map<ModuleName, string>()
 
     readonly initializeFromEntry = (modules: readonly ModuleName[], config: Config) => {
-        this.modules = new Set(modules)
+        this._modules = new Set(modules)
         this.config = config
     }
 
     readonly initializeFromSource = (modulesSource: Record<ModuleName, string>, config: Config) => {
-        this.modulesSource = new Map()
+        this._modulesSource = new Map()
 
         for (const [k, v] of Object.entries(modulesSource)) {
             const moduleName = k as ModuleName
-            this.modulesSource.set(moduleName, (!moduleIsCore(moduleName) ? BGL_PRELUDE : '') + v)
+            this.setSource(moduleName, v)
         }
 
         this.config = config
     }
 
-    get modulesOutstanding() {
-        return this.modules.size === 0 || this.modules.size > this.modulesSource.size
+    readonly registerModule = (moduleName: ModuleName) => {
+        this._modules.add(moduleName)
     }
 
-    readonly parsed = computedFn((module: ModuleName, source: string): { ast: Module, errors: readonly BagelError[] } => {
-        const errors: BagelError[] = []
-        const ast = reshape(parse(module, source, err => errors.push(err)))
-        return { ast, errors }
-    })
+    readonly setSource = (moduleName: ModuleName, source: string) => {
+        this._modulesSource.set(moduleName, (!moduleIsCore(moduleName) ? BGL_PRELUDE : '') + source)
+    }
 
-    readonly getModuleForNode = computedFn((ast: AST): ModuleName|undefined => {
-        for (const moduleName of this.modulesSource.keys()) {
-            const source = this.modulesSource.get(moduleName)
+    get modulesOutstanding() {
+        return this._modules.size === 0 || this._modules.size > this._modulesSource.size
+    }
 
-            if (source) {
-                const { ast: moduleAst } = this.parsed(moduleName, source)
+    readonly parsed = computedFn((moduleName: ModuleName): { ast: Module, errors: readonly BagelError[] } | undefined => {
+        const source = this._modulesSource.get(moduleName)
 
-                for (const { current } of iterateParseTree(moduleAst)) {
-                    if (areSame(current, ast)) {
-                        return moduleName
-                    }
-                }
-            }
+        if (source) {
+            const errors: BagelError[] = []
+            const ast = reshape(parse(moduleName, source, err => errors.push(err)))
+            return { ast, errors }
         }
     })
 
-    readonly typeerrors = computedFn((module: ModuleName, ast: Module): BagelError[] => {
+    readonly typeerrors = computedFn((moduleName: ModuleName): BagelError[] => {
+        const ast = this.parsed(moduleName)?.ast
+
+        if (!ast) {
+            return []
+        }
+
         const errors: BagelError[] = []
         typecheck(
-            {
-                reportError: err => errors.push(err),
-                getModule: imported => 
-                    given(module, module => this.getModuleByName(module, imported)), 
-                getParent: this.getParent,
-                getBinding: this.getBinding
-            }, 
+            err => errors.push(err), 
             ast
         )
         return errors
@@ -89,16 +93,15 @@ class _Store {
     get allErrors() {
         const allErrors = new Map<ModuleName, BagelError[]>()
         
-        for (const module of this.modules) {
+        for (const module of this._modulesSource.keys()) {
             allErrors.set(module, [])
         }
 
-        for (const module of this.modules) {
-            const source = this.modulesSource.get(module)
-
-            if (source) {
-                const { ast, errors: parseErrors } = this.parsed(module, source)
-                const typecheckErrors = this.typeerrors(module, ast)
+        for (const module of this._modulesSource.keys()) {
+            const parsed = this.parsed(module)
+            if (parsed) {
+                const { errors: parseErrors } = parsed
+                const typecheckErrors = this.typeerrors(module)
 
                 for (const err of [...parseErrors, ...typecheckErrors].filter((err, index, arr) => arr.findIndex(other => errorsEquivalent(err, other)) === index)) {
                     const errorModule = err.ast?.module ?? module;
@@ -110,14 +113,19 @@ class _Store {
         return allErrors
     }
 
-    readonly compiled = computedFn((module: ModuleName, ast: Module): string => {
+    readonly compiled = computedFn((moduleName: ModuleName): string => {
+        const ast = this.parsed(moduleName)?.ast
+
+        if (!ast) {
+            return ''
+        }
+        
         return (
             JS_PRELUDE + 
             (ast.hasMain ? MOBX_CONFIGURE : '') + 
             compile(
-                this.getBinding, 
                 ast, 
-                module, 
+                moduleName, 
                 this.config?.includeTests
             )
         )
@@ -126,17 +134,18 @@ class _Store {
     readonly getModuleByName = computedFn((importer: ModuleName, imported: string) => {
         const importedModuleName = canonicalModuleName(importer, imported)
 
-        return given(this.modulesSource.get(importedModuleName), source =>
-            this.parsed(importedModuleName, source).ast)
+        return this.parsed(importedModuleName)?.ast
     })
 
-    readonly getParent: GetParent = computedFn((ast) => {
-        for (const [moduleName, source] of this.modulesSource.entries()) {
-            const { ast: module } = this.parsed(moduleName, source)
+    readonly getParent = computedFn((ast: AST) => {
+        for (const [moduleName, _source] of this._modulesSource.entries()) {
+            const module = this.parsed(moduleName)?.ast
 
-            for (const { parent, current } of iterateParseTree(module)) {
-                if (areSame(current, ast)) {
-                    return parent
+            if (module) {
+                for (const { parent, current } of iterateParseTree(module)) {
+                    if (areSame(current, ast)) {
+                        return parent
+                    }
                 }
             }
         }
@@ -144,16 +153,9 @@ class _Store {
         return undefined
     })
     
-    readonly getBinding: GetBinding = computedFn((reportError, name, context) => {
-        const currentModule = this.getModuleForNode(context)
-
+    readonly getBinding = computedFn((reportError: ReportError, name: string, context: AST) => {
         return resolve(
-            {
-                reportError,
-                getModule: imported => 
-                    given(currentModule, module => this.getModuleByName(module, imported)), 
-                getParent: this.getParent
-            },
+            reportError,
             name,
             context,
             context
@@ -164,9 +166,9 @@ class _Store {
 const Store = new _Store()
 export default Store
 
-export const moduleIsCore = (module: ModuleName) => {
+const moduleIsCore = (moduleName: ModuleName) => {
     // NOTE: This can be made more robust later, probably screened by domain name or something
-    return module.includes('wrappers')
+    return moduleName.includes('wrappers')
 }
 
 export const IMPORTED_ITEMS = [ 'autorun',  'observable', 'computed', 'configure', 'makeObservable', 'h',
@@ -174,19 +176,20 @@ export const IMPORTED_ITEMS = [ 'autorun',  'observable', 'computed', 'configure
 ]
 
 const JS_PRELUDE = `
-import { ${IMPORTED_ITEMS.map(s => `${s} as ${INT}${s}`).join(', ')} } from "../../lib/src/core.ts";
+import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "../lib/src/core.ts";
 `
 export const MOBX_CONFIGURE = `
-${INT}configure({
+___configure({
     enforceActions: "never",
     computedRequiresReaction: false,
     reactionRequiresObservable: false,
     observableRequiresReaction: false,
 });`
 
-export const BGL_PRELUDE = `
-from '../../lib/wrappers/prelude' import { iter, logp, logf }
+const BGL_PRELUDE = `
+from '../lib/wrappers/prelude' import { iter, logp, logf, BagelConfig }
 `
+export const BGL_PRELUDE_COMPILED = compile(parse('foo' as ModuleName, BGL_PRELUDE, () => {}), 'foo' as ModuleName)
 
 export function canonicalModuleName(importerModule: ModuleName, importPath: string): ModuleName {
     if (pathIsRemote(importPath)) {

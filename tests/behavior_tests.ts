@@ -1,6 +1,7 @@
 import { compile, INT } from "../compiler/4_compile/index.ts";
-import { prettyError } from "../compiler/errors.ts";
+import { BagelError, prettyError } from "../compiler/errors.ts";
 import Store, { IMPORTED_ITEMS, MOBX_CONFIGURE } from "../compiler/store.ts";
+import { Module } from "../compiler/_model/ast.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
@@ -69,8 +70,8 @@ async function testSideEffects(bgl: string, expected: any[]) {
         emit: false,
     });
 
-    const { ast, errors } = Store.parsed(moduleName, bgl);
-    const compiled = compile(Store.getBinding, ast, moduleName, false, true);
+    const { ast, errors } = Store.parsed(moduleName) as { ast: Module, errors: BagelError[] };
+    const compiled = compile(ast, moduleName, false, true);
 
     if (errors.length > 0) {
         throw `\n${bgl}\nFailed to parse:\n` +
@@ -78,7 +79,8 @@ async function testSideEffects(bgl: string, expected: any[]) {
     }
 
     const outputs: any[] = [];
-    const output = (output: any) => outputs.push(output);
+    // deno-lint-ignore no-unused-vars
+    const output = (output: any) => outputs.push(output); // Referenced by eval()
 
     await eval(
         `(async function() {

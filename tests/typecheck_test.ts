@@ -1,5 +1,5 @@
 import { BagelError, prettyError } from "../compiler/errors.ts";
-import Store, { BGL_PRELUDE, canonicalModuleName } from "../compiler/store.ts";
+import Store, { canonicalModuleName } from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
@@ -1137,7 +1137,6 @@ Deno.test({
 
 function testTypecheck(code: string, shouldFail: boolean): void {
   const moduleName = "<test>" as ModuleName
-  const errors: BagelError[] = [];
 
   Store.initializeFromSource({
     [moduleName]: code
@@ -1150,18 +1149,17 @@ function testTypecheck(code: string, shouldFail: boolean): void {
     emit: false
   })
   
-  // console.log(JSON.stringify(withoutSourceInfo(Store.parsed(moduleName, code).ast), null, 2))
-  const { ast: parsed, errors: parseErrors } = Store.parsed(moduleName, BGL_PRELUDE + code)
-  errors.push(...parseErrors)
+  const parsed = Store.parsed(moduleName)
 
-  const typeErrors = Store.typeerrors(moduleName, parsed)
-  errors.push(...typeErrors)
-
-  if (!shouldFail && errors.length > 0) {
-    throw `\n${code}\n\nType check should have succeeded but failed with errors\n` +
-      errors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
-  } else if (shouldFail && errors.length === 0) {
-    throw `\n${code}\n\nType check should have failed but succeeded`
+  if (parsed) {
+    const errors = Store.allErrors.get(moduleName) as BagelError[]
+  
+    if (!shouldFail && errors.length > 0) {
+      throw `\n${code}\n\nType check should have succeeded but failed with errors\n` +
+        errors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
+    } else if (shouldFail && errors.length === 0) {
+      throw `\n${code}\n\nType check should have failed but succeeded`
+    }
   }
 }
 
@@ -1172,9 +1170,6 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
       value
     ]))
 
-  const parseErrors: BagelError[] = [];
-  const typeErrors: BagelError[] = [];
-
   Store.initializeFromSource(modules, {
     entryFileOrDir: 'foo' as ModuleName,
     singleEntry: true,
@@ -1184,21 +1179,12 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
     emit: false
   })
   
-  for (const module of Object.keys(modules) as ModuleName[]) {
-    const { ast: parsed, errors: _parseErrors } = Store.parsed(module, BGL_PRELUDE + modules[module])
-    parseErrors.push(..._parseErrors)
+  const errors = [...Store.allErrors.values()].flat()
 
-    const _typeErrors = Store.typeerrors(module, parsed)
-    typeErrors.push(..._typeErrors)
-  }
-
-  if (parseErrors.length > 0) {
-    throw `Parsing should have succeeded\n\n` +
-      parseErrors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
-  } else if (!shouldFail && typeErrors.length > 0) {
+  if (!shouldFail && errors.length > 0) {
     throw `Type check should have succeeded but failed with errors\n\n` +
-      typeErrors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
-  } else if (shouldFail && typeErrors.length === 0) {
+    errors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
+  } else if (shouldFail && errors.length === 0) {
     throw `Type check should have failed but succeeded`
   }
 }

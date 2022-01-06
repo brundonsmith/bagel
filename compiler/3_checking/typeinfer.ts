@@ -1,4 +1,4 @@
-import { GetParent, Refinement, Passthrough, TypeBinding } from "../_model/common.ts";
+import { Refinement, TypeBinding, ReportError } from "../_model/common.ts";
 import { BinaryOp, Expression, InlineConst, Invocation, isExpression, Spread } from "../_model/expressions.ts";
 import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
@@ -10,41 +10,40 @@ import { AST } from "../_model/ast.ts";
 import { LetDeclaration,ConstDeclarationStatement } from "../_model/statements.ts";
 import { computedFn } from "../mobx.ts";
 import { displayAST, displayType,mapParseTree,typesEqual } from "../utils/ast.ts";
+import Store from "../store.ts";
 
 export function inferType(
-    passthrough: Passthrough,
+    reportError: ReportError,
     ast: Expression|StoreMember,
     visited: readonly AST[] = [],
 ): TypeExpression {
-    const { getParent } = passthrough
-
-    const baseType = inferTypeInner(passthrough, ast, visited)
+    const baseType = inferTypeInner(reportError, ast, visited)
 
     let refinedType = baseType
     {
-        const refinements = resolveRefinements(getParent, ast)
+        const refinements = resolveRefinements(ast)
 
         for (const refinement of refinements ?? []) {
             switch (refinement.kind) {
                 case "subtraction": {
-                    refinedType = subtract(passthrough, refinedType, refinement.type)
+                    refinedType = subtract(reportError, refinedType, refinement.type)
                 } break;
                 case "narrowing": {
-                    refinedType = narrow(passthrough, refinedType, refinement.type)
+                    refinedType = narrow(reportError, refinedType, refinement.type)
                 } break;
             }
         }
     }
 
-    return simplifyUnions(passthrough, refinedType)
+    return simplifyUnions(reportError, refinedType)
 }
 
 const inferTypeInner = computedFn((
     passthrough: Passthrough,
+    reportError: ReportError,
     ast: Expression|StoreMember,
     previouslyVisited: readonly AST[],
 ): TypeExpression => {
-    const { reportError, getParent, getBinding } = passthrough
 
     if (previouslyVisited.includes(ast)) {
         return UNKNOWN_TYPE
@@ -59,10 +58,10 @@ const inferTypeInner = computedFn((
             
             // infer callback type based on context
             const typeDictatedByParent = (() => {
-                const parent = getParent(ast)
+                const parent = Store.getParent(ast)
 
                 if (parent?.kind === "invocation") {
-                    const parentSubjectType = resolveType(passthrough, inferType(passthrough, parent.subject, visited))
+                    const parentSubjectType = resolveType(reportError, inferType(reportError, parent.subject, visited))
                     const thisArgIndex = parent.args.findIndex(a => a === ast)
 
                     if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
@@ -85,7 +84,7 @@ const inferTypeInner = computedFn((
                     funcType.returnType ??
                     typeDictatedByParent?.returnType ??
                     // if no return-type is declared, try inferring the type from the inner expression
-                    inferType(passthrough, ast.body, visited)
+                    inferType(reportError, ast.body, visited)
                 )
             }
     
@@ -99,15 +98,15 @@ const inferTypeInner = computedFn((
             }
         }
         case "binary-operator": {
-            const leftType = inferType(passthrough, ast.base, visited)
-            const leftTypeResolved = resolveType(passthrough, leftType)
+            const leftType = inferType(reportError, ast.base, visited)
+            const leftTypeResolved = resolveType(reportError, leftType)
 
             for (const [op, expr] of ast.ops) {
-                const rightType = inferType(passthrough, expr, visited)
-                const rightTypeResolved = resolveType(passthrough, rightType)
+                const rightType = inferType(reportError, expr, visited)
+                const rightTypeResolved = resolveType(reportError, rightType)
 
                 const types = BINARY_OPERATOR_TYPES[op.op].find(({ left, right }) =>
-                    subsumes(passthrough, left, leftTypeResolved) && subsumes(passthrough, right, rightTypeResolved))
+                    subsumes(reportError, left, leftTypeResolved) && subsumes(reportError, right, rightTypeResolved))
 
                 if (types == null) {
                     reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayType(leftType)}' and '${displayType(rightType)}'`));
@@ -130,9 +129,9 @@ const inferTypeInner = computedFn((
             // Creation of nominal values looks like/parses as function 
             // invocation, but needs to be treated differently
             if (ast.kind === "invocation" && ast.subject.kind === "local-identifier") {
-                const binding = getBinding(() => {}, ast.subject.name, ast.subject)
+                const binding = Store.getBinding(() => {}, ast.subject.name, ast.subject)
                 if (binding?.kind === 'type-binding') {
-                    const resolvedType = resolveType(passthrough, binding.type)
+                    const resolvedType = resolveType(reportError, binding.type)
 
                     if (resolvedType.kind === "nominal-type") {
                         return resolvedType
@@ -141,8 +140,8 @@ const inferTypeInner = computedFn((
             }
 
             const subjectType = ast.kind === "invocation"
-                ? bindInvocationGenericArgs(passthrough, ast)
-                : resolveType(passthrough, inferType(passthrough, ast.subject, visited))
+                ? bindInvocationGenericArgs(reportError, ast)
+                : resolveType(reportError, inferType(reportError, ast.subject, visited))
 
             if (subjectType.kind === "func-type") {
                 return subjectType.returnType ?? UNKNOWN_TYPE;
@@ -151,16 +150,16 @@ const inferTypeInner = computedFn((
             }
         }
         case "indexer": {
-            const baseType = resolveType(passthrough, inferType(passthrough, ast.subject, visited));
-            const indexerType = resolveType(passthrough, inferType(passthrough, ast.indexer, visited));
+            const baseType = resolveType(reportError, inferType(reportError, ast.subject, visited));
+            const indexerType = resolveType(reportError, inferType(reportError, ast.indexer, visited));
             
             if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "exact-string-literal") {
                 const key = indexerType.value.value;
-                const valueType = propertiesOf(passthrough, baseType)?.find(entry => entry.name.name === key)?.type;
+                const valueType = propertiesOf(reportError, baseType)?.find(entry => entry.name.name === key)?.type;
 
                 return valueType ?? UNKNOWN_TYPE;
             } else if (baseType.kind === "indexer-type") {
-                if (!subsumes(passthrough, baseType.keyType, indexerType)) {
+                if (!subsumes(reportError, baseType.keyType, indexerType)) {
                     return UNKNOWN_TYPE;
                 } else {
                     return {
@@ -173,7 +172,7 @@ const inferTypeInner = computedFn((
                         endIndex: undefined,
                     };
                 }
-            } else if (baseType.kind === "array-type" && subsumes(passthrough, NUMBER_TYPE, indexerType)) {
+            } else if (baseType.kind === "array-type" && subsumes(reportError, NUMBER_TYPE, indexerType)) {
                 return {
                     kind: "union-type",
                     members: [ baseType.element, NIL_TYPE ],
@@ -183,7 +182,7 @@ const inferTypeInner = computedFn((
                     startIndex: undefined,
                     endIndex: undefined,
                 }
-            } else if (baseType.kind === "tuple-type" && subsumes(passthrough, NUMBER_TYPE, indexerType)) {
+            } else if (baseType.kind === "tuple-type" && subsumes(reportError, NUMBER_TYPE, indexerType)) {
                 if (indexerType.kind === 'literal-type' && indexerType.value.kind === 'number-literal') {
                     return baseType.members[indexerType.value.value] ?? NIL_TYPE
                 } else {
@@ -203,10 +202,10 @@ const inferTypeInner = computedFn((
         }
         case "if-else-expression":
         case "switch-expression": {
-            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(passthrough, ast.value, visited)
+            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, ast.value, visited)
 
             const caseTypes = ast.cases.map(({ outcome }) => 
-                inferType(passthrough, outcome, visited))
+                inferType(reportError, outcome, visited))
 
             const unionType: UnionType = {
                 kind: "union-type",
@@ -218,13 +217,13 @@ const inferTypeInner = computedFn((
                 endIndex: undefined,
             };
 
-            if (!subsumes(passthrough, unionType, valueType)) {
+            if (!subsumes(reportError, unionType, valueType)) {
                 return {
                     ...unionType,
                     members: [
                         ...unionType.members,
                         ast.defaultCase 
-                            ? inferType(passthrough, ast.defaultCase, visited) 
+                            ? inferType(reportError, ast.defaultCase, visited) 
                             : NIL_TYPE
                     ]
                 }
@@ -235,7 +234,7 @@ const inferTypeInner = computedFn((
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
         case "debug": {
             if (isExpression(ast.inner)) {
-                const type = inferType(passthrough, ast.inner, visited)
+                const type = inferType(reportError, ast.inner, visited)
                 console.log(JSON.stringify({
                     bgl: given(ast.inner.code, code =>
                         given(ast.inner.startIndex, startIndex =>
@@ -249,15 +248,15 @@ const inferTypeInner = computedFn((
             }
         }
         case "parenthesized-expression":
-            return inferType(passthrough, ast.inner, visited);
+            return inferType(reportError, ast.inner, visited);
         case "inline-const":
-            return inferType(passthrough, ast.next, visited);
+            return inferType(reportError, ast.next, visited);
         case "property-accessor": {
-            const subjectType = resolveType(passthrough, inferType(passthrough, ast.subject, visited));
+            const subjectType = resolveType(reportError, inferType(reportError, ast.subject, visited));
             const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-                ? subtract(passthrough, subjectType, NIL_TYPE)
+                ? subtract(reportError, subjectType, NIL_TYPE)
                 : subjectType;
-            const propertyType = propertiesOf(passthrough, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)?.type
+            const propertyType = propertiesOf(reportError, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)?.type
 
             if (ast.optional && propertyType) {
                 return {
@@ -291,7 +290,7 @@ const inferTypeInner = computedFn((
                     case 'const-declaration':
                     case 'let-declaration':
                     case 'const-declaration-statement': {
-                        const baseType = decl.type ?? inferType(passthrough, decl.value, visited)
+                        const baseType = decl.type ?? inferType(reportError, decl.value, visited)
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
                             decl.kind === 'const-declaration' || decl.kind === 'const-declaration-statement'
                                 ? 'immutable'
@@ -305,7 +304,7 @@ const inferTypeInner = computedFn((
                     case 'func-declaration':
                     case 'proc-declaration':
                     case 'inline-const': {
-                        const baseType = resolveType(passthrough, inferType(passthrough, decl.value, visited))
+                        const baseType = resolveType(reportError, inferType(reportError, decl.value, visited))
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
                             decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
                                 ? 'immutable'
@@ -332,7 +331,7 @@ const inferTypeInner = computedFn((
                 }
             }
     
-            const binding = getBinding(reportError, ast.name, ast)
+            const binding = Store.getBinding(reportError, ast.name, ast)
 
             if (binding != null) {
                 switch (binding.kind) {
@@ -345,7 +344,7 @@ const inferTypeInner = computedFn((
                             return argType
                         }
 
-                        const inferredHolderType = inferType(passthrough, binding.holder, visited)
+                        const inferredHolderType = inferType(reportError, binding.holder, visited)
                         if (inferredHolderType.kind === 'func-type' || inferredHolderType.kind === 'proc-type') {
                             return inferredHolderType.args[binding.argIndex].type ?? UNKNOWN_TYPE
                         }
@@ -353,9 +352,9 @@ const inferTypeInner = computedFn((
                         return UNKNOWN_TYPE
                     }
                     case 'iterator': {
-                        const iteratorType = resolveType(passthrough, inferType(passthrough, binding.iterator, visited))
+                        const iteratorType = resolveType(reportError, inferType(reportError, binding.iterator, visited))
     
-                        if (!subsumes(passthrough, ITERATOR_OF_ANY, iteratorType)) {
+                        if (!subsumes(reportError, ITERATOR_OF_ANY, iteratorType)) {
                             reportError(assignmentError(binding.iterator, ITERATOR_OF_ANY, iteratorType))
                         }
     
@@ -400,7 +399,7 @@ const inferTypeInner = computedFn((
                 if (Array.isArray(entry)) {
                     const [name, value] = entry
 
-                    const type = resolveType(passthrough, inferType(passthrough, value, visited));
+                    const type = resolveType(reportError, inferType(reportError, value, visited));
                     return {
                         kind: "attribute",
                         name,
@@ -413,7 +412,7 @@ const inferTypeInner = computedFn((
                     }
                 } else {
                     const spreadObj = (entry as Spread).expr
-                    const spreadObjType = resolveType(passthrough, inferType(passthrough, spreadObj, visited));
+                    const spreadObjType = resolveType(reportError, inferType(reportError, spreadObj, visited));
 
                     if (spreadObjType.kind !== 'object-type') {
                         reportError(miscError(spreadObj, `Can only spread objects into an object; found ${displayType(spreadObjType)}`))
@@ -441,7 +440,7 @@ const inferTypeInner = computedFn((
 
             for (const entry of ast.entries) {
                 if (entry.kind === 'spread') {
-                    const spreadType = resolveType(passthrough, inferType(passthrough, entry.expr, visited))
+                    const spreadType = resolveType(reportError, inferType(reportError, entry.expr, visited))
 
                     if (spreadType.kind === 'array-type') {
                         arraySpreads.push(spreadType)
@@ -452,7 +451,7 @@ const inferTypeInner = computedFn((
                         memberTypes.push(UNKNOWN_TYPE)
                     }
                 } else {
-                    memberTypes.push(inferType(passthrough, entry, visited))
+                    memberTypes.push(inferType(reportError, entry, visited))
                 }
             }
 
@@ -469,7 +468,7 @@ const inferTypeInner = computedFn((
             } else {
                 return {
                     kind: "array-type",
-                    element: simplifyUnions(passthrough, {
+                    element: simplifyUnions(reportError, {
                         kind: "union-type",
                         members: [...memberTypes, ...arraySpreads.map(t => t.element)],
                         mutability: undefined,
@@ -488,7 +487,7 @@ const inferTypeInner = computedFn((
         }
         case "store-property":
         case "store-function":
-        case "store-procedure": return (ast.kind === "store-property" ? ast.type : undefined) ?? inferType(passthrough, ast.value, visited);
+        case "store-procedure": return (ast.kind === "store-property" ? ast.type : undefined) ?? inferType(reportError, ast.value, visited);
         case "string-literal": return STRING_TYPE;
         case "exact-string-literal":
         case "number-literal":
@@ -516,10 +515,8 @@ const inferTypeInner = computedFn((
  * b) if the subject is generic, bind its provided type args or try to infer 
  *    them
  */
-export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: Invocation): FuncType|ProcType {
-    const { reportError } = passthrough
-
-    let subjectType = resolveType(passthrough, inferType(passthrough, invocation.subject))
+export function bindInvocationGenericArgs(reportError: ReportError, invocation: Invocation): FuncType|ProcType {
+    let subjectType = resolveType(reportError, inferType(reportError, invocation.subject))
 
     if (subjectType.kind === 'generic-type' && (subjectType.inner.kind === "func-type" || subjectType.inner.kind === "proc-type")) {
         if (subjectType.typeParams.length > 0) {
@@ -529,7 +526,7 @@ export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: 
                 }
 
                 subjectType = parameterizedGenericType(
-                    passthrough, 
+                    reportError, 
                     subjectType, 
                     invocation.typeArgs
                 )
@@ -540,20 +537,20 @@ export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: 
                     ...funcOrProcType,
                     args: funcOrProcType.args.map((arg, index) => ({
                         ...arg,
-                        type: inferType(passthrough, invocation.args[index])
+                        type: inferType(reportError, invocation.args[index])
                     }))
                 }
 
                 // attempt to infer params for generic
                 const inferredBindings = fitTemplate(
-                    passthrough, 
+                    reportError, 
                     funcOrProcType, 
                     invocationSubjectType
                 );
 
                 if (inferredBindings.size === subjectType.typeParams.length) {
                     subjectType = parameterizedGenericType(
-                        passthrough, 
+                        reportError, 
                         subjectType, 
                         subjectType.typeParams.map(param =>
                             inferredBindings.get(param.name.name) ?? UNKNOWN_TYPE)
@@ -568,8 +565,7 @@ export function bindInvocationGenericArgs(passthrough: Passthrough, invocation: 
     return subjectType as FuncType|ProcType
 }
 
-export function parameterizedGenericType(passthrough: Passthrough, generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
-    const { getBinding, reportError } = passthrough
+export function parameterizedGenericType(reportError: ReportError, generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
     
     // index bindings by name
     const bindings: Record<string, TypeExpression> = {}
@@ -584,7 +580,7 @@ export function parameterizedGenericType(passthrough: Passthrough, generic: Gene
 
         // if we've found one of the generic params, substitute it
         if (ast.kind === 'named-type') {
-            const resolved = getBinding(reportError, ast.name.name, ast)
+            const resolved = Store.getBinding(reportError, ast.name.name, ast)
 
             if (resolved?.kind === 'type-binding' && resolved.type.kind === 'generic-param-type' && bindings[resolved.type.name.name]) {
                 return bindings[resolved.type.name.name]
@@ -598,9 +594,9 @@ export function parameterizedGenericType(passthrough: Passthrough, generic: Gene
 /**
  * Apply all union simplifications
  */
-function simplifyUnions(passthrough: Passthrough, type: TypeExpression): TypeExpression {
+function simplifyUnions(reportError: ReportError, type: TypeExpression): TypeExpression {
     return handleSingletonUnion(
-        distillUnion(passthrough,
+        distillUnion(reportError,
             flattenUnions(type)));
 }
 
@@ -636,7 +632,7 @@ function flattenUnions(type: TypeExpression): TypeExpression {
 /**
  * Remove redundant members in union type (members subsumed by other members)
  */
-function distillUnion(passthrough: Passthrough, type: TypeExpression): TypeExpression {
+function distillUnion(reportError: ReportError, type: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         const indicesToDrop = new Set<number>();
 
@@ -646,7 +642,7 @@ function distillUnion(passthrough: Passthrough, type: TypeExpression): TypeExpre
                     const a = type.members[i];
                     const b = type.members[j];
 
-                    if (subsumes(passthrough, b, a) && !indicesToDrop.has(j) && resolveType(passthrough, b).kind !== 'unknown-type') {
+                    if (subsumes(reportError, b, a) && !indicesToDrop.has(j) && resolveType(reportError, b).kind !== 'unknown-type') {
                         indicesToDrop.add(i);
                     }
                 }
@@ -685,35 +681,35 @@ function distillUnion(passthrough: Passthrough, type: TypeExpression): TypeExpre
     return type;
 }
 
-export function subtract(passthrough: Passthrough, type: TypeExpression, without: TypeExpression): TypeExpression {
-    type = resolveType(passthrough, type)
-    without = resolveType(passthrough, without)
+export function subtract(reportError: ReportError, type: TypeExpression, without: TypeExpression): TypeExpression {
+    type = resolveType(reportError, type)
+    without = resolveType(reportError, without)
 
     if (type.kind === "union-type") {
-        return simplifyUnions(passthrough, {
+        return simplifyUnions(reportError, {
             ...type,
-            members: type.members.filter(member => !subsumes(passthrough, without, member))
+            members: type.members.filter(member => !subsumes(reportError, without, member))
         })
     } else { // TODO: There's probably more we can do here
         return type
     }
 }
 
-function narrow(passthrough: Passthrough, type: TypeExpression, fit: TypeExpression): TypeExpression {
+function narrow(reportError: ReportError, type: TypeExpression, fit: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
-        return simplifyUnions(passthrough, {
+        return simplifyUnions(reportError, {
             ...type,
-            members: type.members.filter(member => subsumes(passthrough, fit, member))
+            members: type.members.filter(member => subsumes(reportError, fit, member))
         })
     } else { // TODO: There's probably more we can do here
         return type
     }
 }
 
-function resolveRefinements(getParent: GetParent, epxr: Expression|StoreMember): Refinement[] {
+function resolveRefinements(epxr: Expression|StoreMember): Refinement[] {
     const refinements: Refinement[] = []
 
-    for (let [current, parent] = [epxr, getParent(epxr)] as [AST, AST|undefined]; parent != null;) {
+    for (let [current, parent] = [epxr, Store.getParent(epxr)] as [AST, AST|undefined]; parent != null;) {
 
         switch (current.kind) {
             case 'case': {
@@ -775,7 +771,7 @@ function resolveRefinements(getParent: GetParent, epxr: Expression|StoreMember):
         }
 
         current = parent
-        parent = getParent(parent)
+        parent = Store.getParent(parent)
     }
 
     return refinements
@@ -797,12 +793,10 @@ function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
 }
 
 export const propertiesOf = computedFn((
-    passthrough: Passthrough,
+    reportError: ReportError,
     type: TypeExpression
 ): readonly Attribute[] | undefined => {
-    const { reportError, getBinding } = passthrough
-
-    const resolvedType = resolveType(passthrough, type)
+    const resolvedType = resolveType(reportError, type)
 
     switch (resolvedType.kind) {
         case "nominal-type": {
@@ -817,8 +811,8 @@ export const propertiesOf = computedFn((
         }
         case "iterator-type":
         case "plan-type": {
-            const generic = (getBinding(reportError, resolvedType.kind === 'iterator-type' ? 'Iterator' : 'Plan', resolvedType) as TypeBinding).type
-            return propertiesOf(passthrough, {
+            const generic = (Store.getBinding(reportError, resolvedType.kind === 'iterator-type' ? 'Iterator' : 'Plan', resolvedType) as TypeBinding).type
+            return propertiesOf(reportError, {
                 kind: "bound-generic-type",
                 generic,
                 typeArgs: [resolvedType.inner],
@@ -833,10 +827,10 @@ export const propertiesOf = computedFn((
             const attrs = [...resolvedType.entries]
 
             for (const spread of resolvedType.spreads) {
-                const resolved = getBinding(reportError, spread.name.name, spread)
+                const resolved = Store.getBinding(reportError, spread.name.name, spread)
 
                 if (resolved != null && resolved.kind === 'type-binding' && resolved.type.kind === 'object-type') {
-                    attrs.push(...(propertiesOf(passthrough, resolved.type) ?? []))
+                    attrs.push(...(propertiesOf(reportError, resolved.type) ?? []))
                 } else {
                     if (resolved != null) {
                         if (resolved.kind !== 'type-binding') {
@@ -882,7 +876,7 @@ export const propertiesOf = computedFn((
 
                 const memberType = memberDeclaredType(member) && memberDeclaredType(member)?.kind !== "func-type"
                     ? memberDeclaredType(member) as TypeExpression
-                    : inferType(passthrough, member.value);
+                    : inferType(reportError, member.value);
 
                 const mutability = (
                     memberType.mutability == null ? undefined :
@@ -928,15 +922,14 @@ const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
  * them. Used to infer generic args when not supplied.
  */
 function fitTemplate(
-    passthrough: Passthrough,
+    reportError: ReportError,
     parameterized: TypeExpression, 
     reified: TypeExpression, 
 ): ReadonlyMap<string, TypeExpression> {
-    const { reportError, getBinding } = passthrough
 
     function isGenericParam(type: TypeExpression): type is NamedType {
         if (type.kind === 'named-type') {
-            const binding = getBinding(reportError, type.name.name, type)
+            const binding = Store.getBinding(reportError, type.name.name, type)
             return binding?.kind === 'type-binding' && binding.type.kind === 'generic-param-type'
         }
 
@@ -952,7 +945,7 @@ function fitTemplate(
     if (parameterized.kind === "func-type" && reified.kind === "func-type") {
         const matchGroups = [
             ...parameterized.args.map((arg, index) =>
-                fitTemplate(passthrough, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE)),
+                fitTemplate(reportError, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE)),
             // fitTemplate(reportError, getParent, getBinding, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE)
         ]
 
@@ -962,8 +955,8 @@ function fitTemplate(
             for (const [key, value] of map.entries()) {
                 const existing = matches.get(key)
                 if (existing) {
-                    if (!subsumes(passthrough, existing, value)) {
-                        matches.set(key, simplifyUnions(passthrough, {
+                    if (!subsumes(reportError, existing, value)) {
+                        matches.set(key, simplifyUnions(reportError, {
                             kind: "union-type",
                             members: [value, existing],
                             mutability: undefined,
@@ -980,7 +973,7 @@ function fitTemplate(
     }
 
     if (parameterized.kind === "array-type" && reified.kind === "array-type") {
-        return fitTemplate(passthrough, parameterized.element, reified.element);
+        return fitTemplate(reportError, parameterized.element, reified.element);
     }
 
     if (parameterized.kind === "union-type") {
@@ -1005,7 +998,7 @@ function fitTemplate(
             if (parameterizedMembersRemaining.length === 1 && isGenericParam(parameterizedMembersRemaining[0])) {
                 const matches = new Map<string, TypeExpression>();
 
-                matches.set(parameterizedMembersRemaining[0].name.name, simplifyUnions(passthrough, {
+                matches.set(parameterizedMembersRemaining[0].name.name, simplifyUnions(reportError, {
                     kind: "union-type",
                     members: reifiedMembersRemaining,
                     mutability: undefined,

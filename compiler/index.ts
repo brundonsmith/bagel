@@ -4,7 +4,7 @@ import { BagelError, prettyError } from "./errors.ts";
 import { all, cacheDir, cachedModulePath, esOrNone, on, pathIsRemote, sOrNone } from "./utils/misc.ts";
 
 import { autorun, configure } from "./mobx.ts";
-import Store, { BGL_PRELUDE, moduleIsCore } from "./store.ts";
+import Store from "./store.ts";
 import { ModuleName } from "./_model/common.ts";
 
 configure({
@@ -56,19 +56,19 @@ autorun(async () => {
                 const path = cachedModulePath(module)
                 if (await fs.exists(path)) {  // module has already been cached locally
                     const source = await Deno.readTextFile(path)
-                    Store.modulesSource.set(module, (!moduleIsCore(module) ? BGL_PRELUDE : '') + source)
+                    Store.setSource(module, source)
                 } else {  // need to download module before compiling
                     const res = await fetch(module)
 
                     if (res.status === 200) {
                         const source = await res.text()
                         await Deno.writeTextFile(path, source)
-                        Store.modulesSource.set(module, (!moduleIsCore(module) ? BGL_PRELUDE : '') + source)
+                        Store.setSource(module, source)
                     }
                 }
             } else {  // local disk import
                 const source = await Deno.readTextFile(module)
-                Store.modulesSource.set(module, (!moduleIsCore(module) ? BGL_PRELUDE : '') + source)
+                Store.setSource(module, source)
             }
         }
     }
@@ -77,16 +77,15 @@ autorun(async () => {
 // add imported modules to set
 autorun(() => {
     for (const module of Store.modules) {
-        const source = Store.modulesSource.get(module)
-        if (source) {
-            const { ast } = Store.parsed(module, source)
+        const parsed = Store.parsed(module)
 
-            for (const decl of ast.declarations) {
+        if (parsed) {
+            for (const decl of parsed.ast.declarations) {
                 if (decl.kind === "import-declaration") {
                     const importedModule = canonicalModuleName(module, decl.path.value)
 
                     if (!Store.modules.has(importedModule)) {
-                        Store.modules.add(importedModule)
+                        Store.registerModule(importedModule)
                     }
                 }
             }
@@ -135,11 +134,11 @@ autorun(() => {
     const config = Store.config
 
     if (config != null && !Store.modulesOutstanding) {
-        const compiledModules = [...Store.modulesSource.entries()].map(([module, source]) => ({
+        const compiledModules = [...Store.modulesSource.keys()].map(module => ({
             jsPath: pathIsRemote(module)
                 ? cachedModulePath(module) + '.ts'
                 : bagelFileToTsFile(module),
-            js: Store.compiled(module, Store.parsed(module, source).ast)
+            js: Store.compiled(module)
         }))
 
         if (config.emit && !Store.modulesOutstanding) {
@@ -172,7 +171,7 @@ autorun(() => {
                         const fileContents = await Deno.readTextFile(module);
 
                         if (fileContents && fileContents !== Store.modulesSource.get(module)) {
-                            Store.modulesSource.set(module, (!moduleIsCore(module) ? BGL_PRELUDE : '') + fileContents)
+                            Store.setSource(module, fileContents)
                         }
                     } catch (e) {
                         console.error("Failed to read module " + module + "\n")

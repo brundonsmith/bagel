@@ -1,6 +1,6 @@
 import { compile } from "../compiler/4_compile/index.ts";
 import { prettyError } from "../compiler/errors.ts";
-import Store, { BGL_PRELUDE } from "../compiler/store.ts";
+import Store, { BGL_PRELUDE_COMPILED } from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
@@ -471,8 +471,6 @@ Deno.test({
   }
 })
 
-const COMPILED_BGL_PRELUDE = `import { iter, logp, logf } from "../../lib/wrappers/prelude.bgl.ts";\n\n`
-
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>' as ModuleName
 
@@ -487,19 +485,24 @@ function testCompile(code: string, exp: string) {
     emit: false
   })
   
-  const { ast, errors } = Store.parsed(moduleName, BGL_PRELUDE + code)
-  const compiled = compile(Store.getBinding, ast, moduleName)
+  const parsed = Store.parsed(moduleName)
 
-  if (errors.length > 0) {
-    throw `\n${code}\nFailed to parse:\n` +
-      errors.map(err => prettyError(moduleName, err)).join("\n")
-  }
+  if (parsed) {
+    const { ast, errors } = parsed
 
-  if (normalize(compiled) !== normalize(COMPILED_BGL_PRELUDE + exp)) {
-    throw `Compiler output did not match expected:
-bagel:\n${code}
-expected:\n${COMPILED_BGL_PRELUDE + exp}
-received:\n${compiled}`;
+    const compiled = compile(ast, moduleName)
+  
+    if (errors.length > 0) {
+      throw `\n${code}\nFailed to parse:\n` +
+        errors.map(err => prettyError(moduleName, err)).join("\n")
+    }
+  
+    if (normalize(compiled) !== normalize(BGL_PRELUDE_COMPILED + '\n' + exp)) {
+      throw `Compiler output did not match expected:
+  bagel:\n${code}
+  expected:\n${BGL_PRELUDE_COMPILED + '\n' + exp}
+  received:\n${compiled}`;
+    }
   }
 }
 
