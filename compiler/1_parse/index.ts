@@ -307,11 +307,16 @@ const indexerType: ParseFunction<IndexerType> = (module, code, startIndex) =>
         given(parseExact("const")(module, code, index), ({ parsed: constant, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: constant, newIndex: index })))), ({ parsed: constant, newIndex: indexAfterConstant }) =>
     given(consume(code, indexAfterConstant ?? startIndex, "{"), index =>
+    given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "["), index =>
+    given(consumeWhitespace(code, index), index =>
     expec(typeExpression(module, code, index), err(code, index, 'Type expression for key'), ({ parsed: keyType, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index =>
     given(consume(code, index, ":"), index =>
+    given(consumeWhitespace(code, index), index =>
     given(typeExpression(module, code, index), ({ parsed: valueType, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
         parsed: {
             kind: "indexer-type",
@@ -324,7 +329,7 @@ const indexerType: ParseFunction<IndexerType> = (module, code, startIndex) =>
             endIndex: index,
         },
         newIndex: index,
-    })))))))))
+    }))))))))))))))
 
 const tupleType: ParseFunction<TupleType> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, (module, code, index) =>
@@ -1976,6 +1981,6 @@ const TYPE_PARSER = new TieredParser<TypeExpression>([
     [ maybeType ],
     [ arrayType ],
     [ primitiveType, elementType, funcType, procType, 
-        literalType, namedType, objectType, parenthesizedType, indexerType, 
+        literalType, namedType, indexerType, objectType, parenthesizedType, 
         tupleType, unknownType ],
 ])
