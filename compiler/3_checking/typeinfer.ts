@@ -39,7 +39,6 @@ export function inferType(
 }
 
 const inferTypeInner = computedFn((
-    passthrough: Passthrough,
     reportError: ReportError,
     ast: Expression|StoreMember,
     previouslyVisited: readonly AST[],
