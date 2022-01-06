@@ -151,6 +151,7 @@ function compileOne(getBinding: GetBinding, excludeTypes: boolean, module: strin
         case "boolean-type": return `boolean`;
         case "nil-type": return `(null | undefined)`;
         case "unknown-type": return `unknown`;
+        case "parenthesized-type": return `(${compileOne(getBinding, excludeTypes, module, ast.inner)})`
 
         default:
             throw Error("Couldn't compile '" + ast.kind + "'");
