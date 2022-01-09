@@ -474,15 +474,12 @@ Deno.test({
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>' as ModuleName
 
-  Store.initializeFromSource({
-    [moduleName]: code
-  }, {
-    entryFileOrDir: moduleName,
-    singleEntry: true,
-    bundle: false,
-    watch: false,
-    includeTests: false,
-    emit: false
+  Store.start({
+    mode: 'mock',
+    modules: {
+      [moduleName]: code
+    },
+    watch: undefined
   })
   
   const parsed = Store.parsed(moduleName)

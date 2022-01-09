@@ -1,4 +1,5 @@
 import { os, path } from "../deps.ts";
+import { Mode } from "../store.ts";
 import { AST } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 
@@ -199,12 +200,26 @@ export const cacheDir = () => {
     return path.resolve(tempDir, 'bagel', 'cache')
 }
 
-export function cachedModulePath(module: ModuleName): string {
+export function cachedFilePath(module: string): string {
     return path.resolve(cacheDir(), encodeURIComponent(module))
 }
 
 export function pathIsRemote(path: string): boolean {
     return path.match(/^https?:\/\//) != null
+}
+
+export function jsFileLocation(module: ModuleName, mode: Mode) {
+    return pathIsRemote(module) || mode?.mode !== 'transpile'
+        ? cachedFilePath(module + '.ts')
+        : bagelFileToTsFile(module)
+}
+
+
+export function bagelFileToTsFile(module: ModuleName, isBundle?: boolean): string {
+    return path.resolve(
+        path.dirname(module), 
+        path.basename(module).split(".")[0] + (isBundle ? '.bundle.bgl.js' : '.bgl.ts')
+    )
 }
 
 const NOMINAL_FLAG = Symbol('NOMINAL_FLAG')

@@ -59,15 +59,12 @@ Deno.test({
 async function testSideEffects(bgl: string, expected: any[]) {
     const moduleName = "<test>" as ModuleName;
 
-    Store.initializeFromSource({
-        [moduleName]: bgl,
-    }, {
-        entryFileOrDir: moduleName,
-        singleEntry: true,
-        bundle: false,
-        watch: false,
-        includeTests: false,
-        emit: false,
+    Store.start({
+        mode: "mock",
+        modules: {
+            [moduleName]: bgl
+        },
+        watch: undefined
     });
 
     const { ast, errors } = Store.parsed(moduleName) as { ast: Module, errors: BagelError[] };

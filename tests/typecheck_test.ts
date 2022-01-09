@@ -1138,15 +1138,12 @@ Deno.test({
 function testTypecheck(code: string, shouldFail: boolean): void {
   const moduleName = "<test>" as ModuleName
 
-  Store.initializeFromSource({
-    [moduleName]: code
-  }, {
-    entryFileOrDir: moduleName,
-    singleEntry: true,
-    bundle: false,
-    watch: false,
-    includeTests: false,
-    emit: false
+  Store.start({
+    mode: 'mock',
+    modules: {
+      [moduleName]: code
+    },
+    watch: undefined
   })
   
   const parsed = Store.parsed(moduleName)
@@ -1170,13 +1167,10 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
       value
     ]))
 
-  Store.initializeFromSource(modules, {
-    entryFileOrDir: 'foo' as ModuleName,
-    singleEntry: true,
-    bundle: false,
-    watch: false,
-    includeTests: false,
-    emit: false
+  Store.start({
+    mode: 'mock',
+    modules,
+    watch: undefined
   })
   
   const errors = [...Store.allErrors.values()].flat()

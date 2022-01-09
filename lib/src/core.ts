@@ -7,9 +7,9 @@ export {
     configure,
     makeObservable,
     autorun
-} from "https://jspm.dev/npm:mobx@6.3.3"
+} from "mobx"
 
-import { when, reaction } from "https://jspm.dev/npm:mobx@6.3.3";
+import { when, reaction } from "mobx";
 
 export function reactionUntil<T>(
     data: () => T,
@@ -27,14 +27,14 @@ export function reactionUntil<T>(
 
 export {
     computedFn
-} from "https://jspm.dev/npm:mobx-utils@6.0.4"
+} from "mobx-utils"
 
 
 // Preact
 export {
     h
-} from "https://jspm.dev/npm:preact"
-import { render as prender } from "https://jspm.dev/npm:preact"
+} from "preact"
+import { render as prender } from "preact"
 export function render(el: unknown) {
     // @ts-ignore
     prender(el, document.body)

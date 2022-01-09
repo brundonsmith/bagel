@@ -11,46 +11,86 @@ import { AST, Module } from "./_model/ast.ts";
 import { ModuleName, ReportError } from "./_model/common.ts";
 import { areSame, iterateParseTree } from "./utils/ast.ts";
 
-type Config = {
-    readonly entryFileOrDir: ModuleName,
-    readonly singleEntry: boolean,
-    readonly bundle: boolean,
-    readonly watch: boolean,
-    readonly includeTests: boolean,
-    readonly emit: boolean
-}
+export type Mode =
+    | { mode: "build", entryFile: ModuleName, watch: boolean }
+    | { mode: "run", entryFile: ModuleName, platform?: 'node'|'deno', watch: boolean }
+    | { mode: "check", fileOrDir: string, watch: boolean }
+    | { mode: "transpile", fileOrDir: string, watch: boolean }
+    | { mode: "test", fileOrDir: string, platform?: 'node'|'deno', watch: boolean }
+    | { mode: "format", fileOrDir: string, watch: boolean }
+    | { mode: "mock", modules: Record<ModuleName, string>, watch: undefined } // for internal testing only!
+
 class _Store {
 
     constructor() {
         makeAutoObservable(this)
     }
 
-    config: undefined | Config = undefined
+    
+    // State
+    mode: undefined | Mode = undefined
 
+    private _modules = new Set<ModuleName>()
     public get modules(): ReadonlySet<ModuleName> {
         return this._modules
     }
-    private _modules = new Set<ModuleName>()
 
+    private _modulesSource = new Map<ModuleName, string>()
     public get modulesSource(): ReadonlyMap<ModuleName, string> {
         return this._modulesSource
     }
-    private _modulesSource = new Map<ModuleName, string>()
 
-    readonly initializeFromEntry = (modules: readonly ModuleName[], config: Config) => {
-        this._modules = new Set(modules)
-        this.config = config
+
+    // Computed
+    get done() {
+        return this.mode != null && this.modules.size > 0 && this.modulesSource.size >= this.modules.size
     }
 
-    readonly initializeFromSource = (modulesSource: Record<ModuleName, string>, config: Config) => {
-        this._modulesSource = new Map()
-
-        for (const [k, v] of Object.entries(modulesSource)) {
-            const moduleName = k as ModuleName
-            this.setSource(moduleName, v)
+    get allErrors() {
+        const allErrors = new Map<ModuleName, BagelError[]>()
+        
+        for (const module of this._modulesSource.keys()) {
+            allErrors.set(module, [])
         }
 
-        this.config = config
+        for (const module of this._modulesSource.keys()) {
+            const parsed = this.parsed(module)
+            if (parsed) {
+                const { errors: parseErrors } = parsed
+                const typecheckErrors = this.typeerrors(module)
+
+                for (const err of [...parseErrors, ...typecheckErrors].filter((err, index, arr) => arr.findIndex(other => errorsEquivalent(err, other)) === index)) {
+                    const errorModule = err.ast?.module ?? module;
+                    (allErrors.get(errorModule) as BagelError[]).push(err)
+                }
+            }
+        }
+
+        return allErrors
+    }
+
+
+    // Actions
+    readonly start = async (mode: Mode) => {
+        this.mode = mode
+
+        if (mode.mode === 'mock') {
+            this._modulesSource = new Map()
+
+            for (const [k, v] of Object.entries(mode.modules)) {
+                const moduleName = k as ModuleName
+                this.setSource(moduleName, v)
+            }
+        } else if (mode.mode === 'build' || mode.mode === 'run') {
+            this._modules.add(mode.entryFile)
+        } else {
+            const singleEntry = !(await Deno.stat(mode.fileOrDir)).isDirectory
+            const allFiles = singleEntry 
+                ? [ mode.fileOrDir ]
+                : await getAllFiles(mode.fileOrDir);
+
+            this._modules = new Set(allFiles as ModuleName[])
+        }
     }
 
     readonly registerModule = (moduleName: ModuleName) => {
@@ -61,10 +101,8 @@ class _Store {
         this._modulesSource.set(moduleName, (!moduleIsCore(moduleName) ? BGL_PRELUDE : '') + source)
     }
 
-    get modulesOutstanding() {
-        return this._modules.size === 0 || this._modules.size > this._modulesSource.size
-    }
 
+    // Computed fns
     readonly parsed = computedFn((moduleName: ModuleName): { ast: Module, errors: readonly BagelError[] } | undefined => {
         const source = this._modulesSource.get(moduleName)
 
@@ -90,29 +128,6 @@ class _Store {
         return errors
     })
 
-    get allErrors() {
-        const allErrors = new Map<ModuleName, BagelError[]>()
-        
-        for (const module of this._modulesSource.keys()) {
-            allErrors.set(module, [])
-        }
-
-        for (const module of this._modulesSource.keys()) {
-            const parsed = this.parsed(module)
-            if (parsed) {
-                const { errors: parseErrors } = parsed
-                const typecheckErrors = this.typeerrors(module)
-
-                for (const err of [...parseErrors, ...typecheckErrors].filter((err, index, arr) => arr.findIndex(other => errorsEquivalent(err, other)) === index)) {
-                    const errorModule = err.ast?.module ?? module;
-                    (allErrors.get(errorModule) as BagelError[]).push(err)
-                }
-            }
-        }
-
-        return allErrors
-    }
-
     readonly compiled = computedFn((moduleName: ModuleName): string => {
         const ast = this.parsed(moduleName)?.ast
 
@@ -126,7 +141,7 @@ class _Store {
             compile(
                 ast, 
                 moduleName, 
-                this.config?.includeTests
+                this.mode?.mode === 'test'
             )
         )
     })
@@ -176,7 +191,7 @@ export const IMPORTED_ITEMS = [ 'autorun',  'observable', 'computed', 'configure
 ]
 
 const JS_PRELUDE = `
-import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "../lib/src/core.ts";
+import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "C:/Users/brundolf/git/bagel/lib/src/core.ts";
 `
 export const MOBX_CONFIGURE = `
 ___configure({
@@ -187,15 +202,29 @@ ___configure({
 });`
 
 const BGL_PRELUDE = `
-from '../lib/wrappers/prelude' import { iter, logp, logf, BagelConfig }
+from 'C:/Users/brundolf/git/bagel/lib/wrappers/prelude' import { iter, logp, logf, BagelConfig }
 `
 export const BGL_PRELUDE_COMPILED = compile(parse('foo' as ModuleName, BGL_PRELUDE, () => {}), 'foo' as ModuleName)
 
-export function canonicalModuleName(importerModule: ModuleName, importPath: string): ModuleName {
+export function canonicalModuleName(importerModule: string, importPath: string): ModuleName {
     if (pathIsRemote(importPath)) {
         return importPath as ModuleName
     } else {
         const moduleDir = path.dirname(importerModule);
         return (path.resolve(moduleDir, importPath) + ".bgl") as ModuleName
     }
+}
+
+async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
+    for await (const file of Deno.readDir(dirPath)) {
+        const filePath = path.resolve(dirPath, file.name);
+
+        if ((await Deno.stat(filePath)).isDirectory) {
+            await getAllFiles(filePath, arrayOfFiles);
+        } else {
+            arrayOfFiles.push(filePath);
+        }
+    }
+  
+    return arrayOfFiles;
 }

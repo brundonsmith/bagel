@@ -1,0 +1,19 @@
+{
+    "name": "bagel-lib",
+    "version": "1.0.0",
+    "description": "Runtime library for bagel language",
+    "main": "dist.js",
+    "scripts": {
+        "build": "esbuild src/index.ts --bundle --platform=node --outfile=./lib.ts",
+        "watch": "esbuild src/index.ts --bundle --platform=node --outfile=./lib.ts --watch"
+    },
+    "author": "Brandon Smith",
+    "license": "MIT",
+    "private": true,
+    "dependencies": {
+        "@js-temporal/polyfill": "^0.2.0",
+        "mobx": "^6.3.2",
+        "mobx-utils": "^6.0.4",
+        "preact": "^10.5.14"
+    }
+}

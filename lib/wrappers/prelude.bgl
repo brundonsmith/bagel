@@ -1,6 +1,6 @@
 
 js#
-import { log, iter as ___iter, ___typeof } from '../src/core.ts'
+import { log, iter as ___iter, ___typeof } from 'C:\\Users\\brundolf\\git\\bagel\\lib\\src\\core.ts'
 #js
 
 export proc logp(x: unknown) {
@@ -25,3 +25,12 @@ export type Iterator = <T>(const {
     filter: (fn: (el: T) => boolean) => Iterator<T>,
     array: () => T[],
 })
+
+export type LintRuleName = 'foo'
+
+// TODO: Optional properties
+export type BagelConfig = {
+    lintRules: {[LintRuleName]: 'error'|'warn'|'off'}?,
+    scripts: {[string]: () {}}?,
+    platforms: 'all' | ('browser'|'node'|'deno')[]? // restrict standard libraries based on these
+}

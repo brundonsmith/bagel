@@ -1,6 +1,6 @@
 import { path } from "../deps.ts";
-import Store from "../store.ts";
-import { cachedModulePath, pathIsRemote } from "../utils/misc.ts";
+import Store, { canonicalModuleName, Mode } from "../store.ts";
+import { cachedFilePath, jsFileLocation, pathIsRemote } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { getBindingMutability, ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, StoreDeclaration, StoreFunction, StoreProperty } from "../_model/declarations.ts";
@@ -43,7 +43,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             compileOne(excludeTypes, module, name) + (alias ? ` as ${compileOne(excludeTypes, module, alias)}` : ``)
-        ).join(", ")} } from "${pathIsRemote(ast.path.value) ? (path.relative(path.dirname(module), cachedModulePath(ast.path.value as ModuleName)).replaceAll(/\\/g, '/') + '.ts') : (ast.path.value + '.bgl.ts')}";`;
+        ).join(", ")} } from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}";`;
         case "type-declaration":  return (
             excludeTypes
                 ? ''
@@ -228,7 +228,7 @@ const compileFunc = (excludeTypes: boolean, module: string, func: Func): string 
 
 const compileFuncSignature = (excludeTypes: boolean, module: string, func: Func): string => {
     const typeParams = !excludeTypes && func.type.kind === 'generic-type'
-        ? `<${func.type.typeParams.map(p => p.name).join(',')}>`
+        ? `<${func.type.typeParams.map(p => p.name.name).join(',')}>`
         : ''
     const funcType = func.type.kind === 'generic-type' ? func.type.inner as FuncType : func.type
     
