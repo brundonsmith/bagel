@@ -2,7 +2,7 @@ import { Module } from "../_model/ast.ts";
 import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericType, isTypeExpression, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { assignmentError,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions } from "./typeinfer.ts";
 import { getBindingMutability, ReportError } from "../_model/common.ts";
 import { displayAST, displayType, iterateParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
@@ -362,14 +362,14 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
         case "maybe-type": {
             const { mutability, module, code, startIndex, endIndex } = type
 
-            return {
+            return resolveType(reportError, {
                 kind: "union-type",
                 members: [
                     type.inner,
                     NIL_TYPE
                 ],
                 mutability, module, code, startIndex, endIndex
-            }
+            })
         }
         case "bound-generic-type": {
             const resolvedGeneric = resolveType(reportError, type.generic)
@@ -379,6 +379,20 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
                 return UNKNOWN_TYPE
             } else {
                 return resolveType(reportError, parameterizedGenericType(reportError, resolvedGeneric, type.typeArgs))
+            }
+        }
+        case "union-type": {
+            const resolved = {
+                ...type,
+                members: type.members.map(member => resolveType(reportError, member))
+            }
+
+            const simplified = simplifyUnions(reportError, resolved)
+
+            if (simplified.kind === 'union-type') {
+                return simplified
+            } else {
+                return resolveType(reportError, simplified)
             }
         }
     }
