@@ -1,0 +1,37 @@
+
+export type AST = JSONObject | JSONArray | JSONString | JSONNumber | JSONBoolean | JSONNull
+
+export type JSONObject = {
+    kind: 'json-object',
+    entries: { key: string, value: AST }
+}
+
+export type JSONArray = {
+    kind: 'json-array',
+    entries: AST[]
+}
+
+export type JSONString = {
+    kind: 'json-string',
+    value: string
+}
+
+export type JSONNumber = {
+    kind: 'json-number',
+    value: number
+}
+
+export type JSONBoolean = {
+    kind: 'json-boolean',
+    value: boolean
+}
+
+export type JSONNull = {
+    kind: 'json-null'
+}
+
+export type Error = {
+    str: string,
+    index: number,
+    message: string
+}

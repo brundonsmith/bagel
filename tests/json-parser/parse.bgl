@@ -1,0 +1,41 @@
+
+from './model' import { AST, JSONObject, JSONArray, JSONString, JSONNumber, JSONBoolean, JSONNull, Error }
+
+export const parse = json
+
+func json(str: string, index: number): AST? =>
+    const obj = object(str, index),
+    if obj != nil {
+        obj
+    } else {
+        const arr = array(str, index),
+        if arr != nil {
+            arr
+        } else {
+            const s = strin(str, index),
+            if s != nil {
+                s
+            } else {
+                const n = num(str, index),
+
+                if n != nil {
+                    n
+                } else {
+                    const b = bool(str, index),
+
+                    if b != nil {
+                        b
+                    } else {
+                        null(str, index)
+                    }
+                }
+            }
+        }
+    }
+
+func object(str: string, index: number): JSONObject? => nil
+func array(str: string, index: number): JSONArray? => nil
+func strin(str: string, index: number): JSONString? => nil
+func num(str: string, index: number): JSONNumber? => nil
+func bool(str: string, index: number): JSONBoolean? => nil
+func null(str: string, index: number): JSONNull? => nil
