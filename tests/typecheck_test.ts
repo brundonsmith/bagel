@@ -1,4 +1,4 @@
-import { BagelError, prettyError } from "../compiler/errors.ts";
+import { BagelError, prettyProblem } from "../compiler/errors.ts";
 import Store, { canonicalModuleName } from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
@@ -1149,11 +1149,11 @@ function testTypecheck(code: string, shouldFail: boolean): void {
   const parsed = Store.parsed(moduleName)
 
   if (parsed) {
-    const errors = Store.allErrors.get(moduleName) as BagelError[]
+    const errors = Store.allProblems.get(moduleName) as BagelError[]
   
     if (!shouldFail && errors.length > 0) {
       throw `\n${code}\n\nType check should have succeeded but failed with errors\n` +
-        errors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
+        errors.map(err => prettyProblem("<test>" as ModuleName, err)).join("\n")
     } else if (shouldFail && errors.length === 0) {
       throw `\n${code}\n\nType check should have failed but succeeded`
     }
@@ -1173,11 +1173,11 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
     watch: undefined
   })
   
-  const errors = [...Store.allErrors.values()].flat()
+  const errors = [...Store.allProblems.values()].flat()
 
   if (!shouldFail && errors.length > 0) {
     throw `Type check should have succeeded but failed with errors\n\n` +
-    errors.map(err => prettyError("<test>" as ModuleName, err)).join("\n")
+    errors.map(err => prettyProblem("<test>" as ModuleName, err)).join("\n")
   } else if (shouldFail && errors.length === 0) {
     throw `Type check should have failed but succeeded`
   }

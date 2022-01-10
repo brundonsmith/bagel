@@ -1,5 +1,5 @@
 import { compile } from "../compiler/4_compile/index.ts";
-import { prettyError } from "../compiler/errors.ts";
+import { prettyProblem } from "../compiler/errors.ts";
 import Store, { BGL_PRELUDE_COMPILED } from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
@@ -491,7 +491,7 @@ function testCompile(code: string, exp: string) {
   
     if (errors.length > 0) {
       throw `\n${code}\nFailed to parse:\n` +
-        errors.map(err => prettyError(moduleName, err)).join("\n")
+        errors.map(err => prettyProblem(moduleName, err)).join("\n")
     }
   
     if (normalize(compiled) !== normalize(BGL_PRELUDE_COMPILED + '\n' + exp)) {
