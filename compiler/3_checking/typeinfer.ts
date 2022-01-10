@@ -295,8 +295,22 @@ const inferTypeInner = computedFn((
                                 ? 'immutable'
                                 : mutability)
 
+                        // if this is a let-declaration, its type may need to be made less exact to enable reasonable mutation
+                        const correctedBaseType = (
+                            decl.kind === 'let-declaration' ?
+                                (
+                                    baseType.kind === 'literal-type' && baseType.value.kind === 'exact-string-literal' ? STRING_TYPE :
+                                    baseType.kind === 'literal-type' && baseType.value.kind === 'number-literal' ? NUMBER_TYPE :
+                                    baseType.kind === 'literal-type' && baseType.value.kind === 'boolean-literal' ? BOOLEAN_TYPE :
+                                    baseType.kind === 'tuple-type' ? { ...baseType, kind: 'array-type', element: { kind: 'union-type', members: baseType.members, ...TYPE_AST_NOISE } } :
+                                    // TODO: This needs to include object literals, and also probably be recursive. Might need its own function.
+                                    baseType
+                                )
+                            : baseType
+                        )
+
                         return {
-                            ...baseType,
+                            ...correctedBaseType,
                             mutability
                         } as TypeExpression
                     }
