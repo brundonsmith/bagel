@@ -1,11 +1,12 @@
 import { Colors, path, fs } from "./deps.ts";
 
-import { BagelError, prettyError } from "./errors.ts";
+import { BagelError, prettyProblem } from "./errors.ts";
 import { all, cacheDir, cachedFilePath, esOrNone, on, pathIsRemote, sOrNone, bagelFileToTsFile, jsFileLocation } from "./utils/misc.ts";
 
 import { autorun, configure } from "./mobx.ts";
 import Store, { Mode } from "./store.ts";
 import { ModuleName } from "./_model/common.ts";
+import { LintProblem } from "./other/lint.ts";
 
 configure({
     enforceActions: "never",
@@ -116,7 +117,7 @@ autorun(() => {
 /**
  * Print list of errors
  */
-function printErrors(errors: Map<ModuleName, BagelError[]>, watch?: boolean) {
+function printErrors(errors: Map<ModuleName, (BagelError|LintProblem)[]>, watch?: boolean) {
     if (watch) {
         console.clear()
     }
@@ -134,7 +135,7 @@ function printErrors(errors: Map<ModuleName, BagelError[]>, watch?: boolean) {
             totalErrors += errs.length;
 
             for (const err of errs) {
-                console.log(prettyError(module, err))
+                console.log(prettyProblem(module, err))
             }
         }
 
@@ -145,7 +146,7 @@ function printErrors(errors: Map<ModuleName, BagelError[]>, watch?: boolean) {
 // print errors as they occur
 autorun(() => {
     if (Store.done) {
-        printErrors(Store.allErrors, Store.mode?.watch)
+        printErrors(Store.allProblems, Store.mode?.watch)
     }
 })
 

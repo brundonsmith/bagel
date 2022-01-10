@@ -4,12 +4,13 @@ import { resolve } from "./3_checking/resolve.ts";
 import { typecheck } from "./3_checking/typecheck.ts";
 import { compile } from "./4_compile/index.ts";
 import { path } from "./deps.ts";
-import { BagelError, errorsEquivalent } from "./errors.ts";
+import { BagelError, errorsEquivalent, isError } from "./errors.ts";
 import { computedFn, makeAutoObservable } from "./mobx.ts";
 import { pathIsRemote } from "./utils/misc.ts";
 import { AST, Module } from "./_model/ast.ts";
 import { ModuleName, ReportError } from "./_model/common.ts";
 import { areSame, iterateParseTree } from "./utils/ast.ts";
+import { lint, LintProblem } from "./other/lint.ts";
 
 export type Mode =
     | { mode: "build", entryFile: ModuleName, watch: boolean }
@@ -46,11 +47,11 @@ class _Store {
         return this.mode != null && this.modules.size > 0 && this.modulesSource.size >= this.modules.size
     }
 
-    get allErrors() {
-        const allErrors = new Map<ModuleName, BagelError[]>()
+    get allProblems() {
+        const allProblems = new Map<ModuleName, (BagelError|LintProblem)[]>()
         
         for (const module of this._modulesSource.keys()) {
-            allErrors.set(module, [])
+            allProblems.set(module, [])
         }
 
         for (const module of this._modulesSource.keys()) {
@@ -58,15 +59,16 @@ class _Store {
             if (parsed) {
                 const { errors: parseErrors } = parsed
                 const typecheckErrors = this.typeerrors(module)
+                const lintProblems = lint(parsed.ast)
 
-                for (const err of [...parseErrors, ...typecheckErrors].filter((err, index, arr) => arr.findIndex(other => errorsEquivalent(err, other)) === index)) {
+                for (const err of [...parseErrors, ...typecheckErrors, ...lintProblems].filter((err, index, arr) => !isError(err) || arr.findIndex(other => isError(other) && errorsEquivalent(err, other)) === index)) {
                     const errorModule = err.ast?.module ?? module;
-                    (allErrors.get(errorModule) as BagelError[]).push(err)
+                    (allProblems.get(errorModule) as (BagelError|LintProblem)[]).push(err)
                 }
             }
         }
 
-        return allErrors
+        return allProblems
     }
 
 

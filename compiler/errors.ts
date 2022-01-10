@@ -6,6 +6,7 @@ import { TypeExpression } from "./_model/type-expressions.ts";
 import { Colors } from "./deps.ts";
 import { deepEquals, given } from "./utils/misc.ts";
 import { ModuleName } from "./_model/common.ts";
+import { LintProblem } from "./other/lint.ts";
 
 export type BagelError =
     | BagelSyntaxError
@@ -129,12 +130,41 @@ export function cannotFindExport(ast: ImportItem, importDeclaration: ImportDecla
     return { kind: "bagel-cannot-find-export-error", ast, importDeclaration }
 }
 
-export function prettyError(modulePath: ModuleName, error: BagelError): string {
+export function prettyProblem(modulePath: ModuleName, error: BagelError|LintProblem): string {
     let output = "";
 
-    const code = error.kind === 'bagel-syntax-error' ? error.code : error.ast?.kind !== "module" ? error.ast?.code : undefined
-    const startIndex = error.kind === 'bagel-syntax-error' ? error.index : error.ast?.kind !== "module" ? error.ast?.startIndex : undefined
-    const endIndex = error.kind === 'bagel-syntax-error' ? undefined : error.ast?.kind !== "module" ? error.ast?.endIndex : undefined
+    const code = (
+        error.kind === 'bagel-syntax-error' ? error.code : 
+        error.ast?.kind !== "module" ? error.ast?.code : 
+        error.kind === 'lint-problem' ? error.ast.code : 
+        undefined
+    )
+    const startIndex = (
+        error.kind === 'bagel-syntax-error' ? error.index : 
+        error.ast?.kind !== "module" ? error.ast?.startIndex : 
+        error.kind === 'lint-problem' ? error.ast.startIndex : 
+        undefined
+    )
+    const endIndex = (
+        error.kind === 'bagel-syntax-error' ? undefined : 
+        error.ast?.kind !== "module" ? error.ast?.endIndex : 
+        error.kind === 'lint-problem' ? error.ast.endIndex : 
+        undefined
+    )
+    const message = (
+        error.kind === "bagel-syntax-error" ? error.message : 
+        error.kind === 'lint-problem' ? error.rule.message :
+        errorMessage(error)
+    )
+    const severity = (
+        error.kind === 'lint-problem' ? error.severity :
+        'error'
+    )
+    const color = (
+        severity === 'warning' ? Colors.yellow :
+        severity === 'info' ? Colors.white :
+        Colors.red
+    )
 
     let infoLine = Colors.cyan(modulePath)
     
@@ -150,8 +180,8 @@ export function prettyError(modulePath: ModuleName, error: BagelError): string {
     }
 
     infoLine += Colors.white(" - ")
-        + Colors.red("error")
-        + Colors.white(" " + (error.kind === "bagel-syntax-error" ? error.message : errorMessage(error)))
+        + color(severity)
+        + Colors.white(" " + message)
 
     output += infoLine + "\n"
 
@@ -169,9 +199,9 @@ export function prettyError(modulePath: ModuleName, error: BagelError): string {
 
             if (endIndex != null) {
                 const underline = new Array(endIndex - startIndex).fill('~').join('')
-                output += Colors.red(underlineSpacing + underline) + "\n"
+                output += color(underlineSpacing + underline) + "\n"
             } else {
-                output += Colors.red(underlineSpacing + Colors.red("^")) + "\n"
+                output += color(underlineSpacing + "^") + "\n"
             }
         }
     }

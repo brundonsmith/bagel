@@ -11,6 +11,7 @@ export function lint(ast: AST): LintProblem[] {
 
             if (problemNode) {
                 problems.push({
+                    kind: 'lint-problem',
                     rule,
                     ast: problemNode,
                     severity: DEFAULT_SEVERITY[name]
@@ -44,9 +45,10 @@ type LintRule = {
     readonly autofix?: (ast: AST) => AST,
 }
 
-type Severity = 'error'|'warn'|'info'|'off'
+type Severity = 'error'|'warning'|'info'|'off'
 
-type LintProblem = {
+export type LintProblem = {
+    readonly kind: 'lint-problem',
     readonly rule: LintRule,
     readonly ast: AST,
     readonly severity: Severity,
@@ -77,5 +79,5 @@ const _rules: {[name: string]: LintRule} = RULES
 type RuleName = keyof typeof RULES
 
 const DEFAULT_SEVERITY: { readonly [rule in RuleName]: Severity } = {
-    'unnecessary-parens': 'warn'
+    'unnecessary-parens': 'warning'
 }
