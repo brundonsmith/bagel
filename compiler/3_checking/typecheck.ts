@@ -1,5 +1,5 @@
 import { Module } from "../_model/ast.ts";
-import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericType, isTypeExpression, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, isTypeExpression, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { assignmentError,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions } from "./typeinfer.ts";
@@ -57,8 +57,8 @@ export function typecheck(reportError: ReportError, ast: Module) {
                     }
                 } break;
                 case "func": {
-                    const inferred = inferType(reportError, current) as FuncType|GenericType
-                    const funcType = inferred.kind === 'generic-type' ? inferred.inner as FuncType : inferred
+                    const inferred = inferType(reportError, current) as FuncType|GenericFuncType
+                    const funcType = inferred.kind === 'generic-type' ? inferred.inner : inferred
 
                     // make sure body expression fits declared return type, if there is one
                     const bodyType = inferType(reportError, current.body);

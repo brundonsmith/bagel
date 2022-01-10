@@ -149,7 +149,7 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
             }
 
             // resolve func or proc arguments
-            const funcOrProcType = parent.type.kind === 'generic-type' ? (parent.type.inner as FuncType|ProcType) : parent.type
+            const funcOrProcType = parent.type.kind === 'generic-type' ? parent.type.inner : parent.type
             for (let i = 0; i < funcOrProcType.args.length; i++) {
                 const arg = funcOrProcType.args[i]
 

@@ -6,7 +6,7 @@ import { getBindingMutability, ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, StoreDeclaration, StoreFunction, StoreProperty } from "../_model/declarations.ts";
 import { Expression, Proc, Func, Spread } from "../_model/expressions.ts";
 import { LetDeclaration } from "../_model/statements.ts";
-import { Arg, FuncType, ProcType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { Arg, ProcType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
 export function compile(module: Module, modulePath: ModuleName, includeTests?: boolean, excludeTypes = false): string {
@@ -230,7 +230,7 @@ const compileFuncSignature = (excludeTypes: boolean, module: string, func: Func)
     const typeParams = !excludeTypes && func.type.kind === 'generic-type'
         ? `<${func.type.typeParams.map(p => p.name.name).join(',')}>`
         : ''
-    const funcType = func.type.kind === 'generic-type' ? func.type.inner as FuncType : func.type
+    const funcType = func.type.kind === 'generic-type' ? func.type.inner : func.type
     
     return typeParams + `(${compileArgs(excludeTypes, module, funcType.args)})${
         !excludeTypes && funcType.returnType != null ? `: ${compileOne(excludeTypes, module, funcType.returnType)}` : ''}`;

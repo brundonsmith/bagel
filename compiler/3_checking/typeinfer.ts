@@ -73,7 +73,7 @@ const inferTypeInner = computedFn((
                 }
             })()
 
-            const funcType = ast.type.kind === 'generic-type' ? ast.type.inner as FuncType : ast.type
+            const funcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
 
             const inferredFuncType = {
                 ...funcType,
@@ -336,7 +336,7 @@ const inferTypeInner = computedFn((
                 switch (binding.kind) {
                     case 'basic': return getDeclType(binding.ast)
                     case 'arg': {
-                        const funcOrProcType = binding.holder.type.kind === 'generic-type' ? binding.holder.type.inner as FuncType|ProcType : binding.holder.type as FuncType|ProcType
+                        const funcOrProcType = binding.holder.type.kind === 'generic-type' ? binding.holder.type.inner : binding.holder.type
                         const argType = funcOrProcType.args[binding.argIndex].type
 
                         if (argType) {
@@ -530,7 +530,7 @@ export function bindInvocationGenericArgs(reportError: ReportError, invocation: 
                     invocation.typeArgs
                 )
             } else { // no type arguments (try to infer)
-                const funcOrProcType = subjectType.inner as FuncType|ProcType
+                const funcOrProcType = subjectType.inner
 
                 const invocationSubjectType: FuncType|ProcType = {
                     ...funcOrProcType,
@@ -593,7 +593,7 @@ export function parameterizedGenericType(reportError: ReportError, generic: Gene
 /**
  * Apply all union simplifications
  */
-function simplifyUnions(reportError: ReportError, type: TypeExpression): TypeExpression {
+export function simplifyUnions(reportError: ReportError, type: TypeExpression): TypeExpression {
     return handleSingletonUnion(
         distillUnion(reportError,
             flattenUnions(type)));

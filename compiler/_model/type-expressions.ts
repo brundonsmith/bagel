@@ -76,6 +76,22 @@ export type GenericType = SourceInfo & {
     readonly mutability: undefined,
 }
 
+// These two types are special cases of GenericType that allow us to encode 
+// additional guarantees at certain spots in the AST, and thereby avoid some 
+// as-casting later on
+export type GenericFuncType = SourceInfo & {
+    readonly kind: "generic-type",
+    readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
+    readonly inner: FuncType,
+    readonly mutability: undefined,
+}
+export type GenericProcType = SourceInfo & {
+    readonly kind: "generic-type",
+    readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
+    readonly inner: ProcType,
+    readonly mutability: undefined,
+}
+
 export type BoundGenericType = SourceInfo & {
     readonly kind: "bound-generic-type",
     readonly typeArgs: readonly TypeExpression[],
