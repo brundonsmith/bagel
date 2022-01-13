@@ -1146,7 +1146,7 @@ function testTypecheck(code: string, shouldFail: boolean): void {
     watch: undefined
   })
   
-  const parsed = Store.parsed(moduleName)
+  const parsed = Store.parsed(moduleName, true)
 
   if (parsed) {
     const errors = Store.allProblems.get(moduleName) as BagelError[]

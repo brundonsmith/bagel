@@ -1,6 +1,6 @@
 import { compile } from "../compiler/4_compile/index.ts";
 import { prettyProblem } from "../compiler/errors.ts";
-import Store, { BGL_PRELUDE_COMPILED } from "../compiler/store.ts";
+import Store from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
@@ -482,7 +482,7 @@ function testCompile(code: string, exp: string) {
     watch: undefined
   })
   
-  const parsed = Store.parsed(moduleName)
+  const parsed = Store.parsed(moduleName, false)
 
   if (parsed) {
     const { ast, errors } = parsed
@@ -494,10 +494,10 @@ function testCompile(code: string, exp: string) {
         errors.map(err => prettyProblem(moduleName, err)).join("\n")
     }
   
-    if (normalize(compiled) !== normalize(BGL_PRELUDE_COMPILED + '\n' + exp)) {
+    if (normalize(compiled) !== normalize(exp)) {
       throw `Compiler output did not match expected:
   bagel:\n${code}
-  expected:\n${BGL_PRELUDE_COMPILED + '\n' + exp}
+  expected:\n${exp}
   received:\n${compiled}`;
     }
   }

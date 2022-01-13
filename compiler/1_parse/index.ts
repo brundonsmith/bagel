@@ -4,7 +4,7 @@ import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
@@ -1428,15 +1428,11 @@ const _case: ParseFunction<Case> = (module, code, startIndex) =>
 const switchExpression: ParseFunction<SwitchExpression> = (module, code, startIndex) =>
     given(consume(code, startIndex, "switch"), index =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, '('), err(code, index, '"("'), index =>
-    given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, "Switch expression"), ({ parsed: value, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ')'), err(code, index, '")"'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, '{'), err(code, index, '"{"'), index =>
     given(consumeWhitespace(code, index), index =>
-    given(parseSeries(module, code, index, _switchCase, ','), ({ parsed: cases, newIndex: index }) =>
+    given(parseSeries(module, code, index, switchCase, ','), ({ parsed: cases, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseOptional(module, code, index, _defaultCase), ({ parsed: defaultCase, newIndex: indexAfterDefault }) =>
     given(consumeWhitespace(code, indexAfterDefault ?? index), index =>
@@ -1452,9 +1448,9 @@ const switchExpression: ParseFunction<SwitchExpression> = (module, code, startIn
             endIndex: index
         },
         newIndex: index
-    }))))))))))))))))
+    }))))))))))))
 
-const _switchCase: ParseFunction<Case> = (module, code, startIndex) =>
+const switchCase: ParseFunction<SwitchCase> = (module, code, startIndex) =>
     given(consume(code, startIndex, 'case'), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Case expression'), ({ parsed: condition, newIndex: index }) =>
@@ -1463,7 +1459,7 @@ const _switchCase: ParseFunction<Case> = (module, code, startIndex) =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Case result'), ({ parsed: outcome, newIndex: index }) => ({
         parsed: {
-            kind: "case",
+            kind: "switch-case",
             condition,
             outcome,
             module,

@@ -25,6 +25,10 @@ async function modeFromArgs(args: string[]): Promise<Mode> {
         undefined
     )
 
+    if (!(await fs.exists(providedEntry))) {
+        fail(`${providedEntry} not found`)
+    }
+
     switch (mode) {
         case "build":
         case "run": {
@@ -48,14 +52,10 @@ async function modeFromArgs(args: string[]): Promise<Mode> {
         case "check":
         case "transpile":
         case "test":
-        case "format": {
             // operate on whole subdirectory
-            if (!(await fs.exists(providedEntry))) {
-                fail(`${providedEntry} not found`)
-            }
-
             return { mode, fileOrDir: providedEntry, watch, platform }
-        }
+        case "format":
+            return { mode, fileOrDir: providedEntry, watch: undefined }
         default:
             return fail(`Must provide a command: build, check, test, run, transpile`)
     }
@@ -98,7 +98,7 @@ autorun(async () => {
 // add imported modules to set
 autorun(() => {
     for (const module of Store.modules) {
-        const parsed = Store.parsed(module)
+        const parsed = Store.parsed(module, false)
 
         if (parsed) {
             for (const decl of parsed.ast.declarations) {
@@ -145,7 +145,7 @@ function printErrors(errors: Map<ModuleName, (BagelError|LintProblem)[]>, watch?
     
 // print errors as they occur
 autorun(() => {
-    if (Store.done) {
+    if (Store.done && Store.mode?.mode !== 'format') {
         printErrors(Store.allProblems, Store.mode?.watch)
     }
 })
@@ -175,6 +175,16 @@ autorun(() => {
                     )
                 }
             })
+    }
+})
+
+// write formatted bgl code to disk
+autorun(() => {
+    if (Store.done && Store.mode?.mode === 'format') {
+        Promise.all([...Store.modules]
+            .filter(module => !pathIsRemote(module))
+            .map(module =>
+                Deno.writeTextFile(module, Store.formatted(module))))
     }
 })
 

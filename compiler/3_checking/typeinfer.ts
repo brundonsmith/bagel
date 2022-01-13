@@ -104,20 +104,26 @@ const inferTypeInner = computedFn((
                 const rightType = inferType(reportError, expr, visited)
                 const rightTypeResolved = resolveType(reportError, rightType)
 
-                const types = BINARY_OPERATOR_TYPES[op.op].find(({ left, right }) =>
+                if (op.op === '??') {
+                    return {
+                        kind: "union-type",
+                        members: [
+                            subtract(reportError, leftTypeResolved, NIL_TYPE),
+                            rightTypeResolved
+                        ],
+                        mutability: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined
+                    }
+                } else {
+                    const types = BINARY_OPERATOR_TYPES[op.op]?.find(({ left, right }) =>
                     subsumes(reportError, left, leftTypeResolved) && subsumes(reportError, right, rightTypeResolved))
 
                 if (types == null) {
                     reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayType(leftType)}' and '${displayType(rightType)}'`));
-
-                    if (BINARY_OPERATOR_TYPES[op.op].length === 1) {
-                        return BINARY_OPERATOR_TYPES[op.op][0].output
-                    } else {
-                        return UNKNOWN_TYPE
-                    }
+                        return BINARY_OPERATOR_TYPES[op.op]?.[0].output ?? UNKNOWN_TYPE
                 }
 
                 return types.output;
+                }
             }
 
             return leftType;
@@ -1034,7 +1040,7 @@ function fitTemplate(
     return new Map();
 }
 
-const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] } = {
+const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] }> = {
     "+": [
         { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE },
         { left: STRING_TYPE, right: STRING_TYPE, output: STRING_TYPE },
@@ -1073,9 +1079,6 @@ const BINARY_OPERATOR_TYPES: { [key in BinaryOp]: { left: TypeExpression, right:
     ],
     "!=": [
         { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "??": [
-        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: UNKNOWN_TYPE }
     ],
     // "??": {
     //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },

@@ -11,6 +11,7 @@ import { AST, Module } from "./_model/ast.ts";
 import { ModuleName, ReportError } from "./_model/common.ts";
 import { areSame, iterateParseTree } from "./utils/ast.ts";
 import { lint, LintProblem } from "./other/lint.ts";
+import { DEFAULT_OPTIONS, format } from "./other/format.ts";
 
 export type Mode =
     | { mode: "build", entryFile: ModuleName, watch: boolean }
@@ -18,7 +19,7 @@ export type Mode =
     | { mode: "check", fileOrDir: string, watch: boolean }
     | { mode: "transpile", fileOrDir: string, watch: boolean }
     | { mode: "test", fileOrDir: string, platform?: 'node'|'deno', watch: boolean }
-    | { mode: "format", fileOrDir: string, watch: boolean }
+    | { mode: "format", fileOrDir: string, watch: undefined }
     | { mode: "mock", modules: Record<ModuleName, string>, watch: undefined } // for internal testing only!
 
 class _Store {
@@ -55,7 +56,7 @@ class _Store {
         }
 
         for (const module of this._modulesSource.keys()) {
-            const parsed = this.parsed(module)
+            const parsed = this.parsed(module, true)
             if (parsed) {
                 const { errors: parseErrors } = parsed
                 const typecheckErrors = this.typeerrors(module)
@@ -100,13 +101,13 @@ class _Store {
     }
 
     readonly setSource = (moduleName: ModuleName, source: string) => {
-        this._modulesSource.set(moduleName, (!moduleIsCore(moduleName) ? BGL_PRELUDE : '') + source)
+        this._modulesSource.set(moduleName, source)
     }
 
 
     // Computed fns
-    readonly parsed = computedFn((moduleName: ModuleName): { ast: Module, errors: readonly BagelError[] } | undefined => {
-        const source = this._modulesSource.get(moduleName)
+    readonly parsed = computedFn((moduleName: ModuleName, withPrelude: boolean): { ast: Module, errors: readonly BagelError[] } | undefined => {
+        const source = (withPrelude && !moduleIsCore(moduleName) ? BGL_PRELUDE : '') + this._modulesSource.get(moduleName)
 
         if (source) {
             const errors: BagelError[] = []
@@ -116,7 +117,7 @@ class _Store {
     })
 
     readonly typeerrors = computedFn((moduleName: ModuleName): BagelError[] => {
-        const ast = this.parsed(moduleName)?.ast
+        const ast = this.parsed(moduleName, true)?.ast
 
         if (!ast) {
             return []
@@ -131,7 +132,7 @@ class _Store {
     })
 
     readonly compiled = computedFn((moduleName: ModuleName): string => {
-        const ast = this.parsed(moduleName)?.ast
+        const ast = this.parsed(moduleName, true)?.ast
 
         if (!ast) {
             return ''
@@ -148,20 +149,37 @@ class _Store {
         )
     })
 
+    readonly formatted = computedFn((moduleName: ModuleName): string => {
+        const ast = this.parsed(moduleName, false)?.ast
+
+        if (!ast) {
+            return ''
+        }
+        
+        return (
+            format(
+                ast,
+                DEFAULT_OPTIONS
+            )
+        )
+    })
+
     readonly getModuleByName = computedFn((importer: ModuleName, imported: string) => {
         const importedModuleName = canonicalModuleName(importer, imported)
 
-        return this.parsed(importedModuleName)?.ast
+        return this.parsed(importedModuleName, true)?.ast
     })
 
     readonly getParent = computedFn((ast: AST) => {
         for (const [moduleName, _source] of this._modulesSource.entries()) {
-            const module = this.parsed(moduleName)?.ast
+            const asts = [this.parsed(moduleName, true)?.ast, this.parsed(moduleName, false)?.ast]
 
-            if (module) {
-                for (const { parent, current } of iterateParseTree(module)) {
-                    if (areSame(current, ast)) {
-                        return parent
+            for (const module of asts) {
+                if (module) {
+                    for (const { parent, current } of iterateParseTree(module)) {
+                        if (areSame(current, ast)) {
+                            return parent
+                        }
                     }
                 }
             }
@@ -206,7 +224,6 @@ ___configure({
 const BGL_PRELUDE = `
 from 'C:/Users/brundolf/git/bagel/lib/wrappers/prelude' import { iter, logp, logf, BagelConfig }
 `
-export const BGL_PRELUDE_COMPILED = compile(parse('foo' as ModuleName, BGL_PRELUDE, () => {}), 'foo' as ModuleName)
 
 export function canonicalModuleName(importerModule: string, importPath: string): ModuleName {
     if (pathIsRemote(importPath)) {
