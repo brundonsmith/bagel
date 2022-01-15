@@ -303,15 +303,8 @@ const inferTypeInner = computedFn((
 
                         // if this is a let-declaration, its type may need to be made less exact to enable reasonable mutation
                         const correctedBaseType = (
-                            decl.kind === 'let-declaration' ?
-                                (
-                                    baseType.kind === 'literal-type' && baseType.value.kind === 'exact-string-literal' ? STRING_TYPE :
-                                    baseType.kind === 'literal-type' && baseType.value.kind === 'number-literal' ? NUMBER_TYPE :
-                                    baseType.kind === 'literal-type' && baseType.value.kind === 'boolean-literal' ? BOOLEAN_TYPE :
-                                    baseType.kind === 'tuple-type' ? { ...baseType, kind: 'array-type', element: { kind: 'union-type', members: baseType.members, ...TYPE_AST_NOISE } } :
-                                    // TODO: This needs to include object literals, and also probably be recursive. Might need its own function.
-                                    baseType
-                                )
+                            decl.kind === 'let-declaration'
+                                ? broadenTypeForMutation(baseType)
                             : baseType
                         )
 
@@ -527,6 +520,25 @@ const inferTypeInner = computedFn((
             throw Error(ast.kind)
     }
 })
+
+function broadenTypeForMutation(type: TypeExpression) {
+    if (type.kind === 'literal-type') {
+        if (type.value.kind === 'exact-string-literal') {
+            return STRING_TYPE
+        }
+        if (type.value.kind === 'number-literal') {
+            return NUMBER_TYPE
+        }
+        if (type.value.kind === 'boolean-literal') {
+            return BOOLEAN_TYPE
+        }
+    } else if (type.kind === 'tuple-type') {
+        return { ...type, kind: 'array-type', element: { kind: 'union-type', members: type.members, ...TYPE_AST_NOISE } }
+    }
+
+    // TODO: This needs to include object literals, and also probably be recursive. Might need its own function.
+    return type
+}
 
 /**
  * Given some invocation,
@@ -895,7 +907,7 @@ export const propertiesOf = computedFn((
 
                 const memberType = memberDeclaredType(member) && memberDeclaredType(member)?.kind !== "func-type"
                     ? memberDeclaredType(member) as TypeExpression
-                    : inferType(reportError, member.value);
+                    : broadenTypeForMutation(inferType(reportError, member.value));
 
                 const mutability = (
                     memberType.mutability == null ? undefined :
