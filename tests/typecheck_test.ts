@@ -1132,6 +1132,24 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Nullish-coalescing",
+  fn() {
+    testTypecheck(`
+    func foo(a: number?, b: string?, c: boolean): number|string|boolean => a ?? b ?? c`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Nullish-coalescing mismatch",
+  fn() {
+    testTypecheck(`
+    func foo(a: string?, b: string?): string => a ?? b ?? 12`,
+    true)
+  }
+})
+
 // TODO: Reactions
 // TODO: if/else/switch
 
