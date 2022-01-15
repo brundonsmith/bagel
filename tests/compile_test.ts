@@ -268,7 +268,7 @@ Deno.test({
       `proc doStuff(items: Iterator<number>) {
             let count = 0;
             
-            for (item of items) {
+            for item of items {
             }
 
             console.log(count);
@@ -293,7 +293,7 @@ Deno.test({
       `proc doStuff(items: Iterator<number>) {
             let count = 0;
 
-            for (item of items) {
+            for item of items {
                 if item.foo {
                     count = count + 1;
                 }

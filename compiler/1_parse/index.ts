@@ -1001,15 +1001,11 @@ const _conditionAndOutcomeBlock: ParseFunction<CaseBlock> = (module, code, start
 const forLoop: ParseFunction<ForLoop> = (module, code, startIndex) =>
     given(consume(code, startIndex, "for"), index =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "("), err(code, index, '"("'), index =>
-    given(consumeWhitespace(code, index), index =>
     expec(plainIdentifier(module, code, index), err(code, index, 'Item identifier for loop items'), ({ parsed: itemIdentifier, newIndex: index }) =>
     given(consumeWhitespaceRequired(code, index), index =>
     expec(consume(code, index, "of"), err(code, index, '"of"'), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Iterator expression'), ({ parsed: iterator, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ")"), err(code, index, '")"'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(parseBlock(module, code, index), err(code, index, 'Loop body'), ({ parsed: body, newIndex: index }) => ({
         parsed: {
@@ -1023,7 +1019,7 @@ const forLoop: ParseFunction<ForLoop> = (module, code, startIndex) =>
             endIndex: index,
         },
         newIndex: index,
-    }))))))))))))))
+    }))))))))))
 
 const whileLoop: ParseFunction<WhileLoop> = (module, code, startIndex) =>
     given(consume(code, startIndex, "while"), index =>
