@@ -377,8 +377,8 @@ const inferTypeInner = computedFn((
                             reportError(assignmentError(binding.iterator, ITERATOR_OF_ANY, iteratorType))
                         }
     
-                        return iteratorType.kind === 'bound-generic-type'
-                            ? iteratorType.typeArgs[0] ?? UNKNOWN_TYPE
+                        return iteratorType.kind === 'iterator-type'
+                            ? iteratorType.inner
                             : UNKNOWN_TYPE
                     }
                     case 'this': return {
