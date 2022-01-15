@@ -97,15 +97,15 @@ const inferTypeInner = computedFn((
             }
         }
         case "binary-operator": {
-            const leftType = inferType(reportError, ast.base, visited)
-            const leftTypeResolved = resolveType(reportError, leftType)
+            let leftType = inferType(reportError, ast.base, visited)
 
             for (const [op, expr] of ast.ops) {
+                const leftTypeResolved = resolveType(reportError, leftType)
                 const rightType = inferType(reportError, expr, visited)
                 const rightTypeResolved = resolveType(reportError, rightType)
 
                 if (op.op === '??') {
-                    return {
+                    leftType = {
                         kind: "union-type",
                         members: [
                             subtract(reportError, leftTypeResolved, NIL_TYPE),
@@ -117,12 +117,12 @@ const inferTypeInner = computedFn((
                     const types = BINARY_OPERATOR_TYPES[op.op]?.find(({ left, right }) =>
                     subsumes(reportError, left, leftTypeResolved) && subsumes(reportError, right, rightTypeResolved))
 
-                if (types == null) {
-                    reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayType(leftType)}' and '${displayType(rightType)}'`));
-                        return BINARY_OPERATOR_TYPES[op.op]?.[0].output ?? UNKNOWN_TYPE
-                }
+                    if (types == null) {
+                        reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayType(leftType)}' and '${displayType(rightType)}'`));
+                            return BINARY_OPERATOR_TYPES[op.op]?.[0].output ?? UNKNOWN_TYPE
+                    }
 
-                return types.output;
+                    leftType = types.output;
                 }
             }
 
