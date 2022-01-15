@@ -161,18 +161,30 @@ autorun(() => {
 
         Promise.all(compiledModules.map(({ jsPath, js }) =>
                 Deno.writeTextFile(jsPath, js)))
-            .then(() => {
+            .then(async () => {
                 // bundle
                 if (mode?.mode === 'build') {
-                    bundleOutput(
+                    await bundleOutput(
                         cachedFilePath(mode.entryFile + '.ts'), 
                         bagelFileToTsFile(mode.entryFile, true)
                     )
                 } else if (mode?.mode === 'run') {
-                    bundleOutput(
+                    const bundlePath = cachedFilePath(bagelFileToTsFile(mode.entryFile, true))
+
+                    await bundleOutput(
                         cachedFilePath(mode.entryFile + '.ts'), 
-                        cachedFilePath(bagelFileToTsFile(mode.entryFile, true))
+                        bundlePath
                     )
+
+                    if (mode?.platform === 'node') {
+                        Deno.run({ cmd: ["node", bundlePath] })
+                    } else if (mode?.platform === 'deno') {
+                        Deno.run({ cmd: ["deno", "run", bundlePath, "--allow-all", "--unstable"] })
+                    } else {
+                        throw Error('TODO: Auto-detect platform')
+                    }
+                } else if (Store.mode?.mode === 'test') {
+                    throw Error('TODO: Run tests')
                 }
             })
     }
@@ -185,25 +197,6 @@ autorun(() => {
             .filter(module => !pathIsRemote(module))
             .map(module =>
                 Deno.writeTextFile(module, Store.formatted(module))))
-    }
-})
-
-// run bundle or tests, if needed
-autorun(() => {
-    if (Store.done) {
-        if (Store.mode?.mode === 'run') {
-            const bundlePath = cachedFilePath(bagelFileToTsFile(Store.mode.entryFile, true))
-            
-            if (Store.mode?.platform === 'node') {
-                Deno.run({ cmd: ["node", bundlePath] })
-            } else if (Store.mode?.platform === 'deno') {
-                Deno.run({ cmd: ["deno", "run", bundlePath, "--allow-all", "--unstable"] })
-            } else {
-                throw Error('TODO: Auto-detect platform')
-            }
-        } else if (Store.mode?.mode === 'test') {
-            throw Error('TODO: Run tests')
-        }
     }
 })
 
