@@ -1,5 +1,5 @@
 import { compile, INT } from "../compiler/4_compile/index.ts";
-import { BagelError, prettyError } from "../compiler/errors.ts";
+import { BagelError, prettyProblem } from "../compiler/errors.ts";
 import Store, { IMPORTED_ITEMS, MOBX_CONFIGURE } from "../compiler/store.ts";
 import { Module } from "../compiler/_model/ast.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
@@ -67,12 +67,12 @@ async function testSideEffects(bgl: string, expected: any[]) {
         watch: undefined
     });
 
-    const { ast, errors } = Store.parsed(moduleName) as { ast: Module, errors: BagelError[] };
+    const { ast, errors } = Store.parsed(moduleName, false) as { ast: Module, errors: BagelError[] };
     const compiled = compile(ast, moduleName, false, true);
 
     if (errors.length > 0) {
         throw `\n${bgl}\nFailed to parse:\n` +
-        errors.map((err) => prettyError(moduleName, err)).join("\n");
+        errors.map((err) => prettyProblem(moduleName, err)).join("\n");
     }
 
     const outputs: any[] = [];
