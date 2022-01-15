@@ -826,7 +826,7 @@ const testBlockDeclaration: ParseFunction<TestBlockDeclaration> = (module, code,
 
 // TODO: Generic proc
 const proc: ParseFunction<Proc> = (module, code, startIndex) =>
-    given(_args(module, code, startIndex), ({ parsed: args, newIndex: index }) =>
+    given(_seriesOfArguments(module, code, startIndex), ({ parsed: args, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseBlock(module, code, index), ({ parsed: body, newIndex: index }) => ({
         parsed: {
@@ -1071,7 +1071,7 @@ const expression: ParseFunction<Expression> = memoize3((module, code, startIndex
 
 const func: ParseFunction<Func> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
-    given(_args(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, newIndex: index }) =>
+    given(_funcArgs(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseOptional(module, code, index, (module, code, index) =>
         given(consume(code, index, ":"), index =>
@@ -1125,7 +1125,7 @@ const _typeParams: ParseFunction<{ name: PlainIdentifier, extends: TypeExpressio
     given(consumeWhitespace(code, index), index => 
     given(consume(code, index, ">"), index => ({ parsed: typeParams, newIndex: index }))))))
 
-const _args: ParseFunction<Arg[]> = (module, code, startIndex) => 
+const _funcArgs: ParseFunction<Arg[]> = (module, code, startIndex) => 
     _singleArgument(module, code, startIndex) ?? _seriesOfArguments(module, code, startIndex)
 
 const _singleArgument: ParseFunction<Arg[]> = (module, code, startIndex) =>
