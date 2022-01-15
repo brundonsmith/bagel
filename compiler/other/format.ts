@@ -1,5 +1,6 @@
 
 import { AST, PlainIdentifier } from '../_model/ast.ts'
+import { Spread } from "../_model/expressions.ts";
 import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 export type FormatOptions = {
@@ -69,6 +70,23 @@ const formatInner = (options: FormatOptions, indent: number) => (ast: AST): stri
             return `!${ast.base}`
         case "operator":
             return ast.op
+        // TODO: Put obj and array literals all on one line vs indented based on size of contents
+        case "object-literal":  return `{${
+                ast.entries.map(entry =>
+                    nextIndentation +
+                    (Array.isArray(entry) 
+                        ? `${entry[0].name}: ${fIndent(entry[1])}`
+                        : '...' + f(entry as Spread))
+                ).join(',\n')
+            }\n${currentIndentation}}`;
+        case "array-literal":
+            return `[${
+                ast.entries.map(entry =>
+                    (entry.kind !== 'spread'
+                        ? f(entry)
+                        : '...' + f(entry))
+                ).join(', ')
+            }]`
         case "string-literal":
             return `'${ast.segments.map(segment => typeof segment === 'string' ? segment : '${' + f(segment) + '}')}'`
         case "exact-string-literal":
@@ -129,15 +147,21 @@ const formatInner = (options: FormatOptions, indent: number) => (ast: AST): stri
         case "switch-expression":
             return `switch ${f(ast.value)} {\n${ast.cases.map(c => nextIndentation + f(c)).join('\n')}\n${currentIndentation}}`
         case "test-expr-declaration":
+            return `test expr ${f(ast.name)} = ${f(ast.expr)}`
         case "test-block-declaration":
-        case "pipe":
+            return `test block ${f(ast.name)} ${f(ast.block)}`
         case "debug":
+            return `!debug[${f(ast.inner)}]`
         case "inline-const":
+            return `const ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)},\n${currentIndentation}${f(ast.next)}`
         case "element-tag":
-        case "object-literal":
-        case "array-literal":
+            return `<${ast.tagName.name}${ast.attributes.length > 0 ? ' ' + ast.attributes.map(([name, value]) => `${name.name}={${f(value)}}`).join(' ') : ''}>${
+                ast.children.map(c => '\n' + nextIndentation + fIndent(c)).join('')
+            }${ast.children.length > 0 ? '\n' + currentIndentation : ''}</${ast.tagName.name}>`
+        case "pipe":
+            return `${f(ast.args[0])} |> ${f(ast.subject)}`
         case "javascript-escape":
-            return ''
+            return `js#${ast.js}#js`
         case "union-type": return '(' + ast.members.map(f).join(" | ") + ')';
         case "maybe-type": return f(ast.inner) + '?';
         case "named-type":
