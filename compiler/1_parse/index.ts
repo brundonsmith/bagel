@@ -584,12 +584,16 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
     given(consume(code, indexAfterExport ?? startIndex, "proc"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
-    given(plainIdentifier(module, code, index), ({ parsed: name, newIndex: index }) =>
+    given(parseOptional(module, code, index, (module, code, index) =>
+        given(parseExact("action")(module, code, index), ({ parsed: action, newIndex: index }) =>
+        given(consumeWhitespaceRequired(code, index), index => ({ parsed: action, newIndex: index })))), ({ parsed: action, newIndex: indexAfterAction }) =>
+    given(plainIdentifier(module, code, indexAfterAction ?? index), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(proc(module, code, index), err(code, index, 'Procedure'), ({ parsed: proc, newIndex: index }) => ({
         parsed: {
             kind: "proc-declaration",
             name,
+            action: action != null,
             value: proc,
             exported: exported != null,
             module,
@@ -598,7 +602,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
             endIndex: index,
         },
         newIndex: index,
-    })))))))
+    }))))))))
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startIndex) => 
     given(parseOptional(module, code, startIndex, (module, code, index) =>
@@ -736,18 +740,19 @@ const storeProcedure: ParseFunction<StoreProcedure> = (module, code, startIndex)
     given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(_accessModifier(module, code, index), ({ parsed: access, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: access, newIndex: index })))), ({ parsed: access, newIndex: index }) =>
-    given(procDeclaration(module, code, index ?? startIndex), ({ parsed: { name, value }, newIndex: index }) => ({
-    parsed: {
-        kind: "store-procedure",
-        name,
-        value,
-        access,
-        module,
-        code,
-        startIndex,
-        endIndex: index,
-    },
-    newIndex: index,
+    given(procDeclaration(module, code, index ?? startIndex), ({ parsed: { name, action, value }, newIndex: index }) => ({
+        parsed: {
+            kind: "store-procedure",
+            action,
+            name,
+            value,
+            access,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        newIndex: index,
     })))
 
 const _accessModifierWithVisible: ParseFunction<'private'|'public'|'visible'> = (module, code, startIndex) =>

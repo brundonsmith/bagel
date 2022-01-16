@@ -2,7 +2,7 @@ import Store, { canonicalModuleName, Mode } from "../store.ts";
 import { cachedFilePath, jsFileLocation, pathIsRemote } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { getBindingMutability, ModuleName } from "../_model/common.ts";
-import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, StoreDeclaration, StoreFunction, StoreProperty } from "../_model/declarations.ts";
+import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, StoreDeclaration, StoreFunction, StoreProperty, ProcDeclaration, StoreProcedure } from "../_model/declarations.ts";
 import { Expression, Proc, Func, Spread } from "../_model/expressions.ts";
 import { LetDeclaration } from "../_model/statements.ts";
 import { Arg, ProcType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
@@ -55,12 +55,12 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                         : compileOne(excludeTypes, module, ast.type)};`
                 )
         );
-        case "proc-declaration":  return (ast.exported ? `export ` : ``) + `const ${ast.name.name} = ` + compileOne(excludeTypes, module, ast.value) + ';';
+        case "proc-declaration":  return compileProcDeclaration(excludeTypes, module, ast)
         case "func-declaration":  return compileFuncDeclaration(excludeTypes, module, ast)
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(excludeTypes, module, ast.name)}${!excludeTypes && ast.type ? `: ${compileOne(excludeTypes, module, ast.type)}` : ''} = ${compileOne(excludeTypes, module, ast.value)};`;
         case "store-declaration": return compileStoreDeclaration(excludeTypes, module, ast);
         case "store-property": return  compileStoreProperty(excludeTypes, module, ast)
-        case "store-procedure": return `    ${!excludeTypes ? (ast.access ?? 'private') : ''} readonly ${ast.name.name} = ${compileOne(excludeTypes, module, ast.value)}`
+        case "store-procedure": return compileProcDeclaration(excludeTypes, module, ast)
         case "store-function": return  '    ' + compileFuncDeclaration(excludeTypes, module, ast);
         case "autorun-declaration": return `${INT}autorun(${compileOne(excludeTypes, module, ast.effect)})`;
         case "let-declaration":  return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(excludeTypes, module, ast.value)}`;
@@ -188,6 +188,17 @@ export const INT = `___`;
 
 const NIL = `undefined`;
 const LOCALS_OBJ = INT + "locals";
+
+const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: ProcDeclaration|StoreProcedure): string => {
+    const baseProc = compileOne(excludeTypes, module, decl.value)
+    const proc = decl.action ? `${INT}action(${baseProc})` : baseProc
+
+    if (decl.kind === 'proc-declaration') {
+        return (decl.exported ? `export ` : ``) + `const ${decl.name.name} = ${proc}`;
+    } else {
+        return `    ${!excludeTypes ? (decl.access ?? 'private') : ''} readonly ${decl.name.name} = ${proc}`
+    }
+}
 
 function compileProc(excludeTypes: boolean, module: string, proc: Proc): string {
     const letDeclarations = proc.body.statements.filter(s => s.kind === "let-declaration") as LetDeclaration[]

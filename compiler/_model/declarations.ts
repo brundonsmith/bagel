@@ -37,6 +37,7 @@ export type TypeDeclaration = SourceInfo & Exported & {
 
 export type ProcDeclaration = SourceInfo & Exported & {
     readonly kind: "proc-declaration",
+    readonly action: boolean,
     readonly name: PlainIdentifier,
     readonly value: Proc,
 }
@@ -84,6 +85,7 @@ export type StoreFunction = SourceInfo & {
 
 export type StoreProcedure = SourceInfo & {
     readonly kind: "store-procedure",
+    readonly action: boolean,
     readonly name: PlainIdentifier,
     readonly value: Proc,
     readonly access: 'private'|'public'|undefined,
