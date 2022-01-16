@@ -505,8 +505,7 @@ function testCompile(code: string, exp: string) {
       throw `\n${code}\nFailed to parse:\n` +
         errors.map(err => prettyProblem(moduleName, err)).join("\n")
     }
-    console.log(normalize(exp))
-    console.log(normalize(compiled))
+    
     if (normalize(compiled) !== normalize(exp)) {
       throw `Compiler output did not match expected:
   bagel:\n${code}

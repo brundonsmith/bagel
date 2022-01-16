@@ -1,6 +1,6 @@
 import { compile, INT } from "../compiler/4_compile/index.ts";
 import { BagelError, prettyProblem } from "../compiler/errors.ts";
-import Store, { IMPORTED_ITEMS, MOBX_CONFIGURE } from "../compiler/store.ts";
+import Store, { IMPORTED_ITEMS } from "../compiler/store.ts";
 import { Module } from "../compiler/_model/ast.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
@@ -83,7 +83,7 @@ async function testSideEffects(bgl: string, expected: any[]) {
         `(async function() {
             const { ${IMPORTED_ITEMS.map((s) => `${s}: ${INT}${s}`).join(", ")
         } } = await import("../lib/src/core.ts");
-            ` + MOBX_CONFIGURE + compiled + `
+            ` + compiled + `
             runTest();
         })();`
     );
