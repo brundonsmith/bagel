@@ -71,7 +71,7 @@ export type StoreProperty = SourceInfo & {
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly value: Expression,
-    readonly access: 'private'|'public'|'visible',
+    readonly access: 'private'|'public'|'visible'|undefined,
 }
 
 export type StoreFunction = SourceInfo & {
@@ -79,14 +79,14 @@ export type StoreFunction = SourceInfo & {
     readonly memo: boolean,
     readonly name: PlainIdentifier,
     readonly value: Func,
-    readonly access: 'private'|'public',
+    readonly access: 'private'|'public'|undefined,
 }
 
 export type StoreProcedure = SourceInfo & {
     readonly kind: "store-procedure",
     readonly name: PlainIdentifier,
     readonly value: Proc,
-    readonly access: 'private'|'public',
+    readonly access: 'private'|'public'|undefined,
 }
 
 export function memberDeclaredType(m: StoreMember): TypeExpression|undefined {

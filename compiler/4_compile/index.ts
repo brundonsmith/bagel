@@ -61,7 +61,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(excludeTypes, module, ast.name)}${!excludeTypes && ast.type ? `: ${compileOne(excludeTypes, module, ast.type)}` : ''} = ${compileOne(excludeTypes, module, ast.value)};`;
         case "store-declaration": return compileStoreDeclaration(excludeTypes, module, ast);
         case "store-property": return  compileStoreProperty(excludeTypes, module, ast)
-        case "store-procedure": return `    ${!excludeTypes ? ast.access : ''} readonly ${ast.name.name} = ${compileOne(excludeTypes, module, ast.value)}`
+        case "store-procedure": return `    ${!excludeTypes ? (ast.access ?? 'private') : ''} readonly ${ast.name.name} = ${compileOne(excludeTypes, module, ast.value)}`
         case "store-function": return  '    ' + compileFuncDeclaration(excludeTypes, module, ast);
         case "autorun-declaration": return `${INT}autorun(${compileOne(excludeTypes, module, ast.effect)})`;
         case "let-declaration":  return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(excludeTypes, module, ast.value)}`;
@@ -210,7 +210,7 @@ const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: Fun
     
     const prefix = decl.kind === "func-declaration" 
         ? (decl.exported ? `export ` : ``) + 'const' 
-        : (!excludeTypes ? decl.access + ' readonly' : '')
+        : (!excludeTypes ? (decl.access ?? 'private') + ' readonly' : '')
 
     if (decl.memo) {
         return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ');';
@@ -280,7 +280,7 @@ function compileStoreProperty(excludeTypes: boolean, module: string, ast: StoreP
                `        this.${INT}${ast.name.name} = val;\n` +
                `    }\n`
     } else {
-        return `    ${!excludeTypes ? ast.access + ' ' : ''}${ast.name.name}${typeDeclaration} = ${compileOne(excludeTypes, module, ast.value)};`
+        return `    ${!excludeTypes ? (ast.access ?? 'private') + ' ' : ''}${ast.name.name}${typeDeclaration} = ${compileOne(excludeTypes, module, ast.value)};`
     }
 }
 

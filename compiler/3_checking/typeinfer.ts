@@ -928,7 +928,7 @@ export const propertiesOf = computedFn((
                     .map(memberToAttribute)
             } else {
                 return resolvedType.store.members
-                    .filter(member => member.access !== "private")
+                    .filter(member => member.access != null && member.access !== "private")
                     .map(memberToAttribute)
             }
         }
