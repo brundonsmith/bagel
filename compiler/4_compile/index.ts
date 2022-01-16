@@ -1,4 +1,3 @@
-import { path } from "../deps.ts";
 import Store, { canonicalModuleName, Mode } from "../store.ts";
 import { cachedFilePath, jsFileLocation, pathIsRemote } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
@@ -66,7 +65,15 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "autorun-declaration": return `${INT}autorun(${compileOne(excludeTypes, module, ast.effect)})`;
         case "let-declaration":  return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(excludeTypes, module, ast.value)}`;
         case "const-declaration-statement": return `const ${ast.name.name} = ${compileOne(excludeTypes, module, ast.value)}`;
-        case "assignment": return `${compileOne(excludeTypes, module, ast.target)} = ${compileOne(excludeTypes, module, ast.value)}`;
+        case "assignment": {
+            const value = compileOne(excludeTypes, module, ast.value)
+
+            if (ast.target.kind === 'local-identifier') {
+                return `${LOCALS_OBJ}['${ast.target.name}'] = ${value}; ${INT}invalidate(${LOCALS_OBJ}, ${ast.target.name})`
+            } else {
+                return `${compileOne(excludeTypes, module, ast.target.subject)}.${ast.target.property.name} = ${value}; ${INT}invalidate(${compileOne(excludeTypes, module, ast.target.subject)}, '${ast.target.property.name}')`
+            }
+        }
         case "if-else-statement": return 'if ' + ast.cases
             .map(({ condition, outcome }) => 
                 `(${compileOne(excludeTypes, module, condition)}) ${compileOne(excludeTypes, module, outcome)}`)
@@ -95,13 +102,13 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "range": return `${INT}range(${ast.start})(${ast.end})`;
         case "parenthesized-expression": return `(${compileOne(excludeTypes, module, ast.inner)})`;
         case "debug": return compileOne(excludeTypes, module, ast.inner);
-        case "property-accessor": return `${compileOne(excludeTypes, module, ast.subject)}.${compileOne(excludeTypes, module, ast.property)}`;
+        case "property-accessor": return `${INT}observe(${compileOne(excludeTypes, module, ast.subject)}, '${ast.property.name}')`;
         case "plain-identifier": return ast.name;
         case "local-identifier": {
             const binding = Store.getBinding(() => {}, ast.name, ast)
 
             if (binding && binding.kind !== 'type-binding' && getBindingMutability(binding) === 'assignable') {
-                return `${LOCALS_OBJ}["${ast.name}"]`
+                return `${INT}observe(${LOCALS_OBJ}, '${ast.name}')`
             } else {
                 return ast.name
             }
@@ -197,7 +204,7 @@ function compileProc(excludeTypes: boolean, module: string, proc: Proc): string 
             .map(e => 
                 `${e.name.name}?: any`)
             .join(",")
-    }}` : ''} = ${INT}observable({});
+    }}` : ''} = {};
     
 `
     : ``}${proc.body.statements.map(s => compileOne(excludeTypes, module, s) + ';').join("\n")}
@@ -251,15 +258,6 @@ const compileFuncSignature = (excludeTypes: boolean, module: string, func: Func)
 
 function compileStoreDeclaration(excludeTypes: boolean, module: string, store: StoreDeclaration) {
     return `class ${INT}${store.name.name} {
-        
-        constructor() {
-            ${INT}makeObservable(this, {
-                ${store.members.map(member =>
-                    member.kind === "store-property" ?
-                        `${member.access === "visible" ? INT : ''}${member.name.name}: ${INT}observable`
-                    : '').filter(s => !!s).join(', ')}
-            });
-        }
         
         ${store.members.map(m =>
             compileOne(excludeTypes, module, m)).join('\n')}

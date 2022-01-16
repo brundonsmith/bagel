@@ -47,128 +47,129 @@
 //     }
 // }
 
-// deep map from computedFn arguments to results cache
-// map with which we can respond to any given observable invalidation:
-//  - delete relevant cache entries
-//  - trigger relevant reactions
-
 type Reaction = () => void
+type Observable = { obj: WeakRef<object>, prop: string }
 
-type Observable = { obj: object, prop: string }
+let reportObservableAccessed: ((obs: Observable) => void) | undefined;
+let queuedReactions: Set<Reaction>|undefined // if defined, we're in an action
+let observablesToReactions: Array<{
+    obj: WeakRef<object>,
+    prop: string,
+    effect: Reaction
+}> = []
+const memoCache: Array<{
+    fn: Function,
+    args: unknown[],
+    observables: Observable[]
+    cached: unknown | typeof EMPTY_CACHE
+}> = []
+const EMPTY_CACHE = Symbol('EMPTY_CACHE')
 
 export function observe(obj: object, prop: string) {
-    if (reportObservableRead) {
-        console.log(`observe `, { obj, prop })
-        reportObservableRead({ obj, prop })
+    if (reportObservableAccessed) {
+        // console.log(`observe()`, { obj, prop })
+        reportObservableAccessed({ obj: new WeakRef(obj), prop })
     }
-
+    
     // @ts-ignore
     return obj[prop]
 }
 
 export function invalidate(obj: object, prop: string) {
-    console.log(`invalidate `, { obj, prop })
-    const queued = new Set<Reaction>()
-
-    for (const entry of observablesToReactions) {
-        if (obj === entry.obj && prop === entry.prop) {
-            queued.add(entry.effect)
-        }
-    }
-
-    invalidateCacheEntries(obj, prop)
-
-    console.log('cache ', memoCache[0])
-    // console.log('reactions ', observablesToReactions)
-
-    for (const effect of queued) {
-        effect()
-    }
-}
-
-let reportObservableRead: ((obs: Observable) => void) | undefined;
-
-let observablesToReactions: Array<{
-    obj: object,
-    prop: string,
-    effect: Reaction
-}> = []
-
-let memoCache: Array<{
-    fn: Function,
-    args: unknown[],
-    observables: Observable[]
-    cached: unknown
-}> = []
-
-function invalidateCacheEntries(obj: object, prop: string) {
-    function entryIsInvalidated(cacheEntry: typeof memoCache[number]) {
-        return cacheEntry.observables.some(o => o.obj === obj && o.prop === prop)
-    }
+    const topOfAction = queuedReactions == null
+    const queue = queuedReactions = queuedReactions ?? new Set()
 
     for (const entry of memoCache) {
-        if (entryIsInvalidated(entry)) {
-            invalidate(entry.fn, 'result')
+        const entryIsInvalidated =
+            entry.observables.some(o => 
+                o.obj.deref() === obj && o.prop === prop)
+
+        if (entryIsInvalidated) {
+            entry.cached = EMPTY_CACHE
+            _invalidateInner(entry.fn, 'result')
         }
     }
 
-    memoCache = memoCache.filter(c => !entryIsInvalidated(c))
+    for (const entry of observablesToReactions) {
+        if (obj === entry.obj.deref() && prop === entry.prop) {
+            queue.add(entry.effect)
+        }
+    }
+    
+    if (topOfAction) {
+        for (const effect of queue) {
+            effect()
+        }
+        queuedReactions = undefined
+    }
 }
 
+function _invalidateInner(obj: object, prop: string) {
+
+}
 
 export function autorun(fn: Reaction) {
     function run() {
         observablesToReactions = observablesToReactions.filter(r => r.effect !== run)
 
-        const observables: Observable[] = []
-        
-        const previous = reportObservableRead
-        reportObservableRead = (obs) => observables.push(obs)
+        const previous = reportObservableAccessed
+        reportObservableAccessed = obs => observablesToReactions.push({ ...obs, effect: run })
         fn()
-        reportObservableRead = previous
-
-        for (const { obj, prop } of observables) {
-            observablesToReactions.push({ obj, prop, effect: run })
-        }
+        reportObservableAccessed = previous
     }
 
     run()
 }
 
-export function computedFn(fn: Function): Function {
-    return (...args: any[]) => {
+export function computedFn<F extends Function>(fn: F): F {
+    return ((...args: any[]) => {
         observe(fn, 'result')
 
         const cacheEntry = memoCache.find(cacheEntry =>
             cacheEntry.fn === fn && args.every((_, index) => args[index] === cacheEntry.args[index]))
 
-        if (cacheEntry) {
+        // console.log({ cacheEntry })
+
+        if (cacheEntry && cacheEntry.cached !== EMPTY_CACHE) {
+            // console.log('returned from cache: ' + cacheEntry.cached)
             return cacheEntry.cached
         } else {
             const observables: Observable[] = []
 
-            const previous = reportObservableRead
-            reportObservableRead = (obs) => observables.push(obs)
+            const previous = reportObservableAccessed
+            reportObservableAccessed = (obs) => observables.push(obs)
             const result = fn(...args)
-            reportObservableRead = previous
+            reportObservableAccessed = previous
 
-            console.log('caching ', result)
-            memoCache.push({
-                fn,
-                args,
-                observables,
-                cached: result
-            })
+            // console.log('caching: ', result)
+            if (!cacheEntry) {
+                memoCache.push({
+                    fn,
+                    args,
+                    observables,
+                    cached: result
+                })
+            } else {
+                cacheEntry.cached = result
+            }
 
             return result
         }
-    }
+    }) as unknown as  F
 }
 
-export function startAction() {
-
-}
-
-export function endAction() {
-
+export function action<F extends (...args: any[]) => void>(fn: F): F {
+    return ((...args: any[]) => {
+        const topOfAction = queuedReactions == null
+        const queue = queuedReactions = queuedReactions ?? new Set()
+    
+        fn(...args)
+        
+        if (topOfAction) {
+            for (const effect of queue) {
+                effect()
+            }
+            queuedReactions = undefined
+        }
+    }) as unknown as  F
 }

@@ -64,7 +64,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = a.b.c`,
-      `const x = a.b.c;`,
+      `const x = ___observe(___observe(a, 'b'), 'c');`,
     );
   },
 });
@@ -74,7 +74,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = a.b()`,
-      `const x = a.b();`,
+      `const x = ___observe(a, 'b')();`,
     );
   },
 });
@@ -84,7 +84,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = a.b()()`,
-      `const x = a.b()();`,
+      `const x = ___observe(a, 'b')()();`,
     );
   },
 });
@@ -94,7 +94,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = a.b.c()`,
-      `const x = a.b.c();`,
+      `const x = ___observe(___observe(a, 'b'), 'c')();`,
     );
   },
 });
@@ -104,7 +104,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = a.b().c()`,
-      `const x = a.b().c();`,
+      `const x = ___observe(___observe(a, 'b')(), 'c')();`,
     );
   },
 });
@@ -116,7 +116,7 @@ Deno.test({
       `const x = a
         .b
         .c`,
-      `const x = a.b.c;`,
+      `const x = ___observe(___observe(a, 'b'), 'c');`,
     );
   },
 });
@@ -128,7 +128,7 @@ Deno.test({
       `const x = a
         .b()
         .c()`,
-      `const x = a.b().c();`,
+      `const x = ___observe(___observe(a, 'b')(), 'c')();`,
     );
   },
 });
@@ -143,7 +143,7 @@ Deno.test({
             } else {
                 3
             }`,
-      `const merge = () => ((arr1.length <= 0) ? 2 : 3);`,
+      `const merge = () => ((___observe(arr1, 'length') <= 0) ? 2 : 3);`,
     );
   },
 });
@@ -160,7 +160,13 @@ Deno.test({
             } else {
               4
             }`,
-      `const merge = () => ((arr1.length <= 0) ? 2 : (arr1.length <= 1) ? 3 : 4);`,
+      `const merge = () =>
+        ((___observe(arr1, 'length') <= 0) ?
+          2
+        : (___observe(arr1, 'length') <= 1) ?
+          3
+        :
+          4);`,
     );
   },
 });
@@ -265,23 +271,26 @@ Deno.test({
   name: "Basic proc declaration",
   fn() {
     testCompile(
-      `proc doStuff(items: Iterator<number>) {
-            let count = 0;
-            
-            for item of items {
-            }
-
-            console.log(count);
-        }`,
-      `const doStuff = (items: ___Iter<number>): void => {
-            const ___locals: {count?: any} = ___observable({});
+      `
+      proc doStuff(items: Iterator<number>) {
+        let count = 0;
         
-            ___locals["count"] = 0;
+        for item of items {
+        }
 
-            for (const item of items[___INNER_ITER]) { ; };
+        console.log(count);
+      }`,
+      `
+      const doStuff = (items: ___Iter<number>): void => {
+        const ___locals: {count?: any} = {};
+    
+        ___locals["count"] = 0;
 
-            console.log(___locals["count"]);
-        };`,
+        for (const item of items[___INNER_ITER]) { ;
+        };
+
+        ___observe(console, 'log')(___observe(___locals, 'count'));
+      };`,
     );
   },
 });
@@ -290,42 +299,45 @@ Deno.test({
   name: "Proc declaration with statements",
   fn() {
     testCompile(
-      `proc doStuff(items: Iterator<number>) {
-            let count = 0;
+      `
+      proc doStuff(items: Iterator<number>) {
+        let count = 0;
 
-            for item of items {
-                if item.foo {
-                    count = count + 1;
-                }
-
-                if count > 12 {
-                    console.log(items);
-                } else {
-                    console.log(nil);
-                }
+        for item of items {
+            if item.foo {
+                count = count + 1;
             }
 
-            console.log(count);
-        }`,
-      `const doStuff = (items: ___Iter<number>): void => {
-            const ___locals: {count?: any} = ___observable({});
-        
-            ___locals["count"] = 0;
+            if count > 12 {
+                console.log(items);
+            } else {
+                console.log(nil);
+            }
+        }
 
-            for (const item of items[___INNER_ITER]) {
-                if (item.foo) {
-                    ___locals["count"] = (___locals["count"] + 1);
-                };
-                
-                if ((___locals["count"] > 12)) {
-                    console.log(items);
-                } else {
-                    console.log(undefined);
-                };
+        console.log(count);
+      }`,
+      `
+      const doStuff = (items: ___Iter<number>): void => {
+        const ___locals: {count?: any} = {};
+    
+        ___locals["count"] = 0;
+    
+        for (const item of items[___INNER_ITER]) {
+            if (___observe(item, 'foo')) {
+                ___locals['count'] = (___observe(___locals, 'count') + 1);
+                ___invalidate(___locals, count);
             };
-
-            console.log(___locals["count"]);
-        };`,
+            
+            if ((___observe(___locals, 'count') > 12)) {
+                ___observe(console, 'log')(items);
+            } else {
+                ___observe(console, 'log')(undefined);
+            };
+        };
+    
+        ___observe(console, 'log')(___observe(___locals, 'count'));
+      };`,
     );
   },
 });
@@ -345,7 +357,7 @@ Deno.test({
   fn() {
     testCompile(
       `const foo = bar.prop1.prop2`,
-      `const foo = bar.prop1.prop2;`,
+      `const foo = ___observe(___observe(bar, 'prop1'), 'prop2');`,
     );
   },
 });
@@ -493,7 +505,8 @@ function testCompile(code: string, exp: string) {
       throw `\n${code}\nFailed to parse:\n` +
         errors.map(err => prettyProblem(moduleName, err)).join("\n")
     }
-  
+    console.log(normalize(exp))
+    console.log(normalize(compiled))
     if (normalize(compiled) !== normalize(exp)) {
       throw `Compiler output did not match expected:
   bagel:\n${code}

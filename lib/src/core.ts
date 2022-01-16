@@ -1,35 +1,4 @@
 
-
-// MobX
-export {
-    observable,
-    computed,
-    configure,
-    makeObservable,
-    autorun
-} from "mobx"
-
-import { when, reaction } from "mobx";
-
-export function reactionUntil<T>(
-    data: () => T,
-    effect: (data: T) => void,
-    until?: () => boolean,
-    opts: unknown = {}
-): void {
-    const r = reaction(data, effect, opts);
-    if (until) {
-        when(until, r);
-    }
-
-    effect(data())
-}
-
-export {
-    computedFn
-} from "mobx-utils"
-
-
 // Preact
 export {
     h
@@ -39,6 +8,17 @@ export function render(el: unknown) {
     // @ts-ignore
     prender(el, document.body)
 }
+
+
+
+// Custom reactivity
+export {
+    observe,
+    invalidate,
+    autorun,
+    computedFn,
+    action
+} from './_reactivity.ts'
 
 
 // Custom

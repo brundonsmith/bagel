@@ -140,7 +140,6 @@ class _Store {
         
         return (
             JS_PRELUDE + 
-            (ast.hasMain ? MOBX_CONFIGURE : '') + 
             compile(
                 ast, 
                 moduleName, 
@@ -206,23 +205,16 @@ const moduleIsCore = (moduleName: ModuleName) => {
     return moduleName.includes('wrappers')
 }
 
-export const IMPORTED_ITEMS = [ 'autorun',  'observable', 'computed', 'configure', 'makeObservable', 'h',
-'computedFn', 'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER', 'withConst'
+export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'h',
+'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER', 'withConst'
 ]
 
 const JS_PRELUDE = `
 import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "C:/Users/brundolf/git/bagel/lib/src/core.ts";
 `
-export const MOBX_CONFIGURE = `
-___configure({
-    enforceActions: "never",
-    computedRequiresReaction: false,
-    reactionRequiresObservable: false,
-    observableRequiresReaction: false,
-});`
 
 const BGL_PRELUDE = `
-from 'C:/Users/brundolf/git/bagel/lib/wrappers/prelude' import { iter, logp, logf, BagelConfig }
+from 'C:/Users/brundolf/git/bagel/lib/wrappers/prelude' import { iter, BagelConfig }
 `
 
 export function canonicalModuleName(importerModule: string, importPath: string): ModuleName {
