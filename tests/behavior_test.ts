@@ -4,56 +4,79 @@ import Store, { IMPORTED_ITEMS } from "../compiler/store.ts";
 import { Module } from "../compiler/_model/ast.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
-// Deno.test({
-//     name: "Simple autorun",
-//     fn() {
-//         testSideEffects(
-//             `
-//             store Stuff {
-//                 public counter = 0
-//             }
+Deno.test({
+    name: "Simple autorun",
+    fn() {
+        testSideEffects(
+            `
+            store Stuff {
+                public counter = 0
+            }
 
-//             autorun () {
-//                 output(Stuff.counter);
-//             }
+            autorun () {
+                output(Stuff.counter);
+            }
 
-//             proc runTest() {
-//                 Stuff.counter = Stuff.counter + 1;
-//                 Stuff.counter = Stuff.counter + 1;
-//                 Stuff.counter = Stuff.counter + 1;
-//             }`,
-//             [0, 1, 2, 3],
-//         );
-//     },
-// });
+            proc runTest() {
+                Stuff.counter = Stuff.counter + 1;
+                Stuff.counter = Stuff.counter + 1;
+                Stuff.counter = Stuff.counter + 1;
+            }`,
+            [0, 1, 2, 3],
+        );
+    },
+});
 
-// Deno.test({
-//     name: "Simple autorun deep property",
-//     fn() {
-//         testSideEffects(
-//             `
-//             store Stuff {
-//                 public counterHolder: { prop: number, other: string } = { prop: 0, other: 'stuff' }
-//             }
+Deno.test({
+    name: "Simple autorun deep property",
+    fn() {
+        testSideEffects(
+            `
+            store Stuff {
+                public counterHolder: { prop: number, other: string } = { prop: 0, other: 'stuff' }
+            }
     
-//             autorun () {
-//                 // should be ignored in reactions!
-//                 output(Stuff.counterHolder.other);
-//             }
+            autorun () {
+                // should be ignored in reactions!
+                output(Stuff.counterHolder.other);
+            }
     
-//             autorun () {
-//                 output(Stuff.counterHolder.prop);
-//             }
+            autorun () {
+                output(Stuff.counterHolder.prop);
+            }
     
-//             proc runTest() {
-//                 Stuff.counterHolder.prop = Stuff.counterHolder.prop + 1;
-//                 Stuff.counterHolder.prop = Stuff.counterHolder.prop + 1;
-//                 Stuff.counterHolder.prop = Stuff.counterHolder.prop + 1;
-//             }`,
-//             ['stuff', 0, 1, 2, 3],
-//         );
-//     },
-// });
+            proc runTest() {
+                Stuff.counterHolder.prop = Stuff.counterHolder.prop + 1;
+                Stuff.counterHolder.prop = Stuff.counterHolder.prop + 1;
+                Stuff.counterHolder.prop = Stuff.counterHolder.prop + 1;
+            }`,
+            ['stuff', 0, 1, 2, 3],
+        );
+    },
+});
+
+Deno.test({
+    name: "Action",
+    fn() {
+        testSideEffects(
+            `
+            store Stuff {
+                public counter = 0
+            }
+
+            autorun () {
+                output(Stuff.counter);
+            }
+
+            proc action runTest() {
+                Stuff.counter = Stuff.counter + 1;
+                Stuff.counter = Stuff.counter + 1;
+                Stuff.counter = Stuff.counter + 1;
+            }`,
+            [0, 3],
+        );
+    },
+});
 
 // deno-lint-ignore require-await
 async function testSideEffects(bgl: string, expected: any[]) {
