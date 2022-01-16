@@ -194,7 +194,7 @@ const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: Pro
     const proc = decl.action ? `${INT}action(${baseProc})` : baseProc
 
     if (decl.kind === 'proc-declaration') {
-        return (decl.exported ? `export ` : ``) + `const ${decl.name.name} = ${proc}`;
+        return (decl.exported ? `export ` : ``) + `const ${decl.name.name} = ${proc};`;
     } else {
         return `    ${!excludeTypes ? (decl.access ?? 'private') : ''} readonly ${decl.name.name} = ${proc}`
     }
