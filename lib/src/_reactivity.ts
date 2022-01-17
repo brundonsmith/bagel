@@ -65,7 +65,7 @@ const memoCache: Array<{
 }> = []
 const EMPTY_CACHE = Symbol('EMPTY_CACHE')
 
-export function observe(obj: object, prop: string) {
+export function observe<O extends object, K extends keyof O & string>(obj: O, prop: K): O[K] {
     if (reportObservableAccessed) {
         // console.log(`observe()`, { obj, prop })
         reportObservableAccessed({ obj: new WeakRef(obj), prop })
@@ -86,7 +86,7 @@ export function invalidate(obj: object, prop: string) {
 
         if (entryIsInvalidated) {
             entry.cached = EMPTY_CACHE
-            _invalidateInner(entry.fn, 'result')
+            invalidate(entry.fn, 'result')
         }
     }
 
@@ -104,10 +104,6 @@ export function invalidate(obj: object, prop: string) {
     }
 }
 
-function _invalidateInner(obj: object, prop: string) {
-
-}
-
 export function autorun(fn: Reaction) {
     function run() {
         observablesToReactions = observablesToReactions.filter(r => r.effect !== run)
@@ -123,7 +119,7 @@ export function autorun(fn: Reaction) {
 
 export function computedFn<F extends Function>(fn: F): F {
     return ((...args: any[]) => {
-        observe(fn, 'result')
+        observe(fn as any, 'result')
 
         const cacheEntry = memoCache.find(cacheEntry =>
             cacheEntry.fn === fn && args.every((_, index) => args[index] === cacheEntry.args[index]))
