@@ -10,7 +10,7 @@ import { pathIsRemote } from "./utils/misc.ts";
 import { AST, Module } from "./_model/ast.ts";
 import { ModuleName, ReportError } from "./_model/common.ts";
 import { areSame, iterateParseTree } from "./utils/ast.ts";
-import { lint, LintProblem } from "./other/lint.ts";
+import { autofix, lint, LintProblem } from "./other/lint.ts";
 import { DEFAULT_OPTIONS, format } from "./other/format.ts";
 
 export type Mode =
@@ -20,6 +20,7 @@ export type Mode =
     | { mode: "transpile", fileOrDir: string, watch: boolean }
     | { mode: "test", fileOrDir: string, platform?: 'node'|'deno', watch: boolean }
     | { mode: "format", fileOrDir: string, watch: undefined }
+    | { mode: "autofix", fileOrDir: string, watch: undefined }
     | { mode: "mock", modules: Record<ModuleName, string>, watch: undefined } // for internal testing only!
 
 class _Store {
@@ -158,6 +159,21 @@ class _Store {
         return (
             format(
                 ast,
+                DEFAULT_OPTIONS
+            )
+        )
+    })
+
+    readonly autofixed = computedFn((moduleName: ModuleName): string => {
+        const ast = this.parsed(moduleName, false)?.ast
+
+        if (!ast) {
+            return ''
+        }
+        
+        return (
+            format(
+                autofix(ast),
                 DEFAULT_OPTIONS
             )
         )

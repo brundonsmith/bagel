@@ -55,6 +55,7 @@ async function modeFromArgs(args: string[]): Promise<Mode> {
             // operate on whole subdirectory
             return { mode, fileOrDir: providedEntry, watch, platform }
         case "format":
+        case "autofix":
             return { mode, fileOrDir: providedEntry, watch: undefined }
         default:
             return fail(`Must provide a command: build, check, test, run, transpile`)
@@ -145,7 +146,7 @@ function printErrors(errors: Map<ModuleName, (BagelError|LintProblem)[]>, watch?
     
 // print errors as they occur
 autorun(() => {
-    if (Store.done && Store.mode?.mode !== 'format') {
+    if (Store.done && Store.mode?.mode !== 'format' && Store.mode?.mode !== 'autofix') {
         printErrors(Store.allProblems, Store.mode?.watch)
     }
 })
@@ -192,11 +193,11 @@ autorun(() => {
 
 // write formatted bgl code to disk
 autorun(() => {
-    if (Store.done && Store.mode?.mode === 'format') {
+    if (Store.done && (Store.mode?.mode === 'format' || Store.mode?.mode === 'autofix')) {
         Promise.all([...Store.modules]
             .filter(module => !pathIsRemote(module))
             .map(module =>
-                Deno.writeTextFile(module, Store.formatted(module))))
+                Deno.writeTextFile(module, Store.mode?.mode === 'format' ? Store.formatted(module) : Store.autofixed(module))))
     }
 })
 
