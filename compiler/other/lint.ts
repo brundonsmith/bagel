@@ -1,5 +1,7 @@
 import { iterateParseTree, mapParseTree } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
+import { FuncDeclaration, ProcDeclaration, ValueDeclaration } from "../_model/declarations.ts";
+import { Func, Proc } from "../_model/expressions.ts";
 
 export function lint(ast: AST): LintProblem[] {
     const problems: LintProblem[] = []
@@ -40,7 +42,7 @@ export function autofix(ast: AST): AST {
 }
 
 type LintRule = {
-    readonly message: string,
+    readonly message: (ast: AST) => string,
     readonly match: (ast: AST) => AST|undefined,
     readonly autofix?: (ast: AST) => AST,
 }
@@ -56,7 +58,7 @@ export type LintProblem = {
 
 const RULES = {
     'unnecessary-parens': {
-        message: "Parenthesis aren't needed around this expression",
+        message: () => "Parenthesis aren't needed around this expression",
         match: (ast: AST) => {
             if ((ast.kind === 'case' || ast.kind === 'case-block') && ast.condition.kind === 'parenthesized-expression') {
                 return ast.condition
@@ -72,12 +74,68 @@ const RULES = {
 
             return ast
         }
-    }
+    },
+    'func-or-proc-as-value': {
+        message: (ast: AST) => {
+            const decl = ast as ValueDeclaration
+            const val = decl.value as Proc|Func
+
+            return `Top-level const ${val.kind === 'func' ? 'functions' : 'procedures'} should be ${val.kind} declarations, not ${decl.isConst ? 'const' : 'let'} declarations`
+        },
+        match: (ast: AST) => {
+            if (ast.kind === 'value-declaration' && ast.isConst && (ast.value.kind === 'proc' || ast.value.kind === 'func')) {
+                return ast
+            }
+        },
+        autofix: (ast: AST) => {
+            if (ast.kind === 'value-declaration' && ast.isConst && (ast.value.kind === 'proc' || ast.value.kind === 'func')) {
+                const {kind, name, type, value, isConst, exported, ...rest} = ast
+
+                if (value.kind === 'func') {
+                    const f: FuncDeclaration = {
+                        kind: 'func-declaration',
+                        memo: false,
+                        exported: exported != null,
+                        name,
+                        value,
+                        ...rest,
+                    }
+
+                    return f
+                } else {
+                    const p: ProcDeclaration = {
+                        kind: 'proc-declaration',
+                        action: false,
+                        exported: exported != null,
+                        name,
+                        value,
+                        ...rest,
+                    }
+
+                    return p
+                }
+            }
+
+            return ast
+        }
+    },
+    // 'unnecessary-nil-coalescing': {
+    //     message: "Nil-coalescing operator is redundant because the left operand will never be nil",
+    //     match: (ast: AST) => {
+    //         if (ast.kind === 'binary-operator') {
+
+    //         }
+
+    //         return ast
+    //     }
+    // }
 } as const
 const _rules: {[name: string]: LintRule} = RULES
 
 type RuleName = keyof typeof RULES
 
 const DEFAULT_SEVERITY: { readonly [rule in RuleName]: Severity } = {
-    'unnecessary-parens': 'warning'
+    'unnecessary-parens': 'warning',
+    'func-or-proc-as-value': 'warning',
+    // 'unnecessary-nil-coalescing': 'warning'
 }

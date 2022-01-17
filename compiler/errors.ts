@@ -153,7 +153,7 @@ export function prettyProblem(modulePath: ModuleName, error: BagelError|LintProb
     )
     const message = (
         error.kind === "bagel-syntax-error" ? error.message : 
-        error.kind === 'lint-problem' ? error.rule.message :
+        error.kind === 'lint-problem' ? error.rule.message(error.ast) :
         errorMessage(error)
     )
     const severity = (
