@@ -47,21 +47,17 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "import-item":
             return ast.name.name + (ast.alias ? ' as ' + ast.alias.name : '')
         case "func-declaration":
-        case "store-function":
             return (ast.kind === 'func-declaration' && ast.exported ? 'export ' : '') + 
-                (ast.kind === 'store-function' && ast.access ? ast.access + ' ' : '') + 
                 `func ${ast.memo ? 'memo ' : ''}${ast.name.name}${f(ast.value)}`
         case "proc-declaration":
-        case "store-procedure":
             return (ast.kind === 'proc-declaration' && ast.exported ? 'export ' : '') + 
-                (ast.kind === 'store-procedure' && ast.access ? ast.access + ' ' : '') + 
-                `proc ${ast.name.name}${f(ast.value)}`
+                `proc ${ast.action ? 'action ' : ''}${ast.name.name}${f(ast.value)}`
         case "arg":
             return ast.name.name + (ast.type ? ': ' + f(ast.type) : '')
         case "block":
             return `{\n${ast.statements.map(s => nextIndentation + fIndent(s)).join('\n')}\n${currentIndentation}}`
-        case "const-declaration":
-            return (ast.exported ? 'export ' : '') + `const ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)}`
+        case "value-declaration":
+            return (ast.exported ? ast.exported + ' ' : '') + (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)}`
         case "type-declaration":
             return (ast.exported ? 'export ' : '') + `type ${ast.name.name} = ${f(ast.type)}`
         case "parenthesized-expression":
@@ -94,11 +90,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return JSON.stringify(ast.value)
         case "nil-literal":
             return 'nil'
-        case "store-declaration":
-            return (ast.exported ? 'export ' : '') + `store ${ast.name.name} {\n${ast.members.map(m => nextIndentation + fIndent(m)).join('\n\n')}\n${currentIndentation}}`
-        case "store-property":
-            return `${ast.access ? ast.access + ' ' : ''}${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)}`
-        case "let-declaration":
+        case "let-declaration-statement":
             return   `let ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)};`
         case "const-declaration-statement":
             return `const ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)};`
@@ -178,7 +170,6 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "indexer-type": return (ast.mutability !== 'mutable' ? 'const ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
         case "array-type":   return (ast.mutability !== 'mutable' ? 'const ' : '') + `${f(ast.element)}[]`;
         case "tuple-type":   return (ast.mutability !== 'mutable' ? 'const ' : '') + `[${ast.members.map(f).join(", ")}]`;
-        case "store-type":   return (ast.mutability !== 'mutable' ? 'const ' : '') + ast.store.name.name;
         case "string-type": return `string`;
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;

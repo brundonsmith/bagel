@@ -1,6 +1,5 @@
 import { deepEquals } from "../utils/misc.ts";
 import { AST, PlainIdentifier, SourceInfo } from "./ast.ts";
-import { StoreDeclaration } from "./declarations.ts";
 import { BooleanLiteral, ExactStringLiteral, NumberLiteral } from "./expressions.ts";
 
 export type TypeExpression =
@@ -21,7 +20,6 @@ export type TypeExpression =
     | NumberType
     | BooleanType
     | NilType
-    | StoreType
     | LiteralType
     | NominalType
     | IteratorType
@@ -172,12 +170,6 @@ export type LiteralType = SourceInfo & {
     readonly kind: "literal-type",
     readonly value: ExactStringLiteral | NumberLiteral | BooleanLiteral,
     readonly mutability: undefined,
-}
-
-export type StoreType = SourceInfo & Mutability & {
-    readonly kind: "store-type",
-    readonly store: StoreDeclaration,
-    readonly internal: boolean,
 }
 
 export type NominalType = SourceInfo & {
@@ -390,7 +382,6 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "parenthesized-type": undefined,
     "literal-type": undefined,
     "tuple-type": undefined,
-    "store-type": undefined,
     "nominal-type": undefined,
     "javascript-escape-type": undefined,
 }

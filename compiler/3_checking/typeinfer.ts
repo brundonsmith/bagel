@@ -3,18 +3,18 @@ import { BinaryOp, Expression, InlineConst, Invocation, isExpression, Spread } f
 import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
-import { StoreMember, Declaration, memberDeclaredType } from "../_model/declarations.ts";
+import { Declaration } from "../_model/declarations.ts";
 import { assignmentError, cannotFindName, miscError } from "../errors.ts";
 import { withoutSourceInfo } from "../utils/debugging.ts";
 import { AST } from "../_model/ast.ts";
-import { LetDeclaration,ConstDeclarationStatement } from "../_model/statements.ts";
+import { LetDeclarationStatement,ConstDeclarationStatement } from "../_model/statements.ts";
 import { computedFn } from "../mobx.ts";
 import { displayAST, displayType,mapParseTree,typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
 
 export function inferType(
     reportError: ReportError,
-    ast: Expression|StoreMember,
+    ast: Expression,
     visited: readonly AST[] = [],
 ): TypeExpression {
     const baseType = inferTypeInner(reportError, ast, visited)
@@ -40,7 +40,7 @@ export function inferType(
 
 const inferTypeInner = computedFn((
     reportError: ReportError,
-    ast: Expression|StoreMember,
+    ast: Expression,
     previouslyVisited: readonly AST[],
 ): TypeExpression => {
 
@@ -290,22 +290,25 @@ const inferTypeInner = computedFn((
         case "local-identifier": {
 
             // deno-lint-ignore no-inner-declarations
-            function getDeclType(decl: Declaration|LetDeclaration|ConstDeclarationStatement|InlineConst): TypeExpression {
+            function getDeclType(decl: Declaration|LetDeclarationStatement|ConstDeclarationStatement|InlineConst): TypeExpression {
                 switch (decl.kind) {
-                    case 'const-declaration':
-                    case 'let-declaration':
+                    case 'value-declaration':
+                    case 'let-declaration-statement':
                     case 'const-declaration-statement': {
                         const baseType = decl.type ?? inferType(reportError, decl.value, visited)
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
-                            decl.kind === 'const-declaration' || decl.kind === 'const-declaration-statement'
+                            (decl.kind === 'value-declaration' && (
+                                decl.isConst // const
+                                || (decl.exported === 'expose' && decl.module !== ast.module))) // 'exposed' let imported from another module
+                            || decl.kind === 'const-declaration-statement' // block const
                                 ? 'immutable'
                                 : mutability)
 
-                        // if this is a let-declaration, its type may need to be made less exact to enable reasonable mutation
+                        // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
                         const correctedBaseType = (
-                            decl.kind === 'let-declaration'
+                            decl.kind === 'let-declaration-statement' || (decl.kind === 'value-declaration' && !decl.isConst)
                                 ? broadenTypeForMutation(baseType)
-                            : baseType
+                                : baseType
                         )
 
                         return {
@@ -327,17 +330,6 @@ const inferTypeInner = computedFn((
                             mutability
                         } as TypeExpression
                     }
-                    case 'store-declaration':
-                        return {
-                            kind: "store-type",
-                            store: decl,
-                            internal: false,
-                            module: decl.module,
-                            code: decl.code,
-                            startIndex: decl.startIndex,
-                            endIndex: decl.endIndex,
-                            mutability: 'mutable',
-                        }
                     default:
                         throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
                 }
@@ -373,16 +365,6 @@ const inferTypeInner = computedFn((
                         return iteratorType.kind === 'iterator-type'
                             ? iteratorType.inner
                             : UNKNOWN_TYPE
-                    }
-                    case 'this': return {
-                        kind: "store-type",
-                        store: binding.store,
-                        internal: true,
-                        mutability: "mutable",
-                        module: undefined,
-                        code: undefined,
-                        startIndex: undefined,
-                        endIndex: undefined
                     }
                     case 'type-binding': break;
                     default:
@@ -497,9 +479,6 @@ const inferTypeInner = computedFn((
                 }
             }
         }
-        case "store-property":
-        case "store-function":
-        case "store-procedure": return (ast.kind === "store-property" ? ast.type : undefined) ?? inferType(reportError, ast.value, visited);
         case "string-literal": return STRING_TYPE;
         case "exact-string-literal":
         case "number-literal":
@@ -737,7 +716,7 @@ function narrow(reportError: ReportError, type: TypeExpression, fit: TypeExpress
     }
 }
 
-function resolveRefinements(epxr: Expression|StoreMember): Refinement[] {
+function resolveRefinements(epxr: Expression): Refinement[] {
     const refinements: Refinement[] = []
 
     for (let [current, parent] = [epxr, Store.getParent(epxr)] as [AST, AST|undefined]; parent != null;) {
@@ -900,37 +879,6 @@ export const propertiesOf = computedFn((
             }
 
             return props;
-        }
-        case "store-type": {
-            
-            const memberToAttribute = (member: StoreMember): Attribute => {
-
-                const memberType = memberDeclaredType(member) && memberDeclaredType(member)?.kind !== "func-type"
-                    ? memberDeclaredType(member) as TypeExpression
-                    : broadenTypeForMutation(inferType(reportError, member.value));
-
-                const mutability = (
-                    memberType.mutability == null ? undefined :
-                    memberType.mutability === "mutable" && member.kind === "store-property" && (resolvedType.internal || member.access !== "visible") ? "mutable"
-                    : "readonly"
-                )
-
-                return {
-                    kind: "attribute",
-                    name: member.name,
-                    type: { ...memberType, mutability } as TypeExpression,
-                    ...TYPE_AST_NOISE
-                }
-            }
-
-            if (resolvedType.internal) {
-                return resolvedType.store.members
-                    .map(memberToAttribute)
-            } else {
-                return resolvedType.store.members
-                    .filter(member => member.access != null && member.access !== "private")
-                    .map(memberToAttribute)
-            }
         }
     }
 })

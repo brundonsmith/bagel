@@ -877,80 +877,37 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Store 'this' access",
+  name: "Expose access in module",
   fn() {
-    testTypecheck(`
-    store Foo {
+    testMultiModuleTypecheck({
+      "module-1": `
+      expose let foo: number = 12`,
 
-      prop: number = 12
-
+      "module-2": `
+      from 'module-1' import { foo }
       proc bar() {
-        this.prop = 14;
-      }
-    }
-    `, false)
+        let a: number = 0;
+
+        a = foo;
+      }`
+    }, false)
   }
 })
 
+
 Deno.test({
-  name: "Store 'this' access mismatch",
+  name: "Expose assignment",
   fn() {
-    testTypecheck(`
-    store Foo {
+    testMultiModuleTypecheck({
+      "module-1": `
+      expose let foo: number = 12`,
 
-      prop: number = 12
-
+      "module-2": `
+      from 'module-1' import { foo }
       proc bar() {
-        this.prop23 = 14;
-      }
-    }
-    `, true)
-  }
-})
-
-Deno.test({
-  name: "Store 'this' access in markup",
-  fn() {
-    testTypecheck(`
-        
-    store Counter {
-      count: number = 0
-
-      public func memo render() =>
-          <div>
-              <button onClick={this.decrement}>{'-'}</button>
-              <span>{this.count}</span>
-              <button onClick={this.increment}>{'+'}</button>
-          </div>
-
-      proc decrement() {
-          this.count = this.count - 1;
-      }
-
-      proc increment() {
-          this.count = this.count + 1;
-      }
-    }
-    `, false)
-  }
-})
-
-
-Deno.test({
-  name: "Store 'this' access from outside",
-  fn() {
-    testTypecheck(`
-        
-    store Counter {
-      count: number = 0
-    }
-
-    proc bar(val: unknown) { }
-
-    proc foo() {
-      bar(this);
-    }
-    `, true)
+        foo = 13;
+      }`
+    }, true)
   }
 })
 

@@ -298,58 +298,26 @@ const BAGEL_SNIPPETS = [
         
         func fn(obj: Obj): number|nil =>
           obj.foo.bar`,
-    `
-      store Foo {
+      `
+        let count: number = 0
   
-        prop: number = 12
-  
-        proc bar() {
-          this.prop = 14;
-        }
-      }
-      `, `
-      store Foo {
-  
-        prop: number = 12
-  
-        proc bar() {
-          this.prop23 = 14;
-        }
-      }
-      `, `
-          
-      store Counter {
-        count: number = 0
-  
-        public func memo render() =>
+        func memo render() =>
             <div>
-                <button onClick={this.decrement}>{'-'}</button>
-                <span>{this.count}</span>
-                <button onClick={this.increment}>{'+'}</button>
+                <button onClick={decrement}>{'-'}</button>
+                <span>{count}</span>
+                <button onClick={increment}>{'+'}</button>
             </div>
   
         proc decrement() {
-            this.count = this.count - 1;
+            count = count - 1;
         }
   
         proc increment() {
-            this.count = this.count + 1;
+            count = count + 1;
         }
-      }
-      `, `
-          
-      store Counter {
-        count: number = 0
-      }
-  
-      proc bar(val: unknown) { }
-  
-      proc foo() {
-        bar(this);
-      }
       `,
     `
-        const foo: 'bar' = 'bar'`, `
+      const foo: 'bar' = 'bar'`, `
       func foo(val: number): number|string => val as number|string`, `
       func foo(val: number|string): number => val as number`, `
       const obj = { foo: 'stuff' }

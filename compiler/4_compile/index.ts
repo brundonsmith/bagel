@@ -1,10 +1,10 @@
 import Store, { canonicalModuleName, Mode } from "../store.ts";
-import { cachedFilePath, jsFileLocation, pathIsRemote } from "../utils/misc.ts";
+import { jsFileLocation } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { getBindingMutability, ModuleName } from "../_model/common.ts";
-import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, StoreDeclaration, StoreFunction, StoreProperty, ProcDeclaration, StoreProcedure } from "../_model/declarations.ts";
+import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func, Spread } from "../_model/expressions.ts";
-import { LetDeclaration } from "../_model/statements.ts";
+import { LetDeclarationStatement } from "../_model/statements.ts";
 import { Arg, ProcType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
@@ -39,127 +39,143 @@ export function compile(module: Module, modulePath: ModuleName, includeTests?: b
 }
 
 function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
+    const c = (ast: AST) => compileOne(excludeTypes, module, ast)
+
     switch(ast.kind) {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
-            compileOne(excludeTypes, module, name) + (alias ? ` as ${compileOne(excludeTypes, module, alias)}` : ``)
+            c(name) + (alias ? ` as ${c(alias)}` : ``)
         ).join(", ")} } from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}";`;
         case "type-declaration":  return (
             excludeTypes
                 ? ''
                 : (
                     (ast.type.kind === 'nominal-type' ?
-                        `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n${ast.exported ? `export ` : ``}function ${ast.name.name}(value: ${compileOne(excludeTypes, module, ast.type.inner)}): ${ast.name.name} { return { name: ${INT}${ast.name.name}, value } }\n`
+                        `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n${ast.exported ? `export ` : ``}function ${ast.name.name}(value: ${c(ast.type.inner)}): ${ast.name.name} { return { name: ${INT}${ast.name.name}, value } }\n`
                     : '') +
                     `${ast.exported ? `export ` : ``}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
-                        ? `{ name: typeof ${INT}${ast.name.name}, value: ${compileOne(excludeTypes, module, ast.type.inner)} }`
-                        : compileOne(excludeTypes, module, ast.type)};`
+                        ? `{ name: typeof ${INT}${ast.name.name}, value: ${c(ast.type.inner)} }`
+                        : c(ast.type)};`
                 )
         );
         case "proc-declaration":  return compileProcDeclaration(excludeTypes, module, ast)
         case "func-declaration":  return compileFuncDeclaration(excludeTypes, module, ast)
-        case "const-declaration": return (ast.exported ? `export ` : ``) + `const ${compileOne(excludeTypes, module, ast.name)}${!excludeTypes && ast.type ? `: ${compileOne(excludeTypes, module, ast.type)}` : ''} = ${compileOne(excludeTypes, module, ast.value)};`;
-        case "store-declaration": return compileStoreDeclaration(excludeTypes, module, ast);
-        case "store-property": return  compileStoreProperty(excludeTypes, module, ast)
-        case "store-procedure": return compileProcDeclaration(excludeTypes, module, ast)
-        case "store-function": return  '    ' + compileFuncDeclaration(excludeTypes, module, ast);
-        case "autorun-declaration": return `${INT}autorun(${compileOne(excludeTypes, module, ast.effect)})`;
-        case "let-declaration":  return `${LOCALS_OBJ}["${ast.name.name}"] = ${compileOne(excludeTypes, module, ast.value)}`;
-        case "const-declaration-statement": return `const ${ast.name.name} = ${compileOne(excludeTypes, module, ast.value)}`;
+        case "value-declaration": {
+            const type = (
+                excludeTypes || !ast.type ? '' :
+                ast.isConst ? `: ${c(ast.type)}` :
+                `: { value: ${c(ast.type)} }`
+            )
+
+            const value = ast.isConst
+                ? c(ast.value)
+                : `{ value: ${c(ast.value)} }`
+            
+            return (ast.exported ? `export ` : ``) + `const ${ast.name.name}${type} = ${value};`;
+        }
+        case "autorun-declaration": return `${INT}autorun(${c(ast.effect)})`;
+        case "let-declaration-statement":  return `${LOCALS_OBJ}["${ast.name.name}"] = ${c(ast.value)}`;
+        case "const-declaration-statement": return `const ${ast.name.name} = ${c(ast.value)}`;
         case "assignment": {
-            const value = compileOne(excludeTypes, module, ast.value)
+            const value = c(ast.value)
 
             if (ast.target.kind === 'local-identifier') {
-                return `${LOCALS_OBJ}['${ast.target.name}'] = ${value}; ${INT}invalidate(${LOCALS_OBJ}, ${ast.target.name})`
+                const binding = Store.getBinding(() => {}, ast.target.name, ast.target)
+
+                // const target = ast.target.
+                if (binding?.kind === 'basic' && binding.ast.kind === 'let-declaration-statement') {
+                    return `${LOCALS_OBJ}['${ast.target.name}'] = ${value}; ${INT}invalidate(${LOCALS_OBJ}, ${ast.target.name})`
+                } else {
+                    return `${ast.target.name}.value = ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
+                }
             } else {
-                return `${compileOne(excludeTypes, module, ast.target.subject)}.${ast.target.property.name} = ${value}; ${INT}invalidate(${compileOne(excludeTypes, module, ast.target.subject)}, '${ast.target.property.name}')`
+                return `${c(ast.target.subject)}.${ast.target.property.name} = ${value}; ${INT}invalidate(${c(ast.target.subject)}, '${ast.target.property.name}')`
             }
         }
         case "if-else-statement": return 'if ' + ast.cases
             .map(({ condition, outcome }) => 
-                `(${compileOne(excludeTypes, module, condition)}) ${compileOne(excludeTypes, module, outcome)}`)
+                `(${c(condition)}) ${c(outcome)}`)
             .join(' else if ')
-            + (ast.defaultCase ? ` else ${compileOne(excludeTypes, module, ast.defaultCase)}` : '');
-        case "for-loop": return `for (const ${compileOne(excludeTypes, module, ast.itemIdentifier)} of ${compileOne(excludeTypes, module, ast.iterator)}[${INT}INNER_ITER]) ${compileOne(excludeTypes, module, ast.body)}`;
-        case "while-loop": return `while (${compileOne(excludeTypes, module, ast.condition)}) ${compileOne(excludeTypes, module, ast.body)}`;
+            + (ast.defaultCase ? ` else ${c(ast.defaultCase)}` : '');
+        case "for-loop": return `for (const ${c(ast.itemIdentifier)} of ${c(ast.iterator)}[${INT}INNER_ITER]) ${c(ast.body)}`;
+        case "while-loop": return `while (${c(ast.condition)}) ${c(ast.body)}`;
         case "proc": return compileProc(excludeTypes, module, ast);
         case "func": return compileFunc(excludeTypes, module, ast);
-        case "inline-const": return `${INT}withConst(${compileOne(excludeTypes, module, ast.value)}, ${ast.name.name} =>
-            ${compileOne(excludeTypes, module, ast.next)})`
+        case "inline-const": return `${INT}withConst(${c(ast.value)}, ${ast.name.name} =>
+            ${c(ast.next)})`
         case "pipe":
-        case "invocation": return `${compileOne(excludeTypes, module, ast.subject)}${ast.kind === "invocation" && ast.typeArgs.length > 0 ? `<${ast.typeArgs.map(p => compileOne(excludeTypes, module, p)).join(',')}>` : ''}(${ast.args.map(arg => compileOne(excludeTypes, module, arg)).join(', ')})`;
-        case "binary-operator": return `(${compileOne(excludeTypes, module, ast.base)} ${ast.ops.map(([op, expr]) => compileOne(excludeTypes, module, op) + ' ' + compileOne(excludeTypes, module, expr)).join(' ')})`;
-        case "negation-operator": return `!(${compileOne(excludeTypes, module, ast.base)})`;
+        case "invocation": return `${c(ast.subject)}${ast.kind === "invocation" && ast.typeArgs.length > 0 ? `<${ast.typeArgs.map(c).join(',')}>` : ''}(${ast.args.map(c).join(', ')})`;
+        case "binary-operator": return `(${c(ast.base)} ${ast.ops.map(([op, expr]) => c(op) + ' ' + c(expr)).join(' ')})`;
+        case "negation-operator": return `!(${c(ast.base)})`;
         case "operator": return ast.op;
         case "if-else-expression":
         case "switch-expression": return '(' + ast.cases
             .map(({ condition, outcome }) => 
                 (ast.kind === "if-else-expression"
-                    ? compileOne(excludeTypes, module, condition)
-                    : compileOne(excludeTypes, module, ast.value) + ' === ' + compileOne(excludeTypes, module, condition))
-                + ` ? ${compileOne(excludeTypes, module, outcome)} : `)
+                    ? c(condition)
+                    : c(ast.value) + ' === ' + c(condition))
+                + ` ? ${c(outcome)} : `)
             .join('\n')
-        + (ast.defaultCase ? compileOne(excludeTypes, module, ast.defaultCase) : NIL) + ')'
+        + (ast.defaultCase ? c(ast.defaultCase) : NIL) + ')'
         case "range": return `${INT}range(${ast.start})(${ast.end})`;
-        case "parenthesized-expression": return `(${compileOne(excludeTypes, module, ast.inner)})`;
-        case "debug": return compileOne(excludeTypes, module, ast.inner);
-        case "property-accessor": return `${INT}observe(${compileOne(excludeTypes, module, ast.subject)}, '${ast.property.name}')`;
+        case "parenthesized-expression": return `(${c(ast.inner)})`;
+        case "debug": return c(ast.inner);
+        case "property-accessor": return `${INT}observe(${c(ast.subject)}, '${ast.property.name}')`;
         case "plain-identifier": return ast.name;
         case "local-identifier": {
             const binding = Store.getBinding(() => {}, ast.name, ast)
 
-            if (binding && binding.kind !== 'type-binding' && getBindingMutability(binding) === 'assignable') {
+            if (binding && binding.kind === 'basic' && binding.ast.kind === 'value-declaration' && !binding.ast.isConst) {
+                return `${INT}observe(${ast.name}, 'value')`
+            } else if (binding && binding.kind !== 'type-binding' && getBindingMutability(binding, ast) === 'assignable') {
                 return `${INT}observe(${LOCALS_OBJ}, '${ast.name}')`
             } else {
                 return ast.name
             }
         }
         case "object-literal":  return `{${objectEntries(excludeTypes, module, ast.entries)}}`;
-        case "array-literal":   return `[${ast.entries.map(
-            e => e.kind === 'spread' 
-                ? `...${compileOne(excludeTypes, module, e.expr)}`
-                : compileOne(excludeTypes, module, e)).join(", ")}]`;
+        case "array-literal":   return `[${ast.entries.map(c).join(", ")}]`;
         case "string-literal":  return `\`${ast.segments.map(segment =>
                                             typeof segment === "string"
                                                 ? segment
-                                                : '${' + compileOne(excludeTypes, module, segment) + '}').join("")}\``;
-        case "spread": return `...${compileOne(excludeTypes, module, ast.expr)}`;
+                                                : '${' + c(segment) + '}').join("")}\``;
+        case "spread": return `...${c(ast.expr)}`;
         case "exact-string-literal":
         case "number-literal":
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
-        case "indexer": return `${compileOne(excludeTypes, module, ast.subject)}[${compileOne(excludeTypes, module, ast.indexer)}]`;
+        case "indexer": return `${c(ast.subject)}[${c(ast.indexer)}]`;
         case "block": return `{ ${blockContents(excludeTypes, module, ast)}; }`;
         case "element-tag": return `${INT}h('${ast.tagName.name}',{${
-            objectEntries(excludeTypes, module, (ast.attributes as ([PlainIdentifier, Expression|Expression[]] | Spread)[]))}}, ${ast.children.map(c => compileOne(excludeTypes, module, c)).join(', ')})`;
-        case "union-type": return ast.members.map(m => compileOne(excludeTypes, module, m)).join(" | ");
-        case "maybe-type": return compileOne(excludeTypes, module, ast.inner) + '|null|undefined'
+            objectEntries(excludeTypes, module, (ast.attributes as ([PlainIdentifier, Expression|Expression[]] | Spread)[]))}}, ${ast.children.map(c).join(', ')})`;
+        case "union-type": return ast.members.map(c).join(" | ");
+        case "maybe-type": return c(ast.inner) + '|null|undefined'
         case "named-type": return ast.name.name;
         case "generic-type": return "unknown";
         case "bound-generic-type": return `unknown`;
         case "proc-type": return `(${compileArgs(excludeTypes, module, ast.args)}) => void`;
-        case "func-type": return `(${compileArgs(excludeTypes, module, ast.args)}) => ${compileOne(excludeTypes, module, ast.returnType ?? UNKNOWN_TYPE)}`;
+        case "func-type": return `(${compileArgs(excludeTypes, module, ast.args)}) => ${c(ast.returnType ?? UNKNOWN_TYPE)}`;
         case "element-type": return `unknown`;
         case "object-type": return `{${
             ast.spreads
-            .map(s => '...' + compileOne(excludeTypes, module, s))
+            .map(s => '...' + c(s))
             .concat(
-                ast.entries
-                .map(({ name, type }) => `${name.name}: ${compileOne(excludeTypes, module, type)}`)
+                ast.entries.map(({ name, type }) =>
+                    `${name.name}: ${c(type)}`)
             )
             .join(', ')}}`;
-        case "indexer-type": return `{[key: ${compileOne(excludeTypes, module, ast.keyType)}]: ${compileOne(excludeTypes, module, ast.valueType)}}`;
-        case "array-type": return `${compileOne(excludeTypes, module, ast.element)}[]`;
-        case "tuple-type": return `[${ast.members.map(m => compileOne(excludeTypes, module, m)).join(", ")}]`;
-        case "iterator-type": return `${INT}Iter<${compileOne(excludeTypes, module, ast.inner)}>`;
-        case "plan-type": return `${INT}Plan<${compileOne(excludeTypes, module, ast.inner)}>`;
-        case "literal-type": return `${compileOne(excludeTypes, module, ast.value)}`;
+        case "indexer-type": return `{[key: ${c(ast.keyType)}]: ${c(ast.valueType)}}`;
+        case "array-type": return `${c(ast.element)}[]`;
+        case "tuple-type": return `[${ast.members.map(c).join(", ")}]`;
+        case "iterator-type": return `${INT}Iter<${c(ast.inner)}>`;
+        case "plan-type": return `${INT}Plan<${c(ast.inner)}>`;
+        case "literal-type": return `${c(ast.value)}`;
         case "string-type": return `string`;
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;
         case "nil-type": return `(null | undefined)`;
         case "unknown-type": return `unknown`;
-        case "parenthesized-type": return `(${compileOne(excludeTypes, module, ast.inner)})`
+        case "parenthesized-type": return `(${c(ast.inner)})`
 
         default:
             throw Error("Couldn't compile '" + ast.kind + "'");
@@ -189,19 +205,15 @@ export const INT = `___`;
 const NIL = `undefined`;
 const LOCALS_OBJ = INT + "locals";
 
-const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: ProcDeclaration|StoreProcedure): string => {
+const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: ProcDeclaration): string => {
     const baseProc = compileOne(excludeTypes, module, decl.value)
     const proc = decl.action ? `${INT}action(${baseProc})` : baseProc
 
-    if (decl.kind === 'proc-declaration') {
-        return (decl.exported ? `export ` : ``) + `const ${decl.name.name} = ${proc};`;
-    } else {
-        return `    ${!excludeTypes ? (decl.access ?? 'private') : ''} readonly ${decl.name.name} = ${proc}`
-    }
+    return (decl.exported ? `export ` : ``) + `const ${decl.name.name} = ${proc};`;
 }
 
 function compileProc(excludeTypes: boolean, module: string, proc: Proc): string {
-    const letDeclarations = proc.body.statements.filter(s => s.kind === "let-declaration") as LetDeclaration[]
+    const letDeclarations = proc.body.statements.filter(s => s.kind === "let-declaration-statement") as LetDeclarationStatement[]
 
     const typeParams = !excludeTypes && proc.type.kind === 'generic-type'
         ? `<${proc.type.typeParams.map(p => p.name).join(',')}>`
@@ -222,13 +234,11 @@ function compileProc(excludeTypes: boolean, module: string, proc: Proc): string 
 }`;
 }
 
-const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: FuncDeclaration|StoreFunction): string => {
+const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: FuncDeclaration): string => {
     const signature = compileFuncSignature(excludeTypes, module, decl.value)
     const body = compileOne(excludeTypes, module, decl.value.body)
     
-    const prefix = decl.kind === "func-declaration" 
-        ? (decl.exported ? `export ` : ``) + 'const' 
-        : (!excludeTypes ? (decl.access ?? 'private') + ' readonly' : '')
+    const prefix = (decl.exported ? `export ` : ``) + 'const'
 
     if (decl.memo) {
         return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ');';
@@ -266,32 +276,6 @@ const compileFuncSignature = (excludeTypes: boolean, module: string, func: Func)
 //                 .join('') +
 //             `\n    return ${bodyExpr};\n}`
 // }
-
-function compileStoreDeclaration(excludeTypes: boolean, module: string, store: StoreDeclaration) {
-    return `class ${INT}${store.name.name} {
-        
-        ${store.members.map(m =>
-            compileOne(excludeTypes, module, m)).join('\n')}
-        
-    };
-    ${store.exported ? 'export ' : ''}const ${store.name.name} = new ${INT}${store.name.name}();`
-}
-
-function compileStoreProperty(excludeTypes: boolean, module: string, ast: StoreProperty): string {
-    const typeDeclaration = !excludeTypes && ast.type ? ': ' + compileOne(excludeTypes, module, ast.type) : ''
-
-    if (ast.access === "visible") {
-        return `    ${!excludeTypes ? 'private ' : ''}${INT}${ast.name.name}${typeDeclaration} = ${compileOne(excludeTypes, module, ast.value)};\n` +
-               `    ${!excludeTypes ? 'public ' : ''}get ${ast.name.name}() {\n` +
-               `        return this.${INT}${ast.name.name};\n` +
-               `    }\n` +
-               `    ${!excludeTypes ? 'private ' : ''}set ${ast.name.name}(val${typeDeclaration}) {\n` +
-               `        this.${INT}${ast.name.name} = val;\n` +
-               `    }\n`
-    } else {
-        return `    ${!excludeTypes ? (ast.access ?? 'private') + ' ' : ''}${ast.name.name}${typeDeclaration} = ${compileOne(excludeTypes, module, ast.value)};`
-    }
-}
 
 function compileArgs(excludeTypes: boolean, module: string, args: readonly Arg[]): string {
     return args.map(arg => compileOneArg(excludeTypes, module, arg)).join(', ')

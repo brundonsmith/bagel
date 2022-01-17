@@ -3,12 +3,11 @@ import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { AutorunDeclaration, ConstDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, StoreDeclaration, StoreFunction, StoreMember, StoreProcedure, StoreProperty, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
+import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase } from "../_model/expressions.ts";
-import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclaration, Statement, WhileLoop } from "../_model/statements.ts";
+import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclarationStatement, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, IndexerType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
-
 
 export function parse(module: ModuleName, code: string, reportError: ReportError): Module {
     let index = 0;
@@ -57,7 +56,6 @@ const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     ?? procDeclaration(module, code, startIndex)
     ?? funcDeclaration(module, code, startIndex)
     ?? constDeclaration(module, code, startIndex)
-    ?? storeDeclaration(module, code, startIndex)
     ?? autorunDeclaration(module, code, startIndex)
     ?? testExprDeclaration(module, code, startIndex)
     ?? testBlockDeclaration(module, code, startIndex)
@@ -630,11 +628,11 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
         newIndex: index,
     }))))))))
 
-const constDeclaration: ParseFunction<ConstDeclaration> = (module, code, startIndex) =>
+const constDeclaration: ParseFunction<ValueDeclaration> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, (module, code, index) =>
-        given(parseExact("export")(module, code, index), ({ parsed: exported, newIndex: index }) =>
+        given(parseExact("export")(module, code, index) ?? parseExact("expose")(module, code, index), ({ parsed: exported, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
-    given(consume(code, indexAfterExport ?? startIndex, "const"), index =>
+    given(parseExact("const")(module, code, indexAfterExport ?? startIndex) ?? parseExact("let")(module, code, indexAfterExport ?? startIndex), ({ parsed: kind, newIndex: index }) =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(plainIdentifier(module, code, index), ({ parsed: name, newIndex: index}) =>
     given(consumeWhitespace(code, index), index =>
@@ -646,11 +644,12 @@ const constDeclaration: ParseFunction<ConstDeclaration> = (module, code, startIn
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Expression'), ({ parsed: value, newIndex: index }) => ({
             parsed: {
-                kind: "const-declaration",
+                kind: "value-declaration",
                 name,
                 type,
                 value,
-                exported: exported != null,
+                isConst: kind === 'const',
+                exported,
                 module,
                 code,
                 startIndex,
@@ -658,119 +657,6 @@ const constDeclaration: ParseFunction<ConstDeclaration> = (module, code, startIn
             },
             newIndex: index,
     })))))))))))
-
-const storeDeclaration: ParseFunction<StoreDeclaration> = (module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, (module, code, index) =>
-        given(parseExact("export")(module, code, index), ({ parsed: exported, newIndex: index }) =>
-        given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
-    given(consume(code, indexAfterExport ?? startIndex, "store"), index =>
-    given(consumeWhitespaceRequired(code, index), index =>
-    expec(plainIdentifier(module, code, index), err(code, index, "Store name"), ({ parsed: name, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
-    given(parseSeries(module, code, index, storeMember), ({ parsed: members, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
-        parsed: {
-            kind: "store-declaration",
-            name,
-            typeParams: [],
-            members,
-            exported: exported != null,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        newIndex: index
-    }))))))))))
-
-const storeMember: ParseFunction<StoreMember> = (module, code, startIndex) =>
-    storeProperty(module, code, startIndex)
-    ?? storeFunction(module, code, startIndex)
-    ?? storeProcedure(module, code, startIndex)
-
-const storeProperty: ParseFunction<StoreProperty> = (module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, (module, code, index) =>
-        given(_accessModifierWithVisible(module, code, index), ({ parsed: access, newIndex: index }) =>
-        given(consumeWhitespaceRequired(code, index), index => ({ parsed: access, newIndex: index })))), ({ parsed: access, newIndex: index }) =>
-    given(plainIdentifier(module, code, index ?? startIndex), ({ parsed: name, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(parseOptional(module, code, index, (module, code, index) =>
-        given(consume(code, index, ":"), index =>
-        given(consumeWhitespace(code, index), index => typeExpression(module, code, index)))), ({ parsed: type, newIndex }) =>
-    given(consumeWhitespace(code, newIndex ?? index), index =>
-    expec(consume(code, index, "="), err(code, index, '"="'), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(expression(module, code, index), err(code, index, 'Expression'), ({ parsed: value, newIndex: index }) => ({
-        parsed: {
-            kind: "store-property",
-            name,
-            type,
-            value,
-            access,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        newIndex: index,
-    })))))))))
-
-const storeFunction: ParseFunction<StoreFunction> = (module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, (module, code, index) =>
-        given(_accessModifier(module, code, index), ({ parsed: access, newIndex: index }) =>
-        given(consumeWhitespaceRequired(code, index), index => ({ parsed: access, newIndex: index })))), ({ parsed: access, newIndex: index }) =>
-    given(funcDeclaration(module, code, index ?? startIndex), ({ parsed: { name, value, memo }, newIndex: index }) => ({
-        parsed: {
-            kind: "store-function",
-            memo,
-            name,
-            value,
-            access,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        newIndex: index,
-    })))
-
-const storeProcedure: ParseFunction<StoreProcedure> = (module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, (module, code, index) =>
-        given(_accessModifier(module, code, index), ({ parsed: access, newIndex: index }) =>
-        given(consumeWhitespaceRequired(code, index), index => ({ parsed: access, newIndex: index })))), ({ parsed: access, newIndex: index }) =>
-    given(procDeclaration(module, code, index ?? startIndex), ({ parsed: { name, action, value }, newIndex: index }) => ({
-        parsed: {
-            kind: "store-procedure",
-            action,
-            name,
-            value,
-            access,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        newIndex: index,
-    })))
-
-const _accessModifierWithVisible: ParseFunction<'private'|'public'|'visible'> = (module, code, startIndex) =>
-    _accessModifier(module, code, startIndex)
-    ?? given(consume(code, startIndex, "visible"), index => ({
-        parsed: "visible",
-        newIndex: index
-    }))
-
-const _accessModifier: ParseFunction<'private'|'public'> = (_module, code, startIndex) =>
-    given(consume(code, startIndex, "private"), index => ({
-        parsed: "private",
-        newIndex: index
-    }))
-    ?? given(consume(code, startIndex, "public"), index => ({
-        parsed: "public",
-        newIndex: index
-    }))
 
 const autorunDeclaration: ParseFunction<AutorunDeclaration> = (module, code, startIndex) =>
     given(consume(code, startIndex, "autorun"), index =>
@@ -864,7 +750,7 @@ const statement: ParseFunction<Statement> = (module, code, startIndex) =>
     ?? assignment(module, code, startIndex)
     ?? procCall(module, code, startIndex)
 
-const letDeclaration: ParseFunction<LetDeclaration> = (module, code, startIndex) =>
+const letDeclaration: ParseFunction<LetDeclarationStatement> = (module, code, startIndex) =>
     given(consume(code, startIndex, "let"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     expec(plainIdentifier(module, code, index), err(code, index, "Variable name"), ({ parsed: name, newIndex: index }) =>
@@ -879,7 +765,7 @@ const letDeclaration: ParseFunction<LetDeclaration> = (module, code, startIndex)
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
             parsed: {
-                kind: "let-declaration",
+                kind: "let-declaration-statement",
                 name,
                 value,
                 type,

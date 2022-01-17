@@ -8,8 +8,7 @@ export type Declaration =
     | TypeDeclaration
     | ProcDeclaration
     | FuncDeclaration
-    | ConstDeclaration
-    | StoreDeclaration
+    | ValueDeclaration
     | AutorunDeclaration
     | TestExprDeclaration
     | TestBlockDeclaration
@@ -49,50 +48,13 @@ export type FuncDeclaration = SourceInfo & Exported & {
     readonly value: Func,
 }
 
-export type ConstDeclaration = SourceInfo & Exported & {
-    readonly kind: "const-declaration",
+export type ValueDeclaration = SourceInfo & {
+    readonly kind: "value-declaration",
     readonly name: PlainIdentifier,
     readonly type: TypeExpression|undefined,
     readonly value: Expression,
-}
-
-export type StoreDeclaration = SourceInfo & Exported & {
-    readonly kind: "store-declaration",
-    readonly name: PlainIdentifier,
-    readonly members: readonly StoreMember[],
-}
-
-export type StoreMember =
-    | StoreProperty
-    | StoreFunction
-    | StoreProcedure
-
-export type StoreProperty = SourceInfo & {
-    readonly kind: "store-property",
-    readonly name: PlainIdentifier,
-    readonly type?: TypeExpression,
-    readonly value: Expression,
-    readonly access: 'private'|'public'|'visible'|undefined,
-}
-
-export type StoreFunction = SourceInfo & {
-    readonly kind: "store-function",
-    readonly memo: boolean,
-    readonly name: PlainIdentifier,
-    readonly value: Func,
-    readonly access: 'private'|'public'|undefined,
-}
-
-export type StoreProcedure = SourceInfo & {
-    readonly kind: "store-procedure",
-    readonly action: boolean,
-    readonly name: PlainIdentifier,
-    readonly value: Proc,
-    readonly access: 'private'|'public'|undefined,
-}
-
-export function memberDeclaredType(m: StoreMember): TypeExpression|undefined {
-    return m.kind === "store-property" ? m.type : m.value.type
+    readonly isConst: boolean,
+    readonly exported: undefined|'export'|'expose',
 }
 
 export type TestExprDeclaration = SourceInfo & {

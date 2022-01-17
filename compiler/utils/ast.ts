@@ -74,7 +74,6 @@ export function displayType(typeExpression: TypeExpression): string {
         case "parenthesized-type": str = `(${displayType(typeExpression.inner)})`; break;
         // case "element-type": str = `<${typeExpression.tagName}>`;
         case "javascript-escape-type": str = "<js escape>"; break;
-        case "store-type": str = typeExpression.store.name.name; break;
     }
 
     return (typeExpression.mutability === 'immutable' || typeExpression.mutability === 'readonly' ? 'const ' : '') + str

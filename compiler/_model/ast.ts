@@ -1,5 +1,5 @@
 import { ModuleName } from "./common.ts";
-import { StoreMember, Declaration, ImportItem } from "./declarations.ts";
+import { Declaration, ImportItem } from "./declarations.ts";
 import { Case, Expression, Operator, Spread, SwitchCase } from "./expressions.ts";
 import { CaseBlock, Statement } from "./statements.ts";
 import { Arg, Attribute, TypeExpression } from "./type-expressions.ts";
@@ -7,7 +7,6 @@ import { Arg, Attribute, TypeExpression } from "./type-expressions.ts";
 export type AST = (
     | Module
     | Declaration
-    | StoreMember
     | Expression
     | Attribute
     | Statement

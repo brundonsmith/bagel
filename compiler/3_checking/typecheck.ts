@@ -16,7 +16,7 @@ export function typecheck(reportError: ReportError, ast: Module) {
         if (!isTypeExpression(current)) {
 
             switch(current.kind) {
-                case "const-declaration": {
+                case "value-declaration": {
 
                     // make sure value fits declared type, if there is one
                     const valueType = inferType(reportError, current.value);
@@ -24,20 +24,6 @@ export function typecheck(reportError: ReportError, ast: Module) {
                         reportError(assignmentError(current.value, current.type, valueType));
                     }
 
-                    // forbid top-level const from being a func (should be a real func declaration) TODO: procs too
-                    if (current.value.kind === "func") {
-                        const maxPreviewLength = 8
-                        const fn = displayAST(current.value)
-                        const sample = fn.substr(0, maxPreviewLength)
-                        const truncated = fn.length > maxPreviewLength
-                        reportError(miscError(current, `Top-level const functions should be actual func declarations: func ${current.name.name}${sample}${truncated ? '...' : ''}`))
-                    }
-                } break;
-                case "func-declaration": {
-                    // forbid top-level funcs with no arguments
-                    // if (ast.value.type.args.length === 0 && ast.value.body.kind !== "javascript-escape") {
-                    //     reportError(miscError(ast, "Top-level function declarations aren't allowed to take zero arguments, because the result will always be the same. Consider making this a constant."))
-                    // }
                 } break;
                 case "test-expr-declaration": {
 
@@ -185,11 +171,7 @@ export function typecheck(reportError: ReportError, ast: Module) {
                     if (subjectProperties == null) {
                         reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${displayType(subjectType)}")`));
                     } else if (!subjectProperties.some(property => property.name.name === current.property.name)) {
-                        if (subjectType.kind === "store-type") {
-                            reportError(miscError(current.property, `Property '${current.property.name}' does not exist on store '${subjectType.store.name.name}'`));
-                        } else {
-                            reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${displayType(subjectType)}'`));
-                        }
+                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${displayType(subjectType)}'`));
                     }
                 } break;
                 case "string-literal": {
@@ -214,7 +196,7 @@ export function typecheck(reportError: ReportError, ast: Module) {
                     Store.getBinding(reportError, current.name, current)
                 } break;
                 case "inline-const":
-                case "let-declaration":
+                case "let-declaration-statement":
                 case "const-declaration-statement": {
                     if (current.type != null) {
                     const valueType = inferType(reportError, current.value);
@@ -225,7 +207,7 @@ export function typecheck(reportError: ReportError, ast: Module) {
                 } break;
                 case "assignment": {
                     const resolved = current.target.kind === "local-identifier" ? Store.getBinding(reportError, current.target.name, current.target) : undefined
-                    if (current.target.kind === "local-identifier" && resolved != null && resolved.kind !== 'type-binding' && getBindingMutability(resolved) !== "assignable") {
+                    if (current.target.kind === "local-identifier" && resolved != null && resolved.kind !== 'type-binding' && getBindingMutability(resolved, current.target) !== "assignable") {
                         reportError(miscError(current.target, `Cannot assign to '${current.target.name}' because it's constant`));
                     }
 

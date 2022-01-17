@@ -1,9 +1,10 @@
+import { given } from "../1_parse/common.ts";
 import { alreadyDeclared, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
 import Store from "../store.ts";
 import { areSame } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
 import { Binding, ModuleName, ReportError } from "../_model/common.ts";
-import { FuncType, ProcType } from "../_model/type-expressions.ts";
+import { ValueDeclaration,FuncDeclaration,ProcDeclaration,TypeDeclaration } from "../_model/declarations.ts";
 
 /**
  * Given some identifier and some AST context, look upwards until a binding is
@@ -40,15 +41,14 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                     } break;
                     case "func-declaration":
                     case "proc-declaration":
-                    case "store-declaration":
-                    case "const-declaration": {
+                    case "value-declaration": {
                         if (declaration.name.name === name) {
                             if (resolved) {
                                 reportError(alreadyDeclared(declaration.name))
                             }
     
-                            // detect const being referenced before it's available
-                            if (declaration.kind === 'const-declaration') { 
+                            // detect value being referenced before it's available
+                            if (declaration.kind === 'value-declaration') { 
                                 const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
     
                                 if (comingFromIndex < declarationIndex) {
@@ -56,11 +56,6 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                 } else if (comingFromIndex === declarationIndex) {
                                     reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
                                 }
-                            }
-
-                            // detect store being referenced in const initialization
-                            if (declaration.kind === 'store-declaration' && from.kind === 'const-declaration') {
-                                reportError(miscError(originator, `Stores cannot be referenced when initializing constants`))
                             }
     
                             resolved = {
@@ -85,10 +80,25 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                     // other module doesn't exist
                                     reportError(cannotFindModule(declaration.path))
                                 } else {
-                                    resolved = resolve(reportError, name, otherModule.declarations[0], originator) // HACK
+                                    const imported = otherModule.declarations.find(decl =>
+                                        (decl.kind === 'value-declaration' || decl.kind === 'func-declaration' || decl.kind === 'proc-declaration' || decl.kind === 'type-declaration')
+                                        && decl.name.name === importItem.name.name
+                                        && decl.exported) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|undefined
 
-                                    if (resolved == null) {
+                                    if (imported == null) {
                                         reportError(cannotFindExport(importItem, declaration));
+                                    } else {
+                                        if (imported.kind === 'type-declaration') {
+                                            resolved = {
+                                                kind: 'type-binding',
+                                                type: imported.type
+                                            }
+                                        } else {
+                                            resolved = {
+                                                kind: "basic",
+                                                ast: imported
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -171,7 +181,7 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                 const statement = parent.statements[statementIndex]
 
                 switch (statement.kind) {
-                    case "let-declaration":
+                    case "let-declaration-statement":
                     case "const-declaration-statement": {
                         if (statement.name.name === name) {
                             if (resolved) {
@@ -203,14 +213,6 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                 }
             }
         } break;
-        case "store-declaration":
-            if ("this" === name) {
-                resolved = {
-                    kind: "this",
-                    store: parent
-                }
-            }
-            break;
         case "inline-const":
             if (parent.name.name === name) {
                 resolved = {

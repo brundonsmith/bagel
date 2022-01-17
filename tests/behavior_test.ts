@@ -9,18 +9,16 @@ Deno.test({
     fn() {
         testSideEffects(
             `
-            store Stuff {
-                public counter = 0
-            }
+            let counter = 0
 
             autorun () {
-                output(Stuff.counter);
+                output(counter);
             }
 
             proc runTest() {
-                Stuff.counter = Stuff.counter + 1;
-                Stuff.counter = Stuff.counter + 1;
-                Stuff.counter = Stuff.counter + 1;
+                counter = counter + 1;
+                counter = counter + 1;
+                counter = counter + 1;
             }`,
             [0, 1, 2, 3],
         );
@@ -32,23 +30,21 @@ Deno.test({
     fn() {
         testSideEffects(
             `
-            store Stuff {
-                public counterHolder: { prop: number, other: string } = { prop: 0, other: 'stuff' }
-            }
+            let counterHolder: { prop: number, other: string } = { prop: 0, other: 'stuff' }
     
             autorun () {
                 // should be ignored in reactions!
-                output(Stuff.counterHolder.other);
+                output(counterHolder.other);
             }
     
             autorun () {
-                output(Stuff.counterHolder.prop);
+                output(counterHolder.prop);
             }
     
             proc runTest() {
-                Stuff.counterHolder.prop = Stuff.counterHolder.prop + 1;
-                Stuff.counterHolder.prop = Stuff.counterHolder.prop + 1;
-                Stuff.counterHolder.prop = Stuff.counterHolder.prop + 1;
+                counterHolder.prop = counterHolder.prop + 1;
+                counterHolder.prop = counterHolder.prop + 1;
+                counterHolder.prop = counterHolder.prop + 1;
             }`,
             ['stuff', 0, 1, 2, 3],
         );
@@ -60,18 +56,16 @@ Deno.test({
     fn() {
         testSideEffects(
             `
-            store Stuff {
-                public counter = 0
-            }
+            let counter = 0
 
             autorun () {
-                output(Stuff.counter);
+                output(counter);
             }
 
             proc action runTest() {
-                Stuff.counter = Stuff.counter + 1;
-                Stuff.counter = Stuff.counter + 1;
-                Stuff.counter = Stuff.counter + 1;
+                counter = counter + 1;
+                counter = counter + 1;
+                counter = counter + 1;
             }`,
             [0, 3],
         );

@@ -4,7 +4,7 @@ import { TypeExpression } from "./type-expressions.ts";
 
 export type Statement = 
     | JavascriptEscape
-    | LetDeclaration
+    | LetDeclarationStatement
     | ConstDeclarationStatement
     | IfElseStatement
     | ForLoop
@@ -12,8 +12,8 @@ export type Statement =
     | Assignment
     | Invocation
 
-export type LetDeclaration = SourceInfo & {
-    readonly kind: "let-declaration",
+export type LetDeclarationStatement = SourceInfo & {
+    readonly kind: "let-declaration-statement",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly value: Expression,
