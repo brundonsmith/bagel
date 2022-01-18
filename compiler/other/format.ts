@@ -29,7 +29,7 @@ function formatTypeParam(param: { name: PlainIdentifier, extends: TypeExpression
     return param.name.name + (param.extends ? ' extends ' + f(param.extends) : '')
 }
 
-export function format(ast: AST, options: FormatOptions): string {
+export function format(ast: AST, options: FormatOptions = DEFAULT_OPTIONS): string {
     return formatInner(options, 0, undefined)(ast)
 }
 
