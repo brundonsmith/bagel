@@ -207,34 +207,21 @@ const inferTypeInner = computedFn((
         }
         case "if-else-expression":
         case "switch-expression": {
-            const valueType = ast.kind === "if-else-expression" ? BOOLEAN_TYPE : inferType(reportError, ast.value, visited)
-
-            const caseTypes = ast.cases.map(({ outcome }) => 
-                inferType(reportError, outcome, visited))
-
-            const unionType: UnionType = {
+            return {
                 kind: "union-type",
-                members: caseTypes,
+                members: [
+                    ...ast.cases.map(({ outcome }) => 
+                        inferType(reportError, outcome, visited)),
+                    ast.defaultCase 
+                        ? inferType(reportError, ast.defaultCase, visited) 
+                        : NIL_TYPE
+                ],
                 mutability: undefined,
                 module: undefined,
                 code: undefined,
                 startIndex: undefined,
                 endIndex: undefined,
-            };
-
-            if (!subsumes(reportError, unionType, valueType)) {
-                return {
-                    ...unionType,
-                    members: [
-                        ...unionType.members,
-                        ast.defaultCase 
-                            ? inferType(reportError, ast.defaultCase, visited) 
-                            : NIL_TYPE
-                    ]
-                }
             }
-            
-            return unionType
         }
         case "range": return ITERATOR_OF_NUMBERS_TYPE;
         case "debug": {
