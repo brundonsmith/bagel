@@ -59,7 +59,11 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "value-declaration":
             return (ast.exported ? ast.exported + ' ' : '') + (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)}`
         case "type-declaration":
+            if (ast.type.kind === 'nominal-type') {
+                return (ast.exported ? 'export ' : '') + `nominal type ${ast.name.name}(${f(ast.type.inner)})`
+            } else {
             return (ast.exported ? 'export ' : '') + `type ${ast.name.name} = ${f(ast.type)}`
+            }
         case "parenthesized-expression":
             return `(${f(ast.inner)})`
         case "binary-operator":

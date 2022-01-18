@@ -1,6 +1,8 @@
 import { DEFAULT_OPTIONS, format } from "../compiler/other/format.ts";
 import Store from "../compiler/store.ts";
+import { withoutSourceInfo } from "../compiler/utils/debugging.ts";
 import { deepEquals } from "../compiler/utils/misc.ts";
+import { Module } from "../compiler/_model/ast.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 const BAGEL_SNIPPETS = [
@@ -360,6 +362,7 @@ const BAGEL_SNIPPETS = [
       const foo: (string|number)[] = ['foo', 12, true, 'bar']`, `
       func foo(a: number?, b: string?, c: boolean): number|string|boolean => a ?? b ?? c`, `
       func foo(a: string?, b: string?): string => a ?? b ?? 12`,
+      `export nominal type Foo({ prop1: string, prop2: number })`
 ]
 
 Store.start({
@@ -373,16 +376,16 @@ for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
         name: 'snippet ' + i,
         fn() {
             const { ast, errors } = Store.parsed(('snippet ' + i) as ModuleName, false) ?? {}
-        
+
             if (ast && errors && errors.length === 0) {
                 const formattedModuleName = ('formatted snippet ' + i) as ModuleName
                 const formatted = format(ast, DEFAULT_OPTIONS)
 
                 Store.setSource(formattedModuleName, formatted)
 
-                const reParsed = Store.parsed(formattedModuleName, false)?.ast
+                const reParsed = Store.parsed(formattedModuleName, false)?.ast as Module
 
-                if (!deepEquals(ast, reParsed, ["module", "code", "startIndex", "endIndex"])) {
+                if (!deepEquals(withoutSourceInfo(ast), withoutSourceInfo(reParsed))) {
                     throw `Reformatted AST did not match original:\noriginal:\n${BAGEL_SNIPPETS[i]}\nformatted:\n${formatted}`
                 }
             } else {
