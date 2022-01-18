@@ -169,7 +169,10 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "bound-generic-type": return `${f(ast.generic)}<${ast.typeArgs.map(f).join(',')}>`;
         case "proc-type": return `(${ast.args.map(arg => arg.name.name + (arg.type ? `: ${f(arg.type)}` : '')).join(', ')}) {}`;
         case "func-type": return `(${ast.args.map(arg => arg.name.name + (arg.type ? `: ${f(arg.type)}` : '')).join(', ')}) => ${f(ast.returnType ?? UNKNOWN_TYPE)}`;
-        case "object-type":  return (ast.mutability !== 'mutable' ? 'const ' : '') + `{${ast.spreads.map(s => nextIndentation + '...' + fIndent(s)).concat(ast.entries.map(e => nextIndentation + fIndent(e))).join(', ')}}`;
+        case "object-type":  return (ast.mutability !== 'mutable' ? 'const ' : '') + `{${
+            ast.spreads.map(s => '\n' + nextIndentation + '...' + fIndent(s)).concat(
+            ast.entries.map(e => '\n' + nextIndentation + fIndent(e)))
+                .join(',')}\n${currentIndentation}}`;
         case "attribute": return  `${ast.name.name}: ${f(ast.type)}`
         case "indexer-type": return (ast.mutability !== 'mutable' ? 'const ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
         case "array-type":   return (ast.mutability !== 'mutable' ? 'const ' : '') + `${f(ast.element)}[]`;
