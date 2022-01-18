@@ -312,6 +312,11 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
             return resolvedValue.members.every(member =>
                 subsumes(reportError, resolvedDestination.element, member))
         }
+    } else if (resolvedDestination.kind === "tuple-type") {
+        if (resolvedValue.kind === 'tuple-type') {
+            return resolvedValue.members.every((member, index) =>
+                subsumes(reportError, resolvedDestination.members[index], member))
+        }
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
         const destinationEntries = propertiesOf(reportError, resolvedDestination)
         const valueEntries =       propertiesOf(reportError, resolvedValue)
