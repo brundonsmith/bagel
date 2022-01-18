@@ -9,8 +9,9 @@ import { withoutSourceInfo } from "../utils/debugging.ts";
 import { AST } from "../_model/ast.ts";
 import { LetDeclarationStatement,ConstDeclarationStatement } from "../_model/statements.ts";
 import { computedFn } from "../mobx.ts";
-import { displayAST, displayType,mapParseTree,typesEqual } from "../utils/ast.ts";
+import { mapParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
+import { format } from "../other/format.ts";
 
 export function inferType(
     reportError: ReportError,
@@ -118,7 +119,7 @@ const inferTypeInner = computedFn((
                     subsumes(reportError, left, leftTypeResolved) && subsumes(reportError, right, rightTypeResolved))
 
                     if (types == null) {
-                        reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${displayType(leftType)}' and '${displayType(rightType)}'`));
+                        reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${format(leftType)}' and '${format(rightType)}'`));
                             return BINARY_OPERATOR_TYPES[op.op]?.[0].output ?? UNKNOWN_TYPE
                     }
 
@@ -396,7 +397,7 @@ const inferTypeInner = computedFn((
                     const spreadObjType = resolveType(reportError, inferType(reportError, spreadObj, visited));
 
                     if (spreadObjType.kind !== 'object-type') {
-                        reportError(miscError(spreadObj, `Can only spread objects into an object; found ${displayType(spreadObjType)}`))
+                        reportError(miscError(spreadObj, `Can only spread objects into an object; found ${format(spreadObjType)}`))
                         return undefined
                     } else {
                         return spreadObjType.entries
@@ -428,7 +429,7 @@ const inferTypeInner = computedFn((
                     } else if (spreadType.kind === 'tuple-type') {
                         memberTypes.push(...spreadType.members)
                     } else {
-                        reportError(miscError(entry.expr, `Can only spread arrays into an array; found ${displayType(spreadType)}`))
+                        reportError(miscError(entry.expr, `Can only spread arrays into an array; found ${format(spreadType)}`))
                         memberTypes.push(UNKNOWN_TYPE)
                     }
                 } else {
@@ -833,7 +834,7 @@ export const propertiesOf = computedFn((
                         if (resolved.kind !== 'type-binding') {
                             reportError(miscError(spread, `${spread.name.name} is not a type`))
                         } else if (resolved.type.kind !== 'object-type') {
-                            reportError(miscError(spread, `${displayType(resolved.type)} is not an object type; can only spread object types into object types`))
+                            reportError(miscError(spread, `${format(resolved.type)} is not an object type; can only spread object types into object types`))
                         }
                     }
                 }

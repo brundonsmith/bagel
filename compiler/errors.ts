@@ -1,4 +1,3 @@
-import { displayType } from "./utils/ast.ts";
 import { AST, PlainIdentifier } from "./_model/ast.ts";
 import { ImportDeclaration,ImportItem } from "./_model/declarations.ts";
 import { ExactStringLiteral, LocalIdentifier } from "./_model/expressions.ts";
@@ -7,6 +6,7 @@ import { Colors } from "./deps.ts";
 import { deepEquals, given } from "./utils/misc.ts";
 import { ModuleName } from "./_model/common.ts";
 import { LintProblem } from "./other/lint.ts";
+import { format } from "./other/format.ts";
 
 export type BagelError =
     | BagelSyntaxError
@@ -86,7 +86,7 @@ export function errorMessage(error: BagelError): string {
         case "bagel-syntax-error":
             return error.message
         case "bagel-assignable-to-error":
-            return `Type "${displayType(error.value)}" is not assignable to type "${displayType(error.destination)}"`;
+            return `Type "${format(error.value)}" is not assignable to type "${format(error.destination)}"`;
         case "bagel-cannot-find-name-error":
             return `Cannot find name "${error.name}"`;
         case "bagel-already-declared-error":

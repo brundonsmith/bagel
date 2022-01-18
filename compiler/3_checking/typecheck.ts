@@ -4,8 +4,9 @@ import { given } from "../utils/misc.ts";
 import { assignmentError,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions } from "./typeinfer.ts";
 import { getBindingMutability, ReportError } from "../_model/common.ts";
-import { displayAST, displayType, iterateParseTree, typesEqual } from "../utils/ast.ts";
+import { iterateParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
+import { format } from "../other/format.ts";
 
 /**
  * Walk an entire AST and report all issues that we find
@@ -140,7 +141,7 @@ export function typecheck(reportError: ReportError, ast: Module) {
                         const key = indexerType.value.value;
                         const valueType = propertiesOf(reportError, baseType)?.find(entry => entry.name.name === key)?.type;
                         if (valueType == null) {
-                            reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${displayType(baseType)}'`));
+                            reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${format(baseType)}'`));
                         }
                     } else if (baseType.kind === "indexer-type") {
                         if (!subsumes(reportError,  baseType.keyType, indexerType)) {
@@ -148,18 +149,18 @@ export function typecheck(reportError: ReportError, ast: Module) {
                         }
                     } else if (baseType.kind === "array-type") {
                         if (!subsumes(reportError,  NUMBER_TYPE, indexerType)) {
-                            reportError(miscError(current.indexer, `Expression of type '${displayType(indexerType)}' can't be used to index type '${displayType(baseType)}'`));
+                            reportError(miscError(current.indexer, `Expression of type '${format(indexerType)}' can't be used to index type '${format(baseType)}'`));
                         }
                     } else if (baseType.kind === "tuple-type") {
                         if (!subsumes(reportError,  NUMBER_TYPE, indexerType)) {
-                            reportError(miscError(current.indexer, `Expression of type '${displayType(indexerType)}' can't be used to index type '${displayType(baseType)}'`));
+                            reportError(miscError(current.indexer, `Expression of type '${format(indexerType)}' can't be used to index type '${format(baseType)}'`));
                         } else if (indexerType.kind === 'literal-type' && indexerType.value.kind === 'number-literal') {
                             if (indexerType.value.value < 0 || indexerType.value.value >= baseType.members.length) {
-                                reportError(miscError(current.indexer, `Index ${indexerType.value.value} is out of range on type '${displayType(baseType)}'`));
+                                reportError(miscError(current.indexer, `Index ${indexerType.value.value} is out of range on type '${format(baseType)}'`));
                             }
                         }
                     } else {
-                        reportError(miscError(current.indexer, `Expression of type '${displayType(indexerType)}' can't be used to index type '${displayType(baseType)}'`));
+                        reportError(miscError(current.indexer, `Expression of type '${format(indexerType)}' can't be used to index type '${format(baseType)}'`));
                     }
                 } break;
                 case "property-accessor": {
@@ -169,9 +170,9 @@ export function typecheck(reportError: ReportError, ast: Module) {
                         : propertiesOf(reportError, subjectType)
 
                     if (subjectProperties == null) {
-                        reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${displayType(subjectType)}")`));
+                        reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${format(subjectType)}")`));
                     } else if (!subjectProperties.some(property => property.name.name === current.property.name)) {
-                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${displayType(subjectType)}'`));
+                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${format(subjectType)}'`));
                     }
                 } break;
                 case "string-literal": {
@@ -188,7 +189,7 @@ export function typecheck(reportError: ReportError, ast: Module) {
                 case "as-cast": {
                     const innerType = inferType(reportError, current.inner)
                     if (!subsumes(reportError, current.type, innerType)) {
-                        reportError(miscError(current, `Expression of type ${displayType(innerType)} cannot be expanded to type ${displayType(current.type)}`))
+                        reportError(miscError(current, `Expression of type ${format(innerType)} cannot be expanded to type ${format(current.type)}`))
                     }
                 } break;
                 case "local-identifier": {
