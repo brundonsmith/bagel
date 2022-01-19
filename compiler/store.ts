@@ -23,6 +23,7 @@ export type Mode =
     | { mode: "autofix", fileOrDir: string, watch: undefined }
     | { mode: "mock", modules: Record<ModuleName, string>, watch: undefined } // for internal testing only!
 
+const PRELUDE_PATH = `C:\\Users\\brundolf\\git\\bagel\\lib\\wrappers\\prelude.bgl` as ModuleName
 class _Store {
 
     constructor() {
@@ -33,7 +34,7 @@ class _Store {
     // State
     mode: undefined | Mode = undefined
 
-    private _modules = new Set<ModuleName>()
+    private _modules = new Set<ModuleName>([ PRELUDE_PATH ])
     public get modules(): ReadonlySet<ModuleName> {
         return this._modules
     }
@@ -93,7 +94,7 @@ class _Store {
                 ? [ mode.fileOrDir ]
                 : await getAllFiles(mode.fileOrDir);
 
-            this._modules = new Set(allFiles as ModuleName[])
+            this._modules = new Set([PRELUDE_PATH, ...allFiles as ModuleName[]])
         }
     }
 
