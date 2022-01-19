@@ -159,6 +159,18 @@ export function typecheck(reportError: ReportError, ast: Module) {
                                 reportError(miscError(current.indexer, `Index ${indexType.value.value} is out of range on type '${format(baseType)}'`));
                             }
                         }
+                    } else if (baseType.kind === "string-type") {
+                        if (!subsumes(reportError,  NUMBER_TYPE, indexType)) {
+                            reportError(miscError(current.indexer, `Expression of type '${format(indexType)}' can't be used to index type '${format(baseType)}'`));
+                        }
+                    } else if (baseType.kind === 'literal-type' && baseType.value.kind === 'exact-string-literal') {
+                        if (!subsumes(reportError,  NUMBER_TYPE, indexType)) {
+                            reportError(miscError(current.indexer, `Expression of type '${format(indexType)}' can't be used to index type '${format(baseType)}'`));
+                        } else if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
+                            if (indexType.value.value < 0 || indexType.value.value >= baseType.value.value.length) {
+                                reportError(miscError(current.indexer, `Index ${indexType.value.value} is out of range on type '${format(baseType)}'`));
+                            }
+                        }
                     } else {
                         reportError(miscError(current.indexer, `Expression of type '${format(indexType)}' can't be used to index type '${format(baseType)}'`));
                     }
