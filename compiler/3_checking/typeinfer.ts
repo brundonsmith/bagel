@@ -119,12 +119,13 @@ const inferTypeInner = computedFn((
                     subsumes(reportError, left, leftTypeResolved) && subsumes(reportError, right, rightTypeResolved))
 
                     if (types == null) {
+                        leftType = UNKNOWN_TYPE
                         reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${format(leftType)}' and '${format(rightType)}'`));
                             return BINARY_OPERATOR_TYPES[op.op]?.[0].output ?? UNKNOWN_TYPE
-                    }
-
+                    } else {
                     leftType = types.output;
                 }
+            }
             }
 
             return leftType;
