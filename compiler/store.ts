@@ -108,11 +108,14 @@ class _Store {
 
     // Computed fns
     readonly parsed = computedFn((moduleName: ModuleName, withPrelude: boolean): { ast: Module, errors: readonly BagelError[] } | undefined => {
-        const source = (withPrelude && !moduleIsCore(moduleName) ? BGL_PRELUDE : '') + this._modulesSource.get(moduleName)
-
+        const source = this._modulesSource.get(moduleName)
         if (source) {
             const errors: BagelError[] = []
-            const ast = reshape(parse(moduleName, source, err => errors.push(err)))
+            const ast = reshape(parse(
+                moduleName,  
+                (withPrelude && !moduleIsCore(moduleName) ? BGL_PRELUDE : '') + source, 
+                err => errors.push(err)
+            ))
             return { ast, errors }
         }
     })
