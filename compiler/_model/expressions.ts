@@ -61,8 +61,8 @@ export type Proc = SourceInfo & {
 
 export type Range = SourceInfo & {
     readonly kind: "range",
-    readonly start: number,
-    readonly end: number,
+    readonly start: Expression,
+    readonly end: Expression,
 }
 
 export type BinaryOperator = SourceInfo & {

@@ -3,10 +3,10 @@ import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration } from "../_model/declarations.ts";
+import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclarationStatement, Statement, WhileLoop } from "../_model/statements.ts";
-import { ArrayType, FuncType, IndexerType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier } from "./common.ts";
 
 export function parse(module: ModuleName, code: string, reportError: ReportError): Module {
@@ -50,6 +50,7 @@ export function parse(module: ModuleName, code: string, reportError: ReportError
 
 const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     debug(module, code, startIndex)
+    ?? importAllDeclaration(module, code, startIndex)
     ?? importDeclaration(module, code, startIndex)
     ?? _nominalTypeDeclaration(module, code, startIndex)
     ?? typeDeclaration(module, code, startIndex)
@@ -60,6 +61,26 @@ const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     ?? testExprDeclaration(module, code, startIndex)
     ?? testBlockDeclaration(module, code, startIndex)
     ?? javascriptEscape(module, code, startIndex)
+
+const importAllDeclaration: ParseFunction<ImportAllDeclaration> = (module, code, startIndex) =>
+    given(consume(code, startIndex, "import"), index =>
+    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
+    expec(exactStringLiteral(module, code, index), err(code, index, 'Import path'), ({ parsed: path, newIndex: index }) => 
+    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
+    expec(consume(code, startIndex, "as"), err(code, index, '"as"'), index =>
+    expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
+    expec(plainIdentifier(module, code, index), err(code, index, '"Name"'), ({ parsed: alias, newIndex: index }) => ({
+        parsed: {
+            kind: "import-all-declaration",
+            alias,
+            path,
+            module,
+            code,
+            startIndex,
+            endIndex: index
+        },
+        newIndex: index
+    }))))))))
 
 const importDeclaration: ParseFunction<ImportDeclaration> = (module, code, startIndex) =>
     given(consume(code, startIndex, "from"), index =>
@@ -300,7 +321,7 @@ const _objectTypeEntry: ParseFunction<Attribute> = (module, code, startIndex) =>
         newIndex: index,
     }))))))
 
-const indexerType: ParseFunction<IndexerType> = (module, code, startIndex) =>
+const recordType: ParseFunction<RecordType> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(parseExact("const")(module, code, index), ({ parsed: constant, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: constant, newIndex: index })))), ({ parsed: constant, newIndex: indexAfterConstant }) =>
@@ -317,7 +338,7 @@ const indexerType: ParseFunction<IndexerType> = (module, code, startIndex) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
         parsed: {
-            kind: "indexer-type",
+            kind: "record-type",
             keyType,
             valueType,
             mutability: constant ? "readonly" : "mutable",
@@ -1369,13 +1390,13 @@ const _defaultCase: ParseFunction<Expression> = (module, code, startIndex) =>
 
 
 const range: ParseFunction<Range> = (module, code, startIndex) =>
-    given(numberLiteral(module, code, startIndex), ({ parsed: firstNumber, newIndex: index }) =>
+    given(EXPRESSION_PARSER.parseBeneath(module, code, startIndex, range), ({ parsed: start, newIndex: index }) =>
     given(consume(code, index, ".."), index =>
-    expec(numberLiteral(module, code, index), err(code, index, 'Range end'), ({ parsed: secondNumber, newIndex: index }) => ({
+    expec(EXPRESSION_PARSER.parseBeneath(module, code, index, range), err(code, index, 'Range end'), ({ parsed: end, newIndex: index }) => ({
         parsed: {
             kind: "range",
-            start: firstNumber.value,
-            end: secondNumber.value,
+            start,
+            end,
             module,
             code,
             startIndex,
@@ -1839,7 +1860,7 @@ class TieredParser<T> {
 
 const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ debug, javascriptEscape, pipe, elementTag ],
-    [ func, proc, range ],
+    [ func, proc ],
     [ asCast ],
     [ binaryOperator(0) ],
     [ binaryOperator(1) ],
@@ -1851,6 +1872,7 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ negationOperator ],
     [ indexer ],
     [ invocationAccessorChain ],
+    [ range ],
     [ parenthesized ],
     [ localIdentifier ],
     [ ifElseExpression, switchExpression, inlineConst, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
@@ -1864,6 +1886,6 @@ const TYPE_PARSER = new TieredParser<TypeExpression>([
     [ maybeType ],
     [ arrayType ],
     [ primitiveType, elementType, funcType, procType, 
-        literalType, namedType, indexerType, objectType, parenthesizedType, 
+        literalType, namedType, recordType, objectType, parenthesizedType, 
         tupleType, unknownType ],
 ])

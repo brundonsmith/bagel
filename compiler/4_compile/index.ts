@@ -116,7 +116,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 + ` ? ${c(outcome)} : `)
             .join('\n')
         + (ast.defaultCase ? c(ast.defaultCase) : NIL) + ')'
-        case "range": return `${INT}range(${ast.start})(${ast.end})`;
+        case "range": return `${INT}range(${c(ast.start)})(${c(ast.end)})`;
         case "parenthesized-expression": return `(${c(ast.inner)})`;
         case "debug": return c(ast.inner);
         case "property-accessor": return `${INT}observe(${c(ast.subject)}, '${ast.property.name}')`;
@@ -164,7 +164,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                     `${name.name}: ${c(type)}`)
             )
             .join(', ')}}`;
-        case "indexer-type": return `{[key: ${c(ast.keyType)}]: ${c(ast.valueType)}}`;
+        case "record-type": return `{[key: ${c(ast.keyType)}]: ${c(ast.valueType)}}`;
         case "array-type": return `${c(ast.element)}[]`;
         case "tuple-type": return `[${ast.members.map(c).join(", ")}]`;
         case "iterator-type": return `${INT}Iter<${c(ast.inner)}>`;

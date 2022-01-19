@@ -64,6 +64,11 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                             }
                         }
                     } break;
+                    case "import-all-declaration": {
+                        if (declaration.alias.name === name) {
+                            
+                        }
+                    } break;
                     case "import-declaration": {
                         for (const importItem of declaration.imports) {
                             const nameAst = importItem.alias ?? importItem.name

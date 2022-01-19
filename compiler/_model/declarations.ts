@@ -4,6 +4,7 @@ import { TypeExpression } from "./type-expressions.ts";
 
 export type Declaration =
     | JavascriptEscape
+    | ImportAllDeclaration
     | ImportDeclaration
     | TypeDeclaration
     | ProcDeclaration
@@ -15,6 +16,12 @@ export type Declaration =
     | Debug
 
 type Exported = { readonly exported: boolean }
+
+export type ImportAllDeclaration = SourceInfo & {
+    readonly kind: "import-all-declaration",
+    readonly alias: PlainIdentifier,
+    readonly path: ExactStringLiteral,
+}
 
 export type ImportDeclaration = SourceInfo & {
     readonly kind: "import-declaration",

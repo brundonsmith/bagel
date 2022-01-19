@@ -42,6 +42,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
     switch (ast.kind) {
         case "module":
             return ast.declarations.map(f).join('\n\n')
+        case "import-all-declaration":
+            return `import ${f(ast.path)} as ${ast.alias.name}`
         case "import-declaration":
             return `from '${ast.path.value}' import { ${ast.imports.map(f)} }`
         case "import-item":
@@ -62,7 +64,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             if (ast.type.kind === 'nominal-type') {
                 return (ast.exported ? 'export ' : '') + `nominal type ${ast.name.name}(${f(ast.type.inner)})`
             } else {
-            return (ast.exported ? 'export ' : '') + `type ${ast.name.name} = ${f(ast.type)}`
+                return (ast.exported ? 'export ' : '') + `type ${ast.name.name} = ${f(ast.type)}`
             }
         case "parenthesized-expression":
             return `(${f(ast.inner)})`
@@ -128,7 +130,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "as-cast":
             return `${f(ast.inner)} as ${f(ast.type)}`
         case "range":
-            return `${ast.start}..${ast.end}`
+            return `${f(ast.start)}..${f(ast.end)}`
         case "spread":
             return `...${f(ast.expr)}`
         case "indexer":
@@ -174,7 +176,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             ast.entries.map(e => '\n' + nextIndentation + fIndent(e)))
                 .join(',')}\n${currentIndentation}}`;
         case "attribute": return  `${ast.name.name}: ${f(ast.type)}`
-        case "indexer-type": return (ast.mutability !== 'mutable' ? 'const ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
+        case "record-type": return (ast.mutability !== 'mutable' ? 'const ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
         case "array-type":   return (ast.mutability !== 'mutable' ? 'const ' : '') + `${f(ast.element)}[]`;
         case "tuple-type":   return (ast.mutability !== 'mutable' ? 'const ' : '') + `[${ast.members.map(f).join(", ")}]`;
         case "string-type": return `string`;

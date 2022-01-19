@@ -1,12 +1,12 @@
 import { Refinement, TypeBinding, ReportError } from "../_model/common.ts";
 import { BinaryOp, Expression, InlineConst, Invocation, isExpression, Spread } from "../_model/expressions.ts";
-import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, ITERATOR_OF_NUMBERS_TYPE, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
 import { Declaration } from "../_model/declarations.ts";
 import { assignmentError, cannotFindName, miscError } from "../errors.ts";
 import { withoutSourceInfo } from "../utils/debugging.ts";
-import { AST } from "../_model/ast.ts";
+import { AST, Module } from "../_model/ast.ts";
 import { LetDeclarationStatement,ConstDeclarationStatement } from "../_model/statements.ts";
 import { computedFn } from "../mobx.ts";
 import { mapParseTree, typesEqual } from "../utils/ast.ts";
@@ -157,49 +157,69 @@ const inferTypeInner = computedFn((
         }
         case "indexer": {
             const baseType = resolveType(reportError, inferType(reportError, ast.subject, visited));
-            const indexerType = resolveType(reportError, inferType(reportError, ast.indexer, visited));
+            const indexType = resolveType(reportError, inferType(reportError, ast.indexer, visited));
             
-            if (baseType.kind === "object-type" && indexerType.kind === "literal-type" && indexerType.value.kind === "exact-string-literal") {
-                const key = indexerType.value.value;
+            const indexIsNumber = subsumes(reportError, NUMBER_TYPE, indexType)
+            
+            if (baseType.kind === "object-type" && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
+                const key = indexType.value.value;
                 const valueType = propertiesOf(reportError, baseType)?.find(entry => entry.name.name === key)?.type;
 
                 return valueType ?? UNKNOWN_TYPE;
-            } else if (baseType.kind === "indexer-type") {
-                if (!subsumes(reportError, baseType.keyType, indexerType)) {
+            } else if (baseType.kind === "record-type") {
+                if (!subsumes(reportError, baseType.keyType, indexType)) {
                     return UNKNOWN_TYPE;
                 } else {
                     return {
                         kind: "union-type",
                         members: [ baseType.valueType, NIL_TYPE ],
-                        mutability: undefined,
-                        module: undefined,
-                        code: undefined,
-                        startIndex: undefined,
-                        endIndex: undefined,
+                        ...TYPE_AST_NOISE
                     };
                 }
-            } else if (baseType.kind === "array-type" && subsumes(reportError, NUMBER_TYPE, indexerType)) {
+            } else if (baseType.kind === "array-type" && indexIsNumber) {
                 return {
                     kind: "union-type",
                     members: [ baseType.element, NIL_TYPE ],
-                    mutability: undefined,
-                    module: undefined,
-                    code: undefined,
-                    startIndex: undefined,
-                    endIndex: undefined,
+                    ...TYPE_AST_NOISE
                 }
-            } else if (baseType.kind === "tuple-type" && subsumes(reportError, NUMBER_TYPE, indexerType)) {
-                if (indexerType.kind === 'literal-type' && indexerType.value.kind === 'number-literal') {
-                    return baseType.members[indexerType.value.value] ?? NIL_TYPE
+            } else if (baseType.kind === "tuple-type" && indexIsNumber) {
+                if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
+                    return baseType.members[indexType.value.value] ?? NIL_TYPE
                 } else {
                     return {
                         kind: "union-type",
                         members: [ ...baseType.members, NIL_TYPE ],
-                        mutability: undefined,
-                        module: undefined,
-                        code: undefined,
-                        startIndex: undefined,
-                        endIndex: undefined,
+                        ...TYPE_AST_NOISE
+                    }
+                }
+            } else if (baseType.kind === 'string-type' && indexIsNumber) {
+                return {
+                    kind: "union-type",
+                    members: [ STRING_TYPE, NIL_TYPE ],
+                    ...TYPE_AST_NOISE
+                }
+            } else if (baseType.kind === 'literal-type' && baseType.value.kind === 'exact-string-literal' && indexIsNumber) {
+                if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
+                    const char = baseType.value.value[indexType.value.value]
+
+                    if (char) {
+                        return {
+                            kind: 'literal-type',
+                            value: {
+                                kind: 'exact-string-literal',
+                                value: char,
+                                ...AST_NOISE
+                            },
+                            ...TYPE_AST_NOISE
+                        }
+                    } else {
+                        return NIL_TYPE
+                    }
+                } else {
+                    return {
+                        kind: "union-type",
+                        members: [ STRING_TYPE, NIL_TYPE ],
+                        ...TYPE_AST_NOISE
                     }
                 }
             }
@@ -224,7 +244,16 @@ const inferTypeInner = computedFn((
                 endIndex: undefined,
             }
         }
-        case "range": return ITERATOR_OF_NUMBERS_TYPE;
+        case "range": {
+            const { module, code, startIndex, endIndex, ..._rest } = ast
+
+            return {
+                kind: 'iterator-type',
+                inner: NUMBER_TYPE,
+                mutability: undefined,
+                module, code, startIndex, endIndex
+            }
+        }
         case "debug": {
             if (isExpression(ast.inner)) {
                 const type = inferType(reportError, ast.inner, visited)
@@ -782,7 +811,7 @@ function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
         typeofStr === "boolean" ? BOOLEAN_TYPE :
         typeofStr === "nil" ? NIL_TYPE :
         typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, mutability: "readonly", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined } :
-        typeofStr === "object" ? { kind: "indexer-type", keyType: ANY_TYPE, valueType: ANY_TYPE, mutability: "readonly", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "object" ? { kind: "record-type", keyType: ANY_TYPE, valueType: ANY_TYPE, mutability: "readonly", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined } :
         // TODO
         // type.value === "set" ?
         // type.value === "class-instance" ?

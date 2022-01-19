@@ -13,7 +13,7 @@ export type TypeExpression =
     | BoundGenericType
     | ElementType
     | ObjectType
-    | IndexerType
+    | RecordType
     | ArrayType
     | TupleType
     | StringType
@@ -123,8 +123,8 @@ export type Attribute = SourceInfo & {
     readonly mutability: undefined,
 }
 
-export type IndexerType = SourceInfo & Mutability & {
-    readonly kind: "indexer-type",
+export type RecordType = SourceInfo & Mutability & {
+    readonly kind: "record-type",
     readonly keyType: TypeExpression,
     readonly valueType: TypeExpression,
 }
@@ -271,15 +271,6 @@ export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
     startIndex: undefined,
     endIndex: undefined,
 }
-export const ITERATOR_OF_NUMBERS_TYPE: IteratorType = {
-    kind: "iterator-type",
-    inner: NUMBER_TYPE,
-    mutability: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
-}
 export const ITERATOR_OF_ANY: IteratorType = {
     kind: "iterator-type",
     inner: ANY_TYPE,
@@ -369,7 +360,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "bound-generic-type": undefined,
     "element-type": undefined,
     "object-type": undefined,
-    "indexer-type": undefined,
+    "record-type": undefined,
     "array-type": undefined,
     "string-type": undefined,
     "number-type": undefined,

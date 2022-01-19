@@ -135,32 +135,32 @@ export function typecheck(reportError: ReportError, ast: Module) {
                 } break;
                 case "indexer": {
                     const baseType = resolveType(reportError, inferType(reportError, current.subject))
-                    const indexerType = resolveType(reportError, inferType(reportError, current.indexer))
+                    const indexType = resolveType(reportError, inferType(reportError, current.indexer))
                     
-                    if (baseType.kind === "object-type" && indexerType.kind === "literal-type") {
-                        const key = indexerType.value.value;
+                    if (baseType.kind === "object-type" && indexType.kind === "literal-type") {
+                        const key = indexType.value.value;
                         const valueType = propertiesOf(reportError, baseType)?.find(entry => entry.name.name === key)?.type;
                         if (valueType == null) {
                             reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${format(baseType)}'`));
                         }
-                    } else if (baseType.kind === "indexer-type") {
-                        if (!subsumes(reportError,  baseType.keyType, indexerType)) {
-                            reportError(assignmentError(current.indexer, baseType.keyType, indexerType));
+                    } else if (baseType.kind === "record-type") {
+                        if (!subsumes(reportError,  baseType.keyType, indexType)) {
+                            reportError(assignmentError(current.indexer, baseType.keyType, indexType));
                         }
                     } else if (baseType.kind === "array-type") {
-                        if (!subsumes(reportError,  NUMBER_TYPE, indexerType)) {
-                            reportError(miscError(current.indexer, `Expression of type '${format(indexerType)}' can't be used to index type '${format(baseType)}'`));
+                        if (!subsumes(reportError,  NUMBER_TYPE, indexType)) {
+                            reportError(miscError(current.indexer, `Expression of type '${format(indexType)}' can't be used to index type '${format(baseType)}'`));
                         }
                     } else if (baseType.kind === "tuple-type") {
-                        if (!subsumes(reportError,  NUMBER_TYPE, indexerType)) {
-                            reportError(miscError(current.indexer, `Expression of type '${format(indexerType)}' can't be used to index type '${format(baseType)}'`));
-                        } else if (indexerType.kind === 'literal-type' && indexerType.value.kind === 'number-literal') {
-                            if (indexerType.value.value < 0 || indexerType.value.value >= baseType.members.length) {
-                                reportError(miscError(current.indexer, `Index ${indexerType.value.value} is out of range on type '${format(baseType)}'`));
+                        if (!subsumes(reportError,  NUMBER_TYPE, indexType)) {
+                            reportError(miscError(current.indexer, `Expression of type '${format(indexType)}' can't be used to index type '${format(baseType)}'`));
+                        } else if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
+                            if (indexType.value.value < 0 || indexType.value.value >= baseType.members.length) {
+                                reportError(miscError(current.indexer, `Index ${indexType.value.value} is out of range on type '${format(baseType)}'`));
                             }
                         }
                     } else {
-                        reportError(miscError(current.indexer, `Expression of type '${format(indexerType)}' can't be used to index type '${format(baseType)}'`));
+                        reportError(miscError(current.indexer, `Expression of type '${format(indexType)}' can't be used to index type '${format(baseType)}'`));
                     }
                 } break;
                 case "property-accessor": {
@@ -223,6 +223,18 @@ export function typecheck(reportError: ReportError, ast: Module) {
                     const valueType = inferType(reportError, current.value);
                     if (!subsumes(reportError,  targetType, valueType)) {
                         reportError(assignmentError(current.value, targetType, valueType));
+                    }
+                } break;
+                case "range": {
+
+                    const startType = inferType(reportError, current.start)
+                    if (!subsumes(reportError, NUMBER_TYPE, startType)) {
+                        reportError(miscError(current.start, `Expected number for start of iterator; got '${format(startType)}'`));
+                    }
+
+                    const endType = inferType(reportError, current.end)
+                    if (!subsumes(reportError, NUMBER_TYPE, endType)) {
+                        reportError(miscError(current.end, `Expected number for end of iterator; got '${format(endType)}'`));
                     }
                 } break;
                 case "for-loop": {

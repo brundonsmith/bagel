@@ -68,6 +68,60 @@ Deno.test({
 }})
 
 Deno.test({
+    name: "Deep-equals self",
+    fn() {
+        const obj = {
+            "kind": "module",
+            "hasMain": false,
+            "declarations": [
+                {
+                    "kind": "type-declaration",
+                    "name": {
+                        "kind": "plain-identifier",
+                        "name": "Foo"
+                    },
+                    "type": {
+                        "kind": "nominal-type",
+                        "inner": {
+                            "kind": "object-type",
+                            "spreads": [],
+                            "entries": [
+                                {
+                                    "kind": "attribute",
+                                    "name": {
+                                        "kind": "plain-identifier",
+                                        "name": "prop1"
+                                    },
+                                    "type": {
+                                        "kind": "string-type"
+                                    }
+                                },
+                                {
+                                    "kind": "attribute",
+                                    "name": {
+                                        "kind": "plain-identifier",
+                                        "name": "prop2"
+                                    },
+                                    "type": {
+                                        "kind": "number-type"
+                                    }
+                                }
+                            ],
+                            "mutability": "mutable"
+                        }
+                    },
+                    "exported": true
+                }
+            ]
+        }
+
+        if (!deepEquals(obj, JSON.parse(JSON.stringify(obj)))) {
+            throw "Values should be considered equal but were not"
+        }
+    }
+})
+
+Deno.test({
   name: "Deep-equals big",
   fn() {
     const val = {
