@@ -92,7 +92,7 @@ class _Store {
             const singleEntry = !(await Deno.stat(mode.fileOrDir)).isDirectory
             const allFiles = singleEntry 
                 ? [ mode.fileOrDir ]
-                : await getAllFiles(mode.fileOrDir);
+                : (await getAllFiles(mode.fileOrDir)).filter(f => f.match(/.*\.bgl$/));
 
             this._modules = new Set([PRELUDE_PATH, ...allFiles as ModuleName[]])
         }
