@@ -123,9 +123,9 @@ const inferTypeInner = computedFn((
                         reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${format(leftType)}' and '${format(rightType)}'`));
                             return BINARY_OPERATOR_TYPES[op.op]?.[0].output ?? UNKNOWN_TYPE
                     } else {
-                    leftType = types.output;
+                        leftType = types.output;
+                    }
                 }
-            }
             }
 
             return leftType;
@@ -159,7 +159,7 @@ const inferTypeInner = computedFn((
         case "indexer": {
             const baseType = resolveType(reportError, inferType(reportError, ast.subject, visited));
             const indexType = resolveType(reportError, inferType(reportError, ast.indexer, visited));
-            
+
             const indexIsNumber = subsumes(reportError, NUMBER_TYPE, indexType)
             
             if (baseType.kind === "object-type" && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
@@ -839,7 +839,8 @@ export const propertiesOf = computedFn((
         }
         case "iterator-type":
         case "plan-type": {
-            const generic = (Store.getBinding(reportError, resolvedType.kind === 'iterator-type' ? 'Iterator' : 'Plan', resolvedType) as TypeBinding).type
+            const preludeModule = given(resolvedType.module, module => Store.parsed(module, true)?.ast) as Module
+            const generic = (Store.getBinding(reportError, resolvedType.kind === 'iterator-type' ? 'Iterator' : 'Plan', preludeModule.declarations[0]) as TypeBinding).type
             return propertiesOf(reportError, {
                 kind: "bound-generic-type",
                 generic,
