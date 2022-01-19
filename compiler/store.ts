@@ -233,7 +233,7 @@ import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "C:/Use
 `
 
 const BGL_PRELUDE = `
-from 'C:/Users/brundolf/git/bagel/lib/wrappers/prelude' import { iter, BagelConfig }
+from 'C:/Users/brundolf/git/bagel/lib/wrappers/prelude' import { iter, Iterator, Plan, BagelConfig }
 `
 
 export function canonicalModuleName(importerModule: string, importPath: string): ModuleName {
