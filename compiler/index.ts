@@ -254,7 +254,8 @@ const bundleOutput = async (entryFile: string, outfile: string) => {
         })
 
         console.log('Bundle written to ' + outfile)
-    } catch {
+    } catch (e) {
+        console.error(e)
     } finally {
         esbuild.stop()
     }
