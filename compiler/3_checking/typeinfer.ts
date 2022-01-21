@@ -734,65 +734,66 @@ function narrow(reportError: ReportError, type: TypeExpression, fit: TypeExpress
     }
 }
 
-function resolveRefinements(epxr: Expression): Refinement[] {
+function resolveRefinements(expr: Expression): Refinement[] {
     const refinements: Refinement[] = []
 
-    for (let [current, parent] = [epxr, Store.getParent(epxr)] as [AST, AST|undefined]; parent != null;) {
+    let current: AST = expr
+    let parent = Store.getParent(expr)
+    let grandparent = given(parent, Store.getParent)
 
-        switch (current.kind) {
-            case 'case': {
+    // traverse upwards through the AST, looking for nodes that refine the type 
+    // of the current expression
+    while (parent != null) {
+        if (parent.kind === 'case') {
+            if (grandparent?.kind === 'if-else-expression' && current === parent.outcome) {
+                const condition = parent.condition.kind === 'parenthesized-expression' ? parent.condition.inner : parent.condition;
 
-                // Type refinement
-                if (parent?.kind === "if-else-expression") {
-                    const condition = current.condition.kind === 'parenthesized-expression' ? current.condition.inner : current.condition;
+                if (condition.kind === "binary-operator" && condition.ops[0][0].op === "!=") {
+                    const targetExpression = 
+                        condition.ops[0][1].kind === 'nil-literal' ? condition.base :
+                        condition.base.kind === "nil-literal" ? condition.ops[0][1] :
+                        undefined;
 
-                    if (condition.kind === "binary-operator" && condition.ops[0][0].op === "!=") {
-                        const targetExpression = 
-                            condition.ops[0][1].kind === 'nil-literal' ? condition.base :
-                            condition.base.kind === "nil-literal" ? condition.ops[0][1] :
-                            undefined;
-
-                        if (targetExpression != null) {
-                            refinements.push({ kind: "subtraction", type: NIL_TYPE, targetExpression })
-                        }
+                    if (targetExpression != null) {
+                        refinements.push({ kind: "subtraction", type: NIL_TYPE, targetExpression })
                     }
+                }
 
-                    if (condition.kind === "binary-operator" && condition.ops[0][0].op === "==") {
-                        const bits = (
-                            condition.base.kind === "invocation" && condition.base.subject.kind === "local-identifier" && condition.base.subject.name === "typeof" 
-                            && condition.ops[0][1].kind === "string-literal" && typeof condition.ops[0][1].segments[0] === "string" ? [condition.base.args[0], condition.ops[0][1].segments[0]] as const :
-                            condition.base.kind === "string-literal" && typeof condition.base.segments[0] === "string"
-                            && condition.ops[0][1].kind === "invocation" && condition.ops[0][1].subject.kind === "local-identifier" && condition.ops[0][1].subject.name === "typeof" ? [condition.ops[0][1].args[0], condition.base.segments[0]] as const :
-                            undefined
-                        )
-                        
-                        if (bits) {
-                            const [targetExpression, typeofStr] = bits
-        
-                            const refinedType = typeFromTypeof(typeofStr)
-                            
-                            if (refinedType) {
-                                refinements.push({ kind: "narrowing", type: refinedType, targetExpression })
-                            }
-                        }
-                        
-                    }
-                } else if (parent?.kind === "switch-expression") {
-                    if (parent.value.kind === "invocation" &&
-                        parent.value.subject.kind === "local-identifier" &&
-                        parent.value.subject.name === "typeof" &&
-                        current.condition.kind === "string-literal" &&
-                        current.condition.segments.length === 1 &&
-                        typeof current.condition.segments[0] === 'string') {
-                        
-                        const targetExpression = parent.value.args[0]
-                        const typeofStr = current.condition.segments[0]
-
+                if (condition.kind === "binary-operator" && condition.ops[0][0].op === "==") {
+                    const bits = (
+                        condition.base.kind === "invocation" && condition.base.subject.kind === "local-identifier" && condition.base.subject.name === "typeof" 
+                        && condition.ops[0][1].kind === "string-literal" && typeof condition.ops[0][1].segments[0] === "string" ? [condition.base.args[0], condition.ops[0][1].segments[0]] as const :
+                        condition.base.kind === "string-literal" && typeof condition.base.segments[0] === "string"
+                        && condition.ops[0][1].kind === "invocation" && condition.ops[0][1].subject.kind === "local-identifier" && condition.ops[0][1].subject.name === "typeof" ? [condition.ops[0][1].args[0], condition.base.segments[0]] as const :
+                        undefined
+                    )
+                    
+                    if (bits) {
+                        const [targetExpression, typeofStr] = bits
+    
                         const refinedType = typeFromTypeof(typeofStr)
-
+                        
                         if (refinedType) {
                             refinements.push({ kind: "narrowing", type: refinedType, targetExpression })
                         }
+                    }
+                    
+                }
+            } else if (grandparent?.kind === "switch-expression") {
+                if (grandparent.value.kind === "invocation" &&
+                    grandparent.value.subject.kind === "local-identifier" &&
+                    grandparent.value.subject.name === "typeof" &&
+                    parent.condition.kind === "string-literal" &&
+                    parent.condition.segments.length === 1 &&
+                    typeof parent.condition.segments[0] === 'string') {
+                    
+                    const targetExpression = grandparent.value.args[0]
+                    const typeofStr = parent.condition.segments[0]
+
+                    const refinedType = typeFromTypeof(typeofStr)
+
+                    if (refinedType) {
+                        refinements.push({ kind: "narrowing", type: refinedType, targetExpression })
                     }
                 }
             }
@@ -800,6 +801,7 @@ function resolveRefinements(epxr: Expression): Refinement[] {
 
         current = parent
         parent = Store.getParent(parent)
+        grandparent = given(parent, Store.getParent)
     }
 
     return refinements
@@ -1053,14 +1055,10 @@ const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExpression
     "||": [
         { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
     ],
-    "==": [ // TODO: Should require left and right to be the same type, even though that type can be anything!
+    "==": [
         { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
     ],
     "!=": [
         { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
     ],
-    // "??": {
-    //     inputs: { kind: "union-type", members: [ { kind: "primitive-type", type: "nil" }, ] },
-    //     output: BOOLEAN_TYPE
-    // },
 }
