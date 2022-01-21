@@ -102,10 +102,10 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return `const ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)};`
         case "if-else-expression":
             return `if ${ast.cases.map(f).join(' else if ')}`
-                + (ast.defaultCase ? ` else {\n${nextIndentation}` + f(ast.defaultCase) + `\n${currentIndentation}}` : '')
+                + (ast.defaultCase ? ` else {\n${nextIndentation}` + fIndent(ast.defaultCase) + `\n${currentIndentation}}` : '')
         case "if-else-statement":
             return `if ${ast.cases.map(f).join(' else if ')}`
-                + (ast.defaultCase ? ' else ' + f(ast.defaultCase) : '')
+                + (ast.defaultCase ? ' else ' + fIndent(ast.defaultCase) : '')
         case "plain-identifier":
         case "local-identifier":
             return ast.name
