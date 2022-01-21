@@ -114,7 +114,7 @@ class _Store {
             const errors: BagelError[] = []
             const ast = reshape(parse(
                 moduleName,  
-                (withPrelude && !moduleIsCore(moduleName) ? BGL_PRELUDE : '') + source, 
+                source + (withPrelude && !moduleIsCore(moduleName) ? BGL_PRELUDE : ''), 
                 err => errors.push(err)
             ))
             return { ast, errors }
