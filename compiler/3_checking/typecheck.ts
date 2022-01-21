@@ -55,7 +55,22 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     }
                 } break;
                 case "binary-operator": {
-                    // This gets checked in typeinfer
+                    let leftType = inferType(reportError, current.base)
+
+                    for (const [op, expr] of current.ops) {
+                        const leftTypeResolved = resolveType(reportError, leftType)
+                        const rightType = inferType(reportError, expr)
+                        const rightTypeResolved = resolveType(reportError, rightType)
+
+                        if (op.op === '==' || op.op === '!=') {
+                            if (!subsumes(reportError, leftTypeResolved, rightTypeResolved) 
+                            && !subsumes(reportError, rightTypeResolved, leftTypeResolved)) {
+                                reportError(miscError(current, `Can't compare types ${format(leftTypeResolved)} and ${format(rightTypeResolved)} because they have no overlap`))
+                            }
+
+                            leftType = BOOLEAN_TYPE
+                        }
+                    }
                 } break;
                 case "negation-operator": {
                     const baseType = inferType(reportError, current.base);
@@ -213,7 +228,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 case "let-declaration-statement":
                 case "const-declaration-statement": {
                     if (current.type != null) {
-                    const valueType = inferType(reportError, current.value);
+                        const valueType = inferType(reportError, current.value);
                         if (!subsumes(reportError,  current.type, valueType)) {
                             reportError(assignmentError(current.value, current.type, valueType));
                         }
