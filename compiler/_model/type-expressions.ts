@@ -1,4 +1,3 @@
-import { deepEquals } from "../utils/misc.ts";
 import { AST, PlainIdentifier, SourceInfo } from "./ast.ts";
 import { BooleanLiteral, ExactStringLiteral, NumberLiteral } from "./expressions.ts";
 
@@ -120,6 +119,7 @@ export type Attribute = SourceInfo & {
     readonly kind: "attribute",
     readonly name: PlainIdentifier,
     readonly type: TypeExpression,
+    readonly optional: boolean,
     readonly mutability: undefined,
 }
 

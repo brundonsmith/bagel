@@ -279,12 +279,12 @@ const inferTypeInner = computedFn((
             const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
                 ? subtract(reportError, subjectType, NIL_TYPE)
                 : subjectType;
-            const propertyType = propertiesOf(reportError, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)?.type
+            const property = propertiesOf(reportError, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)
 
-            if (ast.optional && propertyType) {
+            if (ast.optional && property) {
                 return {
                     kind: "union-type",
-                    members: [propertyType, NIL_TYPE],
+                    members: [property.type, NIL_TYPE],
                     mutability: undefined,
                     module: undefined,
                     code: undefined,
@@ -293,14 +293,25 @@ const inferTypeInner = computedFn((
                 }
             } else {
                 const mutability = (
-                    propertyType?.mutability == null ? undefined :
-                    propertyType.mutability === "mutable" && subjectType.mutability === "mutable" ? "mutable" :
+                    property?.type?.mutability == null ? undefined :
+                    property.type.mutability === "mutable" && subjectType.mutability === "mutable" ? "mutable" :
                     subjectType.mutability === "immutable" ? "immutable" :
                     "readonly"
                 )
     
                 return (
-                    given(propertyType, t => ({ ...t, mutability }) as TypeExpression) 
+                    given(property, property => (
+                        property.optional
+                            ?  {
+                                kind: "union-type",
+                                members: [{ ...property.type, mutability }, NIL_TYPE],
+                                mutability: undefined,
+                                module: undefined,
+                                code: undefined,
+                                startIndex: undefined,
+                                endIndex: undefined
+                            }
+                            : { ...property.type, mutability }) as TypeExpression) 
                         ?? UNKNOWN_TYPE
                 )
             }
@@ -831,12 +842,7 @@ export const propertiesOf = computedFn((
     switch (resolvedType.kind) {
         case "nominal-type": {
             return [
-                {
-                    kind: "attribute",
-                    name: { kind: "plain-identifier", name: "value", ...AST_NOISE },
-                    type: resolvedType.inner,
-                    ...TYPE_AST_NOISE
-                }
+                attribute("value", resolvedType.inner)
             ]
         }
         case "iterator-type":
@@ -909,6 +915,7 @@ function attribute(name: string, type: TypeExpression): Attribute {
         kind: "attribute",
         name: { kind: "plain-identifier", name, ...AST_NOISE },
         type,
+        optional: false,
         ...TYPE_AST_NOISE
     }
 }

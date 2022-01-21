@@ -305,21 +305,23 @@ const _objectTypeSpread: ParseFunction<NamedType> = (module, code, startIndex) =
 const _objectTypeEntry: ParseFunction<Attribute> = (module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, ":"), index => 
+    given(parseOptional(module, code, index, parseExact("?")), ({ parsed: optional, newIndex: indexAfterQuestionMark }) =>
+    given(consume(code, indexAfterQuestionMark ?? index, ":"), index => 
     given(consumeWhitespace(code, index), index =>
     given(typeExpression(module, code, index), ({ parsed: type, newIndex: index }) => ({
         parsed: {
             kind: "attribute",
             name,
             type,
-            module,
+            optional: optional != null,
             mutability: undefined,
+            module,
             code,
             startIndex,
             endIndex: index
         },
         newIndex: index,
-    }))))))
+    })))))))
 
 const recordType: ParseFunction<RecordType> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, (module, code, index) =>
