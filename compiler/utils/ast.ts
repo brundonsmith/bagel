@@ -1,5 +1,5 @@
 import { AST,SourceInfo } from "../_model/ast.ts";
-import { isTypeExpression, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { TypeExpression } from "../_model/type-expressions.ts";
 import { deepEquals } from "./misc.ts";
 
 export function areSame(a: AST|undefined, b: AST|undefined) {
@@ -33,54 +33,59 @@ export function typesEqual(a: TypeExpression, b: TypeExpression): boolean {
 
 const NON_AST_PROPERTIES = new Set(["kind", "mutability", "module", "code", "startIndex", "endIndex"])
 
-// very HACKy but needed!
 export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: AST, current: AST }> {
-    yield { parent, current: ast }
+    yield* iterateParseTreeInner(ast, parent)
+}
 
-    for (const key in ast) {
-        if (!NON_AST_PROPERTIES.has(key)) {
-            // @ts-ignore
-            const prop = ast[key] as AST|AST[]|[AST, AST][]|undefined|string|number|boolean|null
+// very HACKy but needed!
+function* iterateParseTreeInner(treeNode: AST|AST[]|[AST, AST][]|undefined|string|number|boolean|null, parent?: AST): Iterable<{ parent?: AST, current: AST }> {
+    if (Array.isArray(treeNode)) {
+        for (const el of treeNode) {
+            yield* iterateParseTreeInner(el, parent)
+        }
+    } else if (typeof treeNode === 'object' && treeNode != null) {
+        const isAST = !!treeNode.kind
 
-            if (typeof prop === 'object' && prop != null) {
-                if (Array.isArray(prop)) {
-                    for (const el of prop) {
-                        if (Array.isArray(el)) {
-                            for (const x of el) {
-                                yield* iterateParseTree(x, ast)
-                            }
-                        } else {
-                            yield* iterateParseTree(el, ast)
-                        }
-                    }
-                } else {
-                    yield* iterateParseTree(prop, ast)
-                }
+        if (isAST) {
+            yield { parent, current: treeNode }
+        }
+
+        for (const key in treeNode) {
+            if (!NON_AST_PROPERTIES.has(key)) {
+                // @ts-ignore
+                const prop = treeNode[key] as AST|AST[]|[AST, AST][]|undefined|string|number|boolean|null
+
+                yield* iterateParseTreeInner(prop, isAST ? treeNode : parent)
             }
         }
     }
 }
 
 export function mapParseTree(ast: AST, transform: (ast: AST) => AST): AST {
-    const newAst = {...ast}
+    return mapParseTreeInner(ast, transform)
+}
 
-    for (const key in newAst) {
-        if (!NON_AST_PROPERTIES.has(key)) {
-            // @ts-ignore
-            const prop = newAst[key] as AST|AST[]|[AST, AST][]|undefined|string|number|boolean|null
+function mapParseTreeInner<T extends AST|AST[]|[AST, AST][]|undefined|string|number|boolean|null>(treeNode: T, transform: (ast: AST) => AST): T {
+    if (Array.isArray(treeNode)) {
+        return treeNode.map(el => mapParseTreeInner(el, transform)) as T
+    } else if (typeof treeNode === 'object' && treeNode != null) {
+        const newTreeNode = {...(treeNode as AST)}
+        
+        for (const key in treeNode) {
+            if (!NON_AST_PROPERTIES.has(key)) {
+                // @ts-ignore
+                const prop = treeNode[key] as AST|AST[]|[AST, AST][]|undefined|string|number|boolean|null
 
-            if (typeof prop === 'object' && prop != null) {
-                if (Array.isArray(prop)) {
-                    (newAst as any)[key] = prop.map(el => 
-                        Array.isArray(el)
-                            ? el.map(x => mapParseTree(x, transform))
-                            : mapParseTree(el, transform))
-                } else {
-                    (newAst as any)[key] = mapParseTree(prop, transform)
-                }
+                (newTreeNode as any)[key] = mapParseTreeInner(prop, transform)
             }
+        }
+
+        if (newTreeNode.kind) {
+            return transform(newTreeNode as AST) as T
+        } else {
+            return newTreeNode
         }
     }
 
-    return transform(newAst)
+    return treeNode
 }
