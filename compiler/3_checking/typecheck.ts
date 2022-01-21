@@ -7,15 +7,16 @@ import { getBindingMutability, ReportError } from "../_model/common.ts";
 import { iterateParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
 import { format } from "../other/format.ts";
+import { withoutSourceInfo } from "../utils/debugging.ts";
 
 /**
  * Walk an entire AST and report all issues that we find
  */
-export function typecheck(reportError: ReportError, ast: Module) {
+export function typecheck(reportError: ReportError, ast: Module): void {
 
     for (const { current } of iterateParseTree(ast)) {
         if (!isTypeExpression(current)) {
-
+            
             switch(current.kind) {
                 case "value-declaration": {
 
@@ -79,7 +80,7 @@ export function typecheck(reportError: ReportError, ast: Module) {
                                     reportError(assignmentError(current.args[0], resolvedType.inner, argType))
                                 }
         
-                                return;
+                                continue;
                             }
                         }
                     }
