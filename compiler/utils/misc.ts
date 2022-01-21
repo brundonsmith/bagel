@@ -216,9 +216,22 @@ export function jsFileLocation(module: ModuleName, mode: Mode) {
 
 
 export function bagelFileToTsFile(module: ModuleName, isBundle?: boolean): string {
+    const basename = path.basename(module)
+    const filename = basename.substring(0, basename.indexOf(path.extname(basename)))
+
+    let bundleFile = filename + '.bgl.ts'
+    
+    if (isBundle) {
+        const bundleName = filename !== 'index'
+            ? filename
+            : path.basename(path.dirname(module))
+
+        bundleFile = bundleName + '.bundle.bgl.js'
+    }
+
     return path.resolve(
         path.dirname(module), 
-        path.basename(module).split(".")[0] + (isBundle ? '.bundle.bgl.js' : '.bgl.ts')
+        bundleFile
     )
 }
 
