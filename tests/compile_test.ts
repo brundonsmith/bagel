@@ -282,14 +282,12 @@ Deno.test({
       }`,
       `
       const doStuff = (items: ___Iter<number>): void => {
-        const ___locals: {count?: any} = {};
-    
-        ___locals["count"] = 0;
+        let count = 0;
 
         for (const item of items[___INNER_ITER]) { ;
         };
 
-        ___observe(console, 'log')(___observe(___locals, 'count'));
+        ___observe(console, 'log')(count);
       };`,
     );
   },
@@ -319,24 +317,21 @@ Deno.test({
       }`,
       `
       const doStuff = (items: ___Iter<number>): void => {
-        const ___locals: {count?: any} = {};
-    
-        ___locals["count"] = 0;
+        let count = 0;
     
         for (const item of items[___INNER_ITER]) {
             if (___observe(item, 'foo')) {
-                ___locals['count'] = (___observe(___locals, 'count') + 1);
-                ___invalidate(___locals, count);
+              count = (count + 1);
             };
             
-            if ((___observe(___locals, 'count') > 12)) {
+            if ((count > 12)) {
                 ___observe(console, 'log')(items);
             } else {
                 ___observe(console, 'log')(undefined);
             };
         };
     
-        ___observe(console, 'log')(___observe(___locals, 'count'));
+        ___observe(console, 'log')(count);
       };`,
     );
   },

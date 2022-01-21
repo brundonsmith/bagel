@@ -1,10 +1,9 @@
 import Store, { canonicalModuleName, Mode } from "../store.ts";
 import { jsFileLocation } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
-import { getBindingMutability, ModuleName } from "../_model/common.ts";
+import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func, Spread } from "../_model/expressions.ts";
-import { LetDeclarationStatement } from "../_model/statements.ts";
 import { Arg, ProcType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
@@ -73,19 +72,21 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             return (ast.exported ? `export ` : ``) + `const ${ast.name.name}${type} = ${value};`;
         }
         case "autorun-declaration": return `${INT}autorun(${c(ast.effect)})`;
-        case "let-declaration-statement":  return `${LOCALS_OBJ}["${ast.name.name}"] = ${c(ast.value)}`;
-        case "const-declaration-statement": return `const ${ast.name.name} = ${c(ast.value)}`;
+        case "let-declaration-statement":
+        case "const-declaration-statement": {
+            const keyword = ast.kind === 'let-declaration-statement' ? 'let' : 'const'
+            return `${keyword} ${ast.name.name}${!excludeTypes && ast.type != null ? `: ${c(ast.type)}` : ''} = ${c(ast.value)}`;
+        }
         case "assignment": {
             const value = c(ast.value)
 
             if (ast.target.kind === 'local-identifier') {
                 const binding = Store.getBinding(() => {}, ast.target.name, ast.target)
 
-                // const target = ast.target.
-                if (binding?.kind === 'basic' && binding.ast.kind === 'let-declaration-statement') {
-                    return `${LOCALS_OBJ}['${ast.target.name}'] = ${value}; ${INT}invalidate(${LOCALS_OBJ}, ${ast.target.name})`
-                } else {
+                if (binding && binding.kind === 'basic' && binding.ast.kind === 'value-declaration' && !binding.ast.isConst) {
                     return `${ast.target.name}.value = ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
+                } else {
+                    return `${ast.target.name} = ${value}`
                 }
             } else {
                 return `${c(ast.target.subject)}.${ast.target.property.name} = ${value}; ${INT}invalidate(${c(ast.target.subject)}, '${ast.target.property.name}')`
@@ -126,8 +127,6 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
 
             if (binding && binding.kind === 'basic' && binding.ast.kind === 'value-declaration' && !binding.ast.isConst) {
                 return `${INT}observe(${ast.name}, 'value')`
-            } else if (binding && binding.kind !== 'type-binding' && getBindingMutability(binding, ast) === 'assignable') {
-                return `${INT}observe(${LOCALS_OBJ}, '${ast.name}')`
             } else {
                 return ast.name
             }
@@ -203,7 +202,6 @@ function objectEntries(excludeTypes: boolean, module: string, entries: readonly 
 export const INT = `___`;
 
 const NIL = `undefined`;
-const LOCALS_OBJ = INT + "locals";
 
 const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: ProcDeclaration): string => {
     const baseProc = compileOne(excludeTypes, module, decl.value)
@@ -213,24 +211,13 @@ const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: Pro
 }
 
 function compileProc(excludeTypes: boolean, module: string, proc: Proc): string {
-    const letDeclarations = proc.body.statements.filter(s => s.kind === "let-declaration-statement") as LetDeclarationStatement[]
-
     const typeParams = !excludeTypes && proc.type.kind === 'generic-type'
         ? `<${proc.type.typeParams.map(p => p.name).join(',')}>`
         : ''
     const procType = proc.type.kind === 'generic-type' ? proc.type.inner as ProcType : proc.type
 
     return typeParams + `(${compileArgs(excludeTypes, module, procType.args)})${!excludeTypes ? ': void' : ''} => {
-    ${letDeclarations.length > 0 ? // TODO: Handle ___locals for parent closures
-`    const ${LOCALS_OBJ}${!excludeTypes ? `: {${
-        letDeclarations
-            .map(e => 
-                `${e.name.name}?: any`)
-            .join(",")
-    }}` : ''} = {};
-    
-`
-    : ``}${proc.body.statements.map(s => compileOne(excludeTypes, module, s) + ';').join("\n")}
+    ${proc.body.statements.map(s => compileOne(excludeTypes, module, s) + ';').join("\n")}
 }`;
 }
 
