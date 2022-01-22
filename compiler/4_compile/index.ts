@@ -90,8 +90,10 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 } else {
                     return `${ast.target.name} = ${value}`
                 }
+            } else if (ast.target.kind === 'indexer') {
+                return `${c(ast.target.subject)}[${c(ast.target.indexer)}] = ${value}; ${INT}invalidate(${c(ast.target.subject)}, ${c(ast.target.indexer)})`
             } else {
-                return `${c(ast.target.subject)}.${ast.target.property.name} = ${value}; ${INT}invalidate(${c(ast.target.subject)}, '${ast.target.property.name}')`
+                return `${c(ast.target.subject)}.${ast.target.property.name} = ${value}; ${INT}invalidate(${c(ast.target.subject)}, ${c(ast.target.property)})`
             }
         }
         case "if-else-statement": return 'if ' + ast.cases

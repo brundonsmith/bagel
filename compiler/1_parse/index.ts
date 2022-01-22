@@ -1079,14 +1079,14 @@ const constDeclarationStatement: ParseFunction<ConstDeclarationStatement> = (mod
         }))))))))))))
 
 const assignment: ParseFunction<Assignment> = (module, code, startIndex) =>
-    given(invocationAccessorChain(module, code, startIndex) ?? localIdentifier(module, code, startIndex), ({ parsed: target, newIndex: index }) =>
+    given(invocationAccessorChain(module, code, startIndex) ?? indexer(module, code, startIndex) ?? localIdentifier(module, code, startIndex), ({ parsed: target, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "="), index =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, "Assignment value"), ({ parsed: value, newIndex: index }) => 
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => 
-        target.kind === "local-identifier" || target.kind === "property-accessor" ? {
+        target.kind === "local-identifier" || target.kind === "property-accessor" || target.kind === 'indexer' ? {
             parsed: {
                 kind: "assignment",
                 target,
@@ -1532,11 +1532,13 @@ const indexer: ParseFunction<Indexer> = (module, code, startIndex) =>
 
 const _indexerExpression: ParseFunction<Expression> = (module, code, startIndex) =>
     given(consume(code, startIndex, "["), index => 
+    given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Indexer expression'),({ parsed: indexer, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index => ({
         parsed: indexer,
         newIndex: index
-    }))))
+    }))))))
 
 const ifElseExpression: ParseFunction<IfElseExpression> = (module, code, startIndex) =>
     given(consume(code, startIndex, "if"), index =>

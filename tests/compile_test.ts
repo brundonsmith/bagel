@@ -478,6 +478,22 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Indexer assignment",
+  fn() {
+    testCompile(`
+    export proc setItem(key: string, value: string) {
+      _localStorage[key] = value;
+      setLocalStorage(key, value);
+    }`,
+    `
+    export const setItem = (key: string, value: string): void => {
+      _localStorage[key] = value; ___invalidate(_localStorage, key);        
+      setLocalStorage(key, value);
+    };`)
+  }
+})
+
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>' as ModuleName
 

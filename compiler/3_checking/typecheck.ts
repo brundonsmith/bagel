@@ -240,10 +240,10 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         reportError(miscError(current.target, `Cannot assign to '${current.target.name}' because it's constant`));
                     }
 
-                    if (current.target.kind === "property-accessor") {
+                    if (current.target.kind === "property-accessor" || current.target.kind === "indexer") {
                         const subjectType = resolveType(reportError, inferType(reportError, current.target.subject))
                         if (subjectType.mutability !== "mutable") {
-                            reportError(miscError(current.target, `Cannot assign to property '${current.target.property.name}' because the target object is constant`));
+                            reportError(miscError(current.target, `Cannot assign to '${format(current.target)}' because '${format(current.target.subject)}' is constant`));
                         }
                     }
 
