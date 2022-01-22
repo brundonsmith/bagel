@@ -198,28 +198,25 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
             for (let statementIndex = 0; statementIndex < parent.statements.length; statementIndex++) {
                 const statement = parent.statements[statementIndex]
 
-                switch (statement.kind) {
-                    case "let-declaration-statement":
-                    case "const-declaration-statement": {
-                        if (statement.name.name === name) {
-                            if (resolved) {
-                                reportError(alreadyDeclared(statement.name))
-                            }
-                            
-                            // detect variable or const being referenced before it's available
-                            const comingFromIndex = parent.statements.findIndex(other => areSame(other, from))
-                            if (comingFromIndex < statementIndex) {
-                                reportError(miscError(originator, `Can't reference "${name}" before initialization`))
-                            } else if (comingFromIndex === statementIndex) {
-                                reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
-                            }
-    
-                            resolved = {
-                                kind: "basic",
-                                ast: statement
-                            }
+                if (statement.kind === "value-declaration-statement") {
+                    if (statement.name.name === name) {
+                        if (resolved) {
+                            reportError(alreadyDeclared(statement.name))
                         }
-                    } break;
+                        
+                        // detect variable or const being referenced before it's available
+                        const comingFromIndex = parent.statements.findIndex(other => areSame(other, from))
+                        if (comingFromIndex < statementIndex) {
+                            reportError(miscError(originator, `Can't reference "${name}" before initialization`))
+                        } else if (comingFromIndex === statementIndex) {
+                            reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
+                        }
+
+                        resolved = {
+                            kind: "basic",
+                            ast: statement
+                        }
+                    }
                 }
             }
             break;

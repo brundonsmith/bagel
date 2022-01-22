@@ -116,10 +116,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return JSON.stringify(ast.value)
         case "nil-literal":
             return 'nil'
-        case "let-declaration-statement":
-            return   `let ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)};`
-        case "const-declaration-statement":
-            return `const ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)};`
+        case "value-declaration-statement":
+            return   `${ast.isConst ? 'const' : 'let'} ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)};`
         case "if-else-expression":
             return `if ${ast.cases.map(f).join(' else if ')}`
                 + (ast.defaultCase ? ` else {\n${nextIndentation}` + fIndent(ast.defaultCase) + `\n${currentIndentation}}` : '')

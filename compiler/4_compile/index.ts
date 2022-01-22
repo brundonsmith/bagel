@@ -74,11 +74,8 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             return (ast.exported ? `export ` : ``) + `const ${ast.name.name}${type} = ${value};`;
         }
         case "autorun-declaration": return `${INT}autorun(${c(ast.effect)})`;
-        case "let-declaration-statement":
-        case "const-declaration-statement": {
-            const keyword = ast.kind === 'let-declaration-statement' ? 'let' : 'const'
-            return `${keyword} ${ast.name.name}${!excludeTypes && ast.type != null ? `: ${c(ast.type)}` : ''} = ${c(ast.value)}`;
-        }
+        case "value-declaration-statement":
+            return `${ast.isConst ? 'const' : 'let'} ${ast.name.name}${!excludeTypes && ast.type != null ? `: ${c(ast.type)}` : ''} = ${c(ast.value)}`;
         case "assignment": {
             const value = c(ast.value)
 

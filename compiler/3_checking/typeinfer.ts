@@ -1,13 +1,13 @@
 import { Refinement, TypeBinding, ReportError } from "../_model/common.ts";
 import { BinaryOp, Expression, InlineConst, Invocation, isExpression, Spread } from "../_model/expressions.ts";
-import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UnionType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
 import { Declaration } from "../_model/declarations.ts";
 import { assignmentError, cannotFindName, miscError } from "../errors.ts";
 import { withoutSourceInfo } from "../utils/debugging.ts";
 import { AST, Module } from "../_model/ast.ts";
-import { LetDeclarationStatement,ConstDeclarationStatement } from "../_model/statements.ts";
+import { ValueDeclarationStatement } from "../_model/statements.ts";
 import { computedFn } from "../mobx.ts";
 import { mapParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
@@ -319,23 +319,19 @@ const inferTypeInner = computedFn((
         case "local-identifier": {
 
             // deno-lint-ignore no-inner-declarations
-            function getDeclType(decl: Declaration|LetDeclarationStatement|ConstDeclarationStatement|InlineConst): TypeExpression {
+            function getDeclType(decl: Declaration|ValueDeclarationStatement|InlineConst): TypeExpression {
                 switch (decl.kind) {
                     case 'value-declaration':
-                    case 'let-declaration-statement':
-                    case 'const-declaration-statement': {
+                    case 'value-declaration-statement': {
                         const baseType = decl.type ?? inferType(reportError, decl.value, visited)
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
-                            (decl.kind === 'value-declaration' && (
-                                decl.isConst // const
-                                || (decl.exported === 'expose' && decl.module !== ast.module))) // 'exposed' let imported from another module
-                            || decl.kind === 'const-declaration-statement' // block const
+                            decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== ast.module)
                                 ? 'immutable'
                                 : mutability)
 
                         // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
                         const correctedBaseType = (
-                            decl.kind === 'let-declaration-statement' || (decl.kind === 'value-declaration' && !decl.isConst)
+                            !decl.isConst
                                 ? broadenTypeForMutation(baseType)
                                 : baseType
                         )

@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-fallthrough
-import { ConstDeclarationStatement, LetDeclarationStatement } from "./statements.ts";
+import { ValueDeclarationStatement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
 import { ValueDeclaration, FuncDeclaration, ProcDeclaration, JsFuncDeclaration, JsProcDeclaration } from "./declarations.ts";
 import { Expression, Func, InlineConst, Proc } from "./expressions.ts";
@@ -15,7 +15,7 @@ export type ReportError = (error: BagelError) => void
 export type Binding = ValueBinding|TypeBinding
 
 export type ValueBinding =
-    | { readonly kind: "basic", readonly ast: ValueDeclaration|ProcDeclaration|JsProcDeclaration|FuncDeclaration|JsFuncDeclaration|LetDeclarationStatement|ConstDeclarationStatement|InlineConst }
+    | { readonly kind: "basic", readonly ast: ValueDeclaration|ProcDeclaration|JsProcDeclaration|FuncDeclaration|JsFuncDeclaration|ValueDeclarationStatement|InlineConst }
     | { readonly kind: "iterator", readonly iterator: Expression }
     | { readonly kind: "arg", readonly holder: Func|Proc, readonly argIndex: number }
 
@@ -32,15 +32,14 @@ export function getBindingMutability(binding: ValueBinding, from: AST): "immutab
                     return binding.ast.isConst || (binding.ast.exported === 'expose' && binding.ast.module !== from.module)
                         ? 'immutable' 
                         : 'assignable'
-                case 'const-declaration-statement':
                 case 'func-declaration':
                 case 'js-func-declaration':
                 case 'proc-declaration':
                 case 'js-proc-declaration':
                 case 'inline-const':
                     return 'immutable'
-                case 'let-declaration-statement':
-                    return 'assignable'
+                case 'value-declaration-statement':
+                    return !binding.ast.isConst ? 'assignable' : 'immutable'
                 default:
                     // @ts-expect-error
                     throw Error('Unreachable!' + binding.ast.kind)

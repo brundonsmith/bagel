@@ -18,7 +18,9 @@ export function typecheck(reportError: ReportError, ast: Module): void {
         if (!isTypeExpression(current)) {
             
             switch(current.kind) {
-                case "value-declaration": {
+                case "value-declaration":
+                case "value-declaration-statement":
+                case "inline-const": {
 
                     // make sure value fits declared type, if there is one
                     const valueType = inferType(reportError, current.value);
@@ -223,16 +225,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 case "local-identifier": {
                     // make sure we err if identifier can't be resolved, even if it isn't used
                     Store.getBinding(reportError, current.name, current)
-                } break;
-                case "inline-const":
-                case "let-declaration-statement":
-                case "const-declaration-statement": {
-                    if (current.type != null) {
-                        const valueType = inferType(reportError, current.value);
-                        if (!subsumes(reportError,  current.type, valueType)) {
-                            reportError(assignmentError(current.value, current.type, valueType));
-                        }
-                    }
                 } break;
                 case "assignment": {
                     const resolved = current.target.kind === "local-identifier" ? Store.getBinding(reportError, current.target.name, current.target) : undefined
