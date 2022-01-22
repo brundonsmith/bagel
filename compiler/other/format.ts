@@ -1,7 +1,7 @@
 
-import { AST, PlainIdentifier } from '../_model/ast.ts'
+import { AST } from '../_model/ast.ts'
 import { Spread } from "../_model/expressions.ts";
-import { TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 export type FormatOptions = {
     spaces: number
@@ -21,12 +21,6 @@ function indentation(options: FormatOptions, indent: number) {
     }
 
     return str
-}
-
-function formatTypeParam(param: { name: PlainIdentifier, extends: TypeExpression | undefined }, options: FormatOptions, indent: number, parent: AST|undefined): string {
-    const f = formatInner(options, indent, parent)
-
-    return param.name.name + (param.extends ? ' extends ' + f(param.extends) : '')
 }
 
 export function format(ast: AST, options: FormatOptions = DEFAULT_OPTIONS): string {
@@ -49,42 +43,43 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "import-item":
             return ast.name.name + (ast.alias ? ' as ' + ast.alias.name : '')
         case "func-declaration":
-        case "js-func-declaration": {
-            const front = 
-                (ast.exported ? 'export ' : '') + 
-                `func ${ast.memo ? 'memo ' : ''}${ast.name.name}`
-
-            if (ast.kind === 'func-declaration') {
-                return front + f(ast.value)
-            } else {
-                const funcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
-                return 'js ' + front + `${ast.type.kind === 'generic-type' ? '<' + ast.type.typeParams.map(p => formatTypeParam(p, options, indent, parent)).join(', ') + '>' : ''}(${funcType.args.map(f).join(', ')})${funcType.returnType ? ': ' + f(funcType.returnType) : ''} => {#${ast.js}#}`
-            }
-        }
+        case "js-func-declaration":
         case "proc-declaration":
         case "js-proc-declaration": {
             const front = 
-                (ast.exported ? 'export ' : '') + 
-                `proc ${ast.action ? 'action ' : ''}${ast.name.name}`
+                (ast.kind === 'js-func-declaration' || ast.kind === 'js-proc-declaration' ? 'js ' : '') +
+                exported(ast.exported) + 
+                (ast.kind === 'func-declaration' || ast.kind === 'js-func-declaration' ? 'func ' : 'proc ') +
+                ((ast.kind === 'func-declaration' || ast.kind === 'js-func-declaration') && ast.memo ? 'memo ' : '') +
+                ((ast.kind === 'proc-declaration' || ast.kind === 'js-proc-declaration') && ast.action ? 'action ' : '') +
+                ast.name.name
 
-            if (ast.kind === 'proc-declaration') {
-                return front + f(ast.value)
-            } else {
-                const funcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
-                return front + `${ast.type.kind === 'generic-type' ? '<' + ast.type.typeParams.map(p => formatTypeParam(p, options, indent, parent)).join(', ') + '>' : ''}(${funcType.args.map(f).join(', ')}) {#${ast.js}#}`
-            }
+            const rawSubjectType = ast.kind === 'func-declaration' || ast.kind === 'proc-declaration' ? ast.value.type : ast.type
+            const subjectType = rawSubjectType.kind === 'generic-type' ? rawSubjectType.inner : rawSubjectType
+
+            return front + 
+                (rawSubjectType.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, rawSubjectType.typeParams) : '') +
+                `(${subjectType.args.map(f).join(', ')})` +
+                (subjectType.kind === 'func-type' ? maybeTypeAnnotation(options, indent, parent, subjectType.returnType) : '') +
+                (subjectType.kind === 'func-type' ? ' => ' : '') +
+                (ast.kind === 'js-func-declaration' || ast.kind === 'js-proc-declaration'
+                    ? `{#${ast.js}#}`
+                    : f(ast.value.body))
         }
         case "arg":
-            return ast.name.name + (ast.type ? ': ' + f(ast.type) : '')
+            return ast.name.name + maybeTypeAnnotation(options, indent, parent, ast.type)
         case "block":
             return `{\n${ast.statements.map(s => nextIndentation + fIndent(s)).join('\n')}\n${currentIndentation}}`
         case "value-declaration":
-            return (ast.exported ? ast.exported + ' ' : '') + (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)}`
+        case "value-declaration-statement":
+            return (ast.kind === 'value-declaration' ? exported(ast.exported) : '') + 
+                (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${f(ast.value)}` +
+                (ast.kind === 'value-declaration-statement' ? ';' : '')
         case "type-declaration":
             if (ast.type.kind === 'nominal-type') {
-                return (ast.exported ? 'export ' : '') + `nominal type ${ast.name.name}(${f(ast.type.inner)})`
+                return exported(ast.exported) + `nominal type ${ast.name.name}(${f(ast.type.inner)})`
             } else {
-                return (ast.exported ? 'export ' : '') + `type ${ast.name.name} = ${f(ast.type)}`
+                return exported(ast.exported) + `type ${ast.name.name} = ${f(ast.type)}`
             }
         case "parenthesized-expression":
             return `(${f(ast.inner)})`
@@ -116,8 +111,6 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return JSON.stringify(ast.value)
         case "nil-literal":
             return 'nil'
-        case "value-declaration-statement":
-            return   `${ast.isConst ? 'const' : 'let'} ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)};`
         case "if-else-expression":
             return `if ${ast.cases.map(f).join(' else if ')}`
                 + (ast.defaultCase ? ` else {\n${nextIndentation}` + fIndent(ast.defaultCase) + `\n${currentIndentation}}` : '')
@@ -134,16 +127,16 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "while-loop":
             return `while ${f(ast.condition)} ${f(ast.body)}`
         case "invocation":
-            return `${f(ast.subject)}${ast.typeArgs.length > 0 ? `<${ast.typeArgs.map(f).join(', ')}>` : ''}(${ast.args.map(f).join(', ')})` + (parent?.kind === 'block' ? ';' : '')
+            return `${f(ast.subject)}${maybeTypeArgs(options, indent, parent, ast.typeArgs)}(${ast.args.map(f).join(', ')})` + (parent?.kind === 'block' ? ';' : '')
         case "property-accessor":
             return `${f(ast.subject)}${ast.optional ? '?' : ''}.${ast.property.name}`
         case "func": {
             const funcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
-            return `${ast.type.kind === 'generic-type' ? '<' + ast.type.typeParams.map(p => formatTypeParam(p, options, indent, parent)).join(', ') + '>' : ''}(${funcType.args.map(f).join(', ')})${funcType.returnType ? ': ' + f(funcType.returnType) : ''} =>\n${nextIndentation}${fIndent(ast.body)}`
+            return `${ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''}(${funcType.args.map(f).join(', ')})${maybeTypeAnnotation(options, indent, parent, funcType.returnType)} =>\n${nextIndentation}${fIndent(ast.body)}`
         }
         case "proc": {
             const procType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
-            return `${ast.type.kind === 'generic-type' ? '<' + ast.type.typeParams.map(p => formatTypeParam(p, options, indent, parent)).join(', ') + '>' : ''}(${procType.args.map(f).join(', ')}) ${f(ast.body)}`
+            return `${ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''}(${procType.args.map(f).join(', ')}) ${f(ast.body)}`
         }
         case "as-cast":
             return `${f(ast.inner)} as ${f(ast.type)}`
@@ -170,7 +163,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "debug":
             return `!debug[${f(ast.inner)}]`
         case "inline-const":
-            return `const ${ast.name.name}${ast.type ? ': ' + f(ast.type) : ''} = ${f(ast.value)},\n${currentIndentation}${f(ast.next)}`
+            return `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${f(ast.value)},\n${currentIndentation}${f(ast.next)}`
         case "element-tag":
             return `<${ast.tagName.name}${ast.attributes.length > 0 ? ' ' + ast.attributes.map(([name, value]) => `${name.name}={${f(value)}}`).join(' ') : ''}>${
                 ast.children.map(c =>
@@ -185,8 +178,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "maybe-type": return f(ast.inner) + '?';
         case "named-type":
         case "generic-param-type": return ast.name.name;
-        case "generic-type": return `<${ast.typeParams.map(p => p.name.name + (p.extends ? ` extends ${f(p.extends)}` : '')).join(',')}>${f(ast.inner)}`;
-        case "bound-generic-type": return `${f(ast.generic)}<${ast.typeArgs.map(f).join(',')}>`;
+        case "generic-type": return maybeTypeParams(options, indent, parent, ast.typeParams) + f(ast.inner);
+        case "bound-generic-type": return f(ast.generic) + maybeTypeArgs(options, indent, parent, ast.typeArgs)
         case "proc-type": return `(${ast.args.map(arg => arg.name.name + (arg.type ? `: ${f(arg.type)}` : '')).join(', ')}) {}`;
         case "func-type": return `(${ast.args.map(arg => arg.name.name + (arg.type ? `: ${f(arg.type)}` : '')).join(', ')}) => ${f(ast.returnType ?? UNKNOWN_TYPE)}`;
         case "object-type":  return (ast.mutability !== 'mutable' ? 'const ' : '') + `{${
@@ -215,4 +208,34 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             // @ts-expect-error
             throw Error(ast.kind)
     }
+}
+
+function exported(e: boolean|"export"|"expose"|undefined): string {
+    if (typeof e === 'string') {
+        return e + ' '
+    } else {
+        return e ? 'export ' : ''
+    }
+}
+
+function maybeTypeParams(options: FormatOptions, indent: number, parent: AST|undefined, typeParams: readonly TypeParam[]): string {
+    if (typeParams.length === 0) {
+        return ''
+    } else {
+        return `<${typeParams.map(p =>
+            p.name.name + (p.extends ? ` extends ${formatInner(options, indent, parent)(p.extends)}` : '')
+        ).join(', ')}>`
+    }
+}
+
+function maybeTypeArgs(options: FormatOptions, indent: number, parent: AST|undefined, typeArgs: readonly TypeExpression[]): string {
+    if (typeArgs.length === 0) {
+        return ''
+    } else {
+        return `<${typeArgs.map(formatInner(options, indent, parent)).join(', ')}>`
+    }
+}
+
+function maybeTypeAnnotation(options: FormatOptions, indent: number, parent: AST|undefined, type: TypeExpression|undefined): string {
+    return type ? `: ${formatInner(options, indent, parent)(type)}` : ''
 }

@@ -4,7 +4,7 @@ import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration, JsFuncDeclaration, JsProcDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func, Spread } from "../_model/expressions.ts";
-import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
 export function compile(module: Module, modulePath: ModuleName, includeTests?: boolean, excludeTypes = false): string {
@@ -49,9 +49,9 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 ? ''
                 : (
                     (ast.type.kind === 'nominal-type' ?
-                        `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n${ast.exported ? `export ` : ``}function ${ast.name.name}(value: ${c(ast.type.inner)}): ${ast.name.name} { return { name: ${INT}${ast.name.name}, value } }\n`
+                        `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n${exported(ast.exported)}function ${ast.name.name}(value: ${c(ast.type.inner)}): ${ast.name.name} { return { name: ${INT}${ast.name.name}, value } }\n`
                     : '') +
-                    `${ast.exported ? `export ` : ``}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
+                    `${exported(ast.exported)}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
                         ? `{ name: typeof ${INT}${ast.name.name}, value: ${c(ast.type.inner)} }`
                         : c(ast.type)};`
                 )
@@ -71,7 +71,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 ? c(ast.value)
                 : `{ value: ${c(ast.value)} }`
             
-            return (ast.exported ? `export ` : ``) + `const ${ast.name.name}${type} = ${value};`;
+            return exported(ast.exported) + `const ${ast.name.name}${type} = ${value};`;
         }
         case "autorun-declaration": return `${INT}autorun(${c(ast.effect)})`;
         case "value-declaration-statement":
@@ -208,27 +208,24 @@ const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: Pro
     const baseProc = compileOne(excludeTypes, module, decl.value)
     const proc = decl.action ? `${INT}action(${baseProc})` : baseProc
 
-    return (decl.exported ? `export ` : ``) + `const ${decl.name.name} = ${proc};`;
+    return exported(decl.exported) + `const ${decl.name.name} = ${proc};`;
 }
 
 function compileProc(excludeTypes: boolean, module: string, proc: Proc): string {
-    const typeParams = !excludeTypes && proc.type.kind === 'generic-type'
-        ? `<${proc.type.typeParams.map(p => p.name).join(',')}>`
-        : ''
-    const procType = proc.type.kind === 'generic-type' ? proc.type.inner as ProcType : proc.type
+    const signature = compileFunctionSignature(excludeTypes, module, proc.type)
 
-    return typeParams + `(${compileArgs(excludeTypes, module, procType.args)})${!excludeTypes ? ': void' : ''} => {
+    return signature + ` => {
     ${proc.body.statements.map(s => compileOne(excludeTypes, module, s) + ';').join("\n")}
 }`;
 }
 
 const compileJsProcDeclaration = (excludeTypes: boolean, module: string, decl: JsProcDeclaration): string => {
-    const signature = compileProcSignature(excludeTypes, module, decl.type)
+    const signature = compileFunctionSignature(excludeTypes, module, decl.type)
     const body = `{
         ${decl.js}
     }`
     
-    const prefix = (decl.exported ? `export ` : ``) + 'const'
+    const prefix = exported(decl.exported) + 'const'
 
     if (decl.action) {
         return `${prefix} ${decl.name.name} = ${INT}action(` + signature + ' => ' + body + ');';
@@ -239,25 +236,10 @@ const compileJsProcDeclaration = (excludeTypes: boolean, module: string, decl: J
 }
 
 const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: FuncDeclaration): string => {
-    const signature = compileFuncSignature(excludeTypes, module, decl.value.type)
+    const signature = compileFunctionSignature(excludeTypes, module, decl.value.type)
     const body = compileOne(excludeTypes, module, decl.value.body)
     
-    const prefix = (decl.exported ? `export ` : ``) + 'const'
-
-    if (decl.memo) {
-        return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ');';
-    } else {
-        return `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
-    }
-}
-
-const compileJsFuncDeclaration = (excludeTypes: boolean, module: string, decl: JsFuncDeclaration): string => {
-    const signature = compileFuncSignature(excludeTypes, module, decl.type)
-    const body = `{
-        ${decl.js}
-    }`
-    
-    const prefix = (decl.exported ? `export ` : ``) + 'const'
+    const prefix = exported(decl.exported) + 'const'
 
     if (decl.memo) {
         return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ');';
@@ -267,29 +249,39 @@ const compileJsFuncDeclaration = (excludeTypes: boolean, module: string, decl: J
 }
 
 const compileFunc = (excludeTypes: boolean, module: string, func: Func): string => {
-    const signature = compileFuncSignature(excludeTypes, module, func.type)
+    const signature = compileFunctionSignature(excludeTypes, module, func.type)
     const body = compileOne(excludeTypes, module, func.body)
 
     return signature + ' => ' + body
 }
 
-const compileProcSignature = (excludeTypes: boolean, module: string, proc: ProcType|GenericProcType): string => {
-    const typeParams = !excludeTypes && proc.kind === 'generic-type'
-        ? `<${proc.typeParams.map(p => p.name.name).join(',')}>`
-        : ''
-    const procType = proc.kind === 'generic-type' ? proc.inner : proc
+const compileJsFuncDeclaration = (excludeTypes: boolean, module: string, decl: JsFuncDeclaration): string => {
+    const signature = compileFunctionSignature(excludeTypes, module, decl.type)
+    const body = `{
+        ${decl.js}
+    }`
     
-    return typeParams + `(${compileArgs(excludeTypes, module, procType.args)})`;
+    const prefix = exported(decl.exported) + 'const'
+
+    if (decl.memo) {
+        return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ');';
+    } else {
+        return `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
+    }
 }
 
-const compileFuncSignature = (excludeTypes: boolean, module: string, func: FuncType|GenericFuncType): string => {
-    const typeParams = !excludeTypes && func.kind === 'generic-type'
-        ? `<${func.typeParams.map(p => p.name.name).join(',')}>`
+const compileFunctionSignature = (excludeTypes: boolean, module: string, subject: ProcType|GenericProcType|FuncType|GenericFuncType): string => {
+    const typeParams = !excludeTypes && subject.kind === 'generic-type'
+        ? maybeTypeParams(excludeTypes, module, subject.typeParams)
         : ''
-    const funcType = func.kind === 'generic-type' ? func.inner : func
-    
-    return typeParams + `(${compileArgs(excludeTypes, module, funcType.args)})${
-        !excludeTypes && funcType.returnType != null ? `: ${compileOne(excludeTypes, module, funcType.returnType)}` : ''}`;
+    const functionType = subject.kind === 'generic-type' ? subject.inner : subject
+
+
+    return typeParams + `(${compileArgs(excludeTypes, module, functionType.args)})` +
+        (excludeTypes ? '' : 
+        functionType.kind === 'proc-type' ? ': void' : 
+        functionType.returnType != null ? `: ${compileOne(excludeTypes, module, functionType.returnType)}` :
+        '')
 }
 
 // TODO: Bring this back as an optimization
@@ -306,9 +298,24 @@ const compileFuncSignature = (excludeTypes: boolean, module: string, func: FuncT
 // }
 
 function compileArgs(excludeTypes: boolean, module: string, args: readonly Arg[]): string {
-    return args.map(arg => compileOneArg(excludeTypes, module, arg)).join(', ')
+    return args.map(arg =>
+        arg.name.name + maybeTypeAnnotation(excludeTypes, module, arg.type)).join(', ')
 }
 
-function compileOneArg(excludeTypes: boolean, module: string, arg: Arg): string {
-    return arg.name.name + (!excludeTypes && arg.type ? `: ${compileOne(excludeTypes, module, arg.type)}` : '')
+function exported(e: boolean|"export"|"expose"|undefined): string {
+    return e ? 'export ' : ''
+}
+
+function maybeTypeParams(excludeTypes: boolean, module: string, typeParams: readonly TypeParam[]): string {
+    if (excludeTypes || typeParams.length === 0) {
+        return ''
+    } else {
+        return `<${typeParams.map(p =>
+            p.name.name + (p.extends ? ` extends ${compileOne(excludeTypes, module, p.extends)}` : '')
+        ).join(', ')}>`
+    }
+}
+
+function maybeTypeAnnotation(excludeTypes: boolean, module: string, type: TypeExpression|undefined): string {
+    return !excludeTypes && type ? `: ${compileOne(excludeTypes, module, type)}` : ''
 }

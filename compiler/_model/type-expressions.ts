@@ -68,9 +68,14 @@ export type FuncType = SourceInfo & {
 
 export type GenericType = SourceInfo & {
     readonly kind: "generic-type",
-    readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
+    readonly typeParams: readonly TypeParam[],
     readonly inner: TypeExpression,
     readonly mutability: undefined,
+}
+
+export type TypeParam = {
+    readonly name: PlainIdentifier,
+    readonly extends: TypeExpression|undefined
 }
 
 // These two types are special cases of GenericType that allow us to encode 
@@ -78,13 +83,13 @@ export type GenericType = SourceInfo & {
 // as-casting later on
 export type GenericFuncType = SourceInfo & {
     readonly kind: "generic-type",
-    readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
+    readonly typeParams: readonly TypeParam[],
     readonly inner: FuncType,
     readonly mutability: undefined,
 }
 export type GenericProcType = SourceInfo & {
     readonly kind: "generic-type",
-    readonly typeParams: readonly { name: PlainIdentifier, extends: TypeExpression|undefined }[],
+    readonly typeParams: readonly TypeParam[],
     readonly inner: ProcType,
     readonly mutability: undefined,
 }
