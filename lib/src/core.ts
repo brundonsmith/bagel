@@ -1,27 +1,28 @@
 
 // Preact
-// export {
-//     h
-// } from "preact"
-// import { render as prender } from "preact"
-// export function render(el: unknown) {
-//     // @ts-ignore
-//     prender(el, document.body)
+export {
+    h
+} from "preact"
+import { render as prender } from "preact"
+import { observe, WHOLE_OBJECT } from "./_reactivity.ts";
+export function render(el: unknown) {
+    // @ts-ignore
+    prender(el, document.body)
+}
+
+// type Element = { tagName: string, attributes: object, children: Element[] }
+
+// export function h(tagName: string, attributes: object, ...children: Element[]): Element {
+//     return { tagName, attributes, children }
 // }
 
-type Element = { tagName: string, attributes: object, children: Element[] }
-
-export function h(tagName: string, attributes: object, ...children: Element[]): Element {
-    return { tagName, attributes, children }
-}
-
-export function render(el: Element) {
-    // @ts-ignore
-    document.body.innerHTML = _renderInner(el)
-}
-function _renderInner({ tagName, attributes, children }: Element): string {
-    return `<${tagName} ${Object.entries(attributes).map(([key, value]) => `${key}="${value}"`)}>${children.map(render)}</${tagName}>`
-}
+// export function render(el: Element) {
+//     // @ts-ignore
+//     document.body.innerHTML = _renderInner(el)
+// }
+// function _renderInner({ tagName, attributes, children }: Element): string {
+//     return `<${tagName} ${Object.entries(attributes ?? {}).map(([key, value]) => `${key}="${value}"`)}>${children.map(render)}</${tagName}>`
+// }
 
 // Custom reactivity
 export {
@@ -141,7 +142,7 @@ function count<T>(iter: RawIter<T>): number {
 }
 
 function concat<T>(iter1: RawIter<T>) {
-    return function*(iter2: RawIter<T>): RawIter<T> {    
+    return function*(iter2: RawIter<T>): RawIter<T> {
         if (iter1[Symbol.iterator]) {
             observe(iter1, WHOLE_OBJECT)
         }
@@ -227,7 +228,7 @@ export class Iter<T> {
     constructor(inner: RawIter<T>) {
         this[INNER_ITER] = inner
     }
-
+    
     map = <R>(fn: (el: T) => R): Iter<R> => {
         return new Iter(map(fn, (this as Iter<any>)[INNER_ITER]))
     }
@@ -274,7 +275,7 @@ export class Iter<T> {
             observe(this[INNER_ITER], WHOLE_OBJECT)
         }
         return Array.from((this as Iter<any>)[INNER_ITER])
-}
+    }
 
     set = (): Set<T> => {
         if (this[INNER_ITER][Symbol.iterator]) {

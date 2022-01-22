@@ -1,0 +1,26 @@
+
+from '../../lib/wrappers/html' import { Event }
+
+export type TodoItem = {
+    text: string,
+    done: boolean
+}
+
+export func makeTodoItem(): TodoItem => { text: '', done: false }
+
+export func memo renderTodoItem(item: TodoItem) =>
+    <div>
+        <input value={item.text} onChange={itemChangeHandler(item)}></input>
+        <input type={'checkbox'} checked={item.done} onChange={itemDoneChangeHandler(item)}></input>
+    </div>
+
+
+func memo itemChangeHandler(item: TodoItem) =>
+    (e: Event) {
+        item.text = e.target.value;
+    }
+
+func memo itemDoneChangeHandler(item: TodoItem) =>
+    (e: Event) {
+        item.done = e.target.checked == true;
+    }

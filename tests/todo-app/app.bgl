@@ -1,0 +1,13 @@
+
+import './store' as store
+from './todo-item' import { TodoItem, renderTodoItem }
+
+export func renderApp() =>
+    <div>
+        {iter<TodoItem>(store.items)
+            .map<Element>(renderTodoItem)
+            .array()}
+
+        <button onClick={store.addItem}>{'Add'}</button>
+        <button onClick={store.clearDone}>{'Clear done'}</button>
+    </div>

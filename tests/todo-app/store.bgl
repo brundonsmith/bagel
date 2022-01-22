@@ -1,0 +1,12 @@
+
+from './todo-item' import { makeTodoItem, TodoItem }
+
+expose let items: TodoItem[] = []
+
+export proc addItem() {
+    items.push(makeTodoItem());
+}
+
+export proc clearDone() {
+    items = iter(items).filter(item => !item.done).array();
+}

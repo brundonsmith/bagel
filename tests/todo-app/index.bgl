@@ -1,0 +1,7 @@
+from '../../lib/wrappers/html' import { render }
+
+from './app' import { renderApp }
+
+autorun () {
+    render(renderApp());
+}
