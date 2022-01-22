@@ -124,17 +124,25 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                     if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {  // check that subject is callable
                         reportError(miscError(current.subject, "Expression must be a function or procedure to be called"));
-                    } else if (subjectType.args.length !== current.args.length) {  // check that the right number of arguments are passed
-                        const functionOrProcedure = subjectType.kind === "func-type" ? "Function" : "Procedure"
-                        reportError(miscError(current, `${functionOrProcedure} expected ${subjectType.args.length} arguments but got ${current.args.length}`));
-                    } else {  // check that each argument matches the expected type
-                        for (let i = 0; i < current.args.length; i++) {
-                            const arg = current.args[i]
-                            const subjectArgType = subjectType.args[i].type ?? UNKNOWN_TYPE
+                    } else {
+                        
+                        // check that if this is a statement, the call subject is a procedure
+                        if (parent?.kind === 'block' && subjectType.kind === 'func-type') {
+                            reportError(miscError(current.subject, `Only procedures can be called as statements, not functions`))
+                        }
 
-                            const argValueType = inferType(reportError, arg)
-                            if (!subsumes(reportError,  subjectArgType, argValueType)) {
-                                reportError(assignmentError(arg, subjectArgType, argValueType));
+                        if (subjectType.args.length !== current.args.length) {  // check that the right number of arguments are passed
+                            const functionOrProcedure = subjectType.kind === "func-type" ? "Function" : "Procedure"
+                            reportError(miscError(current, `${functionOrProcedure} expected ${subjectType.args.length} arguments but got ${current.args.length}`));
+                        } else {  // check that each argument matches the expected type
+                            for (let i = 0; i < current.args.length; i++) {
+                                const arg = current.args[i]
+                                const subjectArgType = subjectType.args[i].type ?? UNKNOWN_TYPE
+
+                                const argValueType = inferType(reportError, arg)
+                                if (!subsumes(reportError,  subjectArgType, argValueType)) {
+                                    reportError(assignmentError(arg, subjectArgType, argValueType));
+                                }
                             }
                         }
                     }
