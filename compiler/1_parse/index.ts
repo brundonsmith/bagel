@@ -469,6 +469,7 @@ const procType: ParseFunction<ProcType|GenericProcType> = (module, code, startIn
             kind: "proc-type",
             args,
             mutability: undefined,
+            invalidatesParent: false,
             module,
             code,
             startIndex,
@@ -885,6 +886,7 @@ const _procHeader: ParseFunction<ProcType|GenericProcType> = (module, code, star
         const procType: ProcType = {
             kind: "proc-type",
             args,
+            invalidatesParent: false,
             mutability: undefined,
             module,
             code,

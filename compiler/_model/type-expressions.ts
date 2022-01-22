@@ -56,6 +56,7 @@ export type GenericParamType = SourceInfo & {
 export type ProcType = SourceInfo & {
     readonly kind: "proc-type",
     readonly args: readonly Arg[],
+    readonly invalidatesParent: boolean,
     readonly mutability: undefined,
 }
 
@@ -319,6 +320,7 @@ export const REACTION_EFFECT_TYPE: TypeExpression = {
         startIndex: undefined,
         endIndex: undefined,
     }],
+    invalidatesParent: false,
     mutability: undefined,
     module: undefined,
     code: undefined,

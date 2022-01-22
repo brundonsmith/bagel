@@ -1,3 +1,5 @@
+import { resolveType } from "../3_checking/typecheck.ts";
+import { inferType } from "../3_checking/typeinfer.ts";
 import Store, { canonicalModuleName, Mode } from "../store.ts";
 import { jsFileLocation } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
@@ -50,10 +52,10 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 ? ''
                 : (
                     (ast.type.kind === 'nominal-type' ?
-                        `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n${exported(ast.exported)}function ${ast.name.name}(value: ${c(ast.type.inner)}): ${ast.name.name} { return { name: ${INT}${ast.name.name}, value } }\n`
+                        `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n${exported(ast.exported)}function ${ast.name.name}(value: ${c(ast.type.inner)}): ${ast.name.name} { return { kind: ${INT}${ast.name.name}, value } }\n`
                     : '') +
                     `${exported(ast.exported)}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
-                        ? `{ name: typeof ${INT}${ast.name.name}, value: ${c(ast.type.inner)} }`
+                        ? `{ kind: typeof ${INT}${ast.name.name}, value: ${c(ast.type.inner)} }`
                         : c(ast.type)};`
                 )
         );
@@ -106,7 +108,20 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "inline-const": return `${INT}withConst(${c(ast.value)}, ${ast.name.name} =>
             ${c(ast.next)})`
         case "pipe":
-        case "invocation": return `${c(ast.subject)}${ast.kind === "invocation" && ast.typeArgs.length > 0 ? `<${ast.typeArgs.map(c).join(',')}>` : ''}(${ast.args.map(c).join(', ')})`;
+        case "invocation": {
+            const subjectType = resolveType(() => {}, inferType(() => {}, ast.subject))
+            const procType = subjectType.kind === 'proc-type' ? subjectType : subjectType.kind === 'generic-type' && subjectType.inner.kind === 'proc-type' ? subjectType.inner : undefined
+
+            let invalidation = ''
+            if (procType?.invalidatesParent) {
+                // TODO: This won't work if the method has been aliased. Gotta figure that out...
+                if (ast.subject.kind === 'property-accessor') {
+                    invalidation = `; ${INT}invalidate(${c(ast.subject.subject)})`
+                }
+            }
+
+            return `${c(ast.subject)}${ast.kind === "invocation" && ast.typeArgs.length > 0 ? `<${ast.typeArgs.map(c).join(',')}>` : ''}(${ast.args.map(c).join(', ')})` + invalidation;
+        }
         case "binary-operator": return `(${c(ast.base)} ${ast.ops.map(([op, expr]) => c(op) + ' ' + c(expr)).join(' ')})`;
         case "negation-operator": return `!(${c(ast.base)})`;
         case "operator": return ast.op;
@@ -122,7 +137,6 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "range": return `${INT}range(${c(ast.start)})(${c(ast.end)})`;
         case "parenthesized-expression": return `(${c(ast.inner)})`;
         case "debug": return c(ast.inner);
-        case "property-accessor": return `${INT}observe(${c(ast.subject)}, '${ast.property.name}')`;
         case "plain-identifier": return ast.name;
         case "local-identifier": {
             const binding = Store.getBinding(() => {}, ast.name, ast)
@@ -132,6 +146,25 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             } else {
                 return ast.name
             }
+        }
+        case "property-accessor":{
+
+            // HACK: let-declarations accessed from whole-module imports need special treatment!
+            // will this break if the module import gets aliased so something else?
+            if (ast.subject.kind === 'local-identifier') {
+                const binding = Store.getBinding(() => {}, ast.subject.name, ast)
+
+                if (binding?.kind === 'module') {
+                    const module = Store.getModuleByName(binding.imported.module as ModuleName, binding.imported.path.value)
+                    
+                    if (module?.declarations.find(decl =>
+                            decl.kind === 'value-declaration' && !decl.isConst && decl.name.name === ast.property.name)) {
+                        return `${INT}observe(${INT}observe(${c(ast.subject)}, '${ast.property.name}'), 'value')`;
+                    }
+                }
+            }
+
+            return `${INT}observe(${c(ast.subject)}, '${ast.property.name}')`;
         }
         case "object-literal":  return `{${objectEntries(excludeTypes, module, ast.entries)}}`;
         case "array-literal":   return `[${ast.entries.map(c).join(", ")}]`;

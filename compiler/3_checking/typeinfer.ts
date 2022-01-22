@@ -916,6 +916,7 @@ export const propertiesOf = computedFn((
                         type: resolvedType.element,
                         ...AST_NOISE
                     }],
+                    invalidatesParent: true,
                     ...TYPE_AST_NOISE
                 }))
             }
