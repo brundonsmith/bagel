@@ -1,10 +1,27 @@
 
-export store LocalStorage {
+// raw js integration
+js func getAllLocalStorage(): {[string]: string} => {#
+    const obj = {}
 
-    public func getItem(key: string): string|nil =>
-        js#window.localStorage.getItem(key)#js
-
-    public proc setItem(key: string, value: string) {
-        js#window.localStorage.setItem(key, value)#js
+    for (let i = 0; i < localStorage.length; i++){
+        const key = localStorage.key(i)
+        obj[key] = localStorage.getItem(key);
     }
+
+    return obj;
+#}
+
+js proc setLocalStorage(key: string, value: string) {#
+    localStorage.setItem(key, value)
+#}
+
+
+// bagel layer
+let _localStorage: {[string]: string} = getAllLocalStorage()
+
+export proc setItem(key: string, value: string) {
+    _localStorage[key] = value;
+    setLocalStorage(key, value);
 }
+
+export func getItem(key: string): string|nil => _localStorage[key]
