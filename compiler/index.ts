@@ -103,7 +103,7 @@ autorun(() => {
 
         if (parsed) {
             for (const decl of parsed.ast.declarations) {
-                if (decl.kind === "import-declaration") {
+                if (decl.kind === "import-declaration" || decl.kind === "import-all-declaration") {
                     const importedModule = canonicalModuleName(module, decl.path.value)
 
                     if (!Store.modules.has(importedModule)) {

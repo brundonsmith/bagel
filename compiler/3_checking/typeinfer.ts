@@ -1,15 +1,16 @@
-import { Refinement, TypeBinding, ReportError } from "../_model/common.ts";
+import { Refinement, TypeBinding, ReportError, ModuleName } from "../_model/common.ts";
 import { BinaryOp, Expression, Invocation, isExpression, Spread } from "../_model/expressions.ts";
 import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
-import { assignmentError, cannotFindName, miscError } from "../errors.ts";
+import { assignmentError, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
 import { withoutSourceInfo } from "../utils/debugging.ts";
 import { AST, Module } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
 import { mapParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
 import { format } from "../other/format.ts";
+import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
 
 export function inferType(
     reportError: ReportError,
@@ -381,6 +382,34 @@ const inferTypeInner = computedFn((
                         return iteratorType.kind === 'iterator-type'
                             ? iteratorType.inner
                             : UNKNOWN_TYPE
+                    }
+                    case 'module': {
+                        const otherModule = Store.getModuleByName(binding.imported.module as ModuleName, binding.imported.path.value)
+
+                        if (otherModule == null) {
+                            // other module doesn't exist
+                            reportError(cannotFindModule(binding.imported.path))
+                            return {
+                                kind: 'object-type',
+                                spreads: [],
+                                entries: [],
+                                mutability: 'immutable',
+                                ...AST_NOISE
+                            }
+                        } else {
+                            const exportedDeclarations = otherModule.declarations.filter(decl =>
+                                (decl.kind === 'value-declaration' || decl.kind === 'func-declaration' || decl.kind === 'proc-declaration')
+                                && decl.exported) as (ValueDeclaration|FuncDeclaration|ProcDeclaration)[]
+
+                            return {
+                                kind: 'object-type',
+                                spreads: [],
+                                entries: exportedDeclarations.map(decl =>
+                                    attribute(decl.name.name, inferType(reportError, decl.value, visited))),
+                                mutability: 'immutable',
+                                ...AST_NOISE
+                            }
+                        }
                     }
                     case 'type-binding': break;
                     default:

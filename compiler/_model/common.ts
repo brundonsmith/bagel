@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-fallthrough
 import { ValueDeclarationStatement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
-import { ValueDeclaration, FuncDeclaration, ProcDeclaration, JsFuncDeclaration, JsProcDeclaration } from "./declarations.ts";
+import { ValueDeclaration, FuncDeclaration, ProcDeclaration, JsFuncDeclaration, JsProcDeclaration, ImportAllDeclaration } from "./declarations.ts";
 import { Expression, Func, InlineConst, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
@@ -18,6 +18,7 @@ export type ValueBinding =
     | { readonly kind: "basic", readonly ast: ValueDeclaration|ProcDeclaration|JsProcDeclaration|FuncDeclaration|JsFuncDeclaration|ValueDeclarationStatement|InlineConst }
     | { readonly kind: "iterator", readonly iterator: Expression }
     | { readonly kind: "arg", readonly holder: Func|Proc, readonly argIndex: number }
+    | { readonly kind: "module", readonly imported: ImportAllDeclaration }
 
 export type TypeBinding = {
     readonly kind: 'type-binding',
@@ -30,7 +31,7 @@ export function getBindingMutability(binding: ValueBinding, from: AST): "immutab
             switch (binding.ast.kind) {
                 case 'value-declaration':
                     return binding.ast.isConst || (binding.ast.exported === 'expose' && binding.ast.module !== from.module)
-                        ? 'immutable' 
+                        ? 'immutable'
                         : 'assignable'
                 case 'func-declaration':
                 case 'js-func-declaration':
@@ -46,6 +47,7 @@ export function getBindingMutability(binding: ValueBinding, from: AST): "immutab
             }
         case 'arg':
         case 'iterator':
+        case 'module':
             return 'mutable'
         default:
             // @ts-expect-error

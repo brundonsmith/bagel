@@ -69,7 +69,7 @@ const importAllDeclaration: ParseFunction<ImportAllDeclaration> = (module, code,
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(exactStringLiteral(module, code, index), err(code, index, 'Import path'), ({ parsed: path, index }) => 
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
-    expec(consume(code, startIndex, "as"), err(code, index, '"as"'), index =>
+    expec(consume(code, index, "as"), err(code, index, '"as"'), index =>
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(plainIdentifier(module, code, index), err(code, index, '"Name"'), ({ parsed: alias, index }) => ({
         parsed: {

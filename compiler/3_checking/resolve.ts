@@ -68,7 +68,14 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                     } break;
                     case "import-all-declaration": {
                         if (declaration.alias.name === name) {
-                            
+                            if (resolved) {
+                                reportError(alreadyDeclared(declaration.alias))
+                            }
+
+                            resolved = {
+                                kind: "module",
+                                imported: declaration
+                            }
                         }
                     } break;
                     case "import-declaration": {
