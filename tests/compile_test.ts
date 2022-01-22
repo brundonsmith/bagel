@@ -8,7 +8,7 @@ Deno.test({
   fn() {
     testCompile(
       `func uid() => '12345'`,
-      `const uid = () => "12345";`,
+      `const uid = () => ("12345");`,
     );
   },
 });
@@ -18,7 +18,7 @@ Deno.test({
   fn() {
     testCompile(
       `const fn = a => a`,
-      `const fn = (a) => a;`,
+      `const fn = (a) => (a);`,
     );
   },
 });
@@ -52,9 +52,9 @@ Deno.test({
         const ten = 5 * double,
         ten`,
       `const uid = (n: number) =>
-        ___withConst((2 * n), double =>
-        ___withConst((5 * double), ten =>
-          ten));`,
+        (___withConst((2 * n), double =>
+        (___withConst((5 * double), ten =>
+          (ten)))));`,
     );
   },
 });
@@ -143,7 +143,7 @@ Deno.test({
             } else {
                 3
             }`,
-      `const merge = () => ((___observe(arr1, 'length') <= 0) ? 2 : 3);`,
+      `const merge = () => (((___observe(arr1, 'length') <= 0) ? 2 : 3));`,
     );
   },
 });
@@ -161,12 +161,12 @@ Deno.test({
               4
             }`,
       `const merge = () =>
-        ((___observe(arr1, 'length') <= 0) ?
+        (((___observe(arr1, 'length') <= 0) ?
           2
         : (___observe(arr1, 'length') <= 1) ?
           3
         :
-          4);`,
+          4));`,
     );
   },
 });
@@ -242,7 +242,7 @@ Deno.test({
   fn() {
     testCompile(
       `func uid(arr, i) => arr[i]`,
-      `const uid = (arr, i) => arr[i];`,
+      `const uid = (arr, i) => (arr[i]);`,
     );
   },
 });
@@ -366,7 +366,7 @@ Deno.test({
                     |> entries 
                     |> fromEntries`,
       `const classNames = (cn) => 
-            fromEntries(entries(cn));`,
+            (fromEntries(entries(cn)));`,
     );
   },
 });
@@ -380,7 +380,7 @@ Deno.test({
                 |> map((n) => n * 2) 
                 |> filter((n) => n < 10)`,
       `const myFunc = (a, b) =>
-            filter((n) => (n < 10))(map((n) => (n * 2))(___range(0)(10)));`,
+            (filter((n) => ((n < 10)))(map((n) => ((n * 2)))(___range(0)(10))));`,
     );
   },
 });
@@ -390,7 +390,7 @@ Deno.test({
   fn() {
     testCompile(
       `func foo(a: string, b: number): number => 0`,
-      `const foo = (a: string, b: number): number => 0;`,
+      `const foo = (a: string, b: number): number => (0);`,
     );
   },
 });
@@ -441,7 +441,7 @@ Deno.test({
     testCompile(
       `func foo() => 13 // foo bar comment
             const a = 12`,
-      `const foo = () => 13;
+      `const foo = () => (13);
             const a = 12;`,
     );
   },
@@ -454,7 +454,7 @@ Deno.test({
       `func foo() => 13 /* foo bar comment
             moar comment*/
             const a = 12`,
-      `const foo = () => 13;
+      `const foo = () => (13);
             const a = 12;`,
     );
   },

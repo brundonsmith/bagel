@@ -106,7 +106,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "proc": return compileProc(excludeTypes, module, ast);
         case "func": return compileFunc(excludeTypes, module, ast);
         case "inline-const": return `${INT}withConst(${c(ast.value)}, ${ast.name.name} =>
-            ${c(ast.next)})`
+            (${c(ast.next)}))`
         case "pipe":
         case "invocation": {
             const subjectType = resolveType(() => {}, inferType(() => {}, ast.subject))
