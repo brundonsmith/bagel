@@ -95,7 +95,12 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                     reportError(cannotFindModule(declaration.path))
                                 } else {
                                     const imported = otherModule.declarations.find(decl =>
-                                        (decl.kind === 'value-declaration' || decl.kind === 'func-declaration' || decl.kind === 'proc-declaration' || decl.kind === 'type-declaration')
+                                        (decl.kind === 'value-declaration' || 
+                                         decl.kind === 'func-declaration' || 
+                                         decl.kind === 'js-func-declaration' || 
+                                         decl.kind === 'proc-declaration' || 
+                                         decl.kind === 'js-proc-declaration' || 
+                                         decl.kind === 'type-declaration')
                                         && decl.name.name === importItem.name.name
                                         && decl.exported) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|undefined
 
