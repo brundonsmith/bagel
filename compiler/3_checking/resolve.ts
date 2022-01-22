@@ -41,7 +41,9 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                     } break;
                     case "func-declaration":
                     case "proc-declaration":
-                    case "value-declaration": {
+                    case "value-declaration":
+                    case "js-func-declaration":
+                    case "js-proc-declaration": {
                         if (declaration.name.name === name) {
                             if (resolved) {
                                 reportError(alreadyDeclared(declaration.name))
@@ -58,19 +60,6 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                 }
                             }
     
-                            resolved = {
-                                kind: "basic",
-                                ast: declaration
-                            }
-                        }
-                    } break;
-                    case "js-func-declaration":
-                    case "js-proc-declaration": {
-                        if (declaration.name.name === name) {
-                            if (resolved) {
-                                reportError(alreadyDeclared(declaration.name))
-                            }
-                            
                             resolved = {
                                 kind: "basic",
                                 ast: declaration

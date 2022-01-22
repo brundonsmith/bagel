@@ -14,7 +14,7 @@ import { withoutSourceInfo } from "../utils/debugging.ts";
  */
 export function typecheck(reportError: ReportError, ast: Module): void {
 
-    for (const { current } of iterateParseTree(ast)) {
+    for (const { current, parent } of iterateParseTree(ast)) {
         if (!isTypeExpression(current)) {
             
             switch(current.kind) {
@@ -277,6 +277,47 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         }
                     }
                 } break;
+                case "spread": {
+                    const spreadType = inferType(reportError, current.expr)
+
+                    if (parent?.kind === 'object-literal' && spreadType.kind !== 'object-type') {
+                        reportError(miscError(current.expr, `Only objects can be spread into an object; found ${format(spreadType)}`))
+                    } else if (parent?.kind === 'array-literal' && spreadType.kind !== 'array-type' && spreadType.kind !== 'tuple-type') {
+                        reportError(miscError(current.expr, `Only arrays or tuples can be spread into an array; found ${format(spreadType)}`))
+                    }
+                } break;
+                case "module":
+                case "import-all-declaration":
+                case "import-declaration":
+                case "import-item":
+                case "proc":
+                case "proc-declaration":
+                case "func-declaration":
+                case "js-proc-declaration":
+                case "js-func-declaration":
+                case "type-declaration":
+                case "test-block-declaration":
+                case "block":
+                case "attribute":
+                case "case":
+                case "switch-case":
+                case "case-block":
+                case "arg":
+                case "operator":
+                case "parenthesized-expression":
+                case "object-literal":
+                case "array-literal":
+                case "exact-string-literal":
+                case "number-literal":
+                case "boolean-literal":
+                case "nil-literal":
+                case "plain-identifier":
+                case "javascript-escape":
+                case "debug":
+                    break;
+                default:
+                    // @ts-expect-error
+                    throw Error(current.kind)
             }        
         }
     }

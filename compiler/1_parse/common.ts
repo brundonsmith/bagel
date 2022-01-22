@@ -96,17 +96,17 @@ export function isSymbolic(ch: string, index: number): boolean {
     return ch != null && (isAlpha(ch) || ch === "_" || (index > 0 && (isNumeric(ch) || ch === "$")));
 }
 
-export type ParseResult<T> = { parsed: T, newIndex: number };
+export type ParseResult<T> = { parsed: T, index: number };
 
 export function parseSeries<T, D extends AST>(module: ModuleName, code: string, index: number, itemParseFn: ParseFunction<T>, delimiter:  ParseFunction<D>,        options?: Partial<SeriesOptions>):      ParseResult<(T|D)[]>|BagelError;
 export function parseSeries<T>(module: ModuleName, code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string, options?: Partial<SeriesOptions>):      ParseResult<T[]>|BagelError;
 export function parseSeries<T, D extends AST>(module: ModuleName, code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string|ParseFunction<D>, options:  Partial<SeriesOptions> = {}): ParseResult<(T|D)[]>|BagelError {
     const delimiterFn: ParseFunction<D|undefined>|undefined = (
         typeof delimiter === "function" ? delimiter : 
-        typeof delimiter === "string" ? ((_module, code, index) => given(consume(code, index, delimiter), newIndex => ({ parsed: undefined, newIndex })))
+        typeof delimiter === "string" ? ((_module, code, index) => given(consume(code, index, delimiter), index => ({ parsed: undefined, index })))
         : undefined
     )
-    const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], newIndex: index };
+    const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], index: index };
 
     const { leadingDelimiter, trailingDelimiter, whitespace } = { ...DEFAULT_SERIES_OPTIONS, ...options };
     const parsed: (T|D)[] = [];
@@ -121,7 +121,7 @@ export function parseSeries<T, D extends AST>(module: ModuleName, code: string, 
         if (leadingDelimiter === "required" && res == null) {
             return EMPTY_RESULT;
         } else if (res != null) {
-            index = res.newIndex;
+            index = res.index;
             if (res.parsed) {
                 parsed.push(res.parsed)
             }
@@ -138,7 +138,7 @@ export function parseSeries<T, D extends AST>(module: ModuleName, code: string, 
             return itemResult;
         }
 
-        index = itemResult.newIndex;
+        index = itemResult.index;
         parsed.push(itemResult.parsed);
 
         foundDelimiter = false;
@@ -155,7 +155,7 @@ export function parseSeries<T, D extends AST>(module: ModuleName, code: string, 
 
             if (res != null) {
                 foundDelimiter = true;
-                index = res.newIndex;
+                index = res.index;
                 if (res.parsed) {
                     parsed.push(res.parsed)
                 }
@@ -177,7 +177,7 @@ export function parseSeries<T, D extends AST>(module: ModuleName, code: string, 
         return EMPTY_RESULT;
     }
 
-    return { parsed, newIndex: index };
+    return { parsed, index: index };
 }
 
 type SeriesOptions = {
@@ -200,13 +200,13 @@ export function parseOptional<T>(module: ModuleName, code: string, index: number
     } else {
         return {
             parsed: result?.parsed,
-            newIndex: result?.newIndex,
+            index: result?.index,
         };
     }
 }
 
 export const parseExact = <K extends string>(str: K): ParseFunction<K> => (_module, code, index) => {
-    return given(consume(code, index, str), index => ({ parsed: str, newIndex: index }))
+    return given(consume(code, index, str), index => ({ parsed: str, index }))
 }
 
 export function parseKeyword(code: string, index: number, keyword: string): ParseResult<boolean> {
@@ -215,7 +215,7 @@ export function parseKeyword(code: string, index: number, keyword: string): Pars
 
     return {
         parsed: indexAfter != null,
-        newIndex: newIndex ?? index
+        index: newIndex ?? index
     }
 }
 
@@ -244,7 +244,7 @@ export function err(code: string|undefined, index: number|undefined, expected: s
 export type ParseFunction<T> = (module: ModuleName, code: string, index: number) => ParseResult<T> | BagelError | undefined;
 
 export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize3((module, code, startIndex) => 
-    given(identifierSegment(code, startIndex), ({ segment: name, newIndex: index }) => ({
+    given(identifierSegment(code, startIndex), ({ segment: name, index }) => ({
         parsed: {
             kind: "plain-identifier",
             name,
@@ -253,10 +253,10 @@ export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize3((module,
             startIndex,
             endIndex: index,
         },
-        newIndex: index,
+        index,
     })))
 
-export const identifierSegment = memoize2((code: string, index: number): { segment: string, newIndex: number} | undefined => {
+export const identifierSegment = memoize2((code: string, index: number): { segment: string, index: number} | undefined => {
     const startIndex = index;
 
     while (isSymbolic(code[index], index - startIndex)) {
@@ -272,6 +272,42 @@ export const identifierSegment = memoize2((code: string, index: number): { segme
     }
 
     if (index - startIndex > 0) {
-        return { segment, newIndex: index };
+        return { segment, index };
     }
 })
+
+export type ParseTiers<T> = readonly ParseFunction<T>[][]
+
+export class TieredParser<T> {
+    private readonly nextTierFor
+
+    constructor(private readonly tiers: ParseTiers<T>) {
+        this.nextTierFor = new Map<ParseFunction<T>, number>();
+    
+        for (let i = 0; i < tiers.length; i++) {
+            for (const fn of tiers[i]) {
+                this.nextTierFor.set(fn, i+1);
+            }
+        }
+    }
+    
+    public readonly parseStartingFromTier = (tier: number): ParseFunction<T> => (module, code, index) => {
+        for (let i = tier; i < this.tiers.length; i++) {
+            for (const fn of this.tiers[i]) {
+                const result = fn(module, code, index)
+
+                if (result != null) {
+                    return result;
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    public readonly beneath = (fn: ParseFunction<T>): ParseFunction<T> => ((module: ModuleName, code: string, index: number) =>
+        this.parseStartingFromTier(this.nextTierFor.get(fn) as number)(module, code, index))
+
+    public readonly parseBeneath = (module: ModuleName, code: string, index: number, fn: ParseFunction<T>) =>
+        this.beneath(fn)(module, code, index)
+}

@@ -1,13 +1,11 @@
 import { Refinement, TypeBinding, ReportError } from "../_model/common.ts";
-import { BinaryOp, Expression, InlineConst, Invocation, isExpression, Spread } from "../_model/expressions.ts";
+import { BinaryOp, Expression, Invocation, isExpression, Spread } from "../_model/expressions.ts";
 import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
-import { Declaration } from "../_model/declarations.ts";
 import { assignmentError, cannotFindName, miscError } from "../errors.ts";
 import { withoutSourceInfo } from "../utils/debugging.ts";
 import { AST, Module } from "../_model/ast.ts";
-import { ValueDeclarationStatement } from "../_model/statements.ts";
 import { computedFn } from "../mobx.ts";
 import { mapParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
@@ -44,6 +42,7 @@ const inferTypeInner = computedFn((
     ast: Expression,
     previouslyVisited: readonly AST[],
 ): TypeExpression => {
+    const { module, code, startIndex, endIndex, ..._rest } = ast
 
     if (previouslyVisited.includes(ast)) {
         return UNKNOWN_TYPE
@@ -112,7 +111,7 @@ const inferTypeInner = computedFn((
                             subtract(reportError, leftTypeResolved, NIL_TYPE),
                             rightTypeResolved
                         ],
-                        mutability: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined
+                        mutability: undefined, module, code, startIndex, endIndex
                     }
                 } else {
                     const types = BINARY_OPERATOR_TYPES[op.op]?.find(({ left, right }) =>
@@ -133,6 +132,7 @@ const inferTypeInner = computedFn((
         case "negation-operator": return BOOLEAN_TYPE;
         case "pipe":
         case "invocation": {
+
             // Creation of nominal values looks like/parses as function 
             // invocation, but needs to be treated differently
             if (ast.kind === "invocation" && ast.subject.kind === "local-identifier") {
@@ -239,15 +239,10 @@ const inferTypeInner = computedFn((
                         : NIL_TYPE
                 ],
                 mutability: undefined,
-                module: undefined,
-                code: undefined,
-                startIndex: undefined,
-                endIndex: undefined,
+                module, code, startIndex, endIndex
             }
         }
         case "range": {
-            const { module, code, startIndex, endIndex, ..._rest } = ast
-
             return {
                 kind: 'iterator-type',
                 inner: NUMBER_TYPE,
@@ -286,10 +281,7 @@ const inferTypeInner = computedFn((
                     kind: "union-type",
                     members: [property.type, NIL_TYPE],
                     mutability: undefined,
-                    module: undefined,
-                    code: undefined,
-                    startIndex: undefined,
-                    endIndex: undefined
+                    module, code, startIndex, endIndex
                 }
             } else {
                 const mutability = (
@@ -306,10 +298,7 @@ const inferTypeInner = computedFn((
                                 kind: "union-type",
                                 members: [{ ...property.type, mutability }, NIL_TYPE],
                                 mutability: undefined,
-                                module: undefined,
-                                code: undefined,
-                                startIndex: undefined,
-                                endIndex: undefined
+                                module, code, startIndex, endIndex
                             }
                             : { ...property.type, mutability }) as TypeExpression) 
                         ?? UNKNOWN_TYPE
@@ -317,58 +306,56 @@ const inferTypeInner = computedFn((
             }
         }
         case "local-identifier": {
-
-            // deno-lint-ignore no-inner-declarations
-            function getDeclType(decl: Declaration|ValueDeclarationStatement|InlineConst): TypeExpression {
-                switch (decl.kind) {
-                    case 'value-declaration':
-                    case 'value-declaration-statement': {
-                        const baseType = decl.type ?? inferType(reportError, decl.value, visited)
-                        const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
-                            decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== ast.module)
-                                ? 'immutable'
-                                : mutability)
-
-                        // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
-                        const correctedBaseType = (
-                            !decl.isConst
-                                ? broadenTypeForMutation(baseType)
-                                : baseType
-                        )
-
-                        return {
-                            ...correctedBaseType,
-                            mutability
-                        } as TypeExpression
-                    }
-                    case 'func-declaration':
-                    case 'proc-declaration':
-                    case 'inline-const': {
-                        const baseType = resolveType(reportError, inferType(reportError, decl.value, visited))
-                        const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
-                            decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
-                                ? 'immutable'
-                                : 'readonly')
-
-                        return {
-                            ...baseType,
-                            mutability
-                        } as TypeExpression
-                    }
-                    case 'js-func-declaration':
-                    case 'js-proc-declaration': {
-                        return resolveType(reportError, decl.type)
-                    }
-                    default:
-                        throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
-                }
-            }
-    
             const binding = Store.getBinding(reportError, ast.name, ast)
 
             if (binding != null) {
                 switch (binding.kind) {
-                    case 'basic': return getDeclType(binding.ast)
+                    case 'basic': {
+                        const decl = binding.ast
+
+                        switch (decl.kind) {
+                            case 'value-declaration':
+                            case 'value-declaration-statement': {
+                                const baseType = decl.type ?? inferType(reportError, decl.value, visited)
+                                const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
+                                    decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== ast.module)
+                                        ? 'immutable'
+                                        : mutability)
+        
+                                // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
+                                const correctedBaseType = (
+                                    !decl.isConst
+                                        ? broadenTypeForMutation(baseType)
+                                        : baseType
+                                )
+        
+                                return {
+                                    ...correctedBaseType,
+                                    mutability
+                                } as TypeExpression
+                            }
+                            case 'func-declaration':
+                            case 'proc-declaration':
+                            case 'inline-const': {
+                                const baseType = resolveType(reportError, inferType(reportError, decl.value, visited))
+                                const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
+                                    decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
+                                        ? 'immutable'
+                                        : 'readonly')
+        
+                                return {
+                                    ...baseType,
+                                    mutability
+                                } as TypeExpression
+                            }
+                            case 'js-func-declaration':
+                            case 'js-proc-declaration':
+                                return resolveType(reportError, decl.type)
+                            default:
+                                // @ts-expect-error
+                                throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
+                        }
+                    } break;
                     case 'arg': {
                         const funcOrProcType = binding.holder.type.kind === 'generic-type' ? binding.holder.type.inner : binding.holder.type
                         const argType = funcOrProcType.args[binding.argIndex].type
@@ -411,10 +398,7 @@ const inferTypeInner = computedFn((
                 // tagName: ast.tagName,
                 // attributes: ast.attributes
                 mutability: undefined,
-                module: undefined,
-                code: undefined,
-                startIndex: undefined,
-                endIndex: undefined,
+                module, code, startIndex, endIndex
             };
         }
         case "object-literal": {
@@ -428,17 +412,13 @@ const inferTypeInner = computedFn((
                         name,
                         type, 
                         mutability: undefined,
-                        module: undefined,
-                        code: undefined,
-                        startIndex: undefined,
-                        endIndex: undefined,
+                        module, code, startIndex, endIndex
                     }
                 } else {
                     const spreadObj = (entry as Spread).expr
                     const spreadObjType = resolveType(reportError, inferType(reportError, spreadObj, visited));
 
                     if (spreadObjType.kind !== 'object-type') {
-                        reportError(miscError(spreadObj, `Can only spread objects into an object; found ${format(spreadObjType)}`))
                         return undefined
                     } else {
                         return spreadObjType.entries
@@ -451,10 +431,7 @@ const inferTypeInner = computedFn((
                 spreads: [],
                 entries,
                 mutability: "mutable",
-                module: undefined,
-                code: undefined,
-                startIndex: undefined,
-                endIndex: undefined,
+                module, code, startIndex, endIndex
             };
         }
         case "array-literal": {
@@ -470,7 +447,6 @@ const inferTypeInner = computedFn((
                     } else if (spreadType.kind === 'tuple-type') {
                         memberTypes.push(...spreadType.members)
                     } else {
-                        reportError(miscError(entry.expr, `Can only spread arrays into an array; found ${format(spreadType)}`))
                         memberTypes.push(UNKNOWN_TYPE)
                     }
                 } else {
@@ -483,10 +459,7 @@ const inferTypeInner = computedFn((
                     kind: "tuple-type",
                     members: memberTypes,
                     mutability: "mutable",
-                    module: undefined,
-                    code: undefined,
-                    startIndex: undefined,
-                    endIndex: undefined,
+                    module, code, startIndex, endIndex
                 }
             } else {
                 return {
@@ -495,16 +468,10 @@ const inferTypeInner = computedFn((
                         kind: "union-type",
                         members: [...memberTypes, ...arraySpreads.map(t => t.element)],
                         mutability: undefined,
-                        module: undefined,
-                        code: undefined,
-                        startIndex: undefined,
-                        endIndex: undefined,
+                        module, code, startIndex, endIndex
                     }),
                     mutability: "mutable",
-                    module: undefined,
-                    code: undefined,
-                    startIndex: undefined,
-                    endIndex: undefined,
+                    module, code, startIndex, endIndex
                 }
             }
         }
@@ -515,10 +482,7 @@ const inferTypeInner = computedFn((
             kind: 'literal-type',
             value: ast,
             mutability: undefined,
-            module: ast.module,
-            code: ast.code,
-            startIndex: ast.startIndex,
-            endIndex: ast.endIndex,
+            module, code, startIndex, endIndex
         };
         case "nil-literal": return NIL_TYPE;
         case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
@@ -529,7 +493,11 @@ const inferTypeInner = computedFn((
     }
 })
 
-function broadenTypeForMutation(type: TypeExpression) {
+/**
+ * When initializing a mutable variable, sometimes we want to broaden the type
+ * a bit to allow for "normal" kinds of mutation
+ */
+function broadenTypeForMutation(type: TypeExpression): TypeExpression {
     if (type.kind === 'literal-type') {
         if (type.value.kind === 'exact-string-literal') {
             return STRING_TYPE
@@ -541,10 +509,13 @@ function broadenTypeForMutation(type: TypeExpression) {
             return BOOLEAN_TYPE
         }
     } else if (type.kind === 'tuple-type') {
-        return { ...type, kind: 'array-type', element: { kind: 'union-type', members: type.members, ...TYPE_AST_NOISE } }
+        return { ...type, kind: 'array-type', element: { kind: 'union-type', members: type.members.map(broadenTypeForMutation), ...TYPE_AST_NOISE } }
+    } else if (type.kind === 'array-type') {
+        return { ...type, element: broadenTypeForMutation(type.element) }
+    } else if (type.kind === 'object-type') {
+        return { ...type, entries: type.entries.map(attribute => ({ ...attribute, type: broadenTypeForMutation(attribute.type) })) }
     }
 
-    // TODO: This needs to include object literals, and also probably be recursive. Might need its own function.
     return type
 }
 
@@ -745,6 +716,9 @@ function narrow(reportError: ReportError, type: TypeExpression, fit: TypeExpress
     }
 }
 
+/**
+ * Given some expression, find all Refinements that modify its type in some way
+ */
 function resolveRefinements(expr: Expression): Refinement[] {
     const refinements: Refinement[] = []
 
@@ -886,8 +860,20 @@ export const propertiesOf = computedFn((
                 attribute("length", NUMBER_TYPE),
             ]
         }
+        case "tuple-type": {
+            return [
+                attribute("length", {
+                    kind: "literal-type",
+                    value: {
+                        kind: "number-literal",
+                        value: resolvedType.members.length,
+                        ...AST_NOISE
+                    },
+                    ...TYPE_AST_NOISE
+                })
+            ]
+        }
         case "array-type": {
-        // case "tuple-type":
             const props: Attribute[] = [
                 attribute("length", NUMBER_TYPE),
             ];
