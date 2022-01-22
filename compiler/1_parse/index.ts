@@ -3,7 +3,7 @@ import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration } from "../_model/declarations.ts";
+import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, JsFuncDeclaration, JsProcDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ConstDeclarationStatement, ForLoop, IfElseStatement, LetDeclarationStatement, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType } from "../_model/type-expressions.ts";
@@ -55,7 +55,9 @@ const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     ?? _nominalTypeDeclaration(module, code, startIndex)
     ?? typeDeclaration(module, code, startIndex)
     ?? procDeclaration(module, code, startIndex)
+    ?? jsProcDeclaration(module, code, startIndex)
     ?? funcDeclaration(module, code, startIndex)
+    ?? jsFuncDeclaration(module, code, startIndex)
     ?? constDeclaration(module, code, startIndex)
     ?? autorunDeclaration(module, code, startIndex)
     ?? testExprDeclaration(module, code, startIndex)
@@ -600,6 +602,117 @@ const unknownType: ParseFunction<UnknownType> = (module, code, startIndex) =>
     }))
 
 const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startIndex) =>
+    given(_procDeclarationHeader(module, code, startIndex), ({ parsed: { exported, action, name, typeParams, args }, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(parseBlock(module, code, index), err(code, index, 'Procedure'), ({ parsed: body, newIndex: index }) => {
+        const procType: ProcType = {
+            kind: "proc-type",
+            args,
+            mutability: undefined,
+            module,
+            code,
+            startIndex,
+            endIndex: index
+        }
+
+        return {
+            parsed: {
+                kind: 'proc-declaration',
+                name,
+                action,
+                value: {
+                    kind: "proc",
+                    type: (
+                        typeParams
+                            ? {
+                                kind: "generic-type",
+                                typeParams,
+                                inner: procType,
+                                mutability: undefined,
+                                module,
+                                code,
+                                startIndex,
+                                endIndex: index
+                            }
+                            : procType
+                    ),
+                    body,
+                    module,
+                    code,
+                    startIndex,
+                    endIndex: index
+                },
+                exported,
+                module,
+                code,
+                startIndex,
+                endIndex: index
+            },
+            newIndex: index,
+        }
+    })))
+
+const jsProcDeclaration: ParseFunction<JsProcDeclaration> = (module, code, startIndex) =>
+    given(consume(code, startIndex, "js"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(_procDeclarationHeader(module, code, index), ({ parsed: { exported, action, name, typeParams, args }, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "{#"), err(code, index, '"{#"'), jsStartIndex => {
+        let jsEndIndex = index;
+
+        while (code[jsEndIndex] !== "#" || code[jsEndIndex+1] !== "}") {
+            jsEndIndex++;
+        }
+
+        const endIndex = jsEndIndex + 2
+        
+        const procType: ProcType = {
+            kind: "proc-type",
+            args,
+            mutability: undefined,
+            module,
+            code,
+            startIndex,
+            endIndex: jsEndIndex
+        }
+
+        return {
+            parsed: {
+                kind: "js-proc-declaration",
+                exported,
+                action,
+                name,
+                type: (
+                    typeParams
+                        ? {
+                            kind: "generic-type",
+                            typeParams,
+                            inner: procType,
+                            module,
+                            mutability: undefined,
+                            code,
+                            startIndex,
+                            endIndex
+                        }
+                        : procType
+                ),
+                js: code.substring(jsStartIndex, jsEndIndex),
+                module,
+                code,
+                startIndex,
+                endIndex,
+            },
+            newIndex: endIndex,
+        }
+    })))))
+
+const _procDeclarationHeader: ParseFunction<{
+    exported: boolean,
+    action: boolean,
+    name: PlainIdentifier,
+    typeParams: { name: PlainIdentifier, extends: TypeExpression | undefined }[]|undefined,
+    args: Arg[],
+}> = (module, code, startIndex) => 
     given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(parseExact("export")(module, code, index), ({ parsed: exported, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
@@ -607,25 +720,135 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
     given(consumeWhitespaceRequired(code, index), index =>
     given(parseOptional(module, code, index, (module, code, index) =>
         given(parseExact("action")(module, code, index), ({ parsed: action, newIndex: index }) =>
-        given(consumeWhitespaceRequired(code, index), index => ({ parsed: action, newIndex: index })))), ({ parsed: action, newIndex: indexAfterAction }) =>
-    given(plainIdentifier(module, code, indexAfterAction ?? index), ({ parsed: name, newIndex: index }) =>
+        given(consumeWhitespaceRequired(code, index), index => ({ parsed: action, newIndex: index })))), ({ parsed: action, newIndex: indexAfterMemo }) =>
+    given(plainIdentifier(module, code, indexAfterMemo ?? index), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
-    expec(proc(module, code, index), err(code, index, 'Procedure'), ({ parsed: proc, newIndex: index }) => ({
+    given(_procHeader(module, code, index), ({ parsed: { typeParams, args }, newIndex: index }) => ({
         parsed: {
-            kind: "proc-declaration",
-            name,
-            action: action != null,
-            value: proc,
             exported: exported != null,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
+            action: action != null,
+            name,
+            typeParams,
+            args,
         },
-        newIndex: index,
+        newIndex: index
     }))))))))
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startIndex) => 
+    given(_funcDeclarationHeader(module, code, startIndex), ({ parsed: { exported, memo, name, typeParams, args, returnType }, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(expression(module, code, index), err(code, index, 'Function body'), ({ parsed: body, newIndex: index }) => {
+        const funcType: FuncType = {
+            kind: "func-type",
+            args,
+            returnType,
+            module,
+            mutability: undefined,
+            code,
+            startIndex,
+            endIndex: index
+        }
+
+        return {
+            parsed: {
+                kind: "func-declaration",
+                name,
+                memo,
+                value: {
+                    kind: "func",
+                    type: (
+                        typeParams
+                            ? {
+                                kind: "generic-type",
+                                typeParams,
+                                inner: funcType,
+                                module,
+                                mutability: undefined,
+                                code,
+                                startIndex,
+                                endIndex: index
+                            }
+                            : funcType
+                    ),
+                    body,
+                    module,
+                    code,
+                    startIndex,
+                    endIndex: index,
+                },
+                exported,
+                module,
+                code,
+                startIndex,
+                endIndex: index,
+            },
+            newIndex: index,
+        }
+    })))
+
+const jsFuncDeclaration: ParseFunction<JsFuncDeclaration> = (module, code, startIndex) =>
+    given(consume(code, startIndex, "js"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(_funcDeclarationHeader(module, code, index), ({ parsed: { exported, memo, name, typeParams, args, returnType }, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "{#"), err(code, index, '"{#"'), jsStartIndex => {
+        let jsEndIndex = index;
+
+        while (code[jsEndIndex] !== "#" || code[jsEndIndex+1] !== "}") {
+            jsEndIndex++;
+        }
+
+        const endIndex = jsEndIndex + 2
+        
+        const funcType: FuncType = {
+            kind: "func-type",
+            args,
+            returnType,
+            mutability: undefined,
+            module,
+            code,
+            startIndex,
+            endIndex: jsEndIndex
+        }
+
+        return {
+            parsed: {
+                kind: "js-func-declaration",
+                exported,
+                memo,
+                name,
+                type: (
+                    typeParams
+                        ? {
+                            kind: "generic-type",
+                            typeParams,
+                            inner: funcType,
+                            mutability: undefined,
+                            module,
+                            code,
+                            startIndex,
+                            endIndex
+                        }
+                        : funcType
+                ),
+                js: code.substring(jsStartIndex, jsEndIndex),
+                module,
+                code,
+                startIndex,
+                endIndex,
+            },
+            newIndex: endIndex,
+        }
+    })))))
+
+const _funcDeclarationHeader: ParseFunction<{
+    exported: boolean,
+    memo: boolean,
+    name: PlainIdentifier,
+    typeParams: { name: PlainIdentifier, extends: TypeExpression | undefined }[]|undefined,
+    args: Arg[],
+    returnType?: TypeExpression,
+}> = (module, code, startIndex) => 
     given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(parseExact("export")(module, code, index), ({ parsed: exported, newIndex: index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, newIndex: index })))), ({ parsed: exported, newIndex: indexAfterExport }) =>
@@ -636,20 +859,19 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: memo, newIndex: index })))), ({ parsed: memo, newIndex: indexAfterMemo }) =>
     given(plainIdentifier(module, code, indexAfterMemo ?? index), ({ parsed: name, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
-    expec(func(module, code, index), err(code, index, 'Function'), ({ parsed: func, newIndex: index }) => ({
+    given(_funcHeader(module, code, index), ({ parsed: { typeParams, args, returnType }, newIndex: index }) => ({
         parsed: {
-            kind: "func-declaration",
-            name,
-            memo: memo != null,
-            value: func,
             exported: exported != null,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
+            memo: memo != null,
+            name,
+            typeParams,
+            args,
+            returnType
         },
-        newIndex: index,
+        newIndex: index
     }))))))))
+
+    
 
 const constDeclaration: ParseFunction<ValueDeclaration> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, (module, code, index) =>
@@ -738,30 +960,59 @@ const testBlockDeclaration: ParseFunction<TestBlockDeclaration> = (module, code,
         newIndex: index
     }))))))))
 
-// TODO: Generic proc
 const proc: ParseFunction<Proc> = (module, code, startIndex) =>
-    given(_seriesOfArguments(module, code, startIndex), ({ parsed: args, newIndex: index }) =>
+    given(_procHeader(module, code, startIndex), ({ parsed: { typeParams, args }, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
-    given(parseBlock(module, code, index), ({ parsed: body, newIndex: index }) => ({
-        parsed: {
-            kind: "proc",
-            type: {
-                kind: "proc-type",
-                args,
-                module,
-                mutability: undefined,
-                code,
-                startIndex,
-                endIndex: index
-            },
-            body,
+    given(parseBlock(module, code, index), ({ parsed: body, newIndex: index }) => {
+        const procType: ProcType = {
+            kind: "proc-type",
+            args,
+            mutability: undefined,
             module,
             code,
             startIndex,
             endIndex: index
+        }
+
+        return {
+            parsed: {
+                kind: "proc",
+                type: (
+                    typeParams
+                        ? {
+                            kind: "generic-type",
+                            typeParams,
+                            inner: procType,
+                            mutability: undefined,
+                            module,
+                            code,
+                            startIndex,
+                            endIndex: index
+                        }
+                        : procType
+                ),
+                body,
+                module,
+                code,
+                startIndex,
+                endIndex: index
+            },
+            newIndex: index,
+        }
+    })))
+
+const _procHeader: ParseFunction<{
+    typeParams: { name: PlainIdentifier, extends: TypeExpression | undefined }[]|undefined,
+    args: Arg[]
+}> = (module, code, startIndex) =>
+    given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
+    given(_seriesOfArguments(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, newIndex: index }) => ({
+        parsed: {
+            typeParams,
+            args,
         },
-        newIndex: index,
-    }))))
+        newIndex: index
+    })))
 
 const statement: ParseFunction<Statement> = (module, code, startIndex) =>
     javascriptEscape(module, code, startIndex)
@@ -984,22 +1235,15 @@ const expression: ParseFunction<Expression> = memoize3((module, code, startIndex
     EXPRESSION_PARSER.parseStartingFromTier(0)(module, code, startIndex))
 
 const func: ParseFunction<Func> = (module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
-    given(_funcArgs(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, newIndex: index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(parseOptional(module, code, index, (module, code, index) =>
-        given(consume(code, index, ":"), index =>
-        given(consumeWhitespace(code, index), index => typeExpression(module, code, index)))), ({ parsed: returnType, newIndex }) =>
-    given(consumeWhitespace(code, newIndex ?? index), index =>
-    given(consume(code, index, "=>"), index =>
+    given(_funcHeader(module, code, startIndex), ({ parsed: { typeParams, args, returnType }, newIndex: index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Function body'), ({ parsed: body, newIndex: index }) => {
         const funcType: FuncType = {
             kind: "func-type",
             args,
             returnType,
-            module,
             mutability: undefined,
+            module,
             code,
             startIndex,
             endIndex: index
@@ -1014,8 +1258,8 @@ const func: ParseFunction<Func> = (module, code, startIndex) =>
                             kind: "generic-type",
                             typeParams,
                             inner: funcType,
-                            module,
                             mutability: undefined,
+                            module,
                             code,
                             startIndex,
                             endIndex: index
@@ -1030,7 +1274,29 @@ const func: ParseFunction<Func> = (module, code, startIndex) =>
             },
             newIndex: index,
         }
-    }))))))))
+    })))
+
+const _funcHeader: ParseFunction<{
+    typeParams: { name: PlainIdentifier, extends: TypeExpression | undefined }[]|undefined,
+    args: Arg[],
+    returnType: TypeExpression|undefined
+}> = (module, code, startIndex) =>
+    given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, newIndex: indexAfterTypeParams }) =>
+    given(_funcArgs(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, newIndex: index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(parseOptional(module, code, index, (module, code, index) =>
+        given(consume(code, index, ":"), index =>
+        given(consumeWhitespace(code, index), index => typeExpression(module, code, index)))), ({ parsed: returnType, newIndex }) =>
+    given(consumeWhitespace(code, newIndex ?? index), index =>
+    given(consume(code, index, "=>"), index => ({
+        parsed: {
+            typeParams,
+            args,
+            returnType
+        },
+        newIndex: index
+    })))))))
+
 
 const _typeParams: ParseFunction<{ name: PlainIdentifier, extends: TypeExpression | undefined }[]> = (module, code, index) =>
     given(consume(code, index, "<"), index =>

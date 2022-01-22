@@ -49,11 +49,31 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "import-item":
             return ast.name.name + (ast.alias ? ' as ' + ast.alias.name : '')
         case "func-declaration":
-            return (ast.kind === 'func-declaration' && ast.exported ? 'export ' : '') + 
-                `func ${ast.memo ? 'memo ' : ''}${ast.name.name}${f(ast.value)}`
+        case "js-func-declaration": {
+            const front = 
+                (ast.exported ? 'export ' : '') + 
+                `func ${ast.memo ? 'memo ' : ''}${ast.name.name}`
+
+            if (ast.kind === 'func-declaration') {
+                return front + f(ast.value)
+            } else {
+                const funcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
+                return 'js ' + front + `${ast.type.kind === 'generic-type' ? '<' + ast.type.typeParams.map(p => formatTypeParam(p, options, indent, parent)).join(', ') + '>' : ''}(${funcType.args.map(f).join(', ')})${funcType.returnType ? ': ' + f(funcType.returnType) : ''} => {#${ast.js}#}`
+            }
+        }
         case "proc-declaration":
-            return (ast.kind === 'proc-declaration' && ast.exported ? 'export ' : '') + 
-                `proc ${ast.action ? 'action ' : ''}${ast.name.name}${f(ast.value)}`
+        case "js-proc-declaration": {
+            const front = 
+                (ast.exported ? 'export ' : '') + 
+                `proc ${ast.action ? 'action ' : ''}${ast.name.name}`
+
+            if (ast.kind === 'proc-declaration') {
+                return front + f(ast.value)
+            } else {
+                const funcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
+                return front + `${ast.type.kind === 'generic-type' ? '<' + ast.type.typeParams.map(p => formatTypeParam(p, options, indent, parent)).join(', ') + '>' : ''}(${funcType.args.map(f).join(', ')}) {#${ast.js}#}`
+            }
+        }
         case "arg":
             return ast.name.name + (ast.type ? ': ' + f(ast.type) : '')
         case "block":

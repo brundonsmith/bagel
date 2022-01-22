@@ -359,6 +359,10 @@ const inferTypeInner = computedFn((
                             mutability
                         } as TypeExpression
                     }
+                    case 'js-func-declaration':
+                    case 'js-proc-declaration': {
+                        return resolveType(reportError, decl.type)
+                    }
                     default:
                         throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
                 }

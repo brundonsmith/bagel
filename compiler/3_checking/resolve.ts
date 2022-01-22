@@ -64,6 +64,19 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                             }
                         }
                     } break;
+                    case "js-func-declaration":
+                    case "js-proc-declaration": {
+                        if (declaration.name.name === name) {
+                            if (resolved) {
+                                reportError(alreadyDeclared(declaration.name))
+                            }
+                            
+                            resolved = {
+                                kind: "basic",
+                                ast: declaration
+                            }
+                        }
+                    } break;
                     case "import-all-declaration": {
                         if (declaration.alias.name === name) {
                             
