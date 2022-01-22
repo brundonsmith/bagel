@@ -245,7 +245,7 @@ const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: Fun
     if (decl.memo) {
         return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ');';
     } else {
-        return `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
+        return `${prefix} ${decl.name.name} = ` + signature + ' => (' + body + ');';
     }
 }
 
@@ -253,7 +253,7 @@ const compileFunc = (excludeTypes: boolean, module: string, func: Func): string 
     const signature = compileFunctionSignature(excludeTypes, module, func.type)
     const body = compileOne(excludeTypes, module, func.body)
 
-    return signature + ' => ' + body
+    return signature + ' => (' + body + ')'
 }
 
 const compileJsFuncDeclaration = (excludeTypes: boolean, module: string, decl: JsFuncDeclaration): string => {
