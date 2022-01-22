@@ -209,6 +209,15 @@ export const parseExact = <K extends string>(str: K): ParseFunction<K> => (_modu
     return given(consume(code, index, str), index => ({ parsed: str, newIndex: index }))
 }
 
+export function parseKeyword(code: string, index: number, keyword: string): ParseResult<boolean> {
+    const indexAfter = consume(code, index, keyword)
+    const newIndex = indexAfter != null ? consumeWhitespaceRequired(code, indexAfter) : undefined
+
+    return {
+        parsed: indexAfter != null,
+        newIndex: newIndex ?? index
+    }
+}
 
 export function given<T, R>(val: T|BagelError|undefined, fn: (val: T) => R): R|BagelError|undefined {
     if (val != null && !(isError(val))) {
