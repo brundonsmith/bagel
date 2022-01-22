@@ -47,14 +47,17 @@
 //     }
 // }
 
+export const WHOLE_OBJECT = Symbol('WHOLE_OBJECT')
+const COMPUTED_RESULT = Symbol('COMPUTED_RESULT')
+
 type Reaction = () => void
-type Observable = { obj: WeakRef<object>, prop: string }
+type Observable = { obj: WeakRef<object>, prop: string|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT }
 
 let reportObservableAccessed: ((obs: Observable) => void) | undefined;
 let queuedReactions: Set<Reaction>|undefined // if defined, we're in an action
 let observablesToReactions: Array<{
     obj: WeakRef<object>,
-    prop: string,
+    prop: string|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT,
     effect: Reaction
 }> = []
 const memoCache: Array<{
@@ -65,33 +68,49 @@ const memoCache: Array<{
 }> = []
 const EMPTY_CACHE = Symbol('EMPTY_CACHE')
 
-export function observe<O extends object, K extends keyof O & string>(obj: O, prop: K): O[K] {
+export function observe<O extends object, K extends (keyof O & string)>(obj: O, prop: K): O[K];
+export function observe<O extends object, K extends typeof WHOLE_OBJECT>(obj: O, prop: K): O;
+export function observe<O extends object, K extends typeof COMPUTED_RESULT>(obj: O, prop: K): undefined;
+export function observe<O extends object, K extends (keyof O & string) | typeof COMPUTED_RESULT | typeof WHOLE_OBJECT>(obj: O, prop: K)
+        // @ts-ignore
+        : O[K] | O | undefined {
     if (reportObservableAccessed) {
+        // console.log('observe(', obj, prop, ')')
         // console.log(`observe()`, { obj, prop })
         reportObservableAccessed({ obj: new WeakRef(obj), prop })
     }
     
+    if (prop === WHOLE_OBJECT) {
+        return obj
+    }
+    if (prop === COMPUTED_RESULT) {
+        return undefined
+    }
+
     // @ts-ignore
-    return obj[prop]
+    const val = obj[prop]
+    
+    return typeof val === 'function' ? val.bind(obj) : val
 }
 
-export function invalidate(obj: object, prop: string) {
+export function invalidate(obj: object, prop: string|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT = WHOLE_OBJECT) {
+    // console.log('invalidate(', obj, prop, ')')
     const topOfAction = queuedReactions == null
     const queue = queuedReactions = queuedReactions ?? new Set()
 
     for (const entry of memoCache) {
         const entryIsInvalidated =
             entry.observables.some(o => 
-                o.obj.deref() === obj && o.prop === prop)
+                o.obj.deref() === obj && (prop === WHOLE_OBJECT || prop === o.prop))
 
         if (entryIsInvalidated) {
             entry.cached = EMPTY_CACHE
-            invalidate(entry.fn, 'result')
+            invalidate(entry.fn, COMPUTED_RESULT)
         }
     }
 
     for (const entry of observablesToReactions) {
-        if (obj === entry.obj.deref() && prop === entry.prop) {
+        if (obj === entry.obj.deref() && (prop === WHOLE_OBJECT || prop === entry.prop)) {
             queue.add(entry.effect)
         }
     }
@@ -119,7 +138,7 @@ export function autorun(fn: Reaction) {
 
 export function computedFn<F extends Function>(fn: F): F {
     return ((...args: any[]) => {
-        observe(fn as any, 'result')
+        observe(fn as any, COMPUTED_RESULT)
 
         const cacheEntry = memoCache.find(cacheEntry =>
             cacheEntry.fn === fn && args.every((_, index) => args[index] === cacheEntry.args[index]))
@@ -127,7 +146,7 @@ export function computedFn<F extends Function>(fn: F): F {
         // console.log({ cacheEntry })
 
         if (cacheEntry && cacheEntry.cached !== EMPTY_CACHE) {
-            // console.log('returned from cache: ' + cacheEntry.cached)
+            // console.log('cache hit: ', cacheEntry.cached)
             return cacheEntry.cached
         } else {
             const observables: Observable[] = []
@@ -149,6 +168,7 @@ export function computedFn<F extends Function>(fn: F): F {
                 cacheEntry.cached = result
             }
 
+            // console.log('cache miss: ', result)
             return result
         }
     }) as unknown as  F
