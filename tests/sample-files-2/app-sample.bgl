@@ -1,6 +1,6 @@
 
-from '../../lib/wrappers/random' import { random }
-from '../../lib/wrappers/time' import { clock }
+from '../../lib/bgl/random' import { random }
+from '../../lib/bgl/time' import { clock }
 
 class Counter {
     count: number = 0

@@ -1,0 +1,51 @@
+
+js#
+import { iter as ___iter, ___typeof } from 'C:\\Users\\brundolf\\git\\bagel\\lib\\src\\core.ts'
+#js
+
+js export proc log(x: unknown) {#
+    console.log(x);
+#}
+
+js export func logf<T>(x: T): T => {#
+   console.log(x);
+   return x;
+#}
+
+js export func iter<T>(x: const T[]): Iterator<T> => {#
+    return ___iter(x)
+#}
+
+// export func typeof(val: unknown): 'string'|'number'|'boolean'|'nil'|'object'|'array'|'set'|'class-instance' =>
+//     js# ___typeof(val) #js
+
+export type Plan = <T>(const {
+    then: <R>(fn: (el: T) => R) => Plan<R>
+})
+
+export type Iterator = <T>(const {
+    map: <R>(fn: (el: T) => R) => Iterator<R>,
+    filter: (fn: (el: T) => boolean) => Iterator<T>,
+    slice: (start: number, end: number) => Iterator<T>,
+    sorted: (fn: (a: T, b: T) => number) => Iterator<T>,
+    every: (fn: (el: T) => boolean) => boolean,
+    some: (fn: (el: T) => boolean) => boolean,
+    count: () => number,
+    concat: (other: Iterator<T>) => Iterator<T>,
+    zip: <R>(other: Iterator<R>) => Iterator<[T?, R?]>,
+    array: () => T[],
+})
+
+export type Object = {[string]: unknown}
+export type Array = unknown[]
+
+// TODO: flat, includes, find, findIndex, indexOf, lastIndexOf, reduce, reverse
+
+type LintRuleName = string
+
+// TODO: Optional properties
+export type BagelConfig = {
+    lintRules: {[LintRuleName]: 'error'|'warn'|'off'}?,
+    scripts: {[string]: () {}}?,
+    platforms: 'all' | ('browser'|'node'|'deno')[]? // restrict standard libraries based on these
+}

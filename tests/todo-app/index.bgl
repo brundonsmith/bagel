@@ -1,4 +1,4 @@
-from '../../lib/wrappers/html' import { render }
+from '../../lib/bgl/html' import { render }
 
 from './app' import { renderApp }
 

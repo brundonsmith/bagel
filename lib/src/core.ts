@@ -36,6 +36,15 @@ export {
 
 
 // Custom
+function* _repeat<T>(val: T, count: number): RawIter<T> {
+    for (let i = 0; i < count; i++) {
+        yield val
+    }
+}
+export function repeat<T>(val: T, count: number): Iter<T> {
+    return new Iter(_repeat(val, count))
+}
+
 function _range(start: number) {
     return function*(end: number): RawIter<number> {
         for (let i = start; i < end; i++) {
@@ -209,13 +218,6 @@ function join<T extends string>(delimiter: string) {
     }
 }
 
-export function log<T>(expr: T): T {
-    console.log(expr);
-    return expr;
-}
-
-export const fromEntries = Object.fromEntries;
-
 export const INNER_ITER = Symbol('INNER_ITER')
 
 export function iter<T>(inner: RawIter<T>): Iter<T> {
@@ -242,7 +244,7 @@ export class Iter<T> {
         return new Iter(slice(start)(end)((this as Iter<any>)[INNER_ITER])) as Iter<T>
     }
 
-    sort = (fn: (a: T, b: T) => number): Iter<T> => {
+    sorted = (fn: (a: T, b: T) => number): Iter<T> => {
         return new Iter(Array.from((this as Iter<any>)[INNER_ITER]).sort(fn))
     }
 
@@ -266,11 +268,6 @@ export class Iter<T> {
         return new Iter(zip((this as Iter<any>)[INNER_ITER])((other as any)[INNER_ITER] ?? other))
     }
 
-    // @ts-ignore
-    join = (delimiter: string): string => {
-        return join(delimiter)((this as unknown as Iter<string>)[INNER_ITER])
-    }
-
     array = (): T[] => {
         if (this[INNER_ITER][Symbol.iterator]) {
             observe(this[INNER_ITER], WHOLE_OBJECT)
@@ -284,6 +281,15 @@ export class Iter<T> {
         }
         return new Set((this as Iter<any>)[INNER_ITER])
     }
+
+    // TODO: These two are only available for certain types of iterators. Need a way to specify that at a type level.
+    // object = (): {[left]: right} => {
+    //
+    // }
+    //
+    // join = (delimiter: string): string => {
+    //     return join(delimiter)((this as unknown as Iter<string>)[INNER_ITER])
+    // }
 }
 
 

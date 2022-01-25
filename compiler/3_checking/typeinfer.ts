@@ -287,7 +287,7 @@ const inferTypeInner = computedFn((
             } else {
                 const mutability = (
                     property?.type?.mutability == null ? undefined :
-                    property.type.mutability === "mutable" && subjectType.mutability === "mutable" ? "mutable" :
+                    property.type.mutability === "mutable" && subjectType.mutability === "mutable" && !property.forceReadonly ? "mutable" :
                     subjectType.mutability === "immutable" ? "immutable" :
                     "readonly"
                 )
@@ -405,8 +405,12 @@ const inferTypeInner = computedFn((
                                 kind: 'object-type',
                                 spreads: [],
                                 entries: exportedDeclarations.map(decl =>
-                                    attribute(decl.name.name, inferType(reportError, decl.value, visited))),
-                                mutability: 'immutable',
+                                    attribute(
+                                        decl.name.name, 
+                                        inferType(reportError, decl.value, visited),
+                                        decl.kind !== 'value-declaration' || decl.isConst || decl.exported === 'expose'
+                                    )),
+                                mutability: 'mutable',
                                 ...AST_NOISE
                             }
                         }
@@ -845,7 +849,7 @@ export const propertiesOf = computedFn((
     switch (resolvedType.kind) {
         case "nominal-type": {
             return [
-                attribute("value", resolvedType.inner)
+                attribute("value", resolvedType.inner, false)
             ]
         }
         case "iterator-type":
@@ -886,7 +890,7 @@ export const propertiesOf = computedFn((
         }
         case "string-type": {
             return [
-                attribute("length", NUMBER_TYPE),
+                attribute("length", NUMBER_TYPE, true),
             ]
         }
         case "tuple-type": {
@@ -899,26 +903,71 @@ export const propertiesOf = computedFn((
                         ...AST_NOISE
                     },
                     ...TYPE_AST_NOISE
-                })
+                }, true)
             ]
         }
         case "array-type": {
             const props: Attribute[] = [
-                attribute("length", NUMBER_TYPE),
+                // TODO: Make sure length is immutable even when the array is not
+                attribute("length", NUMBER_TYPE, true),
             ];
 
             if (resolvedType.mutability === "mutable") {
-                props.push(attribute("push", {
-                    kind: "proc-type",
-                    args: [{
-                        kind: "arg",
-                        name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
-                        type: resolvedType.element,
-                        ...AST_NOISE
-                    }],
-                    invalidatesParent: true,
-                    ...TYPE_AST_NOISE
-                }))
+                props.push(
+                    attribute("push", {
+                        kind: "proc-type",
+                        args: [{
+                            kind: "arg",
+                            name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
+                            type: resolvedType.element,
+                            ...AST_NOISE
+                        }],
+                        invalidatesParent: true,
+                        ...TYPE_AST_NOISE
+                    }, true),
+                    attribute("unshift", {
+                        kind: "proc-type",
+                        args: [{
+                            kind: "arg",
+                            name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
+                            type: resolvedType.element,
+                            ...AST_NOISE
+                        }],
+                        invalidatesParent: true,
+                        ...TYPE_AST_NOISE
+                    }, true),
+                    attribute("pop", {
+                        kind: "proc-type",
+                        args: [],
+                        invalidatesParent: true,
+                        ...TYPE_AST_NOISE
+                    }, true),
+                    attribute("shift", {
+                        kind: "proc-type",
+                        args: [],
+                        invalidatesParent: true,
+                        ...TYPE_AST_NOISE
+                    }, true),
+                    attribute("splice", {
+                        kind: "proc-type",
+                        args: [
+                            {
+                                kind: "arg",
+                                name: { kind: "plain-identifier", name: "index", ...AST_NOISE },
+                                type: NUMBER_TYPE,
+                                ...AST_NOISE
+                            },
+                            {
+                                kind: "arg",
+                                name: { kind: "plain-identifier", name: "count", ...AST_NOISE },
+                                type: NUMBER_TYPE,
+                                ...AST_NOISE
+                            }
+                        ],
+                        invalidatesParent: true,
+                        ...TYPE_AST_NOISE
+                    }, true),
+                )
             }
 
             return props;
@@ -926,12 +975,13 @@ export const propertiesOf = computedFn((
     }
 })
 
-function attribute(name: string, type: TypeExpression): Attribute {
+function attribute(name: string, type: TypeExpression, forceReadonly: boolean): Attribute {
     return {
         kind: "attribute",
         name: { kind: "plain-identifier", name, ...AST_NOISE },
         type,
         optional: false,
+        forceReadonly,
         ...TYPE_AST_NOISE
     }
 }

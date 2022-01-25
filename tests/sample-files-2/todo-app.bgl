@@ -1,8 +1,8 @@
 
-// from '../../lib/wrappers/core' import { iter, logf, logp }
-from '../../lib/wrappers/local-storage' import { LocalStorage }
-from '../../lib/wrappers/json' import { parse, stringify }
-from '../../lib/wrappers/html' import { render, Event }
+// from '../../lib/bgl/core' import { iter, logf, logp }
+from '../../lib/bgl/local-storage' import { LocalStorage }
+from '../../lib/bgl/json' import { parse, stringify }
+from '../../lib/bgl/html' import { render, Event }
 
 const lsKey = 'todo-list'
 

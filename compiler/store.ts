@@ -12,6 +12,7 @@ import { ModuleName, ReportError } from "./_model/common.ts";
 import { areSame, iterateParseTree } from "./utils/ast.ts";
 import { autofix, lint, LintProblem } from "./other/lint.ts";
 import { DEFAULT_OPTIONS, format } from "./other/format.ts";
+import { withoutSourceInfo } from "./utils/debugging.ts";
 
 export type Mode =
     | { mode: "build", entryFile: ModuleName, watch: boolean }
@@ -23,7 +24,7 @@ export type Mode =
     | { mode: "autofix", fileOrDir: string, watch: undefined }
     | { mode: "mock", modules: Record<ModuleName, string>, watch: undefined } // for internal testing only!
 
-const PRELUDE_PATH = `C:\\Users\\brundolf\\git\\bagel\\lib\\wrappers\\prelude.bgl` as ModuleName
+const PRELUDE_PATH = `C:\\Users\\brundolf\\git\\bagel\\lib\\bgl\\prelude.bgl` as ModuleName
 class _Store {
 
     constructor() {
@@ -60,6 +61,7 @@ class _Store {
         for (const module of this._modulesSource.keys()) {
             const parsed = this.parsed(module, true)
             if (parsed) {
+                // console.log(withoutSourceInfo(parsed.ast))
                 const { errors: parseErrors } = parsed
                 const typecheckErrors = this.typeerrors(module)
                 const lintProblems = lint(parsed.ast)
@@ -222,11 +224,11 @@ export default Store
 
 const moduleIsCore = (moduleName: ModuleName) => {
     // NOTE: This can be made more robust later, probably screened by domain name or something
-    return moduleName.includes('wrappers')
+    return moduleName.includes('bgl')
 }
 
 export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'h',
-'range', 'entries', 'log', 'fromEntries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER', 'withConst'
+'range', 'entries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER', 'withConst'
 ]
 
 const JS_PRELUDE = `
@@ -234,7 +236,7 @@ import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "C:/Use
 `
 
 const BGL_PRELUDE = `
-from 'C:/Users/brundolf/git/bagel/lib/wrappers/prelude' import { iter, Iterator, Plan, BagelConfig }
+from 'C:/Users/brundolf/git/bagel/lib/bgl/prelude' import { log, iter, Iterator, Plan, Object, Array, BagelConfig }
 `
 
 export function canonicalModuleName(importerModule: string, importPath: string): ModuleName {

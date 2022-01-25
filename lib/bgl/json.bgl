@@ -1,0 +1,8 @@
+
+// TODO: Or error
+js export func parse(str: string): unknown => {# return JSON.parse(str) #}
+
+// TODO: Use types to ensure only valid JSON values make it in here
+js export func stringify(val: unknown, indentation: number): string => {#
+    return JSON.stringify(val, x => typeof x === 'undefined' ? null : x, indentation)
+#}

@@ -126,6 +126,7 @@ export type Attribute = SourceInfo & {
     readonly name: PlainIdentifier,
     readonly type: TypeExpression,
     readonly optional: boolean,
+    readonly forceReadonly: boolean,
     readonly mutability: undefined,
 }
 

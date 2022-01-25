@@ -1,6 +1,0 @@
-js#
-import * as json from '../src/json.ts'
-#js
-
-export func parse(str: string): unknown => js# json.parse(str) #js
-export func stringify(val: unknown, indentation: number): string => js# json.stringify(val, indentation) #js

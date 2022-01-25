@@ -1,0 +1,57 @@
+
+export const decodeURIComponent: (str: string) => string = js# globalThis.decodeURIComponent #js
+export const encodeURIComponent: (str: string) => string = js# globalThis.encodeURIComponent #js
+
+export type URI = const {
+    href: string,
+    protocol: string,
+    origin: string,
+    host: string,
+    hostname: string,
+    pathname: string,
+    port: string?,
+    search: string?,
+    hash: string?,
+    username: string?,
+    password: string?,
+}
+
+js export func parseUri(str: string): URI? => {#
+    try {
+        const url = new URL(str);
+    } catch {
+        return undefined;
+    }
+
+    const { href, protocol, origin, host, hostname, pathname, 
+        port, search, hash, username, password} = url;
+
+    return {
+        href,
+        protocol,
+        origin,
+        host,
+        hostname,
+        pathname,
+        port: port === '' ? undefined : port,
+        search: search === '' ? undefined : search,
+        hash: hash === '' ? undefined : hash,
+        username: username === '' ? undefined : username,
+        password: password === '' ? undefined : password,
+    }
+#}
+
+js export func parseSearchParams(str: string): {[string]: string}? => {#
+    try {
+        const params = new URLSearchParams(str);
+    } catch {
+        return undefined
+    }
+
+    const res = {}
+    for (const [key, value] of params.entries()) {
+        res[key] = value
+    }
+
+    return res
+#}

@@ -1,6 +1,6 @@
 
 js#
-import { render as ___render } from '../src/core.ts'
+import { render as ___render } from 'C:\\Users\\brundolf\\git\\bagel\\lib\\src\\core.ts'
 #js
 
 export proc render(el: Element) {

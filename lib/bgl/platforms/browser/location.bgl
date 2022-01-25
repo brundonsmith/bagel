@@ -1,0 +1,6 @@
+
+expose let hash = js# window.location.hash #js
+
+// autorun () {
+//     js# window.location.hash #js = hash;
+// }

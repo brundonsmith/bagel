@@ -305,6 +305,7 @@ const _objectTypeEntry: ParseFunction<Attribute> = (module, code, startIndex) =>
             name,
             type,
             optional: optional != null,
+            forceReadonly: false,
             mutability: undefined,
             module,
             code,

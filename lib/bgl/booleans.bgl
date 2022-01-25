@@ -1,0 +1,14 @@
+
+js export func parse(s: string): boolean? => {#
+    if (s === 'true') {
+        return true
+    } else if (s === 'false') {
+        return false
+    } else {
+        return undefined
+    }
+#}
+
+js export func stringify(b: boolean): string => {#
+    return String(b)
+#}

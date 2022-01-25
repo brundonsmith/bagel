@@ -1,0 +1,35 @@
+
+js#
+import { Temporal } from '@js-temporal/polyfill'
+#js
+
+
+export type Instant = const {
+    epoch: number,
+    millisecond: number,
+    second: number,
+    minute: number,
+    hour: number,
+}
+
+let _now: number = js# Date.now() #js
+
+js export func now(): Instant => {#
+    startUpdatingTimeIfNeeded();
+    return Temporal.Now.Instant();
+#}
+
+proc updateTime() {
+    _now = js# Date.now() #js;
+    js#setTimeout(updateTime, 1)#js
+}
+
+js#
+let updateTimeStarted = false;
+export function startUpdatingTimeIfNeeded() {
+    if (!updateTimeStarted) {
+        updateTimeStarted = true;
+        updateTime();
+    }
+}
+#js

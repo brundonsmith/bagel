@@ -1,5 +1,5 @@
 
-from '../../lib/wrappers/html' import { Event }
+from '../../lib/bgl/html' import { Event }
 
 export type TodoItem = {
     text: string,

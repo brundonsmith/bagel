@@ -1,0 +1,28 @@
+
+js#
+import { iter as ___iter } from 'C:\\Users\\brundolf\\git\\bagel\\lib\\src\\core.ts'
+#js
+
+js export proc assign<B extends Object, A extends B>(a: A, b: B) {#
+    Object.assign(a, b)
+#}
+
+
+// TODO: can eventually derive better types for these three
+
+js export func keys<O extends Object>(obj: O): Iterator<string> => {#
+    return ___iter(Object.keys(obj))
+#}
+
+js export func values<O extends Object>(obj: O): Iterator<unknown> => {#
+    return ___iter(Object.values(obj))
+#}
+
+js export func entries<O extends Object>(obj: O): Iterator<[string, unknown]> => {#
+    return ___iter(Object.entries(obj))
+#}
+
+
+js export func fromEntries<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} => {#
+    return Object.fromEntries(iter.array())
+#}

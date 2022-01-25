@@ -1,5 +1,5 @@
 
-from '../../lib/wrappers/core' import { logf }
+from '../../lib/bgl/core' import { logf }
 from './foo' import { x }
 
 func foo(x: number): boolean => 2 + 2 == 4

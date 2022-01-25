@@ -1,11 +1,11 @@
 
 // raw js integration
 js func getAllLocalStorage(): {[string]: string} => {#
-    const obj = {}
+    const obj: {[key: string]: string} = {}
 
     for (let i = 0; i < localStorage.length; i++){
-        const key = localStorage.key(i)
-        obj[key] = localStorage.getItem(key);
+        const key = localStorage.key(i) as string;
+        obj[key] = localStorage.getItem(key) as string;
     }
 
     return obj;
@@ -24,4 +24,4 @@ export proc setItem(key: string, value: string) {
     setLocalStorage(key, value);
 }
 
-export func getItem(key: string): string|nil => _localStorage[key]
+export func getItem(key: string): string? => _localStorage[key]
