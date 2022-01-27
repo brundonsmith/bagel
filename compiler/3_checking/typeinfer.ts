@@ -7,7 +7,7 @@ import { assignmentError, cannotFindModule, cannotFindName, miscError } from "..
 import { withoutSourceInfo } from "../utils/debugging.ts";
 import { AST, Module } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
-import { mapParseTree, typesEqual } from "../utils/ast.ts";
+import { areSame, mapParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
 import { format } from "../other/format.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
@@ -62,7 +62,7 @@ const inferTypeInner = computedFn((
 
                 if (parent?.kind === "invocation") {
                     const parentSubjectType = resolveType(reportError, inferType(reportError, parent.subject, visited))
-                    const thisArgIndex = parent.args.findIndex(a => a === ast)
+                    const thisArgIndex = parent.args.findIndex(a => areSame(a, ast))
 
                     if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
                         const thisArgParentType = parentSubjectType.args[thisArgIndex]?.type
@@ -763,7 +763,7 @@ function resolveRefinements(expr: Expression): Refinement[] {
     // of the current expression
     while (parent != null) {
         if (parent.kind === 'case') {
-            if (grandparent?.kind === 'if-else-expression' && current === parent.outcome) {
+            if (grandparent?.kind === 'if-else-expression' && areSame(current, parent.outcome)) {
                 const condition = parent.condition.kind === 'parenthesized-expression' ? parent.condition.inner : parent.condition;
 
                 if (condition.kind === "binary-operator" && condition.ops[0][0].op === "!=") {
