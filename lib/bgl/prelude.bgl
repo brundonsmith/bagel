@@ -19,23 +19,6 @@ export js func iter<T>(x: const T[]): Iterator<T> => {#
 // export func typeof(val: unknown): 'string'|'number'|'boolean'|'nil'|'object'|'array'|'set'|'class-instance' =>
 //     js# ___typeof(val) #js
 
-export type Plan = <T>(const {
-    then: <R>(fn: (el: T) => R) => Plan<R>
-})
-
-export type Iterator = <T>(const {
-    map: <R>(fn: (el: T) => R) => Iterator<R>,
-    filter: (fn: (el: T) => boolean) => Iterator<T>,
-    slice: (start: number, end: number) => Iterator<T>,
-    sorted: (fn: (a: T, b: T) => number) => Iterator<T>,
-    every: (fn: (el: T) => boolean) => boolean,
-    some: (fn: (el: T) => boolean) => boolean,
-    count: () => number,
-    concat: (other: Iterator<T>) => Iterator<T>,
-    zip: <R>(other: Iterator<R>) => Iterator<[T?, R?]>,
-    array: () => T[],
-})
-
 export type Object = {[string]: unknown}
 export type Array = unknown[]
 

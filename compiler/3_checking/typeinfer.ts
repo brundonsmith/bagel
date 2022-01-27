@@ -870,22 +870,6 @@ export const propertiesOf = computedFn((
                 attribute("value", resolvedType.inner, false)
             ]
         }
-        case "iterator-type":
-        case "plan-type": {
-            const preludeModule = given(resolvedType.module, module => Store.parsed(module, true)?.ast) as Module
-            const generic = (Store.getBinding(reportError, resolvedType.kind === 'iterator-type' ? 'Iterator' : 'Plan', preludeModule.declarations[0]) as TypeBinding).type
-            return propertiesOf(reportError, {
-                kind: "bound-generic-type",
-                generic,
-                typeArgs: [resolvedType.inner],
-                mutability: undefined,
-                parent: resolvedType.parent,
-                module: resolvedType.module,
-                code: resolvedType.code,
-                startIndex: resolvedType.startIndex,
-                endIndex: resolvedType.endIndex,
-            })
-        }
         case "object-type": {
             const attrs = [...resolvedType.entries]
 
@@ -907,7 +891,8 @@ export const propertiesOf = computedFn((
 
             return attrs
         }
-        case "string-type": {
+        case "string-type":
+        case "array-type": {
             return [
                 attribute("length", NUMBER_TYPE, true),
             ]
@@ -925,11 +910,6 @@ export const propertiesOf = computedFn((
                     parent: resolvedType.parent,
                     ...TYPE_AST_NOISE
                 }, true)
-            ]
-        }
-        case "array-type": {
-            return [
-                attribute("length", NUMBER_TYPE, true),
             ]
         }
     }

@@ -264,7 +264,7 @@ export class Iter<T> {
         return new Iter(concat((this as Iter<any>)[INNER_ITER])((other as any)[INNER_ITER] ?? other))
     }
 
-    zip = <R>(other: RawIter<R>|Iter<R>): Iter<[T|undefined, R|undefined]> => {
+    zip = <R>(other: RawIter<R>|Iter<R>): Iter<[T|null|undefined, R|null|undefined]> => {
         return new Iter(zip((this as Iter<any>)[INNER_ITER])((other as any)[INNER_ITER] ?? other))
     }
 
