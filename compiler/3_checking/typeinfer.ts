@@ -591,7 +591,7 @@ export function bindInvocationGenericArgs(reportError: ReportError, invocation: 
                     invocationSubjectType
                 );
 
-                if (inferredBindings.size === subjectType.typeParams.length) {
+                if (inferredBindings && inferredBindings.size === subjectType.typeParams.length) {
                     subjectType = parameterizedGenericType(
                         reportError, 
                         subjectType, 
@@ -998,7 +998,7 @@ function fitTemplate(
     reportError: ReportError,
     parameterized: TypeExpression, 
     reified: TypeExpression, 
-): ReadonlyMap<string, TypeExpression> {
+): ReadonlyMap<string, TypeExpression>|undefined {
 
     function isGenericParam(type: TypeExpression): type is NamedType {
         if (type.kind === 'named-type') {
@@ -1015,26 +1015,26 @@ function fitTemplate(
         return matches;
     }
 
-    if (parameterized.kind === "func-type" && reified.kind === "func-type") {
+    if ((parameterized.kind === "func-type" && reified.kind === "func-type") 
+     || (parameterized.kind === "proc-type" && reified.kind === "proc-type")) {
         const matchGroups = [
             ...parameterized.args.map((arg, index) =>
                 fitTemplate(reportError, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE)),
             // fitTemplate(reportError, getParent, getBinding, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE)
         ]
 
+        if (matchGroups.some(g => g == null)) {
+            return undefined
+        }
+
         const matches = new Map<string, TypeExpression>();
 
         for (const map of matchGroups) {
-            for (const [key, value] of map.entries()) {
+            for (const [key, value] of (map as ReadonlyMap<string, TypeExpression>).entries()) {
                 const existing = matches.get(key)
                 if (existing) {
                     if (!subsumes(reportError, existing, value)) {
-                        matches.set(key, simplifyUnions(reportError, {
-                            kind: "union-type",
-                            members: [value, existing],
-                            mutability: undefined,
-                            module: undefined, code: undefined, startIndex: undefined, endIndex: undefined
-                        }))
+                        return undefined
                     }
                 } else {
                     matches.set(key, value);
