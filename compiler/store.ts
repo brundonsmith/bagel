@@ -24,7 +24,6 @@ export type Mode =
     | { mode: "autofix", fileOrDir: string, watch: undefined }
     | { mode: "mock", modules: Record<ModuleName, string>, watch: undefined } // for internal testing only!
 
-const PRELUDE_PATH = `C:\\Users\\brundolf\\git\\bagel\\lib\\bgl\\prelude.bgl` as ModuleName
 class _Store {
 
     constructor() {
@@ -35,7 +34,7 @@ class _Store {
     // State
     mode: undefined | Mode = undefined
 
-    private _modules = new Set<ModuleName>([ PRELUDE_PATH ])
+    private _modules = new Set<ModuleName>([])
     public get modules(): ReadonlySet<ModuleName> {
         return this._modules
     }
@@ -96,7 +95,7 @@ class _Store {
                 ? [ mode.fileOrDir ]
                 : (await getAllFiles(mode.fileOrDir)).filter(f => f.match(/.*\.bgl$/));
 
-            this._modules = new Set([PRELUDE_PATH, ...allFiles as ModuleName[]])
+            this._modules = new Set([...allFiles as ModuleName[]])
         }
     }
 
@@ -116,7 +115,7 @@ class _Store {
             const errors: BagelError[] = []
             const ast = parse(
                 moduleName,  
-                source + (typecheckReady && !moduleIsCore(moduleName) ? BGL_PRELUDE : ''), 
+                source + (typecheckReady ? preludeFor(moduleName) : ''), 
                 err => errors.push(err)
             )
 
@@ -209,11 +208,6 @@ class _Store {
 const Store = new _Store()
 export default Store
 
-const moduleIsCore = (moduleName: ModuleName) => {
-    // NOTE: This can be made more robust later, probably screened by domain name or something
-    return moduleName.includes('bgl')
-}
-
 export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'h',
 'range', 'entries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER', 'withConst'
 ]
@@ -222,9 +216,36 @@ const JS_PRELUDE = `
 import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "C:/Users/brundolf/git/bagel/lib/src/core.ts";
 `
 
-const BGL_PRELUDE = `
-from 'C:/Users/brundolf/git/bagel/lib/bgl/prelude' import { log, iter, Iterator, Plan, Object, Array, BagelConfig }
-`
+const BGL_PRELUDE_DATA = [
+    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/core' as ModuleName, imports: [ 'log', 'iter' ] },
+    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/bagel' as ModuleName, imports: [ 'BagelConfig' ] },
+    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/arrays' as ModuleName, imports: [ 'push', 'unshift', 'pop', 'shift', 'splice' ] },
+    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/strings' as ModuleName, imports: [ 'includes', 'indexOf', 'replace', 'split', 'startsWith', 'substring', 'toLowerCase', 'toUpperCase', 'trim' ] },
+    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/objects' as ModuleName, imports: [ 'keys', 'values', 'entries' ] },
+    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/numbers' as ModuleName, imports: [ 'parseNumber', 'stringifyNumber', 'abs', 'pow', 'sqrt', 'ceil', 'floor', 'sin', 'cos', 'tan' ] },
+    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/booleans' as ModuleName, imports: [ 'parseBoolean', 'stringifyBoolean' ] },
+    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/iterators' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'collectArray', 'collectObject' ] },
+    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/plans' as ModuleName, imports: [ 'then' ] },
+] as const
+
+function normalizeName(module: ModuleName): string {
+    return module
+        .replace(/^[a-zA-Z]:/, '')
+        .split(/[\\/]+/)
+        .filter(s => !!s)
+        .map(s => s.split('.')[0])
+        .join('/')
+}
+
+function preludeFor(module: ModuleName) {
+    const normalizedModule = normalizeName(module)
+
+    return BGL_PRELUDE_DATA
+        .filter(m => normalizeName(m.module) !== normalizedModule)
+        .map(({ module, imports }) =>
+            `from '${module}' import { ${imports.join(', ')} }`)
+        .join('\n')
+}
 
 export function canonicalModuleName(importerModule: string, importPath: string): ModuleName {
     if (pathIsRemote(importPath)) {

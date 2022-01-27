@@ -99,7 +99,7 @@ autorun(async () => {
 // add imported modules to set
 autorun(() => {
     for (const module of Store.modules) {
-        const parsed = Store.parsed(module, false)
+        const parsed = Store.parsed(module, true)
 
         if (parsed) {
             for (const decl of parsed.ast.declarations) {
