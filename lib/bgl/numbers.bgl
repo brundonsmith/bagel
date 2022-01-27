@@ -40,13 +40,14 @@ export const tan: (x: number) => number = js# Math.tan #js
 export const tanh: (x: number) => number = js# Math.tanh #js
 export const trunc: (x: number) => number = js# Math.trunc #js
 
-export js func parse(s: string): number? => {#
+export js func parseNumber(s: string): number? => {#
     if (isNaN(s as any)) {
         return undefined
     } else {
         return Number(s)
     }
 #}
-export js func stringify(x: number): string => {#
+
+export js func stringifyNumber(x: number): string => {#
     return String(x)
 #}

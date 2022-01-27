@@ -1,0 +1,9 @@
+
+type LintRuleName = string
+
+// TODO: Optional properties
+export type BagelConfig = {
+    lintRules: {[LintRuleName]: 'error'|'warn'|'off'}?,
+    scripts: {[string]: () {}}?,
+    platforms: 'all' | ('browser'|'node'|'deno')[]? // restrict standard libraries based on these
+}

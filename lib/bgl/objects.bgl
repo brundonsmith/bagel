@@ -21,8 +21,3 @@ export js func values<O extends Object>(obj: O): Iterator<unknown> => {#
 export js func entries<O extends Object>(obj: O): Iterator<[string, unknown]> => {#
     return ___iter(Object.entries(obj))
 #}
-
-
-export js func fromEntries<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} => {#
-    return Object.fromEntries(iter.array())
-#}

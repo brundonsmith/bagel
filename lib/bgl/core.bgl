@@ -1,0 +1,17 @@
+
+js#
+import { iter as ___iter } from 'C:\\Users\\brundolf\\git\\bagel\\lib\\src\\core.ts'
+#js
+
+export js proc log(x: unknown) {#
+    console.log(x);
+#}
+
+export js func logf<T>(x: T): T => {#
+   console.log(x);
+   return x;
+#}
+
+export js func iter<T>(x: const T[]): Iterator<T> => {#
+    return ___iter(x)
+#}
