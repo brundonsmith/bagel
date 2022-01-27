@@ -74,7 +74,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = a.b()`,
-      `const x = ___observe(a, 'b')();`,
+      `const x = b(a);`,
     );
   },
 });
@@ -84,7 +84,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = a.b()()`,
-      `const x = ___observe(a, 'b')()();`,
+      `const x = b(a)();`,
     );
   },
 });
@@ -94,7 +94,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = a.b.c()`,
-      `const x = ___observe(___observe(a, 'b'), 'c')();`,
+      `const x = c(___observe(a, 'b'));`,
     );
   },
 });
@@ -104,7 +104,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = a.b().c()`,
-      `const x = ___observe(___observe(a, 'b')(), 'c')();`,
+      `const x = c(b(a));`,
     );
   },
 });
@@ -128,7 +128,7 @@ Deno.test({
       `const x = a
         .b()
         .c()`,
-      `const x = ___observe(___observe(a, 'b')(), 'c')();`,
+      `const x = c(b(a));`,
     );
   },
 });
@@ -278,7 +278,7 @@ Deno.test({
         for item of items {
         }
 
-        console.log(count);
+        log(count);
       }`,
       `
       const doStuff = (items: ___Iter<number>): void => {
@@ -287,7 +287,7 @@ Deno.test({
         for (const item of items[___INNER_ITER]) { ;
         };
 
-        ___observe(console, 'log')(count);
+        log(count);
       };`,
     );
   },
@@ -307,13 +307,13 @@ Deno.test({
             }
 
             if count > 12 {
-                console.log(items);
+                log(items);
             } else {
-                console.log(nil);
+                log(nil);
             }
         }
 
-        console.log(count);
+        log(count);
       }`,
       `
       const doStuff = (items: ___Iter<number>): void => {
@@ -325,13 +325,13 @@ Deno.test({
             };
             
             if ((count > 12)) {
-                ___observe(console, 'log')(items);
+                log(items);
             } else {
-                ___observe(console, 'log')(undefined);
+                log(undefined);
             };
         };
     
-        ___observe(console, 'log')(count);
+        log(count);
       };`,
     );
   },
@@ -490,6 +490,29 @@ Deno.test({
     export const setItem = (key: string, value: string): void => {
       _localStorage[key] = value; ___invalidate(_localStorage, key);        
       setLocalStorage(key, value);
+    };`)
+  }
+})
+
+Deno.test({
+  name: "Method proc call",
+  fn() {
+    testCompile(`
+    proc push<T>(arr: T[], el: T) {
+      // stub
+    }
+
+    export proc bar() {
+      let foo = [1, 2, 3];
+      foo.push(4);
+    }`,
+    `
+    const push = <T>(arr: T[], el: T): void => {
+    };
+
+    export const bar = (): void => {
+      let foo = [1, 2, 3];
+      push(foo, 4);
     };`)
   }
 })

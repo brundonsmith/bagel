@@ -2,7 +2,7 @@ import { Module } from "../_model/ast.ts";
 import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, isTypeExpression, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { assignmentError,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall } from "./typeinfer.ts";
 import { getBindingMutability, ReportError } from "../_model/common.ts";
 import { iterateParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
@@ -102,18 +102,21 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         }
                     }
 
-                    const subjectType = current.kind === "invocation"
-                        ? bindInvocationGenericArgs(reportError, current)
-                        : resolveType(reportError, inferType(reportError, current.subject))
+                    // method call
+                    const invocation = invocationFromMethodCall(current) ?? current;
+
+                    const subjectType = invocation.kind === "invocation"
+                        ? bindInvocationGenericArgs(reportError, invocation)
+                        : resolveType(reportError, inferType(reportError, invocation.subject))
                     
                     // check that type args satisfy any `extends` clauses
-                    if (current.kind === "invocation") {
-                        const resolvedSubject = resolveType(reportError, inferType(reportError, current.subject))
+                    if (invocation.kind === "invocation") {
+                        const resolvedSubject = resolveType(reportError, inferType(reportError, invocation.subject))
 
-                        if (resolvedSubject.kind === 'generic-type' && resolvedSubject.typeParams.length === current.typeArgs.length) {
+                        if (resolvedSubject.kind === 'generic-type' && resolvedSubject.typeParams.length === invocation.typeArgs.length) {
                             for (let i = 0; i < resolvedSubject.typeParams.length; i++) {
                                 const typeParam = resolvedSubject.typeParams[i]
-                                const typeArg = current.typeArgs[i]
+                                const typeArg = invocation.typeArgs[i]
 
                                 if (typeParam.extends && !subsumes(reportError, typeParam.extends, typeArg)) {
                                     reportError(assignmentError(typeArg, typeParam.extends, typeArg))
@@ -123,20 +126,20 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     }
 
                     if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type") {  // check that subject is callable
-                        reportError(miscError(current.subject, "Expression must be a function or procedure to be called"));
+                        reportError(miscError(invocation.subject, "Expression must be a function or procedure to be called"));
                     } else {
                         
                         // check that if this is a statement, the call subject is a procedure
                         if (parent?.kind === 'block' && subjectType.kind === 'func-type') {
-                            reportError(miscError(current.subject, `Only procedures can be called as statements, not functions`))
+                            reportError(miscError(invocation.subject, `Only procedures can be called as statements, not functions`))
                         }
 
-                        if (subjectType.args.length !== current.args.length) {  // check that the right number of arguments are passed
+                        if (subjectType.args.length !== invocation.args.length) {  // check that the right number of arguments are passed
                             const functionOrProcedure = subjectType.kind === "func-type" ? "Function" : "Procedure"
-                            reportError(miscError(current, `${functionOrProcedure} expected ${subjectType.args.length} arguments but got ${current.args.length}`));
+                            reportError(miscError(invocation, `${functionOrProcedure} expected ${subjectType.args.length} arguments but got ${current.args.length}`));
                         } else {  // check that each argument matches the expected type
-                            for (let i = 0; i < current.args.length; i++) {
-                                const arg = current.args[i]
+                            for (let i = 0; i < invocation.args.length; i++) {
+                                const arg = invocation.args[i]
                                 const subjectArgType = subjectType.args[i].type ?? UNKNOWN_TYPE
 
                                 const argValueType = inferType(reportError, arg)
@@ -202,15 +205,19 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     }
                 } break;
                 case "property-accessor": {
-                    const subjectType = resolveType(reportError, inferType(reportError, current.subject))
-                    const subjectProperties = current.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-                        ? propertiesOf(reportError, subtract(reportError, subjectType, NIL_TYPE))
-                        : propertiesOf(reportError, subjectType)
+                    const isMethodCall = current.parent?.kind === 'invocation' && invocationFromMethodCall(current.parent) != null
 
-                    if (subjectProperties == null) {
-                        reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${format(subjectType)}")`));
-                    } else if (!subjectProperties.some(property => property.name.name === current.property.name)) {
-                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${format(subjectType)}'`));
+                    if (!isMethodCall) {
+                        const subjectType = resolveType(reportError, inferType(reportError, current.subject))
+                        const subjectProperties = current.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
+                            ? propertiesOf(reportError, subtract(reportError, subjectType, NIL_TYPE))
+                            : propertiesOf(reportError, subjectType)
+
+                        if (subjectProperties == null) {
+                            reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${format(subjectType)}")`));
+                        } else if (!subjectProperties.some(property => property.name.name === current.property.name)) {
+                            reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${format(subjectType)}'`));
+                        }
                     }
                 } break;
                 case "string-literal": {

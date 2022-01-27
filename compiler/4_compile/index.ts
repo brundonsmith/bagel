@@ -1,5 +1,5 @@
 import { resolveType } from "../3_checking/typecheck.ts";
-import { inferType } from "../3_checking/typeinfer.ts";
+import { inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
 import Store, { canonicalModuleName, Mode } from "../store.ts";
 import { jsFileLocation } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
@@ -109,18 +109,26 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             (${c(ast.next)}))`
         case "pipe":
         case "invocation": {
-            const subjectType = resolveType(() => {}, inferType(() => {}, ast.subject))
-            const procType = subjectType.kind === 'proc-type' ? subjectType : subjectType.kind === 'generic-type' && subjectType.inner.kind === 'proc-type' ? subjectType.inner : undefined
+            
+            // method call
+            const invocationOrPipe = invocationFromMethodCall(ast) ?? ast;
+
+            const subjectType = resolveType(() => {}, inferType(() => {}, invocationOrPipe.subject))
+            const procType = (
+                subjectType.kind === 'proc-type' ? subjectType :
+                subjectType.kind === 'generic-type' && subjectType.inner.kind === 'proc-type' ? subjectType.inner :
+                undefined
+            )
 
             let invalidation = ''
             if (procType?.invalidatesParent) {
                 // TODO: This won't work if the method has been aliased. Gotta figure that out...
-                if (ast.subject.kind === 'property-accessor') {
-                    invalidation = `; ${INT}invalidate(${c(ast.subject.subject)})`
+                if (invocationOrPipe.subject.kind === 'property-accessor') {
+                    invalidation = `; ${INT}invalidate(${c(invocationOrPipe.subject.subject)})`
                 }
             }
 
-            return `${c(ast.subject)}${ast.kind === "invocation" && ast.typeArgs.length > 0 ? `<${ast.typeArgs.map(c).join(',')}>` : ''}(${ast.args.map(c).join(', ')})` + invalidation;
+            return `${c(invocationOrPipe.subject)}${invocationOrPipe.kind === "invocation" && invocationOrPipe.typeArgs.length > 0 ? `<${invocationOrPipe.typeArgs.map(c).join(',')}>` : ''}(${invocationOrPipe.args.map(c).join(', ')})` + invalidation;
         }
         case "binary-operator": return `(${c(ast.base)} ${ast.ops.map(([op, expr]) => c(op) + ' ' + c(expr)).join(' ')})`;
         case "negation-operator": return `!(${c(ast.base)})`;

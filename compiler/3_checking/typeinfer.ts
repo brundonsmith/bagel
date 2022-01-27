@@ -121,7 +121,7 @@ const inferTypeInner = computedFn((
 
                     if (types == null) {
                         reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${format(leftType)}' and '${format(rightType)}'`));
-                            return BINARY_OPERATOR_TYPES[op.op]?.[0].output ?? UNKNOWN_TYPE
+                        return BINARY_OPERATOR_TYPES[op.op]?.[0].output ?? UNKNOWN_TYPE
                     } else {
                         leftType = types.output;
                     }
@@ -145,6 +145,12 @@ const inferTypeInner = computedFn((
                         return resolvedType
                     }
                 }
+            }
+            
+            // method call
+            const inv = invocationFromMethodCall(ast)
+            if (inv) {
+                return inferType(reportError, inv, visited)
             }
 
             const subjectType = ast.kind === "invocation"
@@ -922,70 +928,9 @@ export const propertiesOf = computedFn((
             ]
         }
         case "array-type": {
-            const props: Attribute[] = [
-                // TODO: Make sure length is immutable even when the array is not
+            return [
                 attribute("length", NUMBER_TYPE, true),
-            ];
-
-            if (resolvedType.mutability === "mutable") {
-                props.push(
-                    attribute("push", {
-                        kind: "proc-type",
-                        args: [{
-                            kind: "arg",
-                            name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
-                            type: resolvedType.element,
-                            ...AST_NOISE
-                        }],
-                        invalidatesParent: true,
-                        ...TYPE_AST_NOISE
-                    }, true),
-                    attribute("unshift", {
-                        kind: "proc-type",
-                        args: [{
-                            kind: "arg",
-                            name: { kind: "plain-identifier", name: "el", ...AST_NOISE },
-                            type: resolvedType.element,
-                            ...AST_NOISE
-                        }],
-                        invalidatesParent: true,
-                        ...TYPE_AST_NOISE
-                    }, true),
-                    attribute("pop", {
-                        kind: "proc-type",
-                        args: [],
-                        invalidatesParent: true,
-                        ...TYPE_AST_NOISE
-                    }, true),
-                    attribute("shift", {
-                        kind: "proc-type",
-                        args: [],
-                        invalidatesParent: true,
-                        ...TYPE_AST_NOISE
-                    }, true),
-                    attribute("splice", {
-                        kind: "proc-type",
-                        args: [
-                            {
-                                kind: "arg",
-                                name: { kind: "plain-identifier", name: "index", ...AST_NOISE },
-                                type: NUMBER_TYPE,
-                                ...AST_NOISE
-                            },
-                            {
-                                kind: "arg",
-                                name: { kind: "plain-identifier", name: "count", ...AST_NOISE },
-                                type: NUMBER_TYPE,
-                                ...AST_NOISE
-                            }
-                        ],
-                        invalidatesParent: true,
-                        ...TYPE_AST_NOISE
-                    }, true),
-                )
-            }
-
-            return props;
+            ]
         }
     }
 })
@@ -1109,6 +1054,36 @@ function fitTemplate(
     }
 
     return new Map();
+}
+
+export function invocationFromMethodCall(expr: Expression): Invocation|undefined {
+    if (expr.kind === 'invocation' && expr.subject.kind === 'property-accessor') {
+        const fnName = expr.subject.property.name
+        const subjectType = inferType(() => {}, expr.subject.subject)
+
+        if (!propertiesOf(() => {}, subjectType)?.some(p => p.name.name === fnName)) {
+            const { module, code, startIndex, endIndex } = expr.subject.property
+
+            const inv: Invocation = {
+                ...expr,
+                subject: {
+                    kind: 'local-identifier',
+                    name: fnName,
+                    parent: expr.parent,
+                    module,
+                    code,
+                    startIndex,
+                    endIndex
+                },
+                args: [
+                    expr.subject.subject,
+                    ...expr.args
+                ]
+            }
+
+            return inv
+        }
+    }
 }
 
 const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] }> = {

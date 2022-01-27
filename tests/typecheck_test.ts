@@ -1107,6 +1107,65 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Function method call",
+  fn() {
+    testTypecheck(`
+    func foo(s: string) => s.length
+    const a: number = 'foo'.foo()`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Function method call mismatch",
+  fn() {
+    testTypecheck(`
+    func foo(s: string) => s.length
+    const a: string = 'foo'.foo()`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Function method call with property 1",
+  fn() {
+    testTypecheck(`
+    type T = { foo: () => string }
+    const t: T = { foo: () => 'stuff' }
+
+    func foo(s: T) => 12
+    const a: string = t.foo()`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Function method call with property 2",
+  fn() {
+    testTypecheck(`
+    type T = { foo: () => string }
+    const t: T = { foo: () => 'stuff' }
+
+    func bar(s: T) => 12
+    const a: string = t.foo()`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Function method call with property 3",
+  fn() {
+    testTypecheck(`
+    type T = { foo: () => string }
+    const t: T = { foo: () => 'stuff' }
+
+    func bar(s: T) => 12
+    const a: number = t.bar()`,
+    false)
+  }
+})
+
 // TODO: Reactions
 // TODO: if/else/switch
 
