@@ -6,10 +6,10 @@ export function log<T>(expr: T, fn?: (expr: T) => unknown): T {
     return expr;
 }
 
-export function withoutSourceInfo(ast: AST) {
-    const clone = JSON.parse(JSON.stringify(ast))
-
-    for (const { current } of iterateParseTree(clone)) {
+export function stripSourceInfo(ast: AST) {
+    for (const { current } of iterateParseTree(ast)) {
+        // @ts-ignore
+        delete current.parent
         // @ts-ignore
         delete current.module
         // @ts-ignore
@@ -19,6 +19,4 @@ export function withoutSourceInfo(ast: AST) {
         // @ts-ignore
         delete current.endIndex
     }
-
-    return clone
 }

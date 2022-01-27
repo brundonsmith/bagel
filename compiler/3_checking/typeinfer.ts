@@ -4,7 +4,7 @@ import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, IT
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
 import { assignmentError, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
-import { withoutSourceInfo } from "../utils/debugging.ts";
+import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Module } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
 import { areSame, mapParseTree, typesEqual } from "../utils/ast.ts";
@@ -43,7 +43,7 @@ const inferTypeInner = computedFn((
     ast: Expression,
     previouslyVisited: readonly AST[],
 ): TypeExpression => {
-    const { module, code, startIndex, endIndex, ..._rest } = ast
+    const { parent, module, code, startIndex, endIndex, ..._rest } = ast
 
     if (previouslyVisited.includes(ast)) {
         return UNKNOWN_TYPE
@@ -58,7 +58,7 @@ const inferTypeInner = computedFn((
             
             // infer callback type based on context
             const typeDictatedByParent = (() => {
-                const parent = Store.getParent(ast)
+                const parent = ast.parent
 
                 if (parent?.kind === "invocation") {
                     const parentSubjectType = resolveType(reportError, inferType(reportError, parent.subject, visited))
@@ -112,7 +112,7 @@ const inferTypeInner = computedFn((
                             subtract(reportError, leftTypeResolved, NIL_TYPE),
                             rightTypeResolved
                         ],
-                        mutability: undefined, module, code, startIndex, endIndex
+                        mutability: undefined, parent, module, code, startIndex, endIndex
                     }
                 } else {
                     const types = BINARY_OPERATOR_TYPES[op.op]?.find(({ left, right }) =>
@@ -175,6 +175,7 @@ const inferTypeInner = computedFn((
                     return {
                         kind: "union-type",
                         members: [ baseType.valueType, NIL_TYPE ],
+                        parent,
                         ...TYPE_AST_NOISE
                     };
                 }
@@ -182,6 +183,7 @@ const inferTypeInner = computedFn((
                 return {
                     kind: "union-type",
                     members: [ baseType.element, NIL_TYPE ],
+                    parent,
                     ...TYPE_AST_NOISE
                 }
             } else if (baseType.kind === "tuple-type" && indexIsNumber) {
@@ -191,6 +193,7 @@ const inferTypeInner = computedFn((
                     return {
                         kind: "union-type",
                         members: [ ...baseType.members, NIL_TYPE ],
+                        parent,
                         ...TYPE_AST_NOISE
                     }
                 }
@@ -198,6 +201,7 @@ const inferTypeInner = computedFn((
                 return {
                     kind: "union-type",
                     members: [ STRING_TYPE, NIL_TYPE ],
+                    parent,
                     ...TYPE_AST_NOISE
                 }
             } else if (baseType.kind === 'literal-type' && baseType.value.kind === 'exact-string-literal' && indexIsNumber) {
@@ -210,8 +214,10 @@ const inferTypeInner = computedFn((
                             value: {
                                 kind: 'exact-string-literal',
                                 value: char,
+                                parent,
                                 ...AST_NOISE
                             },
+                            parent,
                             ...TYPE_AST_NOISE
                         }
                     } else {
@@ -221,6 +227,7 @@ const inferTypeInner = computedFn((
                     return {
                         kind: "union-type",
                         members: [ STRING_TYPE, NIL_TYPE ],
+                        parent,
                         ...TYPE_AST_NOISE
                     }
                 }
@@ -240,7 +247,7 @@ const inferTypeInner = computedFn((
                         : NIL_TYPE
                 ],
                 mutability: undefined,
-                module, code, startIndex, endIndex
+                parent, module, code, startIndex, endIndex
             }
         }
         case "range": {
@@ -248,18 +255,19 @@ const inferTypeInner = computedFn((
                 kind: 'iterator-type',
                 inner: NUMBER_TYPE,
                 mutability: undefined,
-                module, code, startIndex, endIndex
+                parent, module, code, startIndex, endIndex
             }
         }
         case "debug": {
             if (isExpression(ast.inner)) {
                 const type = inferType(reportError, ast.inner, visited)
+                stripSourceInfo(type)
                 console.log(JSON.stringify({
                     bgl: given(ast.inner.code, code =>
                         given(ast.inner.startIndex, startIndex =>
                         given(ast.inner.endIndex, endIndex =>
                             code.substring(startIndex, endIndex)))),
-                    type: withoutSourceInfo(type)
+                    type,
                 }, null, 2));
                 return type;
             } else {
@@ -282,7 +290,7 @@ const inferTypeInner = computedFn((
                     kind: "union-type",
                     members: [property.type, NIL_TYPE],
                     mutability: undefined,
-                    module, code, startIndex, endIndex
+                    parent, module, code, startIndex, endIndex
                 }
             } else {
                 const mutability = (
@@ -394,6 +402,7 @@ const inferTypeInner = computedFn((
                                 spreads: [],
                                 entries: [],
                                 mutability: 'immutable',
+                                parent,
                                 ...AST_NOISE
                             }
                         } else {
@@ -411,6 +420,7 @@ const inferTypeInner = computedFn((
                                         decl.kind !== 'value-declaration' || decl.isConst || decl.exported === 'expose'
                                     )),
                                 mutability: 'mutable',
+                                parent,
                                 ...AST_NOISE
                             }
                         }
@@ -431,7 +441,7 @@ const inferTypeInner = computedFn((
                 // tagName: ast.tagName,
                 // attributes: ast.attributes
                 mutability: undefined,
-                module, code, startIndex, endIndex
+                parent, module, code, startIndex, endIndex
             };
         }
         case "object-literal": {
@@ -445,7 +455,7 @@ const inferTypeInner = computedFn((
                         name,
                         type, 
                         mutability: undefined,
-                        module, code, startIndex, endIndex
+                        parent, module, code, startIndex, endIndex
                     }
                 } else {
                     const spreadObj = (entry as Spread).expr
@@ -464,7 +474,7 @@ const inferTypeInner = computedFn((
                 spreads: [],
                 entries,
                 mutability: "mutable",
-                module, code, startIndex, endIndex
+                parent, module, code, startIndex, endIndex
             };
         }
         case "array-literal": {
@@ -492,7 +502,7 @@ const inferTypeInner = computedFn((
                     kind: "tuple-type",
                     members: memberTypes,
                     mutability: "mutable",
-                    module, code, startIndex, endIndex
+                    parent, module, code, startIndex, endIndex
                 }
             } else {
                 return {
@@ -501,10 +511,10 @@ const inferTypeInner = computedFn((
                         kind: "union-type",
                         members: [...memberTypes, ...arraySpreads.map(t => t.element)],
                         mutability: undefined,
-                        module, code, startIndex, endIndex
+                        parent, module, code, startIndex, endIndex
                     }),
                     mutability: "mutable",
-                    module, code, startIndex, endIndex
+                    parent, module, code, startIndex, endIndex
                 }
             }
         }
@@ -515,7 +525,7 @@ const inferTypeInner = computedFn((
             kind: 'literal-type',
             value: ast,
             mutability: undefined,
-            module, code, startIndex, endIndex
+            parent, module, code, startIndex, endIndex
         };
         case "nil-literal": return NIL_TYPE;
         case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
@@ -542,7 +552,7 @@ function broadenTypeForMutation(type: TypeExpression): TypeExpression {
             return BOOLEAN_TYPE
         }
     } else if (type.kind === 'tuple-type') {
-        return { ...type, kind: 'array-type', element: { kind: 'union-type', members: type.members.map(broadenTypeForMutation), ...TYPE_AST_NOISE } }
+        return { ...type, kind: 'array-type', element: { kind: 'union-type', members: type.members.map(broadenTypeForMutation), parent: type.parent, ...TYPE_AST_NOISE } }
     } else if (type.kind === 'array-type') {
         return { ...type, element: broadenTypeForMutation(type.element) }
     } else if (type.kind === 'object-type') {
@@ -662,6 +672,7 @@ function flattenUnions(type: TypeExpression): TypeExpression {
             kind: "union-type",
             members,
             mutability: undefined,
+            parent: type.parent,
             module: type.module,
             code: type.code,
             startIndex: type.startIndex,
@@ -698,6 +709,7 @@ function distillUnion(reportError: ReportError, type: TypeExpression): TypeExpre
             kind: "union-type",
             members,
             mutability: undefined,
+            parent: type.parent,
             module: type.module,
             code: type.code,
             startIndex: type.startIndex,
@@ -756,8 +768,8 @@ function resolveRefinements(expr: Expression): Refinement[] {
     const refinements: Refinement[] = []
 
     let current: AST = expr
-    let parent = Store.getParent(expr)
-    let grandparent = given(parent, Store.getParent)
+    let parent = expr.parent
+    let grandparent = parent?.parent
 
     // traverse upwards through the AST, looking for nodes that refine the type 
     // of the current expression
@@ -818,8 +830,8 @@ function resolveRefinements(expr: Expression): Refinement[] {
         }
 
         current = parent
-        parent = Store.getParent(parent)
-        grandparent = given(parent, Store.getParent)
+        parent = parent.parent
+        grandparent =parent?.parent
     }
 
     return refinements
@@ -831,8 +843,8 @@ function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
         typeofStr === "number" ? NUMBER_TYPE :
         typeofStr === "boolean" ? BOOLEAN_TYPE :
         typeofStr === "nil" ? NIL_TYPE :
-        typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, mutability: "readonly", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined } :
-        typeofStr === "object" ? { kind: "record-type", keyType: ANY_TYPE, valueType: ANY_TYPE, mutability: "readonly", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "array" ? { kind: "array-type", element: ANY_TYPE, mutability: "readonly", parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined } :
+        typeofStr === "object" ? { kind: "record-type", keyType: ANY_TYPE, valueType: ANY_TYPE, mutability: "readonly", parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined } :
         // TODO
         // type.value === "set" ?
         // type.value === "class-instance" ?
@@ -861,6 +873,7 @@ export const propertiesOf = computedFn((
                 generic,
                 typeArgs: [resolvedType.inner],
                 mutability: undefined,
+                parent: resolvedType.parent,
                 module: resolvedType.module,
                 code: resolvedType.code,
                 startIndex: resolvedType.startIndex,
@@ -900,8 +913,10 @@ export const propertiesOf = computedFn((
                     value: {
                         kind: "number-literal",
                         value: resolvedType.members.length,
+                        parent: resolvedType.parent,
                         ...AST_NOISE
                     },
+                    parent: resolvedType.parent,
                     ...TYPE_AST_NOISE
                 }, true)
             ]
@@ -978,10 +993,11 @@ export const propertiesOf = computedFn((
 function attribute(name: string, type: TypeExpression, forceReadonly: boolean): Attribute {
     return {
         kind: "attribute",
-        name: { kind: "plain-identifier", name, ...AST_NOISE },
+        name: { kind: "plain-identifier", name, parent: type.parent, ...AST_NOISE },
         type,
         optional: false,
         forceReadonly,
+        parent: type.parent,
         ...TYPE_AST_NOISE
     }
 }
@@ -1075,6 +1091,7 @@ function fitTemplate(
                     kind: "union-type",
                     members: reifiedMembersRemaining,
                     mutability: undefined,
+                    parent: reifiedMembers[0]?.parent,
                     module: undefined, code: undefined, startIndex: undefined, endIndex: undefined
                 }))
                 

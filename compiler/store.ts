@@ -12,7 +12,7 @@ import { ModuleName, ReportError } from "./_model/common.ts";
 import { areSame, iterateParseTree } from "./utils/ast.ts";
 import { autofix, lint, LintProblem } from "./other/lint.ts";
 import { DEFAULT_OPTIONS, format } from "./other/format.ts";
-import { withoutSourceInfo } from "./utils/debugging.ts";
+import { stripSourceInfo } from "./utils/debugging.ts";
 
 export type Mode =
     | { mode: "build", entryFile: ModuleName, watch: boolean }
@@ -110,16 +110,21 @@ class _Store {
 
 
     // Computed fns
-    readonly parsed = computedFn((moduleName: ModuleName, withPrelude: boolean): { ast: Module, errors: readonly BagelError[] } | undefined => {
+    readonly parsed = computedFn((moduleName: ModuleName, typecheckReady: boolean): { ast: Module, errors: readonly BagelError[] } | undefined => {
         const source = this._modulesSource.get(moduleName)
         if (source) {
             const errors: BagelError[] = []
-            const ast = reshape(parse(
+            const ast = parse(
                 moduleName,  
-                source + (withPrelude && !moduleIsCore(moduleName) ? BGL_PRELUDE : ''), 
+                source + (typecheckReady && !moduleIsCore(moduleName) ? BGL_PRELUDE : ''), 
                 err => errors.push(err)
-            ))
-            return { ast, errors }
+            )
+
+            if (typecheckReady) {
+                return { ast: reshape(ast), errors }
+            } else {
+                return { ast, errors }
+            }
         }
     })
 
@@ -189,24 +194,6 @@ class _Store {
         const importedModuleName = canonicalModuleName(importer, imported)
 
         return this.parsed(importedModuleName, true)?.ast
-    })
-
-    readonly getParent = computedFn((ast: AST) => {
-        for (const [moduleName, _source] of this._modulesSource.entries()) {
-            const asts = [this.parsed(moduleName, true)?.ast, this.parsed(moduleName, false)?.ast]
-
-            for (const module of asts) {
-                if (module) {
-                    for (const { parent, current } of iterateParseTree(module)) {
-                        if (areSame(current, ast)) {
-                            return parent
-                        }
-                    }
-                }
-            }
-        }
-
-        return undefined
     })
     
     readonly getBinding = computedFn((reportError: ReportError, name: string, context: AST) => {

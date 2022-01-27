@@ -45,6 +45,7 @@ export type Debug = SourceInfo & {
 }
 
 export type SourceInfo = {
+    readonly parent?: AST|undefined,
     readonly module: ModuleName|undefined,
     readonly code: string|undefined,
     readonly startIndex: number|undefined,

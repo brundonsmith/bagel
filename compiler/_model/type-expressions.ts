@@ -225,6 +225,7 @@ export type Mutability = { readonly mutability: "immutable"|"readonly"|"mutable"
 export const STRING_TYPE: StringType = {
     kind: "string-type",
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -233,6 +234,7 @@ export const STRING_TYPE: StringType = {
 export const NUMBER_TYPE: NumberType = {
     kind: "number-type",
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -241,6 +243,7 @@ export const NUMBER_TYPE: NumberType = {
 export const BOOLEAN_TYPE: BooleanType = {
     kind: "boolean-type",
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -249,6 +252,7 @@ export const BOOLEAN_TYPE: BooleanType = {
 export const NIL_TYPE: NilType = {
     kind: "nil-type",
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -257,6 +261,7 @@ export const NIL_TYPE: NilType = {
 export const UNKNOWN_TYPE: UnknownType = {
     kind: "unknown-type",
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -265,6 +270,7 @@ export const UNKNOWN_TYPE: UnknownType = {
 export const ANY_TYPE: AnyType = {
     kind: "any-type",
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -273,6 +279,7 @@ export const ANY_TYPE: AnyType = {
 export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
     kind: "javascript-escape-type",
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -282,6 +289,7 @@ export const ITERATOR_OF_ANY: IteratorType = {
     kind: "iterator-type",
     inner: ANY_TYPE,
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -295,6 +303,7 @@ export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
         BOOLEAN_TYPE,
     ],
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -305,6 +314,7 @@ export const REACTION_DATA_TYPE: TypeExpression = {
     args: [],
     returnType: UNKNOWN_TYPE,
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -314,8 +324,9 @@ export const REACTION_EFFECT_TYPE: TypeExpression = {
     kind: "proc-type",
     args: [{
         kind: "arg",
-        name: { kind: "plain-identifier", name: "_", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
+        name: { kind: "plain-identifier", name: "_", parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
         type: UNKNOWN_TYPE,
+        parent: undefined,
         module: undefined,
         code: undefined,
         startIndex: undefined,
@@ -323,6 +334,7 @@ export const REACTION_EFFECT_TYPE: TypeExpression = {
     }],
     invalidatesParent: false,
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
@@ -334,23 +346,25 @@ export const ELEMENT_TAG_CHILD_TYPE: TypeExpression = {
         STRING_TYPE,
         NUMBER_TYPE,
         NIL_TYPE,
-        { kind: "element-type", mutability: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
+        { kind: "element-type", mutability: undefined, parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
         { kind: "array-type", element: {
             kind: "union-type",
             members: [
                 STRING_TYPE,
                 NUMBER_TYPE,
                 NIL_TYPE,
-                { kind: "element-type", mutability: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
+                { kind: "element-type", mutability: undefined, parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
             ],
             code: undefined,
+            parent: undefined,
             module: undefined,
             startIndex: undefined,
             endIndex: undefined,
             mutability: undefined,
-        }, mutability: "immutable", module: undefined, code: undefined, startIndex: undefined, endIndex: undefined}
+        }, mutability: "immutable", parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined}
     ],
     mutability: undefined,
+    parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,

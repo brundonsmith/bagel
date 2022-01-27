@@ -7,6 +7,7 @@ import { deepEquals, given } from "./utils/misc.ts";
 import { ModuleName } from "./_model/common.ts";
 import { LintProblem } from "./other/lint.ts";
 import { format } from "./other/format.ts";
+import { SOURCE_INFO_PROPERTIES } from "./utils/ast.ts";
 
 export type BagelError =
     | BagelSyntaxError
@@ -78,7 +79,7 @@ export function isError(x: unknown): x is BagelError {
 }
 
 export function errorsEquivalent(a: BagelError, b: BagelError): boolean {
-    return deepEquals(a, b)
+    return deepEquals(a, b, SOURCE_INFO_PROPERTIES)
 }
 
 export function errorMessage(error: BagelError): string {

@@ -7,7 +7,7 @@ import { getBindingMutability, ReportError } from "../_model/common.ts";
 import { iterateParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
 import { format } from "../other/format.ts";
-import { withoutSourceInfo } from "../utils/debugging.ts";
+import { stripSourceInfo } from "../utils/debugging.ts";
 
 /**
  * Walk an entire AST and report all issues that we find
@@ -429,7 +429,7 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
         case "parenthesized-type":
             return resolveType(reportError, type.inner)
         case "maybe-type": {
-            const { mutability, module, code, startIndex, endIndex } = type
+            const { mutability, parent, module, code, startIndex, endIndex } = type
 
             return resolveType(reportError, {
                 kind: "union-type",
@@ -437,7 +437,7 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
                     type.inner,
                     NIL_TYPE
                 ],
-                mutability, module, code, startIndex, endIndex
+                mutability, parent, module, code, startIndex, endIndex
             })
         }
         case "bound-generic-type": {

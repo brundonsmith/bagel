@@ -28,10 +28,11 @@ export function moreSpecificThan(a: Partial<SourceInfo>, b: Partial<SourceInfo>)
 }
 
 export function typesEqual(a: TypeExpression, b: TypeExpression): boolean {
-    return deepEquals(a, b, ["module", "code", "startIndex", "endIndex"])
+    return deepEquals(a, b, SOURCE_INFO_PROPERTIES)
 }
 
-const NON_AST_PROPERTIES = new Set(["kind", "mutability", "module", "code", "startIndex", "endIndex"])
+export const SOURCE_INFO_PROPERTIES = ["parent", "module", "code", "startIndex", "endIndex"] as const
+const NON_AST_PROPERTIES = new Set([...SOURCE_INFO_PROPERTIES, "kind", "mutability"])
 
 export function* iterateParseTree(ast: AST, parent?: AST): Iterable<{ parent?: AST, current: AST }> {
     yield* iterateParseTreeInner(ast, parent)
@@ -88,4 +89,10 @@ function mapParseTreeInner<T extends AST|AST[]|[AST, AST][]|undefined|string|num
     }
 
     return treeNode
+}
+
+export function setParents(ast: AST) {
+    for (const { current, parent } of iterateParseTree(ast)) {
+        (current as { parent: AST|undefined }).parent = parent
+    }
 }

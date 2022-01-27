@@ -1,6 +1,6 @@
 import { DEFAULT_OPTIONS, format } from "../compiler/other/format.ts";
 import Store from "../compiler/store.ts";
-import { withoutSourceInfo } from "../compiler/utils/debugging.ts";
+import { stripSourceInfo } from "../compiler/utils/debugging.ts";
 import { deepEquals } from "../compiler/utils/misc.ts";
 import { Module } from "../compiler/_model/ast.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
@@ -385,7 +385,10 @@ for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
 
                 const reParsed = Store.parsed(formattedModuleName, false)?.ast as Module
 
-                if (!deepEquals(withoutSourceInfo(ast), withoutSourceInfo(reParsed))) {
+                stripSourceInfo(ast)
+                stripSourceInfo(reParsed)
+
+                if (!deepEquals(ast, reParsed)) {
                     throw `Reformatted AST did not match original:\noriginal:\n${BAGEL_SNIPPETS[i]}\nformatted:\n${formatted}`
                 }
             } else {

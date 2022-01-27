@@ -11,7 +11,7 @@ import { ValueDeclaration,FuncDeclaration,ProcDeclaration,TypeDeclaration } from
  * found for the identifier (or the root is reached)
  */
 export function resolve(reportError: ReportError, name: string, from: AST, originator: AST): Binding|undefined {
-    const parent = Store.getParent(from)
+    const parent = from.parent
 
     // if we've reached the root of the AST, there's no binding
     if (parent == null) {
@@ -139,6 +139,7 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                             kind: "generic-param-type",
                             name: typeParam.name,
                             extends: typeParam.extends,
+                            parent: typeParam.name.parent,
                             module: undefined,
                             code: undefined,
                             startIndex: undefined,
@@ -166,6 +167,7 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                 kind: "generic-param-type",
                                 name: typeParam.name,
                                 extends: typeParam.extends,
+                                parent: typeParam.name.parent,
                                 module: undefined,
                                 code: undefined,
                                 startIndex: undefined,

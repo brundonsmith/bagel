@@ -1,4 +1,4 @@
-import { log, withoutSourceInfo } from "../utils/debugging.ts";
+import { log, stripSourceInfo } from "../utils/debugging.ts";
 import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
@@ -8,6 +8,7 @@ import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, F
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./common.ts";
+import { setParents } from "../utils/ast.ts";
 
 export function parse(module: ModuleName, code: string, reportError: ReportError): Module {
     let index = 0;
@@ -23,7 +24,6 @@ export function parse(module: ModuleName, code: string, reportError: ReportError
         result = declaration(module, code, index);
     }
 
-    
     if (isError(result)) {
         reportError(result);
     } else if (index < code.length) {
@@ -37,7 +37,7 @@ export function parse(module: ModuleName, code: string, reportError: ReportError
         });
     }
 
-    return {
+    const moduleAst: Module = {
         kind: "module",
         hasMain: declarations.some(decl => decl.kind === "proc-declaration" && decl.name.name === "main"),
         declarations,
@@ -46,6 +46,10 @@ export function parse(module: ModuleName, code: string, reportError: ReportError
         startIndex: 0,
         endIndex: index
     };
+
+    setParents(moduleAst)
+
+    return moduleAst
 }
 
 const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
@@ -1933,17 +1937,21 @@ const debug: ParseFunction<Debug> = (module, code, startIndex) =>
     given(consumeWhitespace(code, index), index =>
     given(expression(module, code, index) ?? declaration(module, code, index), ({ parsed: inner, index }) =>
     given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, ']'), index => ({
-        parsed: {
-            kind: "debug",
-            inner: log(inner, ast => JSON.stringify({ bgl: code.substring(ast.startIndex ?? startIndex, ast.endIndex ?? index), ast: withoutSourceInfo(ast) }, null, 2)),
-            module,
-            code,
-            startIndex,
-            endIndex: index
-        },
-        index
-    }))))))
+    given(consume(code, index, ']'), index => {
+        stripSourceInfo(inner)
+
+        return {
+            parsed: {
+                kind: "debug",
+                inner: log(inner, ast => JSON.stringify({ bgl: code.substring(ast.startIndex ?? startIndex, ast.endIndex ?? index), ast }, null, 2)),
+                module,
+                code,
+                startIndex,
+                endIndex: index
+            },
+            index
+        }
+    })))))
 
 const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ debug, javascriptEscape, pipe, elementTag ],

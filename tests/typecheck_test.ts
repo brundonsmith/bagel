@@ -1124,11 +1124,13 @@ function testTypecheck(code: string, shouldFail: boolean): void {
   const parsed = Store.parsed(moduleName, true)
 
   if (parsed) {
-    const errors = Store.allProblems.get(moduleName) as BagelError[]
+    const errors = Store.allProblems.get(moduleName)
+
+    if (!errors) throw Error('Bwahhhh!')
   
     if (!shouldFail && errors.length > 0) {
       throw `\n${code}\n\nType check should have succeeded but failed with errors\n` +
-        errors.map(err => prettyProblem("<test>" as ModuleName, err)).join("\n")
+        errors.map(err => prettyProblem(moduleName, err)).join("\n")
     } else if (shouldFail && errors.length === 0) {
       throw `\n${code}\n\nType check should have failed but succeeded`
     }
