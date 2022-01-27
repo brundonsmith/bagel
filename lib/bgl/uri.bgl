@@ -16,7 +16,7 @@ export type URI = const {
     password: string?,
 }
 
-js export func parseUri(str: string): URI? => {#
+export js func parseUri(str: string): URI? => {#
     try {
         const url = new URL(str);
     } catch {
@@ -41,7 +41,7 @@ js export func parseUri(str: string): URI? => {#
     }
 #}
 
-js export func parseSearchParams(str: string): {[string]: string}? => {#
+export js func parseSearchParams(str: string): {[string]: string}? => {#
     try {
         const params = new URLSearchParams(str);
     } catch {

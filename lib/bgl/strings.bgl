@@ -1,7 +1,7 @@
 
-js export func includes(s: string, piece: string): boolean => {# return s.includes(piece) #}
-js export func endsWith(s: string, piece: string): boolean => {# return s.endsWith(piece) #}
-js export func indexOf(s: string, piece: string): number? => {#
+export js func includes(s: string, piece: string): boolean => {# return s.includes(piece) #}
+export js func endsWith(s: string, piece: string): boolean => {# return s.endsWith(piece) #}
+export js func indexOf(s: string, piece: string): number? => {#
     const res = s.indexOf(piece)
     if (res === -1) {
         return undefined
@@ -9,7 +9,7 @@ js export func indexOf(s: string, piece: string): number? => {#
         return res
     }
 #}
-js export func lastIndexOf(s: string, piece: string): number? => {#
+export js func lastIndexOf(s: string, piece: string): number? => {#
     const res = s.lastIndexOf(piece)
     if (res === -1) {
         return undefined
@@ -17,23 +17,23 @@ js export func lastIndexOf(s: string, piece: string): number? => {#
         return res
     }
 #}
-js export func compare(s: string, other: string): number => {# return s.localeCompare(other) #}
+export js func compare(s: string, other: string): number => {# return s.localeCompare(other) #}
 
 // TODO: match and/or matchAll, once we have regexes
 
-js export func padEnd(s: string, targetLength: number, padString: string): string => {#
+export js func padEnd(s: string, targetLength: number, padString: string): string => {#
     return s.padEnd(targetLength, padString)
 #}
-js export func padStart(s: string, targetLength: number, padString: string): string => {#
+export js func padStart(s: string, targetLength: number, padString: string): string => {#
     return s.padStart(targetLength, padString)
 #}
-js export func repeat(s: string, count: number): string => {# return s.repeat(count) #}
-js export func replace(s: string, searchFor: string, replaceWith: string): string => {# return s.replace(searchFor, replaceWith) #}
-js export func split(s: string, sep: string): string[] => {# return s.split(sep) #}
-js export func startsWith(s: string, piece: string): boolean => {# return s.startsWith(piece) #}
-js export func substring(s: string, start: number, end: number): string => {# return s.substring(start, end) #}
-js export func toLowerCase(s: string): string => {# return s.toLocaleLowerCase() #}
-js export func toUpperCase(s: string): string => {# return s.toLocaleUpperCase() #}
-js export func trim(s: string): string => {# return s.trim() #}
-js export func trimStart(s: string): string => {# return s.trimStart() #}
-js export func trimEnd(s: string): string => {# return s.trimEnd() #}
+export js func repeat(s: string, count: number): string => {# return s.repeat(count) #}
+export js func replace(s: string, searchFor: string, replaceWith: string): string => {# return s.replace(searchFor, replaceWith) #}
+export js func split(s: string, sep: string): string[] => {# return s.split(sep) #}
+export js func startsWith(s: string, piece: string): boolean => {# return s.startsWith(piece) #}
+export js func substring(s: string, start: number, end: number): string => {# return s.substring(start, end) #}
+export js func toLowerCase(s: string): string => {# return s.toLocaleLowerCase() #}
+export js func toUpperCase(s: string): string => {# return s.toLocaleUpperCase() #}
+export js func trim(s: string): string => {# return s.trim() #}
+export js func trimStart(s: string): string => {# return s.trimStart() #}
+export js func trimEnd(s: string): string => {# return s.trimEnd() #}

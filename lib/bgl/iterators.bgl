@@ -3,10 +3,10 @@ js#
 import { repeat as ___repeat } from 'C:\\Users\\brundolf\\git\\bagel\\lib\\src\\core.ts'
 #js
 
-js export func repeat<T>(val: T, count: number): Iterator<T> => {#
+export js func repeat<T>(val: T, count: number): Iterator<T> => {#
     return ___repeat(val, count)
 #}
 
-js export func join(iter: Iterator<string>, delimiter: string): string => {#
+export js func join(iter: Iterator<string>, delimiter: string): string => {#
     return iter.array().join(delimiter)
 #}

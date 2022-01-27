@@ -1,5 +1,5 @@
 
-js export func parse(s: string): boolean? => {#
+export js func parse(s: string): boolean? => {#
     if (s === 'true') {
         return true
     } else if (s === 'false') {
@@ -9,6 +9,6 @@ js export func parse(s: string): boolean? => {#
     }
 #}
 
-js export func stringify(b: boolean): string => {#
+export js func stringify(b: boolean): string => {#
     return String(b)
 #}

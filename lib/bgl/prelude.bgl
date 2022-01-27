@@ -3,16 +3,16 @@ js#
 import { iter as ___iter, ___typeof } from 'C:\\Users\\brundolf\\git\\bagel\\lib\\src\\core.ts'
 #js
 
-js export proc log(x: unknown) {#
+export js proc log(x: unknown) {#
     console.log(x);
 #}
 
-js export func logf<T>(x: T): T => {#
+export js func logf<T>(x: T): T => {#
    console.log(x);
    return x;
 #}
 
-js export func iter<T>(x: const T[]): Iterator<T> => {#
+export js func iter<T>(x: const T[]): Iterator<T> => {#
     return ___iter(x)
 #}
 

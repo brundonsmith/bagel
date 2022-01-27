@@ -14,7 +14,7 @@ export type Instant = const {
 
 let _now: number = js# Date.now() #js
 
-js export func now(): Instant => {#
+export js func now(): Instant => {#
     startUpdatingTimeIfNeeded();
     return Temporal.Now.Instant();
 #}
