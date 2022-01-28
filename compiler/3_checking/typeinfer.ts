@@ -1,11 +1,11 @@
-import { Refinement, TypeBinding, ReportError, ModuleName } from "../_model/common.ts";
+import { Refinement, ReportError, ModuleName } from "../_model/common.ts";
 import { BinaryOp, Expression, Invocation, isExpression, Spread } from "../_model/expressions.ts";
 import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
 import { assignmentError, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
-import { AST, Module } from "../_model/ast.ts";
+import { AST } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
 import { areSame, mapParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
@@ -179,16 +179,16 @@ const inferTypeInner = computedFn((
                     return UNKNOWN_TYPE;
                 } else {
                     return {
-                        kind: "union-type",
-                        members: [ baseType.valueType, NIL_TYPE ],
+                        kind: "maybe-type",
+                        inner: baseType.valueType,
                         parent,
                         ...TYPE_AST_NOISE
                     };
                 }
             } else if (baseType.kind === "array-type" && indexIsNumber) {
                 return {
-                    kind: "union-type",
-                    members: [ baseType.element, NIL_TYPE ],
+                    kind: "maybe-type",
+                    inner: baseType.element,
                     parent,
                     ...TYPE_AST_NOISE
                 }
@@ -205,8 +205,8 @@ const inferTypeInner = computedFn((
                 }
             } else if (baseType.kind === 'string-type' && indexIsNumber) {
                 return {
-                    kind: "union-type",
-                    members: [ STRING_TYPE, NIL_TYPE ],
+                    kind: "maybe-type",
+                    inner: STRING_TYPE,
                     parent,
                     ...TYPE_AST_NOISE
                 }
@@ -231,8 +231,8 @@ const inferTypeInner = computedFn((
                     }
                 } else {
                     return {
-                        kind: "union-type",
-                        members: [ STRING_TYPE, NIL_TYPE ],
+                        kind: "maybe-type",
+                        inner: STRING_TYPE,
                         parent,
                         ...TYPE_AST_NOISE
                     }
@@ -293,8 +293,8 @@ const inferTypeInner = computedFn((
 
             if (ast.optional && property) {
                 return {
-                    kind: "union-type",
-                    members: [property.type, NIL_TYPE],
+                    kind: "maybe-type",
+                    inner: property.type,
                     mutability: undefined,
                     parent, module, code, startIndex, endIndex
                 }
@@ -310,8 +310,8 @@ const inferTypeInner = computedFn((
                     given(property, property => (
                         property.optional
                             ?  {
-                                kind: "union-type",
-                                members: [{ ...property.type, mutability }, NIL_TYPE],
+                                kind: "maybe-type",
+                                inner: { ...property.type, mutability },
                                 mutability: undefined,
                                 module, code, startIndex, endIndex
                             }
@@ -381,6 +381,22 @@ const inferTypeInner = computedFn((
 
                         const inferredHolderType = inferType(reportError, binding.holder, visited)
                         if (inferredHolderType.kind === 'func-type' || inferredHolderType.kind === 'proc-type') {
+                            const declaredType = inferredHolderType.args[binding.argIndex].type
+
+                            if (declaredType) {
+                                if (!inferredHolderType.args[binding.argIndex].optional) {
+                                    return declaredType
+                                } else {
+                                    const { module, code, startIndex, endIndex } = declaredType
+
+                                    return {
+                                        kind: 'maybe-type',
+                                        inner: declaredType,
+                                        mutability: undefined,
+                                        module, code, startIndex, endIndex
+                                    }
+                                }
+                            }
                             return inferredHolderType.args[binding.argIndex].type ?? UNKNOWN_TYPE
                         }
                         
@@ -961,8 +977,14 @@ function fitTemplate(
         const matchGroups = [
             ...parameterized.args.map((arg, index) =>
                 fitTemplate(reportError, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE)),
-            // fitTemplate(reportError, getParent, getBinding, parameterized.returnType ?? UNKNOWN_TYPE, reified.returnType ?? UNKNOWN_TYPE)
         ]
+
+        // if (parameterized.kind === 'func-type' && reified.kind === 'func-type' &&
+        //     parameterized.returnType && reified.returnType) {
+        //     matchGroups.push(
+        //         fitTemplate(reportError, parameterized.returnType, reified.returnType)
+        //     )
+        // }
 
         if (matchGroups.some(g => g == null)) {
             return undefined
@@ -988,6 +1010,11 @@ function fitTemplate(
 
     if (parameterized.kind === "array-type" && reified.kind === "array-type") {
         return fitTemplate(reportError, parameterized.element, reified.element);
+    }
+
+    if ((parameterized.kind === "iterator-type" && reified.kind === "iterator-type") 
+     || (parameterized.kind === "plan-type" && reified.kind === "plan-type")) {
+        return fitTemplate(reportError, parameterized.inner, reified.inner);
     }
 
     if (parameterized.kind === "union-type") {

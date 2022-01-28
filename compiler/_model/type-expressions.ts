@@ -105,7 +105,8 @@ export type BoundGenericType = SourceInfo & {
 export type Arg = SourceInfo & {
     readonly kind: "arg",
     readonly name: PlainIdentifier,
-    readonly type?: TypeExpression
+    readonly type?: TypeExpression,
+    readonly optional: boolean,
 }
 
 export type ElementType = SourceInfo & {
@@ -326,6 +327,7 @@ export const REACTION_EFFECT_TYPE: TypeExpression = {
         kind: "arg",
         name: { kind: "plain-identifier", name: "_", parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
         type: UNKNOWN_TYPE,
+        optional: false,
         parent: undefined,
         module: undefined,
         code: undefined,

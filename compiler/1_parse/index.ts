@@ -1183,6 +1183,7 @@ const _singleArgument: ParseFunction<Arg[]> = (module, code, startIndex) =>
             {
                 kind: "arg",
                 name,
+                optional: false,
                 module,
                 code,
                 startIndex,
@@ -1203,18 +1204,20 @@ const _seriesOfArguments: ParseFunction<Arg[]> = (module, code, startIndex) =>
 const arg: ParseFunction<Arg> = (module, code, startIndex) => 
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index => 
-    given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) => ({
+    given(parseOptional(module, code, index, parseExact('?')), ({ parsed: question, index: indexAfterQuestionMark }) =>
+    given(_maybeTypeAnnotation(module, code, indexAfterQuestionMark ?? index), ({ parsed: type, index }) => ({
         parsed: {
             kind: "arg",
             name,
             type,
+            optional: question != null,
             module,
             code,
             startIndex,
             endIndex: index
         },
         index
-    }))))
+    })))))
 
 const inlineConst: ParseFunction<InlineConst> = (module, code, startIndex) =>
     given(consume(code, startIndex, 'const'), index =>
