@@ -1,6 +1,16 @@
 
-export js proc push<T>(a: T[], el: T) {# a.push(el) #}
-export js proc unshift<T>(a: T[], el: T) {# a.unshift(el) #}
-export js proc pop<T>(a: T[]) {# a.pop() #}
-export js proc shift<T>(a: T[]) {# a.shift() #}
-export js proc splice<T>(a: T[], index: number, count?: number) {# a.splice(index, count) #}
+export js proc push<T>(a: T[], el: T) {#
+    a.push(el); invalidate(a, ___WHOLE_OBJECT)
+#}
+export js proc unshift<T>(a: T[], el: T) {#
+    a.unshift(el); invalidate(a, ___WHOLE_OBJECT)
+#}
+export js proc pop<T>(a: T[]) {#
+    a.pop(); invalidate(a, ___WHOLE_OBJECT)
+#}
+export js proc shift<T>(a: T[]) {#
+    a.shift(); invalidate(a, ___WHOLE_OBJECT)
+#}
+export js proc splice<T>(a: T[], index: number, count?: number) {#
+    a.splice(index, count); invalidate(a, ___WHOLE_OBJECT)
+#}

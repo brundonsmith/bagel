@@ -208,7 +208,7 @@ class _Store {
 const Store = new _Store()
 export default Store
 
-export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'h',
+export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'WHOLE_OBJECT', 'h',
 'range', 'entries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER', 'withConst'
 ]
 
