@@ -286,6 +286,27 @@ export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
     startIndex: undefined,
     endIndex: undefined,
 }
+export const OBJECT_OF_ANY: RecordType = {
+    kind: "record-type",
+    keyType: ANY_TYPE,
+    valueType: ANY_TYPE,
+    mutability: "immutable",
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const ARRAY_OF_ANY: ArrayType = {
+    kind: "array-type",
+    element: ANY_TYPE,
+    mutability: "immutable",
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
 export const ITERATOR_OF_ANY: IteratorType = {
     kind: "iterator-type",
     inner: ANY_TYPE,
@@ -303,38 +324,6 @@ export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
         NUMBER_TYPE,
         BOOLEAN_TYPE,
     ],
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
-}
-export const REACTION_DATA_TYPE: TypeExpression = {
-    kind: "func-type",
-    args: [],
-    returnType: UNKNOWN_TYPE,
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
-}
-export const REACTION_EFFECT_TYPE: TypeExpression = {
-    kind: "proc-type",
-    args: [{
-        kind: "arg",
-        name: { kind: "plain-identifier", name: "_", parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
-        type: UNKNOWN_TYPE,
-        optional: false,
-        parent: undefined,
-        module: undefined,
-        code: undefined,
-        startIndex: undefined,
-        endIndex: undefined,
-    }],
-    invalidatesParent: false,
     mutability: undefined,
     parent: undefined,
     module: undefined,

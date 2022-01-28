@@ -59,10 +59,12 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                         : c(ast.type)};`
                 )
         );
-        case "proc-declaration":  return compileProcDeclaration(excludeTypes, module, ast)
-        case "js-proc-declaration": return compileJsProcDeclaration(excludeTypes, module, ast)
-        case "func-declaration":  return compileFuncDeclaration(excludeTypes, module, ast)
-        case "js-func-declaration": return compileJsFuncDeclaration(excludeTypes, module, ast)
+        case "proc-declaration":
+        case "js-proc-declaration":
+            return compileProcDeclaration(excludeTypes, module, ast)
+        case "func-declaration":
+        case "js-func-declaration":
+            return compileFuncDeclaration(excludeTypes, module, ast)
         case "value-declaration": {
             const type = (
                 excludeTypes || !ast.type ? '' :
@@ -245,73 +247,45 @@ export const INT = `___`;
 
 const NIL = `undefined`;
 
-const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: ProcDeclaration): string => {
-    const baseProc = compileOne(excludeTypes, module, decl.value)
-    const proc = decl.action ? `${INT}action(${baseProc})` : baseProc
-
-    return exported(decl.exported) + `const ${decl.name.name} = ${proc};`;
-}
-
 function compileProc(excludeTypes: boolean, module: string, proc: Proc): string {
-    const signature = compileFunctionSignature(excludeTypes, module, proc.type)
-
-    return signature + ` => {
-    ${proc.body.statements.map(s => compileOne(excludeTypes, module, s) + ';').join("\n")}
-}`;
+    const signature = compileProcOrFunctionSignature(excludeTypes, module, proc.type)
+    return signature + ` => ${compileOne(excludeTypes, module, proc.body)}`;
 }
 
-const compileJsProcDeclaration = (excludeTypes: boolean, module: string, decl: JsProcDeclaration): string => {
-    const signature = compileFunctionSignature(excludeTypes, module, decl.type)
-    const body = `{
-        ${decl.js}
-    }`
+const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: ProcDeclaration|JsProcDeclaration): string => {
+    const baseProc = (
+        decl.kind === 'proc-declaration'
+            ? compileOne(excludeTypes, module, decl.value)
+            : compileProcOrFunctionSignature(excludeTypes, module, decl.type) + ` => {
+                ${decl.js}
+            }`)
+        
+    const proc = decl.action ? `${INT}action(${baseProc})` : baseProc
     
-    const prefix = exported(decl.exported) + 'const'
+    return exported(decl.exported) + `const ${decl.name.name} = ` + proc + ';';
 
-    if (decl.action) {
-        return `${prefix} ${decl.name.name} = ${INT}action(` + signature + ' => ' + body + ');';
-    } else {
-        return `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
-    }
-
-}
-
-const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: FuncDeclaration): string => {
-    const signature = compileFunctionSignature(excludeTypes, module, decl.value.type)
-    const body = compileOne(excludeTypes, module, decl.value.body)
-    
-    const prefix = exported(decl.exported) + 'const'
-
-    if (decl.memo) {
-        return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ');';
-    } else {
-        return `${prefix} ${decl.name.name} = ` + signature + ' => (' + body + ');';
-    }
 }
 
 const compileFunc = (excludeTypes: boolean, module: string, func: Func): string => {
-    const signature = compileFunctionSignature(excludeTypes, module, func.type)
-    const body = compileOne(excludeTypes, module, func.body)
-
-    return signature + ' => (' + body + ')'
+    const signature = compileProcOrFunctionSignature(excludeTypes, module, func.type)
+    return signature + ` => (${compileOne(excludeTypes, module, func.body)})`
 }
 
-const compileJsFuncDeclaration = (excludeTypes: boolean, module: string, decl: JsFuncDeclaration): string => {
-    const signature = compileFunctionSignature(excludeTypes, module, decl.type)
-    const body = `{
-        ${decl.js}
-    }`
+const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: FuncDeclaration|JsFuncDeclaration): string => {
+    const baseFunc = (
+        decl.kind === 'func-declaration'
+            ? compileOne(excludeTypes, module, decl.value)
+            : compileProcOrFunctionSignature(excludeTypes, module, decl.type) + ` => {
+                ${decl.js}
+            }`
+    )
+
+    const func = decl.memo ? `${INT}computedFn(${baseFunc})` : baseFunc
     
-    const prefix = exported(decl.exported) + 'const'
-
-    if (decl.memo) {
-        return `${prefix} ${decl.name.name} = ${INT}computedFn(` + signature + ' => ' + body + ');';
-    } else {
-        return `${prefix} ${decl.name.name} = ` + signature + ' => ' + body + ';';
-    }
+    return exported(decl.exported) + `const ${decl.name.name} = ` + func + ';';
 }
 
-const compileFunctionSignature = (excludeTypes: boolean, module: string, subject: ProcType|GenericProcType|FuncType|GenericFuncType): string => {
+const compileProcOrFunctionSignature = (excludeTypes: boolean, module: string, subject: ProcType|GenericProcType|FuncType|GenericFuncType): string => {
     const typeParams = !excludeTypes && subject.kind === 'generic-type'
         ? maybeTypeParams(excludeTypes, module, subject.typeParams)
         : ''

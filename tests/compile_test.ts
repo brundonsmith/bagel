@@ -28,7 +28,7 @@ Deno.test({
   fn() {
     testCompile(
       `func memo uid() => '12345'`,
-      `const uid = ___computedFn(() => "12345");`,
+      `const uid = ___computedFn(() => ("12345"));`,
     );
   },
 });
@@ -177,8 +177,7 @@ Deno.test({
     testCompile(
       `proc foo() {
             }`,
-      `const foo = (): void => {
-      };`,
+      `const foo = (): void => { ; };`,
     );
   },
 });
@@ -262,7 +261,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc doStuff(a) { }`,
-      `const doStuff = (a): void => { };`,
+      `const doStuff = (a): void => { ; };`,
     );
   },
 });
@@ -372,7 +371,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc bar(a: string[], b: { foo: number }) { }`,
-      `const bar = (a: string[], b: {foo: number}): void => { };`,
+      `const bar = (a: string[], b: {foo: number}): void => { ; };`,
     );
   },
 });
@@ -479,8 +478,7 @@ Deno.test({
       foo.push(4);
     }`,
     `
-    const push = <T>(arr: T[], el: T): void => {
-    };
+    const push = <T>(arr: T[], el: T): void => { ; };
 
     export const bar = (): void => {
       let foo = [1, 2, 3];

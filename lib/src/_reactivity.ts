@@ -51,13 +51,13 @@ export const WHOLE_OBJECT = Symbol('WHOLE_OBJECT')
 const COMPUTED_RESULT = Symbol('COMPUTED_RESULT')
 
 type Reaction = () => void
-type Observable = { obj: WeakRef<object>, prop: string|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT }
+type Observable = { obj: WeakRef<object>, prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT }
 
 let reportObservableAccessed: ((obs: Observable) => void) | undefined;
 let queuedReactions: Set<Reaction>|undefined // if defined, we're in an action
 let observablesToReactions: Array<{
     obj: WeakRef<object>,
-    prop: string|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT,
+    prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT,
     effect: Reaction
 }> = []
 const memoCache: Array<{
@@ -68,10 +68,11 @@ const memoCache: Array<{
 }> = []
 const EMPTY_CACHE = Symbol('EMPTY_CACHE')
 
-export function observe<O extends object, K extends (keyof O & string)>(obj: O, prop: K): O[K];
+// @ts-ignore
+export function observe<O extends object, K extends (keyof O & string|number)>(obj: O, prop: K): O[K];
 export function observe<O extends object, K extends typeof WHOLE_OBJECT>(obj: O, prop: K): O;
 export function observe<O extends object, K extends typeof COMPUTED_RESULT>(obj: O, prop: K): undefined;
-export function observe<O extends object, K extends (keyof O & string) | typeof COMPUTED_RESULT | typeof WHOLE_OBJECT>(obj: O, prop: K)
+export function observe<O extends object, K extends (keyof O & string|number) | typeof COMPUTED_RESULT | typeof WHOLE_OBJECT>(obj: O, prop: K)
         // @ts-ignore
         : O[K] | O | undefined {
     if (reportObservableAccessed) {
@@ -93,7 +94,7 @@ export function observe<O extends object, K extends (keyof O & string) | typeof 
     return typeof val === 'function' ? val.bind(obj) : val
 }
 
-export function invalidate(obj: object, prop: string|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT = WHOLE_OBJECT) {
+export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT = WHOLE_OBJECT) {
     // console.log('invalidate(', obj, prop, ')')
     const topOfAction = queuedReactions == null
     const queue = queuedReactions = queuedReactions ?? new Set()

@@ -31,7 +31,8 @@ export {
     invalidate,
     autorun,
     computedFn,
-    action
+    action,
+    WHOLE_OBJECT
 } from './_reactivity.ts'
 
 
