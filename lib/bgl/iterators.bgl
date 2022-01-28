@@ -13,7 +13,8 @@ export js func join(iter: Iterator<string>, delimiter: string): string => {#
 
 export js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> => {# return iter.map(fn) #}
 export js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> => {# return iter.filter(fn) #}
-export js func slice<T>(iter: Iterator<T>, start: number, end: number): Iterator<T> => {# return iter.slice(start, end) #}
+export js func slice<T>(iter: Iterator<T>, start: number, end?: number): Iterator<T> => {# return iter.slice(start, end) #}
+// takeWhile
 export js func sorted<T>(iter: Iterator<T>, fn: (a: T, b: T) => number): Iterator<T> => {# return iter.sorted(fn) #}
 export js func every<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean => {# return iter.every(fn) #}
 export js func some<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean => {# return iter.some(fn) #}
@@ -22,7 +23,7 @@ export js func concat<T>(iter: Iterator<T>, other: Iterator<T>): Iterator<T> => 
 export js func zip<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<[T?, R?]> => {# return iter.zip(other) #}
 export js func collectArray<T>(iter: Iterator<T>): T[] => {# return iter.array() #}
 export js func collectObject<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} => {#
-    return Object.fromEntries(iter.array())
+    return Object.fromEntries(iter.collectArray())
 #}
 
 // const a: string[] = repeat(0, 10)
