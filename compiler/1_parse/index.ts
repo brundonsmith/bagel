@@ -4,7 +4,7 @@ import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, JsFuncDeclaration, JsProcDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Pipe, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./common.ts";
@@ -1247,23 +1247,6 @@ const inlineConst: ParseFunction<InlineConst> = (module, code, startIndex) =>
         index
     }))))))))))))))
 
-const pipe: ParseFunction<Pipe> = (module, code, startIndex) => 
-    given(parseSeries(module, code, startIndex, EXPRESSION_PARSER.beneath(pipe), "|>", { trailingDelimiter: "forbidden" }), ({ parsed: expressions, index }) =>
-        expressions.length >= 2
-            ? {
-                parsed: expressions.slice(1).reduce((acc, expr) => ({
-                    kind: "pipe",
-                    subject: expr,
-                    args: [acc],
-                    module,
-                    code: expr.code,
-                    startIndex: expr.startIndex,
-                    endIndex: expr.endIndex
-                }), expressions[0]) as Pipe,
-                index
-            }
-            : undefined)
-
 const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => memoize3((module, code, startIndex) => 
     given(parseSeries(module, code, startIndex, 
         EXPRESSION_PARSER.beneath(binaryOperator(tier)), 
@@ -1967,7 +1950,7 @@ const debug: ParseFunction<Debug> = (module, code, startIndex) =>
     })))))
 
 const EXPRESSION_PARSER = new TieredParser<Expression>([
-    [ debug, javascriptEscape, pipe, elementTag ],
+    [ debug, javascriptEscape, elementTag ],
     [ func, proc ],
     [ asCast ],
     [ binaryOperator(0) ],

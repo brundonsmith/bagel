@@ -170,8 +170,6 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                     '\n' + nextIndentation + (c.kind === 'element-tag' ? fIndent(c) : `{${fIndent(c)}}`)
                 ).join('')
             }${ast.children.length > 0 ? '\n' + currentIndentation : ''}</${ast.tagName.name}>`
-        case "pipe":
-            return `${f(ast.args[0])} |> ${f(ast.subject)}`
         case "javascript-escape":
             return `js#${ast.js}#js`
         case "union-type": return ast.members.map(f).join(" | ");

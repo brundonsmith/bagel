@@ -107,13 +107,12 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "func": return compileFunc(excludeTypes, module, ast);
         case "inline-const": return `${INT}withConst(${c(ast.value)}, ${ast.name.name} =>
             (${c(ast.next)}))`
-        case "pipe":
         case "invocation": {
             
             // method call
-            const invocationOrPipe = invocationFromMethodCall(ast) ?? ast;
+            const invocation = invocationFromMethodCall(ast) ?? ast;
 
-            const subjectType = resolveType(() => {}, inferType(() => {}, invocationOrPipe.subject))
+            const subjectType = resolveType(() => {}, inferType(() => {}, invocation.subject))
             const procType = (
                 subjectType.kind === 'proc-type' ? subjectType :
                 subjectType.kind === 'generic-type' && subjectType.inner.kind === 'proc-type' ? subjectType.inner :
@@ -123,12 +122,12 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             let invalidation = ''
             if (procType?.invalidatesParent) {
                 // TODO: This won't work if the method has been aliased. Gotta figure that out...
-                if (invocationOrPipe.subject.kind === 'property-accessor') {
-                    invalidation = `; ${INT}invalidate(${c(invocationOrPipe.subject.subject)})`
+                if (invocation.subject.kind === 'property-accessor') {
+                    invalidation = `; ${INT}invalidate(${c(invocation.subject.subject)})`
                 }
             }
 
-            return `${c(invocationOrPipe.subject)}${invocationOrPipe.kind === "invocation" && invocationOrPipe.typeArgs.length > 0 ? `<${invocationOrPipe.typeArgs.map(c).join(',')}>` : ''}(${invocationOrPipe.args.map(c).join(', ')})` + invalidation;
+            return `${c(invocation.subject)}${invocation.kind === "invocation" && invocation.typeArgs.length > 0 ? `<${invocation.typeArgs.map(c).join(',')}>` : ''}(${invocation.args.map(c).join(', ')})` + invalidation;
         }
         case "binary-operator": return `(${c(ast.base)} ${ast.ops.map(([op, expr]) => c(op) + ' ' + c(expr)).join(' ')})`;
         case "negation-operator": return `!(${c(ast.base)})`;

@@ -1,5 +1,5 @@
 import { Module } from "../_model/ast.ts";
-import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, isTypeExpression, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { assignmentError,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall } from "./typeinfer.ts";
@@ -110,12 +110,11 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     reportError(assignmentError(current.base, BOOLEAN_TYPE, baseType));
                 }
             } break;
-            case "pipe":
             case "invocation": {
 
                 // Creation of nominal values looks like/parses as function 
                 // invocation, but needs to be treated differently
-                if (current.kind === "invocation" && current.subject.kind === "local-identifier") {
+                if (current.subject.kind === "local-identifier") {
                     const binding = Store.getBinding(() => {}, current.subject.name, current.subject)
                     if (binding?.kind === 'type-binding') {
                         const resolvedType = resolveType(reportError, binding.type)
@@ -135,12 +134,17 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 // method call
                 const invocation = invocationFromMethodCall(current) ?? current;
 
-                const subjectType = invocation.kind === "invocation"
-                    ? bindInvocationGenericArgs(reportError, invocation)
-                    : resolveType(reportError, inferType(reportError, invocation.subject))
+                // bound generic
+                const subjectType = bindInvocationGenericArgs(reportError, invocation)
                 
-                // check that type args satisfy any `extends` clauses
-                if (invocation.kind === "invocation") {
+                // check that subject is callable
+                if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type" 
+                && (subjectType.kind !== 'generic-type' || (subjectType.inner.kind !== 'func-type' && subjectType.inner.kind !== 'proc-type'))) {
+                    reportError(miscError(invocation.subject, "Expression must be a function or procedure to be called"));
+                } else {
+                    const invoked = subjectType.kind === 'generic-type' ? subjectType.inner as FuncType|ProcType : subjectType
+        
+                    // check that type args satisfy any `extends` clauses
                     const resolvedSubject = resolveType(reportError, inferType(reportError, invocation.subject))
 
                     if (resolvedSubject.kind === 'generic-type' && resolvedSubject.typeParams.length === invocation.typeArgs.length) {
@@ -153,30 +157,22 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             }
                         }
                     }
-                }
-
-                if (subjectType.kind !== "func-type" && subjectType.kind !== "proc-type" 
-                && (subjectType.kind !== 'generic-type' || (subjectType.inner.kind !== 'func-type' && subjectType.inner.kind !== 'proc-type'))) {  // check that subject is callable
-                    reportError(miscError(invocation.subject, "Expression must be a function or procedure to be called"));
-                }
-                
-                if (subjectType.kind === "func-type" || subjectType.kind === "proc-type") {
                     
                     // check that if this is a statement, the call subject is a procedure
-                    if (parent?.kind === 'block' && subjectType.kind === 'func-type') {
+                    if (parent?.kind === 'block' && invoked.kind === 'func-type') {
                         reportError(miscError(invocation.subject, `Only procedures can be called as statements, not functions`))
                     }
 
-                    const nonOptionalArgs = subjectType.args.filter(a => !a.optional).length
+                    const nonOptionalArgs = invoked.args.filter(a => !a.optional).length
 
                     // check that the right number of arguments are passed
-                    if (invocation.args.length > subjectType.args.length || invocation.args.length < nonOptionalArgs) {
-                        const functionOrProcedure = subjectType.kind === "func-type" ? "Function" : "Procedure"
-                        reportError(miscError(invocation, `${functionOrProcedure} expected ${nonOptionalArgs}-${subjectType.args.length} arguments but got ${invocation.args.length}`));
+                    if (invocation.args.length > invoked.args.length || invocation.args.length < nonOptionalArgs) {
+                        const functionOrProcedure = invoked.kind === "func-type" ? "Function" : "Procedure"
+                        reportError(miscError(invocation, `${functionOrProcedure} expected ${nonOptionalArgs}-${invoked.args.length} arguments but got ${invocation.args.length}`));
                     } else { // check that each argument matches the expected type
                         for (let i = 0; i < invocation.args.length; i++) {
                             const arg = invocation.args[i]
-                            const subjectArgType = subjectType.args[i].type ?? UNKNOWN_TYPE
+                            const subjectArgType = invoked.args[i].type ?? UNKNOWN_TYPE
 
                             const argValueType = inferType(reportError, arg)
                             if (!subsumes(reportError,  subjectArgType, argValueType)) {

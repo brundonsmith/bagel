@@ -358,34 +358,6 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Func declaration with pipe",
-  fn() {
-    testCompile(
-      `func classNames(cn) =>
-                cn
-                    |> entries 
-                    |> fromEntries`,
-      `const classNames = (cn) => 
-            (fromEntries(entries(cn)));`,
-    );
-  },
-});
-
-Deno.test({
-  name: "Func declaration with iteration",
-  fn() {
-    testCompile(
-      `func myFunc(a, b) => 
-                0..10 
-                |> map((n) => n * 2) 
-                |> filter((n) => n < 10)`,
-      `const myFunc = (a, b) =>
-            (filter((n) => ((n < 10)))(map((n) => ((n * 2)))(___range(0)(10))));`,
-    );
-  },
-});
-
-Deno.test({
   name: "Typed func declaration",
   fn() {
     testCompile(

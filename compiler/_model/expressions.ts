@@ -1,10 +1,9 @@
 import { AST, Block, Debug, PlainIdentifier, SourceInfo } from "./ast.ts";
-import { FuncType, GenericFuncType, GenericProcType, GenericType, ProcType, TypeExpression } from "./type-expressions.ts";
+import { FuncType, GenericFuncType, GenericProcType, ProcType, TypeExpression } from "./type-expressions.ts";
 
 export type Expression = 
     | JavascriptEscape
     | Debug
-    | Pipe
     | Func
     | Proc
     | Range
@@ -31,12 +30,6 @@ export type Expression =
 export type JavascriptEscape = SourceInfo & {
     readonly kind: "javascript-escape",
     readonly js: string,
-}
-
-export type Pipe = SourceInfo & {
-    readonly kind: "pipe",
-    readonly subject: Expression,
-    readonly args: readonly [Expression],
 }
   
 export type Func = SourceInfo & {
@@ -208,7 +201,6 @@ export type AsCast = SourceInfo & {
 const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "proc": undefined,
     "func": undefined,
-    "pipe": undefined,
     "binary-operator": undefined,
     "negation-operator": undefined,
     "invocation": undefined,

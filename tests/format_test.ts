@@ -86,14 +86,6 @@ const BAGEL_SNIPPETS = [
         }`,
     `const foo: FooType = 'stuff'`,
     `const foo = bar.prop1.prop2`,
-    `func classNames(cn) =>
-                cn
-                    |> entries 
-                    |> fromEntries`,
-    `func myFunc(a, b) => 
-                0..10 
-                |> map((n) => n * 2) 
-                |> filter((n) => n < 10)`,
     `func foo(a: string, b: number): number => 0`,
     `proc bar(a: string[], b: { foo: number }) { }`,
     `export type MyFn = (a: number, b: string) => string[]`,

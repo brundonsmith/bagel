@@ -131,12 +131,11 @@ const inferTypeInner = computedFn((
             return leftType;
         }
         case "negation-operator": return BOOLEAN_TYPE;
-        case "pipe":
         case "invocation": {
 
             // Creation of nominal values looks like/parses as function 
             // invocation, but needs to be treated differently
-            if (ast.kind === "invocation" && ast.subject.kind === "local-identifier") {
+            if (ast.subject.kind === "local-identifier") {
                 const binding = Store.getBinding(() => {}, ast.subject.name, ast.subject)
                 if (binding?.kind === 'type-binding') {
                     const resolvedType = resolveType(reportError, binding.type)
@@ -153,9 +152,7 @@ const inferTypeInner = computedFn((
                 return inferType(reportError, inv, visited)
             }
 
-            const subjectType = ast.kind === "invocation"
-                ? bindInvocationGenericArgs(reportError, ast)
-                : resolveType(reportError, inferType(reportError, ast.subject, visited))
+            const subjectType = bindInvocationGenericArgs(reportError, ast)
 
             if (subjectType.kind === "func-type") {
                 return subjectType.returnType ?? UNKNOWN_TYPE;
@@ -590,7 +587,7 @@ function broadenTypeForMutation(type: TypeExpression): TypeExpression {
  * b) if the subject is generic, bind its provided type args or try to infer 
  *    them
  */
-export function bindInvocationGenericArgs(reportError: ReportError, invocation: Invocation): FuncType|ProcType {
+export function bindInvocationGenericArgs(reportError: ReportError, invocation: Invocation): TypeExpression {
     let subjectType = resolveType(reportError, inferType(reportError, invocation.subject))
 
     if (subjectType.kind === 'generic-type' && (subjectType.inner.kind === "func-type" || subjectType.inner.kind === "proc-type")) {
@@ -637,7 +634,7 @@ export function bindInvocationGenericArgs(reportError: ReportError, invocation: 
         }
     }
 
-    return subjectType as FuncType|ProcType
+    return subjectType
 }
 
 export function parameterizedGenericType(reportError: ReportError, generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
