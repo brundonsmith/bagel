@@ -240,7 +240,7 @@ function normalizeName(module: ModuleName): string {
 function preludeFor(module: ModuleName) {
     const normalizedModule = normalizeName(module)
 
-    return BGL_PRELUDE_DATA
+    return '\n\n' + BGL_PRELUDE_DATA
         .filter(m => normalizeName(m.module) !== normalizedModule)
         .map(({ module, imports }) =>
             `from '${module}' import { ${imports.join(', ')} }`)
