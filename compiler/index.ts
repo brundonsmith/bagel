@@ -1,4 +1,4 @@
-import { Colors, path, fs } from "./deps.ts";
+import { Colors, path, fs, debounce } from "./deps.ts";
 
 import { BagelError, prettyProblem } from "./errors.ts";
 import { all, cacheDir, cachedFilePath, esOrNone, on, pathIsRemote, sOrNone, bagelFileToTsFile, jsFileLocation } from "./utils/misc.ts";
@@ -58,11 +58,20 @@ async function modeFromArgs(args: string[]): Promise<Mode> {
         case "autofix":
             return { mode, fileOrDir: providedEntry, watch: undefined }
         default:
-            return fail(`Must provide a command: build, check, test, run, transpile`)
+            return fail(`Must provide a command: build, check, test, run, transpile, clean`)
     }
 } 
 
 async function main() {
+    if (Deno.args[0] === 'clean' || Deno.args.includes('--clean')) {
+        const numFiles = await cleanCache()
+        console.log(Colors.yellow('Cleared    ') + 'Bagel cache (' + numFiles + ' files)')
+
+        if (Deno.args[0] === 'clean') {
+            return
+        }
+    }
+
     const mode = await modeFromArgs(Deno.args)
 
     await fs.ensureDir(cacheDir())
@@ -76,19 +85,24 @@ autorun(async () => {
         if (Store.modulesSource.get(module) == null) {
             if (pathIsRemote(module)) {  // http import
                 const path = cachedFilePath(module)
-                if (await fs.exists(path)) {  // module has already been cached locally
+
+                if (fs.existsSync(path)) {  // module has already been cached locally
                     const source = await Deno.readTextFile(path)
                     Store.setSource(module, source)
                 } else {  // need to download module before compiling
-                    console.log(Colors.green('Download ') + module)
+                    Deno.writeTextFileSync(path, '') // immediately write a file to mark it as in-progress
                     const res = await fetch(module)
 
                     if (res.status === 200) {
+                        console.log(Colors.green('Downloaded ') + module)
                         const source = await res.text()
                         await Deno.writeTextFile(path, source)
                         Store.setSource(module, source)
                     } else {
-                        console.error(Colors.red('Failed   ') + module)
+                        if (await fs.exists(path)) {
+                            await Deno.remove(path)
+                        }
+                        console.error(Colors.red('Failed     ') + module)
                         Deno.exit(1)
                     }
                 }
@@ -122,7 +136,7 @@ autorun(() => {
 /**
  * Print list of errors
  */
-function printErrors(errors: Map<ModuleName, (BagelError|LintProblem)[]>, watch?: boolean) {
+const printErrors = debounce((errors: Map<ModuleName, (BagelError|LintProblem)[]>, watch?: boolean) => {
     if (watch) {
         console.clear()
     }
@@ -132,7 +146,7 @@ function printErrors(errors: Map<ModuleName, (BagelError|LintProblem)[]>, watch?
     const modulesWithErrors = new Array(...errors.values()).filter(errs => errs.length > 0).length
 
     if (modulesWithErrors === 0) {
-        console.log('No errors')
+        console.log('No problems detected')
     } else {
         console.log()
 
@@ -146,7 +160,7 @@ function printErrors(errors: Map<ModuleName, (BagelError|LintProblem)[]>, watch?
 
         console.log(`Found ${totalErrors} error${sOrNone(totalErrors)} across ${modulesWithErrors} module${sOrNone(modulesWithErrors)}`)
     }
-}
+}, 500)
     
 // print errors as they occur
 autorun(() => {
@@ -232,6 +246,24 @@ autorun(() => {
     }
 })
 
+async function cleanCache() {
+    const dir = cacheDir()
+    let numFiles = 0;
+    for await (const file of Deno.readDir(dir)) {
+        numFiles++
+        await Deno.remove(path.resolve(dir, file.name))
+    }
+    // for (const module of Store.modules) {
+    //     const cachedPath = cachedFilePath(module)
+    //     try {
+    //         Deno.remove(cachedPath)
+    //     } catch {
+    //     }
+    // }
+
+    return numFiles
+}
+
 
 // Utils
 
@@ -257,7 +289,7 @@ const bundleOutput = async (entryFile: string, outfile: string) => {
             outfile
         })
 
-        console.log('Bundle written to ' + outfile)
+        console.log(Colors.green('Bundled    ') + outfile)
     } catch (e) {
         console.error(e)
     } finally {
