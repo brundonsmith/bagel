@@ -279,9 +279,11 @@ const bundleOutput = async (entryFile: string, outfile: string) => {
     // await Deno.writeTextFile(bundleFile, code)
 
     const esbuild = await import("https://raw.githubusercontent.com/esbuild/deno-esbuild/main/mod.js")
+    const httpFetch = (await import("https://deno.land/x/esbuild_plugin_http_fetch@v1.0.3/index.js")).default
 
     try {
         await esbuild.build({
+            plugins: [ httpFetch ],
             write: true,
             bundle: true,
             minify: false,
