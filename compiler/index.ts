@@ -80,12 +80,16 @@ autorun(async () => {
                     const source = await Deno.readTextFile(path)
                     Store.setSource(module, source)
                 } else {  // need to download module before compiling
+                    console.log(Colors.green('Download ') + module)
                     const res = await fetch(module)
 
                     if (res.status === 200) {
                         const source = await res.text()
                         await Deno.writeTextFile(path, source)
                         Store.setSource(module, source)
+                    } else {
+                        console.error(Colors.red('Failed   ') + module)
+                        Deno.exit(1)
                     }
                 }
             } else {  // local disk import
