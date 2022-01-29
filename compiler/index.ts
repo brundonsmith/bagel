@@ -270,7 +270,7 @@ function canonicalModuleName(importerModule: ModuleName, importPath: string): Mo
         return importPath as ModuleName
     } else {
         const moduleDir = path.dirname(importerModule);
-        return (path.resolve(moduleDir, importPath) + ".bgl") as ModuleName
+        return path.resolve(moduleDir, importPath) as ModuleName
     }
 }
 
