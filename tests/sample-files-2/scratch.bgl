@@ -1,4 +1,5 @@
 
-const i: Iterator<string> = iter<number>([1, 2, 3, 4])
-    .filter(n => n > 0)
-    .map<string>((n: number) => 'foo' + n)
+
+proc main() {
+    log('Hello world!');
+}

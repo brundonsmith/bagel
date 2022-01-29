@@ -213,19 +213,19 @@ export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn', 'autorun'
 ]
 
 const JS_PRELUDE = `
-import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "C:/Users/brundolf/git/bagel/lib/src/core.ts";
+import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/core.ts";
 `
 
 const BGL_PRELUDE_DATA = [
-    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/core' as ModuleName, imports: [ 'log', 'iter' ] },
-    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/bagel' as ModuleName, imports: [ 'BagelConfig' ] },
-    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/arrays' as ModuleName, imports: [ 'push', 'unshift', 'pop', 'shift', 'splice' ] },
-    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/strings' as ModuleName, imports: [ 'includes', 'indexOf', 'replace', 'split', 'startsWith', 'substring', 'toLowerCase', 'toUpperCase', 'trim' ] },
-    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/objects' as ModuleName, imports: [ 'keys', 'values', 'entries' ] },
-    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/numbers' as ModuleName, imports: [ 'parseNumber', 'stringifyNumber', 'abs', 'pow', 'sqrt', 'ceil', 'floor', 'sin', 'cos', 'tan' ] },
-    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/booleans' as ModuleName, imports: [ 'parseBoolean', 'stringifyBoolean' ] },
-    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/iterators' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'collectArray', 'collectObject' ] },
-    { module: 'C:/Users/brundolf/git/bagel/lib/bgl/plans' as ModuleName, imports: [ 'then' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/core.bgl' as ModuleName, imports: [ 'log', 'iter' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/bagel.bgl' as ModuleName, imports: [ 'BagelConfig' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/arrays.bgl' as ModuleName, imports: [ 'push', 'unshift', 'pop', 'shift', 'splice' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/strings.bgl' as ModuleName, imports: [ 'includes', 'indexOf', 'replace', 'split', 'startsWith', 'substring', 'toLowerCase', 'toUpperCase', 'trim' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/objects.bgl' as ModuleName, imports: [ 'keys', 'values', 'entries' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/numbers.bgl' as ModuleName, imports: [ 'parseNumber', 'stringifyNumber', 'abs', 'pow', 'sqrt', 'ceil', 'floor', 'sin', 'cos', 'tan' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/booleans.bgl' as ModuleName, imports: [ 'parseBoolean', 'stringifyBoolean' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/iterators.bgl' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'collectArray', 'collectObject' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/plans.bgl' as ModuleName, imports: [ 'then' ] },
 ] as const
 
 function normalizeName(module: ModuleName): string {

@@ -1,6 +1,6 @@
 
 js#
-import { iter as ___iter } from 'C:\\Users\\brundolf\\git\\bagel\\lib\\src\\core.ts'
+import { iter as ___iter } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/core.ts'
 #js
 
 export js proc log(x: unknown) {#
