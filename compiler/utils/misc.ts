@@ -90,7 +90,7 @@ export function memoize<A, R>(fn: (arg: A) => R): (arg: A) => R {
 
     const results = new Map<A, R>()
 
-    const mFn =  (arg: A): R => {
+    const mFn = (arg: A): R => {
         if (!results.has(arg)) {
             results.set(arg, fn(arg))
         }
@@ -160,7 +160,7 @@ export function memoize4<A1, A2, A3, A4, R>(fn: (arg1: A1, arg2: A2, arg3: A3, a
         if (!results.has(arg4)) {
             results.set(arg4, fn(arg1, arg2, arg3, arg4))
         }
-        
+
         return results.get(arg4) as R
     }
 
@@ -192,14 +192,41 @@ export function memoize5<A1, A2, A3, A4, A5, R>(fn: (arg1: A1, arg2: A2, arg3: A
 }
 
 export const cacheDir = () => {
-    const tempDir = os.tempDir()
-        ?? (os.platform() === "darwin" || os.platform() === "linux" ? "/tmp" : undefined)
-    
-    if (tempDir == null) {
-        throw Error("Unable to determine temporary directory")
+    let baseDir;
+    switch (Deno.build.os) {
+        case "darwin":
+            baseDir = Deno.env.get("HOME");
+            if (baseDir)
+                baseDir = path.resolve(baseDir, "./Library/Caches")
+            break;
+        case "windows":
+            baseDir = Deno.env.get("LOCALAPPDATA");
+            if (!baseDir) {
+                baseDir = Deno.env.get("USERPROFILE");
+                if (baseDir)
+                    baseDir = path.resolve(baseDir, "./AppData/Local");
+            }
+            if (baseDir)
+                baseDir = path.resolve(baseDir, "./Cache");
+            break;
+        case "linux": {
+            const xdg = Deno.env.get("XDG_CACHE_HOME");
+            if (xdg && xdg[0] === "/")
+                baseDir = xdg;
+        } break;
     }
-    
-    return path.resolve(tempDir, 'bagel', 'cache')
+
+    if (!baseDir) {
+        baseDir = Deno.env.get("HOME");
+        if (baseDir)
+            baseDir = path.resolve(baseDir, "./.cache")
+    }
+
+    if (!baseDir)
+        throw new Error("Failed to find cache directory");
+
+    const finalDir = path.resolve(baseDir, `./bagel/cache`);
+    return finalDir
 }
 
 export function cachedFilePath(module: string): string {
@@ -222,7 +249,7 @@ export function bagelFileToTsFile(module: ModuleName, isBundle?: boolean): strin
     const filename = basename.substring(0, basename.indexOf(path.extname(basename)))
 
     let bundleFile = filename + '.bgl.ts'
-    
+
     if (isBundle) {
         const bundleName = filename !== 'index'
             ? filename
@@ -232,7 +259,7 @@ export function bagelFileToTsFile(module: ModuleName, isBundle?: boolean): strin
     }
 
     return path.resolve(
-        path.dirname(module), 
+        path.dirname(module),
         bundleFile
     )
 }
