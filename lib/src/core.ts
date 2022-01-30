@@ -1,5 +1,5 @@
 
-import { observe, WHOLE_OBJECT } from "./_reactivity.ts";
+import { autorun, invalidate, observe, WHOLE_OBJECT } from "./_reactivity.ts";
 
 // Preact
 // export {
@@ -323,6 +323,37 @@ function asWorker<P extends unknown[], R>(fn: (...params: P) => R): (...params: 
     })
 }
 
+export class Remote<T> {
+
+    constructor (
+        fetcher: () => Plan<T>
+    ) {
+        let latestRequestId: string|undefined;
+
+        autorun(() => {
+            const thisRequestId = latestRequestId = String(Math.random())
+            
+            this.loading = true; invalidate(this, 'loading');
+            
+            fetcher()()
+                .then(res => {
+                    if (thisRequestId === latestRequestId) {
+                        this.value = res; invalidate(this, 'value');
+                        this.loading = false; invalidate(this, 'loading');
+                    }
+                })
+                .catch(() => {
+                    if (thisRequestId === latestRequestId) {
+                        // TODO
+                        this.loading = false; invalidate(this, 'loading');
+                    }
+                })
+        })
+    }
+
+    public value: T|undefined;
+    public loading = false;
+}
 
 // misc
 export function ___typeof(val: unknown) {
