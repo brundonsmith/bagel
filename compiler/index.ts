@@ -224,10 +224,14 @@ const bundle = debounce(async (mode: Mode) => {
             return
         } else {
             try {
+                await Deno.run({ cmd: ["node", "-v"], stdout: 'piped' }).status()
+                console.log(Colors.green('Running (node) ') + bundlePath)
                 await Deno.run({ cmd: nodeCommand }).status()
                 return
             } catch {
                 try {
+                    await Deno.run({ cmd: ["deno", "--version"], stdout: 'piped' }).status()
+                    console.log(Colors.green('Running (deno) ') + bundlePath)
                     await Deno.run({ cmd: denoCommand }).status()
                     return
                 } catch {
@@ -235,7 +239,7 @@ const bundle = debounce(async (mode: Mode) => {
             }
         }
 
-        console.error('Failed to find Node or Deno installation; please supply a path as BAGEL_NODE_BIN or BAGEL_DENO_BIN')
+        console.error(Colors.red('Failed to run: ') + 'Couldn\'t find a Node or Deno installation; please install one of the two or supply a path as BAGEL_NODE_BIN or BAGEL_DENO_BIN')
         Deno.exit(1)
     } else if (Store.mode?.mode === 'test') {
         throw Error('TODO: Run tests')
