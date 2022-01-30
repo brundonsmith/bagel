@@ -1,5 +1,5 @@
 js#
-import * as http from '../src/http.ts'
+import * as http from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/http.ts'
 #js
 
 export func get(url: string): Plan<unknown> =>     js# http.get(url) #js

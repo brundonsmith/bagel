@@ -1,6 +1,6 @@
 
 js#
-import * as randomlib from '../src/random.ts'
+import * as randomlib from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/random.ts'
 #js
 
 export proc random(handler: (n: number) {}) {
