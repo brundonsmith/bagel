@@ -65,7 +65,7 @@ async function modeFromArgs(args: string[]): Promise<Mode> {
 async function main() {
     if (Deno.args[0] === 'clean' || Deno.args.includes('--clean')) {
         const numFiles = await cleanCache()
-        console.log(Colors.yellow('Cleared    ') + 'Bagel cache (' + numFiles + ' files)')
+        console.log(Colors.yellow('Cleaned    ') + 'Bagel cache (' + numFiles + ' files)')
 
         if (Deno.args[0] === 'clean') {
             return
@@ -146,7 +146,9 @@ const printErrors = debounce((errors: Map<ModuleName, (BagelError|LintProblem)[]
     const modulesWithErrors = new Array(...errors.values()).filter(errs => errs.length > 0).length
 
     if (modulesWithErrors === 0) {
-        console.log('No problems detected')
+        if (Store.mode?.mode === 'check' || Store.mode?.mode === 'build' || Store.mode?.mode === 'transpile') {
+            console.log('No problems detected')
+        }
     } else {
         console.log()
 
@@ -180,34 +182,65 @@ autorun(() => {
 
         Promise.all(compiledModules.map(({ jsPath, js }) =>
                 Deno.writeTextFile(jsPath, js)))
-            .then(async () => {
-                // bundle
-                if (mode?.mode === 'build') {
-                    await bundleOutput(
-                        cachedFilePath(mode.entryFile + '.ts'), 
-                        bagelFileToTsFile(mode.entryFile, true)
-                    )
-                } else if (mode?.mode === 'run') {
-                    const bundlePath = cachedFilePath(bagelFileToTsFile(mode.entryFile, true))
-
-                    await bundleOutput(
-                        cachedFilePath(mode.entryFile + '.ts'), 
-                        bundlePath
-                    )
-
-                    if (mode?.platform === 'node') {
-                        Deno.run({ cmd: ["node", bundlePath] })
-                    } else if (mode?.platform === 'deno') {
-                        Deno.run({ cmd: ["deno", "run", bundlePath, "--allow-all", "--unstable"] })
-                    } else {
-                        throw Error('TODO: Auto-detect platform')
-                    }
-                } else if (Store.mode?.mode === 'test') {
-                    throw Error('TODO: Run tests')
-                }
-            })
+            .then(() => bundle(mode))
     }
 })
+
+const bundle = debounce(async (mode: Mode) => {
+    if (mode?.mode === 'build') {
+        await bundleOutput(
+            cachedFilePath(mode.entryFile + '.ts'), 
+            bagelFileToTsFile(mode.entryFile, true)
+        )
+    } else if (mode?.mode === 'run') {
+        const bundlePath = cachedFilePath(bagelFileToTsFile(mode.entryFile, true))
+
+        await bundleOutput(
+            cachedFilePath(mode.entryFile + '.ts'), 
+            bundlePath
+        )
+
+        const nodePath = Deno.env.get('BAGEL_NODE_BIN')
+        const denoPath = Deno.env.get('BAGEL_DENO_BIN')
+        
+        const nodeCommand = [nodePath || "node", bundlePath]
+        const denoCommand = [denoPath || "deno", "run", bundlePath, "--allow-all", "--unstable"]
+
+        if (mode?.platform === 'node') {
+            console.log(Colors.green('Running (node) ') + bundlePath)
+            await Deno.run({ cmd: nodeCommand }).status()
+            return
+        } else if (mode?.platform === 'deno') {
+            console.log(Colors.green('Running (deno) ') + bundlePath)
+            await Deno.run({ cmd: denoCommand }).status()
+            return
+        } else if (nodePath) {
+            console.log(Colors.green('Running (' + nodePath + ')     ') + bundlePath)
+            await Deno.run({ cmd: nodeCommand }).status()
+            return
+        } else if (denoPath) {
+            console.log(Colors.green('Running (' + denoPath + ')     ') + bundlePath)
+            await Deno.run({ cmd: denoCommand }).status()
+            return
+        } else {
+            try {
+                await Deno.run({ cmd: nodeCommand }).status()
+                return
+            } catch {
+                try {
+                    await Deno.run({ cmd: denoCommand }).status()
+                    return
+                } catch {
+                }
+            }
+        }
+
+        console.error('Failed to find Node or Deno installation; please supply a path as BAGEL_NODE_BIN or BAGEL_DENO_BIN')
+        Deno.exit(1)
+    } else if (Store.mode?.mode === 'test') {
+        throw Error('TODO: Run tests')
+    }
+}, 500)
 
 // write formatted bgl code to disk
 autorun(() => {
@@ -291,7 +324,7 @@ const bundleOutput = async (entryFile: string, outfile: string) => {
             outfile
         })
 
-        console.log(Colors.green('Bundled    ') + outfile)
+        console.log(Colors.green('Bundled ') + outfile)
     } catch (e) {
         console.error(e)
     } finally {
@@ -318,67 +351,63 @@ function fail(msg: string): any {
 }
 
 
-function test() {
-    // build({ entry: Deno.cwd(), emit: true, includeTests: true })
+async function test() {
+    const thisModulePath = windowsPathToModulePath(path.dirname(import.meta.url))
 
-    setTimeout(async () => {
-        const thisModulePath = windowsPathToModulePath(path.dirname(import.meta.url))
+    const filesToTest = await all(fs.walk(Deno.cwd(), {
+        // match: given(filePattern, pattern => [ new RegExp(pattern) ]),
+        exts: ['.bgl']
+    }))
 
-        const filesToTest = await all(fs.walk(Deno.cwd(), {
-            // match: given(filePattern, pattern => [ new RegExp(pattern) ]),
-            exts: ['.bgl']
-        }))
-    
-        const allTests: { [key: string]: { name: string, passed: boolean }[] } = {}
+    const allTests: { [key: string]: { name: string, passed: boolean }[] } = {}
 
-        for (const file of filesToTest) {
-            if (file.isFile) {
-                const moduleDir = windowsPathToModulePath(path.dirname(file.path))
-                const moduleName = path.basename(file.path)
-                const modulePath = windowsPathToModulePath(path.relative(thisModulePath, moduleDir)) + '/' + moduleName
+    for (const file of filesToTest) {
+        if (file.isFile) {
+            const moduleDir = windowsPathToModulePath(path.dirname(file.path))
+            const moduleName = path.basename(file.path)
+            const modulePath = windowsPathToModulePath(path.relative(thisModulePath, moduleDir)) + '/' + moduleName
 
-                const { tests } = await import(modulePath + '.ts')
-                
-                if (tests.testExprs.length > 0 || tests.testBlocks.length > 0) {
-                    allTests[modulePath] = []
+            const { tests } = await import(modulePath + '.ts')
+            
+            if (tests.testExprs.length > 0 || tests.testBlocks.length > 0) {
+                allTests[modulePath] = []
+            }
+
+            for (const test of tests.testExprs) {
+                if (test.expr === false) {
+                    allTests[modulePath].push({ name: test.name, passed: false })
+                } else {
+                    allTests[modulePath].push({ name: test.name, passed: true })
                 }
+            }
 
-                for (const test of tests.testExprs) {
-                    if (test.expr === false) {
-                        allTests[modulePath].push({ name: test.name, passed: false })
-                    } else {
-                        allTests[modulePath].push({ name: test.name, passed: true })
-                    }
-                }
-
-                for (const test of tests.testBlocks) {
-                    try {
-                        test.block()
-                        allTests[modulePath].push({ name: test.name, passed: true })
-                    } catch {
-                        allTests[modulePath].push({ name: test.name, passed: false })
-                    }
+            for (const test of tests.testBlocks) {
+                try {
+                    test.block()
+                    allTests[modulePath].push({ name: test.name, passed: true })
+                } catch {
+                    allTests[modulePath].push({ name: test.name, passed: false })
                 }
             }
         }
+    }
 
-        const totalModules = Object.keys(allTests).length
-        const modulesWithFailures = Object.keys(allTests).filter(module => allTests[module].some(m => !m.passed)).length
-        const totalSuccesses = Object.keys(allTests).map(module => allTests[module].filter(m => m.passed)).flat().length
-        const totalFailures = Object.keys(allTests).map(module => allTests[module].filter(m => !m.passed)).flat().length
-        const totalTests = totalSuccesses + totalFailures
+    const totalModules = Object.keys(allTests).length
+    const modulesWithFailures = Object.keys(allTests).filter(module => allTests[module].some(m => !m.passed)).length
+    const totalSuccesses = Object.keys(allTests).map(module => allTests[module].filter(m => m.passed)).flat().length
+    const totalFailures = Object.keys(allTests).map(module => allTests[module].filter(m => !m.passed)).flat().length
+    const totalTests = totalSuccesses + totalFailures
 
-        for (const module of Object.keys(allTests)) {
-            console.log('\nIn ' + module)
-            for (const test of allTests[module]) {
-                const label = test.passed ? Colors.green('[Passed]') : Colors.red('[Failed]')
-                console.log(`    ${label} ${test.name}`)
-            }
+    for (const module of Object.keys(allTests)) {
+        console.log('\nIn ' + module)
+        for (const test of allTests[module]) {
+            const label = test.passed ? Colors.green('[Passed]') : Colors.red('[Failed]')
+            console.log(`    ${label} ${test.name}`)
         }
+    }
 
-        console.log(`\nFound ${totalTests} test${sOrNone(totalTests)} across ${totalModules} module${sOrNone(totalModules)}; ${Colors.green(String(totalSuccesses) + ' success' + esOrNone(totalSuccesses))}, ${Colors.red(String(totalFailures) + ' failure' + sOrNone(totalFailures))}`)
-        Deno.exit(modulesWithFailures > 0 ? 1 : 0)
-    }, 1000)
+    console.log(`\nFound ${totalTests} test${sOrNone(totalTests)} across ${totalModules} module${sOrNone(totalModules)}; ${Colors.green(String(totalSuccesses) + ' success' + esOrNone(totalSuccesses))}, ${Colors.red(String(totalFailures) + ' failure' + sOrNone(totalFailures))}`)
+    Deno.exit(modulesWithFailures > 0 ? 1 : 0)
 }
 
 // testInWorker(file.path)
