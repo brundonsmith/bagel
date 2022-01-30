@@ -1,4 +1,3 @@
-import { given } from "../1_parse/common.ts";
 import { alreadyDeclared, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
 import Store from "../store.ts";
 import { areSame } from "../utils/ast.ts";
@@ -231,11 +230,29 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                 }
             }
         } break;
-        case "inline-const":
-            if (parent.name.name === name) {
-                resolved = {
-                    kind: "basic",
-                    ast: parent
+        case "inline-const-group":
+            for (let declarationIndex = 0; declarationIndex < parent.declarations.length; declarationIndex++) {
+                const declaration = parent.declarations[declarationIndex]
+
+                if (declaration.name.name === name) {
+                    if (resolved) {
+                        reportError(alreadyDeclared(declaration.name))
+                    }
+
+                    // detect value being referenced before it's available
+                    if (from.kind === 'inline-const-declaration') {
+                        const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
+                        if (comingFromIndex < declarationIndex) {
+                            reportError(miscError(originator, `Can't reference "${name}" before initialization`))
+                        } else if (comingFromIndex === declarationIndex) {
+                            reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
+                        }
+                    }
+
+                    resolved = {
+                        kind: "basic",
+                        ast: declaration
+                    }
                 }
             }
             break;

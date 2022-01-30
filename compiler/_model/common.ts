@@ -2,7 +2,7 @@
 import { ValueDeclarationStatement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
 import { ValueDeclaration, FuncDeclaration, ProcDeclaration, JsFuncDeclaration, JsProcDeclaration, ImportAllDeclaration } from "./declarations.ts";
-import { Expression, Func, InlineConst, Proc } from "./expressions.ts";
+import { Expression, Func, InlineConstDeclaration, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
 import { AST } from "./ast.ts";
@@ -15,7 +15,7 @@ export type ReportError = (error: BagelError) => void
 export type Binding = ValueBinding|TypeBinding
 
 export type ValueBinding =
-    | { readonly kind: "basic", readonly ast: ValueDeclaration|ProcDeclaration|JsProcDeclaration|FuncDeclaration|JsFuncDeclaration|ValueDeclarationStatement|InlineConst }
+    | { readonly kind: "basic", readonly ast: ValueDeclaration|ProcDeclaration|JsProcDeclaration|FuncDeclaration|JsFuncDeclaration|ValueDeclarationStatement|InlineConstDeclaration }
     | { readonly kind: "iterator", readonly iterator: Expression }
     | { readonly kind: "arg", readonly holder: Func|Proc, readonly argIndex: number }
     | { readonly kind: "module", readonly imported: ImportAllDeclaration }
@@ -37,7 +37,7 @@ export function getBindingMutability(binding: ValueBinding, from: AST): "immutab
                 case 'js-func-declaration':
                 case 'proc-declaration':
                 case 'js-proc-declaration':
-                case 'inline-const':
+                case 'inline-const-declaration':
                     return 'immutable'
                 case 'value-declaration-statement':
                     return !binding.ast.isConst ? 'assignable' : 'immutable'

@@ -107,8 +107,12 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "while-loop": return `while (${c(ast.condition)}) ${c(ast.body)}`;
         case "proc": return compileProc(excludeTypes, module, ast);
         case "func": return compileFunc(excludeTypes, module, ast);
-        case "inline-const": return `${INT}withConst(${c(ast.value)}, ${ast.name.name} =>
-            (${c(ast.next)}))`
+        case "inline-const-group": return `(() => {
+            ${ast.declarations.map(c).join('\n')}
+            return ${c(ast.inner)};
+        })()`;
+        case "inline-const-declaration":
+            return `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, ast.type)} = ${c(ast.value)};`
         case "invocation": {
             
             // method call

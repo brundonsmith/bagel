@@ -24,7 +24,7 @@ export type Expression =
     | ExactStringLiteral
     | NumberLiteral
     | ElementTag
-    | InlineConst
+    | InlineConstGroup
     | AsCast
 
 export type JavascriptEscape = SourceInfo & {
@@ -38,12 +38,17 @@ export type Func = SourceInfo & {
     readonly body: Expression,
 }
 
-export type InlineConst = SourceInfo & {
-    readonly kind: "inline-const",
+export type InlineConstGroup = SourceInfo & {
+    readonly kind: "inline-const-group",
+    readonly declarations: readonly InlineConstDeclaration[],
+    readonly inner: Expression
+}
+
+export type InlineConstDeclaration = SourceInfo & {
+    readonly kind: "inline-const-declaration",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly value: Expression,
-    readonly next: Expression
 }
 
 export type Proc = SourceInfo & {
@@ -221,7 +226,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "nil-literal": undefined,
     "javascript-escape": undefined,
     "debug": undefined,
-    "inline-const": undefined,
+    "inline-const-group": undefined,
     "as-cast": undefined,
 };
 

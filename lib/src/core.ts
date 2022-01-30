@@ -375,7 +375,3 @@ export function ___typeof(val: unknown) {
 
     throw Error("Failed to determine a typeof for " + val)
 }
-
-export function withConst<T,R>(val: T, fn: (val: T) => R): R {
-    return fn(val)
-}

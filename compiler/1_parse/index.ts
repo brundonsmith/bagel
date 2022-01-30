@@ -4,7 +4,7 @@ import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, JsFuncDeclaration, JsProcDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConst, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./common.ts";
@@ -1219,7 +1219,25 @@ const arg: ParseFunction<Arg> = (module, code, startIndex) =>
         index
     })))))
 
-const inlineConst: ParseFunction<InlineConst> = (module, code, startIndex) =>
+const inlineConstGroup: ParseFunction<InlineConstGroup> = (module, code, startIndex) =>
+    given(parseSeries(module, code, startIndex, inlineConstDeclaration), ({ parsed: declarations, index }) =>
+    declarations.length > 0 ?
+        given(consumeWhitespace(code, index), index => 
+        expec(expression(module, code, index), err(code, index, "Expression"), ({ parsed: inner, index }) => ({
+            parsed: {
+                kind: "inline-const-group",
+                declarations,
+                inner,
+                module,
+                code,
+                startIndex,
+                endIndex: index
+            },
+            index
+        })))
+    : undefined)
+
+const inlineConstDeclaration: ParseFunction<InlineConstDeclaration> = (module, code, startIndex) =>
     given(consume(code, startIndex, 'const'), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
@@ -1230,22 +1248,20 @@ const inlineConst: ParseFunction<InlineConst> = (module, code, startIndex) =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, "Value"), ({ parsed: value, index }) =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ','), err(code, index, '","'), index =>
-    given(consumeWhitespace(code, index), index => 
-    expec(expression(module, code, index), err(code, index, "Expression"), ({ parsed: next, index }) =>({
+    expec(consume(code, index, ','), err(code, index, '","'), index => ({
         parsed: {
-            kind: "inline-const",
+            kind: 'inline-const-declaration',
             name,
             type,
             value,
-            next,
             module,
             code,
             startIndex,
             endIndex: index
         },
         index
-    }))))))))))))))
+    }))))))))))))
+
 
 const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => memoize3((module, code, startIndex) => 
     given(parseSeries(module, code, startIndex, 
@@ -1966,7 +1982,7 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ range ],
     [ parenthesized ],
     [ localIdentifier ],
-    [ ifElseExpression, switchExpression, inlineConst, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
+    [ ifElseExpression, switchExpression, inlineConstGroup, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
         stringLiteral, numberLiteral ],
 ])
 

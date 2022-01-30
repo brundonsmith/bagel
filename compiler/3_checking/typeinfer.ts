@@ -1,9 +1,9 @@
 import { Refinement, ReportError, ModuleName } from "../_model/common.ts";
 import { BinaryOp, Expression, Invocation, isExpression, Spread } from "../_model/expressions.ts";
-import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, ITERATOR_OF_ANY, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
-import { assignmentError, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
+import { assignmentError, cannotFindModule } from "../errors.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
@@ -280,9 +280,8 @@ const inferTypeInner = computedFn((
             }
         }
         case "parenthesized-expression":
+        case "inline-const-group":
             return infer(ast.inner);
-        case "inline-const":
-            return infer(ast.next);
         case "property-accessor": {
             const subjectType = resolve(infer(ast.subject));
             const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
@@ -350,7 +349,7 @@ const inferTypeInner = computedFn((
                             }
                             case 'func-declaration':
                             case 'proc-declaration':
-                            case 'inline-const': {
+                            case 'inline-const-declaration': {
                                 const baseType = resolve(infer(decl.value))
                                 const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
                                     decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'

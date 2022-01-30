@@ -155,15 +155,17 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "switch-case":
             return `case ${f(ast.condition)}: ${f(ast.outcome)}`
         case "switch-expression":
-            return `switch ${f(ast.value)} {\n${ast.cases.map(c => nextIndentation + f(c)).join('\n')}\n${currentIndentation}}`
+            return `switch ${f(ast.value)} {\n${ast.cases.map(c => nextIndentation + fIndent(c)).join('\n')}\n${currentIndentation}}`
         case "test-expr-declaration":
             return `test expr ${f(ast.name)} = ${f(ast.expr)}`
         case "test-block-declaration":
             return `test block ${f(ast.name)} ${f(ast.block)}`
         case "debug":
             return `!debug[${f(ast.inner)}]`
-        case "inline-const":
-            return `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${f(ast.value)},\n${currentIndentation}${f(ast.next)}`
+        case "inline-const-group":
+            return ast.declarations.map(d => nextIndentation + fIndent(d) + ',\n').join('') + fIndent(ast.inner)
+        case "inline-const-declaration":
+            return `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${f(ast.value)}`
         case "element-tag":
             return `<${ast.tagName.name}${ast.attributes.length > 0 ? ' ' + ast.attributes.map(([name, value]) => `${name.name}={${f(value)}}`).join(' ') : ''}>${
                 ast.children.map(c =>

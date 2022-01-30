@@ -22,7 +22,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
         switch(current.kind) {
             case "value-declaration":
             case "value-declaration-statement":
-            case "inline-const": {
+            case "inline-const-declaration": {
                 // make sure value fits declared type, if there is one
                 if (current.type != null) {
                     expect(reportError, current.type, current.value)
@@ -306,6 +306,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "js-func-declaration":
             case "type-declaration":
             case "test-block-declaration":
+            case "inline-const-group":
             case "block":
             case "attribute":
             case "case":

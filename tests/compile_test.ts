@@ -51,10 +51,11 @@ Deno.test({
         const double = 2 * n,
         const ten = 5 * double,
         ten`,
-      `const uid = (n: number) =>
-        (___withConst((2 * n), double =>
-        (___withConst((5 * double), ten =>
-          (ten)))));`,
+      `const uid = (n: number) => ((() => {
+        const double = (2 * n);
+        const ten = (5 * double);
+        return ten;
+      })());`,
     );
   },
 });
