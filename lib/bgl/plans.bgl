@@ -1,3 +1,4 @@
-export js func then<T, R>(plan: Plan<T>, fn: (el: T) => R): Plan<R> => {#
-    return plan.then(fn)
+
+export js func timeout(millis: number): Plan<nil> => {#
+    return () => new Promise(res => setTimeout(() => res), millis)
 #}
