@@ -7,4 +7,4 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
 done
 compiler_path="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 
-deno run --allow-read --allow-write --allow-net --allow-env --allow-run --unstable "$compiler_path/index.ts" "$@"
+deno run --allow-all --unstable "$compiler_path/index.ts" "$@"
