@@ -10,6 +10,7 @@ export type Statement =
     | WhileLoop
     | Assignment
     | Invocation
+    | AwaitStatement
 
 export type ValueDeclarationStatement = SourceInfo & {
     readonly kind: "value-declaration-statement",
@@ -48,4 +49,12 @@ export type Assignment = SourceInfo & {
     readonly kind: "assignment",
     readonly target: LocalIdentifier | PropertyAccessor | Indexer,
     readonly value: Expression,
+}
+
+export type AwaitStatement = SourceInfo & {
+    readonly kind: "await-statement",
+    readonly plan: Expression,
+    readonly noAwait: boolean,
+    readonly name: PlainIdentifier|undefined,
+    readonly type: TypeExpression|undefined,
 }

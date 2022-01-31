@@ -3,12 +3,12 @@ import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, JsFuncDeclaration, JsProcDeclaration } from "../_model/declarations.ts";
+import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, JsFuncDeclaration, JsProcDeclaration, RemoteDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase } from "../_model/expressions.ts";
-import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop } from "../_model/statements.ts";
+import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./common.ts";
-import { setParents } from "../utils/ast.ts";
+import { iterateParseTree, setParents } from "../utils/ast.ts";
 
 export function parse(module: ModuleName, code: string, reportError: ReportError): Module {
     let index = 0;
@@ -63,6 +63,7 @@ const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     ?? funcDeclaration(module, code, startIndex)
     ?? jsFuncDeclaration(module, code, startIndex)
     ?? valueDeclaration(module, code, startIndex)
+    ?? remoteDeclaration(module, code, startIndex)
     ?? autorunDeclaration(module, code, startIndex)
     ?? testExprDeclaration(module, code, startIndex)
     ?? testBlockDeclaration(module, code, startIndex)
@@ -473,8 +474,9 @@ const procType: ParseFunction<ProcType|GenericProcType> = (module, code, startIn
         const procType: ProcType = {
             kind: "proc-type",
             args,
-            mutability: undefined,
             invalidatesParent: false,
+            isAsync: undefined,
+            mutability: undefined,
             module,
             code,
             startIndex,
@@ -620,7 +622,10 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
                 action,
                 value: {
                     kind: "proc",
-                    type,
+                    type: {
+                        ...type,
+                        isAsync: [...iterateParseTree(body)].some(({ current }) => current.kind === 'await-statement')
+                    },
                     body,
                     module,
                     code,
@@ -805,6 +810,31 @@ const valueDeclaration: ParseFunction<ValueDeclaration> = (module, code, startIn
             index,
     })))))))))))
 
+const remoteDeclaration: ParseFunction<RemoteDeclaration> = (module, code, startIndex) =>
+    given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
+    given(consume(code, index, "remote"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(consume(code, index, "="), index =>
+    given(consumeWhitespace(code, index), index =>
+    given(expression(module, code, index), ({ parsed: planGenerator, index }) => ({
+        parsed: {
+            kind: 'remote-declaration',
+            name,
+            type,
+            planGenerator,
+            exported,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    })))))))))))
+
 const _maybeTypeAnnotation: ParseFunction<TypeExpression|undefined> = (module, code, startIndex) =>{
     const result = (
         given(consume(code, startIndex, ":"), index =>
@@ -885,7 +915,10 @@ const proc: ParseFunction<Proc> = (module, code, startIndex) =>
     given(parseBlock(module, code, index), ({ parsed: body, index }) => ({
         parsed: {
             kind: "proc",
-            type,
+            type: {
+                ...type,
+                isAsync: [...iterateParseTree(body)].some(({ current }) => current.kind === 'await-statement')
+            },
             body,
             module,
             code,
@@ -902,6 +935,7 @@ const _procHeader: ParseFunction<ProcType|GenericProcType> = (module, code, star
             kind: "proc-type",
             args,
             invalidatesParent: false,
+            isAsync: undefined,
             mutability: undefined,
             module,
             code,
@@ -936,6 +970,7 @@ const statement: ParseFunction<Statement> = (module, code, startIndex) =>
     ?? whileLoop(module, code, startIndex)
     ?? assignment(module, code, startIndex)
     ?? procCall(module, code, startIndex)
+    ?? awaitStatement(module, code, startIndex)
 
 const valueDeclarationStatement: ParseFunction<ValueDeclarationStatement> = (module, code, startIndex) => 
     given(parseExact("const")(module, code, startIndex) ?? parseExact("let")(module, code, startIndex), ({ parsed: kind, index }) =>
@@ -984,6 +1019,33 @@ const assignment: ParseFunction<Assignment> = (module, code, startIndex) =>
             index,
         } : undefined
     )))))))
+
+const awaitStatement: ParseFunction<AwaitStatement> = (module, code, startIndex) =>
+    given(parseOptional(module, code, startIndex, (module, code, index) =>
+        given(consume(code, index, "const"), index =>
+        given(consumeWhitespaceRequired(code, index), index =>
+        given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
+        given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) =>
+        given(consumeWhitespace(code, index), index =>
+        given(consume(code, index, "="), index =>
+        given(consumeWhitespace(code, index), index => ({ parsed: { name, type }, index }))))))))), ({ parsed: assignToInfo, index }) =>
+    given(consume(code, index ?? startIndex, "await"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(expression(module, code, index), ({ parsed: plan, index }) =>
+    expec(consume(code, index, ';'), err(code, index, '";"'), index => ({
+        parsed: {
+            kind: 'await-statement',
+            name: assignToInfo?.name,
+            type: assignToInfo?.type,
+            noAwait: false,
+            plan,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    }))))))
 
 const procCall: ParseFunction<Invocation> = (module, code, startIndex) =>
     given(invocationAccessorChain(module, code, startIndex), ({ parsed, index }) =>
@@ -1246,6 +1308,7 @@ const inlineConstDeclaration: ParseFunction<InlineConstDeclaration> = (module, c
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, '='), index =>
     given(consumeWhitespace(code, index), index =>
+    given(parseKeyword(code, index, 'await'), ({ parsed: awaited, index }) =>
     expec(expression(module, code, index), err(code, index, "Value"), ({ parsed: value, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ','), err(code, index, '","'), index => ({
@@ -1253,6 +1316,7 @@ const inlineConstDeclaration: ParseFunction<InlineConstDeclaration> = (module, c
             kind: 'inline-const-declaration',
             name,
             type,
+            awaited,
             value,
             module,
             code,
@@ -1260,7 +1324,7 @@ const inlineConstDeclaration: ParseFunction<InlineConstDeclaration> = (module, c
             endIndex: index
         },
         index
-    }))))))))))))
+    })))))))))))))
 
 
 const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => memoize3((module, code, startIndex) => 

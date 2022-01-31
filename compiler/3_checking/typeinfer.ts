@@ -280,8 +280,20 @@ const inferTypeInner = computedFn((
             }
         }
         case "parenthesized-expression":
-        case "inline-const-group":
-            return infer(ast.inner);
+        case "inline-const-group": {
+            const innerType = infer(ast.inner);
+
+            if (ast.kind === 'inline-const-group' && ast.declarations.some(d => d.awaited)) {
+                return {
+                    kind: 'plan-type',
+                    inner: innerType,
+                    mutability: undefined,
+                    parent, module, code, startIndex, endIndex
+                }
+            }
+
+            return innerType
+        }
         case "property-accessor": {
             const subjectType = resolve(infer(ast.subject));
             const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
@@ -347,6 +359,24 @@ const inferTypeInner = computedFn((
                                     mutability
                                 } as TypeExpression
                             }
+                            case 'await-statement': {
+
+                                if (decl.type) {
+                                    return decl.type
+                                }
+
+                                if (decl.name == null) {
+                                    return UNKNOWN_TYPE
+                                }
+
+                                const planType = resolve(infer(decl.plan))
+
+                                if (planType.kind !== 'plan-type') {
+                                    return UNKNOWN_TYPE
+                                } else {
+                                    return planType.inner
+                                }
+                            }
                             case 'func-declaration':
                             case 'proc-declaration':
                             case 'inline-const-declaration': {
@@ -364,6 +394,28 @@ const inferTypeInner = computedFn((
                             case 'js-func-declaration':
                             case 'js-proc-declaration':
                                 return resolve(decl.type)
+                            case 'remote-declaration': {
+                                const planGeneratorType = resolve(infer(decl.planGenerator))
+
+                                let inner;
+                                if (planGeneratorType.kind === 'plan-type') {
+                                    inner = planGeneratorType.inner
+                                } else if (planGeneratorType.kind === 'func-type') {
+
+                                    inner = UNKNOWN_TYPE
+                                } else {
+                                    inner = UNKNOWN_TYPE
+                                }
+
+                                const { module, code, startIndex, endIndex } = decl
+
+                                return {
+                                    kind: 'remote-type',
+                                    inner,
+                                    mutability: undefined,
+                                    module, code, startIndex, endIndex
+                                }
+                            }
                             default:
                                 // @ts-expect-error
                                 throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
@@ -937,6 +989,13 @@ export const propertiesOf = computedFn((
                     parent: resolvedType.parent,
                     ...TYPE_AST_NOISE
                 }, true)
+            ]
+        }
+        case "remote-type": {
+            return [
+                attribute("value", resolvedType.inner, true),
+                attribute("loading", BOOLEAN_TYPE, true),
+                // TODO: reload() proc
             ]
         }
     }

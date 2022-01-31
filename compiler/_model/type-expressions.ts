@@ -23,6 +23,7 @@ export type TypeExpression =
     | NominalType
     | IteratorType
     | PlanType
+    | RemoteType
     | ParenthesizedType
     | UnknownType
     | AnyType
@@ -57,6 +58,7 @@ export type ProcType = SourceInfo & {
     readonly kind: "proc-type",
     readonly args: readonly Arg[],
     readonly invalidatesParent: boolean,
+    readonly isAsync: boolean|undefined,
     readonly mutability: undefined,
 }
 
@@ -195,6 +197,12 @@ export type IteratorType = SourceInfo & {
 
 export type PlanType = SourceInfo & {
     readonly kind: "plan-type",
+    readonly inner: TypeExpression,
+    readonly mutability: undefined,
+}
+
+export type RemoteType = SourceInfo & {
+    readonly kind: "remote-type",
     readonly inner: TypeExpression,
     readonly mutability: undefined,
 }
@@ -383,6 +391,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "any-type": undefined,
     "iterator-type": undefined,
     "plan-type": undefined,
+    "remote-type": undefined,
     "parenthesized-type": undefined,
     "literal-type": undefined,
     "tuple-type": undefined,

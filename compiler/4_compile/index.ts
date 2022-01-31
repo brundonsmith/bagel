@@ -78,6 +78,16 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             
             return exported(ast.exported) + `const ${ast.name.name}${type} = ${value};`;
         }
+        case "remote-declaration": {
+            const planGeneratorType = resolveType(() => {}, inferType(() => {}, ast.planGenerator))
+            const compiledPlanGenerator = c(ast.planGenerator)
+
+            return exported(ast.exported) + `const ${ast.name.name} = new ${INT}Remote${ast.type ? `<${c(ast.type)}>` : ``}(
+                ${planGeneratorType.kind === 'plan-type'
+                    ? `() => ${compiledPlanGenerator}`
+                    : compiledPlanGenerator}
+            )`
+        }
         case "autorun-declaration": return `${INT}autorun(${c(ast.effect)})`;
         case "value-declaration-statement":
             return `${ast.isConst ? 'const' : 'let'} ${ast.name.name}${!excludeTypes && ast.type != null ? `: ${c(ast.type)}` : ''} = ${c(ast.value)}`;
@@ -98,6 +108,9 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 return `${c(ast.target.subject)}.${ast.target.property.name} = ${value}; ${INT}invalidate(${c(ast.target.subject)}, '${c(ast.target.property)}')`
             }
         }
+        case "await-statement": {
+            return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, ast.type)} = ` : '') + `await ${c(ast.plan)}();`
+        }
         case "if-else-statement": return 'if ' + ast.cases
             .map(({ condition, outcome }) => 
                 `(${c(condition)}) ${c(outcome)}`)
@@ -107,12 +120,22 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "while-loop": return `while (${c(ast.condition)}) ${c(ast.body)}`;
         case "proc": return compileProc(excludeTypes, module, ast);
         case "func": return compileFunc(excludeTypes, module, ast);
-        case "inline-const-group": return `(() => {
-            ${ast.declarations.map(c).join('\n')}
-            return ${c(ast.inner)};
-        })()`;
+        case "inline-const-group": {
+            const awaited = ast.declarations.some(d => d.awaited)
+
+            const body = `(${awaited ? 'async ' : ''}() => {
+                ${ast.declarations.map(c).join('\n')}
+                return ${c(ast.inner)};
+            })()`;
+
+            if (awaited) {
+                return `() => ${body}`
+            } else {
+                return body
+            }
+        }
         case "inline-const-declaration":
-            return `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, ast.type)} = ${c(ast.value)};`
+            return `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, ast.type)} = ${ast.awaited ? `await (${c(ast.value)})()` : c(ast.value)};`
         case "invocation": {
             
             // method call
@@ -295,26 +318,14 @@ const compileProcOrFunctionSignature = (excludeTypes: boolean, module: string, s
         : ''
     const functionType = subject.kind === 'generic-type' ? subject.inner : subject
 
-
-    return typeParams + `(${compileArgs(excludeTypes, module, functionType.args)})` +
+    return (functionType.kind === 'proc-type' && functionType.isAsync ? 'async ' : '') +
+        typeParams + 
+        `(${compileArgs(excludeTypes, module, functionType.args)})` +
         (excludeTypes ? '' : 
-        functionType.kind === 'proc-type' ? ': void' : 
+        functionType.kind === 'proc-type' ? (functionType.isAsync ? ': Promise<void>' : ': void') : 
         functionType.returnType != null ? `: ${compileOne(excludeTypes, module, functionType.returnType)}` :
         '')
 }
-
-// TODO: Bring this back as an optimization
-// const compileFuncBody = (excludeTypes: boolean, module: string, func: Func): string => {
-//     const bodyExpr = compileOne(excludeTypes, module, func.body);
-
-//     return func.consts.length === 0
-//         ? bodyExpr
-//         : ' {\n' + 
-//             func.consts
-//                 .map(c => `    const ${c.name.name}${c.type ? ': ' + compileOne(excludeTypes, module, c.type) : ""} = ${compileOne(excludeTypes, module, c.value)};\n`)
-//                 .join('') +
-//             `\n    return ${bodyExpr};\n}`
-// }
 
 function compileArgs(excludeTypes: boolean, module: string, args: readonly Arg[]): string {
     return args.map(arg =>

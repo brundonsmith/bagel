@@ -75,6 +75,10 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return (ast.kind === 'value-declaration' ? exported(ast.exported) : '') + 
                 (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${f(ast.value)}` +
                 (ast.kind === 'value-declaration-statement' ? ';' : '')
+        case "remote-declaration":
+            return exported(ast.exported) + `remote ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${format(ast.planGenerator)}`
+        case "await-statement":
+            return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ` : '') + `await ${f(ast.plan)};`
         case "type-declaration":
             if (ast.type.kind === 'nominal-type') {
                 return exported(ast.exported) + `nominal type ${ast.name.name}(${f(ast.type.inner)})`
@@ -198,6 +202,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "nominal-type": return ast.name.description ?? '<unnamed nominal>';
         case "iterator-type": return `Iterator<${f(ast.inner)}>`;
         case "plan-type": return `Plan<${f(ast.inner)}>`;
+        case "remote-type": return `Remote<${f(ast.inner)}>`
         case "unknown-type": return "unknown";
         case "any-type": return "any";
         case "element-type": return `Element`;

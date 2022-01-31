@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-fallthrough
-import { ValueDeclarationStatement } from "./statements.ts";
+import { AwaitStatement, ValueDeclarationStatement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
-import { ValueDeclaration, FuncDeclaration, ProcDeclaration, JsFuncDeclaration, JsProcDeclaration, ImportAllDeclaration } from "./declarations.ts";
+import { ValueDeclaration, FuncDeclaration, ProcDeclaration, JsFuncDeclaration, JsProcDeclaration, ImportAllDeclaration, RemoteDeclaration } from "./declarations.ts";
 import { Expression, Func, InlineConstDeclaration, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
@@ -15,7 +15,7 @@ export type ReportError = (error: BagelError) => void
 export type Binding = ValueBinding|TypeBinding
 
 export type ValueBinding =
-    | { readonly kind: "basic", readonly ast: ValueDeclaration|ProcDeclaration|JsProcDeclaration|FuncDeclaration|JsFuncDeclaration|ValueDeclarationStatement|InlineConstDeclaration }
+    | { readonly kind: "basic", readonly ast: ValueDeclaration|ProcDeclaration|JsProcDeclaration|FuncDeclaration|JsFuncDeclaration|ValueDeclarationStatement|InlineConstDeclaration|RemoteDeclaration|AwaitStatement }
     | { readonly kind: "iterator", readonly iterator: Expression }
     | { readonly kind: "arg", readonly holder: Func|Proc, readonly argIndex: number }
     | { readonly kind: "module", readonly imported: ImportAllDeclaration }
@@ -38,6 +38,8 @@ export function getBindingMutability(binding: ValueBinding, from: AST): "immutab
                 case 'proc-declaration':
                 case 'js-proc-declaration':
                 case 'inline-const-declaration':
+                case 'remote-declaration':
+                case 'await-statement':
                     return 'immutable'
                 case 'value-declaration-statement':
                     return !binding.ast.isConst ? 'assignable' : 'immutable'

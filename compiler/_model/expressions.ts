@@ -48,6 +48,7 @@ export type InlineConstDeclaration = SourceInfo & {
     readonly kind: "inline-const-declaration",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
+    readonly awaited: boolean,
     readonly value: Expression,
 }
 

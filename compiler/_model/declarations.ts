@@ -12,6 +12,7 @@ export type Declaration =
     | FuncDeclaration
     | JsFuncDeclaration
     | ValueDeclaration
+    | RemoteDeclaration
     | AutorunDeclaration
     | TestExprDeclaration
     | TestBlockDeclaration
@@ -80,6 +81,13 @@ export type ValueDeclaration = SourceInfo & {
     readonly value: Expression,
     readonly isConst: boolean,
     readonly exported: undefined|'export'|'expose',
+}
+
+export type RemoteDeclaration = SourceInfo & Exported & {
+    readonly kind: "remote-declaration",
+    readonly name: PlainIdentifier,
+    readonly type: TypeExpression|undefined,
+    readonly planGenerator: Expression,
 }
 
 export type TestExprDeclaration = SourceInfo & {
