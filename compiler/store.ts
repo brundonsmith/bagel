@@ -209,7 +209,7 @@ const Store = new _Store()
 export default Store
 
 export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'WHOLE_OBJECT', 'h',
-'range', 'entries', 'Iter', 'RawIter', 'Plan', 'INNER_ITER'
+'range', 'entries', 'Iter', 'RawIter', 'Plan', 'Remote', 'INNER_ITER'
 ]
 
 const JS_PRELUDE = `
@@ -225,7 +225,7 @@ const BGL_PRELUDE_DATA = [
     { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/numbers.bgl' as ModuleName, imports: [ 'parseNumber', 'stringifyNumber', 'abs', 'pow', 'sqrt', 'ceil', 'floor', 'sin', 'cos', 'tan' ] },
     { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/booleans.bgl' as ModuleName, imports: [ 'parseBoolean', 'stringifyBoolean' ] },
     { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/iterators.bgl' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'collectArray', 'collectObject' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/plans.bgl' as ModuleName, imports: [ 'then' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/plans.bgl' as ModuleName, imports: [ 'timeout' ] },
 ] as const
 
 function normalizeName(module: ModuleName): string {
