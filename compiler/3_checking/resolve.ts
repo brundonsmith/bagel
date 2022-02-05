@@ -59,8 +59,9 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                             }
     
                             resolved = {
-                                kind: "basic",
-                                ast: declaration
+                                kind: "value-binding",
+                                owner: declaration,
+                                identifier: declaration.name
                             }
                         }
                     } break;
@@ -71,8 +72,9 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                             }
 
                             resolved = {
-                                kind: "module",
-                                imported: declaration
+                                kind: "value-binding",
+                                owner: declaration,
+                                identifier: declaration.alias
                             }
                         }
                     } break;
@@ -110,8 +112,9 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                             }
                                         } else {
                                             resolved = {
-                                                kind: "basic",
-                                                ast: imported
+                                                kind: "value-binding",
+                                                owner: imported,
+                                                identifier: imported.name
                                             }
                                         }
                                     }
@@ -186,9 +189,9 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                     }
 
                     resolved = {
-                        kind: "arg",
-                        holder: parent,
-                        argIndex: i
+                        kind: "value-binding",
+                        owner: parent,
+                        identifier: arg.name
                     }
                 }
             }
@@ -213,8 +216,9 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                             }
 
                             resolved = {
-                                kind: "basic",
-                                ast: statement
+                                kind: "value-binding",
+                                owner: statement,
+                                identifier: statement.name
                             }
                         }
                     } else {
@@ -232,9 +236,9 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                 }
         
                                 resolved = {
-                                    kind: "destructure",
-                                    destructure: statement,
-                                    property
+                                    kind: "value-binding",
+                                    owner: statement,
+                                    identifier: property
                                 }
                             }
                         }
@@ -245,8 +249,9 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
         case "for-loop": {
             if (parent.itemIdentifier.name === name) {
                 resolved = {
-                    kind: "iterator",
-                    iterator: parent.iterator,
+                    kind: "value-binding",
+                    owner: parent,
+                    identifier: parent.itemIdentifier
                 }
             }
         } break;
@@ -271,8 +276,9 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                         }
 
                         resolved = {
-                            kind: "basic",
-                            ast: declaration
+                            kind: "value-binding",
+                            owner: declaration,
+                            identifier: declaration.name
                         }
                     }
                 } else {
@@ -293,9 +299,9 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                             }
     
                             resolved = {
-                                kind: "destructure",
-                                destructure: declaration,
-                                property
+                                kind: "value-binding",
+                                owner: declaration,
+                                identifier: property
                             }
                         }
                     }

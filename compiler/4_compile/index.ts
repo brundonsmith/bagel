@@ -106,7 +106,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             if (ast.target.kind === 'local-identifier') {
                 const binding = Store.getBinding(() => {}, ast.target.name, ast.target)
 
-                if (binding && binding.kind === 'basic' && binding.ast.kind === 'value-declaration' && !binding.ast.isConst) {
+                if (binding && binding.kind === 'value-binding' && binding.owner.kind === 'value-declaration' && !binding.owner.isConst) {
                     return `${ast.target.name}.value = ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
                 } else {
                     return `${ast.target.name} = ${value}`
@@ -186,7 +186,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "local-identifier": {
             const binding = Store.getBinding(() => {}, ast.name, ast)
 
-            if (binding && binding.kind === 'basic' && binding.ast.kind === 'value-declaration' && !binding.ast.isConst) {
+            if (binding && binding.kind === 'value-binding' && binding.owner.kind === 'value-declaration' && !binding.owner.isConst) {
                 return `${INT}observe(${ast.name}, 'value')`
             } else {
                 return ast.name
@@ -199,8 +199,8 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             if (ast.subject.kind === 'local-identifier') {
                 const binding = Store.getBinding(() => {}, ast.subject.name, ast)
 
-                if (binding?.kind === 'module') {
-                    const module = Store.getModuleByName(binding.imported.module as ModuleName, binding.imported.path.value)
+                if (binding?.kind === 'value-binding' && binding.owner.kind === 'import-all-declaration') {
+                    const module = Store.getModuleByName(binding.owner.module as ModuleName, binding.owner.path.value)
                     
                     if (module?.declarations.find(decl =>
                             decl.kind === 'value-declaration' && !decl.isConst && decl.name.name === ast.property.name)) {

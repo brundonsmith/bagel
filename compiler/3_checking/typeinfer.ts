@@ -335,99 +335,93 @@ const inferTypeInner = computedFn((
         case "local-identifier": {
             const binding = Store.getBinding(reportError, ast.name, ast)
 
-            if (binding != null) {
-                switch (binding.kind) {
-                    case 'basic': {
-                        const decl = binding.ast
+            if (binding?.kind === 'value-binding') {
+                const decl = binding.owner
 
-                        switch (decl.kind) {
-                            case 'value-declaration':
-                            case 'value-declaration-statement': {
-                                const baseType = decl.type ?? infer(decl.value)
-                                const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
-                                    decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== ast.module)
-                                        ? 'immutable'
-                                        : mutability)
-        
-                                // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
-                                const correctedBaseType = (
-                                    !decl.isConst
-                                        ? broadenTypeForMutation(baseType)
-                                        : baseType
-                                )
-        
-                                return {
-                                    ...correctedBaseType,
-                                    mutability
-                                } as TypeExpression
-                            }
-                            case 'await-statement': {
+                switch (decl.kind) {
+                    case 'value-declaration':
+                    case 'value-declaration-statement': {
+                        const baseType = decl.type ?? infer(decl.value)
+                        const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
+                            decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== ast.module)
+                                ? 'immutable'
+                                : mutability)
 
-                                if (decl.type) {
-                                    return decl.type
-                                }
+                        // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
+                        const correctedBaseType = (
+                            !decl.isConst
+                                ? broadenTypeForMutation(baseType)
+                                : baseType
+                        )
 
-                                if (decl.name == null) {
-                                    return UNKNOWN_TYPE
-                                }
+                        return {
+                            ...correctedBaseType,
+                            mutability
+                        } as TypeExpression
+                    }
+                    case 'await-statement': {
 
-                                const planType = resolve(infer(decl.plan))
-
-                                if (planType.kind !== 'plan-type') {
-                                    return UNKNOWN_TYPE
-                                } else {
-                                    return planType.inner
-                                }
-                            }
-                            case 'func-declaration':
-                            case 'proc-declaration':
-                            case 'inline-const-declaration': {
-                                const baseType = resolve(infer(decl.value))
-                                const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
-                                    decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
-                                        ? 'immutable'
-                                        : 'readonly')
-        
-                                return {
-                                    ...baseType,
-                                    mutability
-                                } as TypeExpression
-                            }
-                            case 'remote-declaration': {
-                                const planGeneratorType = resolve(infer(decl.planGenerator))
-
-                                let inner;
-                                if (planGeneratorType.kind === 'plan-type') {
-                                    inner = planGeneratorType.inner
-                                } else if (planGeneratorType.kind === 'func-type') {
-
-                                    inner = UNKNOWN_TYPE
-                                } else {
-                                    inner = UNKNOWN_TYPE
-                                }
-
-                                const { module, code, startIndex, endIndex } = decl
-
-                                return {
-                                    kind: 'remote-type',
-                                    inner,
-                                    mutability: undefined,
-                                    module, code, startIndex, endIndex
-                                }
-                            }
-                            default:
-                                // @ts-expect-error
-                                throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
+                        if (decl.type) {
+                            return decl.type
                         }
-                    } break;
-                    case 'destructure': {
-                        const objectOrArrayType = resolve(infer(binding.destructure.value))
 
-                        if (binding.destructure.destructureKind === 'object' && objectOrArrayType.kind === 'object-type') {
+                        if (decl.name == null) {
+                            return UNKNOWN_TYPE
+                        }
+
+                        const planType = resolve(infer(decl.plan))
+
+                        if (planType.kind !== 'plan-type') {
+                            return UNKNOWN_TYPE
+                        } else {
+                            return planType.inner
+                        }
+                    }
+                    case 'func-declaration':
+                    case 'proc-declaration':
+                    case 'inline-const-declaration': {
+                        const baseType = resolve(infer(decl.value))
+                        const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
+                            decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
+                                ? 'immutable'
+                                : 'readonly')
+
+                        return {
+                            ...baseType,
+                            mutability
+                        } as TypeExpression
+                    }
+                    case 'remote-declaration': {
+                        const planGeneratorType = resolve(infer(decl.planGenerator))
+
+                        let inner;
+                        if (planGeneratorType.kind === 'plan-type') {
+                            inner = planGeneratorType.inner
+                        } else if (planGeneratorType.kind === 'func-type') {
+
+                            inner = UNKNOWN_TYPE
+                        } else {
+                            inner = UNKNOWN_TYPE
+                        }
+
+                        const { module, code, startIndex, endIndex } = decl
+
+                        return {
+                            kind: 'remote-type',
+                            inner,
+                            mutability: undefined,
+                            module, code, startIndex, endIndex
+                        }
+                    }
+                    case 'inline-destructuring-declaration':
+                    case 'destructuring-declaration-statement': {
+                        const objectOrArrayType = resolve(infer(decl.value))
+
+                        if (decl.destructureKind === 'object' && objectOrArrayType.kind === 'object-type') {
                             const props = propertiesOf(reportError, objectOrArrayType)
 
-                            return props?.find(prop => prop.name.name === binding.property.name)?.type ?? UNKNOWN_TYPE
-                        } else if (binding.destructure.destructureKind === 'array') {
+                            return props?.find(prop => prop.name.name === binding.identifier.name)?.type ?? UNKNOWN_TYPE
+                        } else if (decl.destructureKind === 'array') {
                             if (objectOrArrayType.kind === 'array-type') {
                                 return {
                                     kind: "maybe-type",
@@ -436,25 +430,27 @@ const inferTypeInner = computedFn((
                                     ...TYPE_AST_NOISE
                                 }
                             } else if (objectOrArrayType.kind === 'tuple-type') {
-                                const index = binding.destructure.properties.findIndex(p => p.name === binding.property.name)
+                                const index = decl.properties.findIndex(p => p.name === binding.identifier.name)
                                 return objectOrArrayType.members[index] ?? UNKNOWN_TYPE
                             }
                         }
                     } break;
-                    case 'arg': {
-                        const funcOrProcType = binding.holder.type.kind === 'generic-type' ? binding.holder.type.inner : binding.holder.type
-                        const argType = funcOrProcType.args[binding.argIndex].type
+                    case 'func':
+                    case 'proc': {
+                        const funcOrProcType = decl.type.kind === 'generic-type' ? decl.type.inner : decl.type
+                        const argType = funcOrProcType.args.find(a => a.name.name === binding.identifier.name)?.type
 
                         if (argType) {
                             return argType
                         }
 
-                        const inferredHolderType = infer(binding.holder)
+                        const inferredHolderType = infer(decl)
                         if (inferredHolderType.kind === 'func-type' || inferredHolderType.kind === 'proc-type') {
-                            const declaredType = inferredHolderType.args[binding.argIndex].type
+                            const inferredArg = inferredHolderType.args.find(a => a.name.name === binding.identifier.name)
+                            const declaredType = inferredArg?.type
 
                             if (declaredType) {
-                                if (!inferredHolderType.args[binding.argIndex].optional) {
+                                if (!inferredArg?.optional) {
                                     return declaredType
                                 } else {
                                     const { module, code, startIndex, endIndex } = declaredType
@@ -467,24 +463,25 @@ const inferTypeInner = computedFn((
                                     }
                                 }
                             }
-                            return inferredHolderType.args[binding.argIndex].type ?? UNKNOWN_TYPE
+                            
+                            return UNKNOWN_TYPE
                         }
                         
                         return UNKNOWN_TYPE
                     }
-                    case 'iterator': {
-                        const iteratorType = resolve(infer(binding.iterator))
-    
+                    case 'for-loop': {
+                        const iteratorType = resolve(infer(decl.iterator))
+
                         return iteratorType.kind === 'iterator-type'
                             ? iteratorType.inner
                             : UNKNOWN_TYPE
                     }
-                    case 'module': {
-                        const otherModule = Store.getModuleByName(binding.imported.module as ModuleName, binding.imported.path.value)
+                    case 'import-all-declaration': {
+                        const otherModule = Store.getModuleByName(decl.module as ModuleName, decl.path.value)
 
                         if (otherModule == null) {
                             // other module doesn't exist
-                            reportError(cannotFindModule(binding.imported.path))
+                            reportError(cannotFindModule(decl.path))
                             return {
                                 kind: 'object-type',
                                 spreads: [],
@@ -513,10 +510,9 @@ const inferTypeInner = computedFn((
                             }
                         }
                     }
-                    case 'type-binding': break;
                     default:
                         // @ts-expect-error
-                        throw Error('Unreachable!' + binding.kind)
+                        throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
                 }
             }
 
