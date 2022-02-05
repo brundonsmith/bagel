@@ -421,6 +421,27 @@ const inferTypeInner = computedFn((
                                 throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
                         }
                     } break;
+                    case 'destructure': {
+                        const objectOrArrayType = resolve(infer(binding.destructure.value))
+
+                        if (binding.destructure.destructureKind === 'object' && objectOrArrayType.kind === 'object-type') {
+                            const props = propertiesOf(reportError, objectOrArrayType)
+
+                            return props?.find(prop => prop.name.name === binding.property.name)?.type ?? UNKNOWN_TYPE
+                        } else if (binding.destructure.destructureKind === 'array') {
+                            if (objectOrArrayType.kind === 'array-type') {
+                                return {
+                                    kind: "maybe-type",
+                                    inner: objectOrArrayType.element,
+                                    parent,
+                                    ...TYPE_AST_NOISE
+                                }
+                            } else if (objectOrArrayType.kind === 'tuple-type') {
+                                const index = binding.destructure.properties.findIndex(p => p.name === binding.property.name)
+                                return objectOrArrayType.members[index] ?? UNKNOWN_TYPE
+                            }
+                        }
+                    } break;
                     case 'arg': {
                         const funcOrProcType = binding.holder.type.kind === 'generic-type' ? binding.holder.type.inner : binding.holder.type
                         const argType = funcOrProcType.args[binding.argIndex].type

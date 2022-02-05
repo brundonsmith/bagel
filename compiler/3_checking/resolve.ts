@@ -201,22 +201,47 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
             for (let statementIndex = 0; statementIndex < parent.statements.length; statementIndex++) {
                 const statement = parent.statements[statementIndex]
 
-                if ((statement.kind === "value-declaration-statement" || statement.kind === 'await-statement') && statement.name?.name === name) {
-                    if (resolved) {
-                        reportError(alreadyDeclared(statement.name))
-                    }
-                    
-                    // detect variable or const being referenced before it's available
-                    const comingFromIndex = parent.statements.findIndex(other => areSame(other, from))
-                    if (comingFromIndex < statementIndex) {
-                        reportError(miscError(originator, `Can't reference "${name}" before initialization`))
-                    } else if (comingFromIndex === statementIndex) {
-                        reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
-                    }
+                if (statement.kind === "value-declaration-statement" || statement.kind === 'destructuring-declaration-statement' || statement.kind === 'await-statement') {
+                    if (statement.kind !== 'destructuring-declaration-statement') {
+                        if (statement.name?.name === name) {
+                            if (resolved) {
+                                reportError(alreadyDeclared(statement.name))
+                            }
+                            
+                            // detect variable or const being referenced before it's available
+                            const comingFromIndex = parent.statements.findIndex(other => areSame(other, from))
+                            if (comingFromIndex < statementIndex) {
+                                reportError(miscError(originator, `Can't reference "${name}" before initialization`))
+                            } else if (comingFromIndex === statementIndex) {
+                                reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
+                            }
 
-                    resolved = {
-                        kind: "basic",
-                        ast: statement
+                            resolved = {
+                                kind: "basic",
+                                ast: statement
+                            }
+                        }
+                    } else {
+                        for (const property of statement.properties) {
+                            if (property.name === name) {
+                                if (resolved) {
+                                    reportError(alreadyDeclared(property))
+                                }
+
+                                const comingFromIndex = parent.statements.findIndex(other => areSame(other, from))
+                                if (comingFromIndex < statementIndex) {
+                                    reportError(miscError(originator, `Can't reference "${name}" before initialization`))
+                                } else if (comingFromIndex === statementIndex) {
+                                    reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
+                                }
+        
+                                resolved = {
+                                    kind: "destructure",
+                                    destructure: statement,
+                                    property
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -233,24 +258,50 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
             for (let declarationIndex = 0; declarationIndex < parent.declarations.length; declarationIndex++) {
                 const declaration = parent.declarations[declarationIndex]
 
-                if (declaration.name.name === name) {
-                    if (resolved) {
-                        reportError(alreadyDeclared(declaration.name))
-                    }
+                if (declaration.kind === 'inline-const-declaration') {
+                    if (declaration.name.name === name) {
+                        if (resolved) {
+                            reportError(alreadyDeclared(declaration.name))
+                        }
 
-                    // detect value being referenced before it's available
-                    if (from.kind === 'inline-const-declaration') {
-                        const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
-                        if (comingFromIndex < declarationIndex) {
-                            reportError(miscError(originator, `Can't reference "${name}" before initialization`))
-                        } else if (comingFromIndex === declarationIndex) {
-                            reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
+                        // detect value being referenced before it's available
+                        if (from.kind === 'inline-const-declaration') {
+                            const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
+                            if (comingFromIndex < declarationIndex) {
+                                reportError(miscError(originator, `Can't reference "${name}" before initialization`))
+                            } else if (comingFromIndex === declarationIndex) {
+                                reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
+                            }
+                        }
+
+                        resolved = {
+                            kind: "basic",
+                            ast: declaration
                         }
                     }
-
-                    resolved = {
-                        kind: "basic",
-                        ast: declaration
+                } else {
+                    for (const property of declaration.properties) {
+                        if (property.name === name) {
+                            if (resolved) {
+                                reportError(alreadyDeclared(property))
+                            }
+    
+                            // detect value being referenced before it's available
+                            if (from.kind === 'inline-const-declaration' || from.kind === 'destructuring-declaration-statement') {
+                                const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
+                                if (comingFromIndex < declarationIndex) {
+                                    reportError(miscError(originator, `Can't reference "${name}" before initialization`))
+                                } else if (comingFromIndex === declarationIndex) {
+                                    reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
+                                }
+                            }
+    
+                            resolved = {
+                                kind: "destructure",
+                                destructure: declaration,
+                                property
+                            }
+                        }
                     }
                 }
             }

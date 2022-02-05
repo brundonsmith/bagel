@@ -40,7 +40,7 @@ export type Func = SourceInfo & {
 
 export type InlineConstGroup = SourceInfo & {
     readonly kind: "inline-const-group",
-    readonly declarations: readonly InlineConstDeclaration[],
+    readonly declarations: readonly (InlineConstDeclaration|InlineDestructuringDeclaration)[],
     readonly inner: Expression
 }
 
@@ -48,6 +48,15 @@ export type InlineConstDeclaration = SourceInfo & {
     readonly kind: "inline-const-declaration",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
+    readonly awaited: boolean,
+    readonly value: Expression,
+}
+
+export type InlineDestructuringDeclaration = SourceInfo & {
+    readonly kind: "inline-destructuring-declaration",
+    readonly properties: readonly PlainIdentifier[],
+    readonly spread: PlainIdentifier|undefined,
+    readonly destructureKind: 'array'|'object',
     readonly awaited: boolean,
     readonly value: Expression,
 }

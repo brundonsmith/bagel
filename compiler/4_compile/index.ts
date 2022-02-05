@@ -91,6 +91,17 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "autorun-declaration": return `${INT}autorun(${c(ast.effect)})`;
         case "value-declaration-statement":
             return `${ast.isConst ? 'const' : 'let'} ${ast.name.name}${!excludeTypes && ast.type != null ? `: ${c(ast.type)}` : ''} = ${c(ast.value)}`;
+        case "destructuring-declaration-statement":
+        case "inline-destructuring-declaration": {
+            const propsAndSpread = ast.properties.map(p => p.name).join(', ') + (ast.spread ? `, ...${ast.spread.name}` : '')
+            const value = ast.kind === "inline-destructuring-declaration" && ast.awaited ? `await (${c(ast.value)})()` : c(ast.value)
+
+            if (ast.destructureKind === 'object') {
+                return `const { ${propsAndSpread} } = ${value}`
+            } else {
+                return `const [ ${propsAndSpread} ] = ${value}`
+            }
+        }
         case "assignment": {
             const value = c(ast.value)
 

@@ -5,6 +5,7 @@ import { TypeExpression } from "./type-expressions.ts";
 export type Statement = 
     | JavascriptEscape
     | ValueDeclarationStatement
+    | DestructuringDeclarationStatement
     | IfElseStatement
     | ForLoop
     | WhileLoop
@@ -18,6 +19,14 @@ export type ValueDeclarationStatement = SourceInfo & {
     readonly type: TypeExpression|undefined,
     readonly value: Expression,
     readonly isConst: boolean,
+}
+
+export type DestructuringDeclarationStatement = SourceInfo & {
+    readonly kind: "destructuring-declaration-statement",
+    readonly properties: readonly PlainIdentifier[],
+    readonly spread: PlainIdentifier|undefined,
+    readonly destructureKind: 'array'|'object',
+    readonly value: Expression,
 }
 
 export type IfElseStatement = SourceInfo & {

@@ -169,7 +169,19 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "inline-const-group":
             return ast.declarations.map(d => nextIndentation + fIndent(d) + ',\n').join('') + fIndent(ast.inner)
         case "inline-const-declaration":
-            return `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${f(ast.value)}`
+            return `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${ast.awaited ? 'await ' : ''}${f(ast.value)}`
+        case "inline-destructuring-declaration":
+        case "destructuring-declaration-statement": {
+            const propsAndSpread = ast.properties.map(p => p.name).join(', ') + (ast.spread ? `, ...${ast.spread.name}` : '')
+            const value = ast.kind === "inline-destructuring-declaration" && ast.awaited ? `await ${f(ast.value)}` : f(ast.value)
+            const semicolon = ast.kind === "destructuring-declaration-statement" ? ';' : ''
+
+            if (ast.destructureKind === 'object') {
+                return `const { ${propsAndSpread} } = ${value}` + semicolon
+            } else {
+                return `const [ ${propsAndSpread} ] = ${value}` + semicolon
+            }
+        }
         case "element-tag":
             return `<${ast.tagName.name}${ast.attributes.length > 0 ? ' ' + ast.attributes.map(([name, value]) => `${name.name}={${f(value)}}`).join(' ') : ''}>${
                 ast.children.map(c =>

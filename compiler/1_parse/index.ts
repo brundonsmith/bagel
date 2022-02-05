@@ -4,8 +4,8 @@ import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, JsFuncDeclaration, JsProcDeclaration, RemoteDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase } from "../_model/expressions.ts";
-import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement } from "../_model/statements.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration } from "../_model/expressions.ts";
+import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./common.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
@@ -972,31 +972,42 @@ const statement: ParseFunction<Statement> = (module, code, startIndex) =>
     ?? procCall(module, code, startIndex)
     ?? awaitStatement(module, code, startIndex)
 
-const valueDeclarationStatement: ParseFunction<ValueDeclarationStatement> = (module, code, startIndex) => 
+const valueDeclarationStatement: ParseFunction<ValueDeclarationStatement|DestructuringDeclarationStatement> = (module, code, startIndex) => 
     given(parseExact("const")(module, code, startIndex) ?? parseExact("let")(module, code, startIndex), ({ parsed: kind, index }) =>
     given(consumeWhitespaceRequired(code, index), index =>
-    expec(plainIdentifier(module, code, index), err(code, index, "Constant name"), ({ parsed: name, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) =>
+    expec(_declarationTarget(module, code, index), err(code, index, "Constant name or spread"), ({ parsed: target, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "="), err(code, index, '"="'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Expression'), ({ parsed: value, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => ({
-            parsed: {
-                kind: "value-declaration-statement",
-                name,
-                value,
-                type,
-                isConst: kind === 'const',
-                module,
-                code,
-                startIndex,
-                endIndex: index,
-            },
+            parsed: 
+                target.kind === 'const'
+                    ? {
+                        kind: "value-declaration-statement",
+                        name: target.name,
+                        type: target.type,
+                        value,
+                        isConst: kind === 'const',
+                        module,
+                        code,
+                        startIndex,
+                        endIndex: index,
+                    }
+                    : {
+                        kind: "destructuring-declaration-statement",
+                        properties: target.properties,
+                        spread: target.spread,
+                        destructureKind: target.destructureKind,
+                        value,
+                        module,
+                        code,
+                        startIndex,
+                        endIndex: index
+                    },
             index,
-        }))))))))))))
+        }))))))))))
 
 const assignment: ParseFunction<Assignment> = (module, code, startIndex) =>
     given(invocationAccessorChain(module, code, startIndex) ?? indexer(module, code, startIndex) ?? localIdentifier(module, code, startIndex), ({ parsed: target, index }) =>
@@ -1299,12 +1310,10 @@ const inlineConstGroup: ParseFunction<InlineConstGroup> = (module, code, startIn
         })))
     : undefined)
 
-const inlineConstDeclaration: ParseFunction<InlineConstDeclaration> = (module, code, startIndex) =>
+const inlineConstDeclaration: ParseFunction<InlineConstDeclaration|InlineDestructuringDeclaration> = (module, code, startIndex) =>
     given(consume(code, startIndex, 'const'), index =>
     given(consumeWhitespaceRequired(code, index), index =>
-    given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) =>
+    given(_declarationTarget(module, code, index), ({ parsed: target, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, '='), index =>
     given(consumeWhitespace(code, index), index =>
@@ -1312,19 +1321,77 @@ const inlineConstDeclaration: ParseFunction<InlineConstDeclaration> = (module, c
     expec(expression(module, code, index), err(code, index, "Value"), ({ parsed: value, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ','), err(code, index, '","'), index => ({
+        parsed: 
+            target.kind === 'const'
+                ? {
+                    kind: 'inline-const-declaration',
+                    name: target.name,
+                    type: target.type,
+                    awaited,
+                    value,
+                    module,
+                    code,
+                    startIndex,
+                    endIndex: index
+                }
+                : {
+                    kind: 'inline-destructuring-declaration',
+                    properties: target.properties,
+                    spread: target.spread,
+                    destructureKind: target.destructureKind,
+                    awaited,
+                    value,
+                    module,
+                    code,
+                    startIndex,
+                    endIndex: index
+                },
+        index
+    })))))))))))
+
+const _declarationTarget: ParseFunction<
+    | { kind: 'const', name: PlainIdentifier, type: TypeExpression|undefined }
+    | { 
+        kind: 'destructure',
+        properties: PlainIdentifier[],
+        spread: PlainIdentifier|undefined,
+        destructureKind: 'array'|'object',
+    }
+> = (module, code, startIndex) =>
+    _nameAndType(module, code, startIndex) ?? _destructure(module, code, startIndex)
+
+const _nameAndType: ParseFunction<{ kind: 'const', name: PlainIdentifier, type: TypeExpression|undefined }> = (module, code, startIndex) =>
+    given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) => ({
         parsed: {
-            kind: 'inline-const-declaration',
+            kind: 'const',
             name,
-            type,
-            awaited,
-            value,
-            module,
-            code,
-            startIndex,
-            endIndex: index
+            type
         },
         index
-    })))))))))))))
+    }))))
+
+const _destructure: ParseFunction<{ 
+    kind: 'destructure',
+    properties: PlainIdentifier[],
+    spread: PlainIdentifier|undefined,
+    destructureKind: 'array'|'object',
+}> = (module, code, startIndex) =>
+    given(parseExact('{')(module, code, startIndex) ?? parseExact('[')(module, code, startIndex), ({ parsed: destructureChar, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(parseSeries(module, code, index, plainIdentifier, ','), ({ parsed: properties, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(destructureChar === '{' ? consume(code, index, '}') : consume(code, index, ']'), err(code, index, destructureChar === '{' ? '"}"' : '"]"'), index => ({
+        parsed: {
+            kind: 'destructure',
+            properties,
+            spread: undefined,
+            destructureKind: destructureChar === '{' ? 'object' : 'array'
+        },
+        index
+    }))))))
+
 
 
 const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => memoize3((module, code, startIndex) => 

@@ -44,6 +44,39 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
 
             } break;
+            case "inline-destructuring-declaration":
+            case "destructuring-declaration-statement": {
+                const valueType = resolve(infer(current.value))
+                
+                if (current.kind === 'inline-destructuring-declaration' && current.awaited) {
+                    if (valueType.kind !== 'plan-type') {
+                        // make sure value is a plan
+                        reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${format(valueType)}'`))
+                    } else {
+                        // make sure destructuring matches value type
+                        if (current.destructureKind === 'object') {
+                            if (valueType.inner.kind !== 'object-type') {
+                                reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${format(valueType.inner)}'`))
+                            }
+                        } else {
+                            if (valueType.inner.kind !== 'array-type' && valueType.inner.kind !== 'tuple-type') {
+                                reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type '${format(valueType.inner)}'`))
+                            }
+                        }
+                    }
+                }
+
+                // make sure destructuring matches value type
+                if (current.destructureKind === 'object') {
+                    if (valueType.kind !== 'object-type') {
+                        reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${format(valueType)}'`))
+                    }
+                } else {
+                    if (valueType.kind !== 'array-type' && valueType.kind !== 'tuple-type') {
+                        reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type '${format(valueType)}'`))
+                    }
+                }
+            } break;
             case "remote-declaration": {
                 const planGeneratorType = resolve(infer(current.planGenerator))
 

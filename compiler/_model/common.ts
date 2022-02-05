@@ -1,11 +1,11 @@
 // deno-lint-ignore-file no-fallthrough
-import { AwaitStatement, ValueDeclarationStatement } from "./statements.ts";
+import { AwaitStatement, DestructuringDeclarationStatement, ValueDeclarationStatement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
 import { ValueDeclaration, FuncDeclaration, ProcDeclaration, JsFuncDeclaration, JsProcDeclaration, ImportAllDeclaration, RemoteDeclaration } from "./declarations.ts";
-import { Expression, Func, InlineConstDeclaration, Proc } from "./expressions.ts";
+import { Expression, Func, InlineConstDeclaration, InlineDestructuringDeclaration, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
-import { AST } from "./ast.ts";
+import { AST, PlainIdentifier } from "./ast.ts";
 
 const MODULE_NAME = Symbol('MODULE_NAME')
 export type ModuleName = NominalType<string, typeof MODULE_NAME>
@@ -19,6 +19,7 @@ export type ValueBinding =
     | { readonly kind: "iterator", readonly iterator: Expression }
     | { readonly kind: "arg", readonly holder: Func|Proc, readonly argIndex: number }
     | { readonly kind: "module", readonly imported: ImportAllDeclaration }
+    | { readonly kind: "destructure", readonly destructure: InlineDestructuringDeclaration|DestructuringDeclarationStatement, readonly property: PlainIdentifier }
 
 export type TypeBinding = {
     readonly kind: 'type-binding',
@@ -47,6 +48,8 @@ export function getBindingMutability(binding: ValueBinding, from: AST): "immutab
                     // @ts-expect-error
                     throw Error('Unreachable!' + binding.ast.kind)
             }
+        case 'destructure':
+            return 'immutable'
         case 'arg':
         case 'iterator':
         case 'module':
