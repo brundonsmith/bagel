@@ -23,7 +23,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "value-declaration":
             case "value-declaration-statement":
             case "inline-const-declaration": {
-
                 if (current.kind === 'inline-const-declaration' && current.awaited) {
                     const valueType = resolve(infer(current.value))
 
@@ -42,7 +41,19 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         expect(reportError, current.type, current.value)
                     }
                 }
+            } break;
+            case "await-statement": {
+                const valueType = resolve(infer(current.plan))
 
+                if (valueType.kind !== 'plan-type') {
+                    // make sure value is a plan
+                    reportError(miscError(current.plan, `Can only await expressions of type Plan; found type '${format(valueType)}'`))
+                } else if (current.type != null) {
+                    // make sure value fits declared type, if there is one
+                    if (!subsumes(reportError, current.type, valueType.inner)) {
+                        reportError(assignmentError(current.plan, current.type, valueType.inner))
+                    }
+                }
             } break;
             case "inline-destructuring-declaration":
             case "destructuring-declaration-statement": {
@@ -97,19 +108,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 } else {
                     // make sure value is a plan
                     reportError(miscError(current.planGenerator, `Remote declarations must be defined with either a Plan or a function that returns a Plan; found type '${format(planGeneratorType)}'`))
-                }
-            } break;
-            case "await-statement": {
-                const valueType = resolve(infer(current.plan))
-
-                if (valueType.kind !== 'plan-type') {
-                    // make sure value is a plan
-                    reportError(miscError(current.plan, `Can only await expressions of type Plan; found type '${format(valueType)}'`))
-                } else if (current.type != null) {
-                    // make sure value fits declared type, if there is one
-                    if (!subsumes(reportError, current.type, valueType.inner)) {
-                        reportError(assignmentError(current.plan, current.type, valueType.inner))
-                    }
                 }
             } break;
             case "test-expr-declaration": {

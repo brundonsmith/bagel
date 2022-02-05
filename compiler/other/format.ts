@@ -212,9 +212,9 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "nil-type": return `nil`;
         case "literal-type": return JSON.stringify(ast.value.value).replaceAll('"', "'");
         case "nominal-type": return ast.name.description ?? '<unnamed nominal>';
-        case "iterator-type": return `Iterator<${f(ast.inner)}>`;
-        case "plan-type": return `Plan<${f(ast.inner)}>`;
-        case "remote-type": return `Remote<${f(ast.inner)}>`
+        case "iterator-type": return ast.inner.kind === 'any-type' ? `Iterator` : `Iterator<${f(ast.inner)}>`;
+        case "plan-type":     return ast.inner.kind === 'any-type' ? `Plan` : `Plan<${f(ast.inner)}>`;
+        case "remote-type":   return ast.inner.kind === 'any-type' ? `Remote` : `Remote<${f(ast.inner)}>`
         case "unknown-type": return "unknown";
         case "any-type": return "any";
         case "element-type": return `Element`;

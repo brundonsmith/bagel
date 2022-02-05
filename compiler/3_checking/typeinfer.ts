@@ -341,41 +341,23 @@ const inferTypeInner = computedFn((
                 switch (decl.kind) {
                     case 'value-declaration':
                     case 'value-declaration-statement': {
-                        const baseType = decl.type ?? infer(decl.value)
+                        const baseType = decl.type ?? resolve(infer(decl.value))
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
                             decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== ast.module)
                                 ? 'immutable'
                                 : mutability)
 
                         // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
-                        const correctedBaseType = (
+                        const broadenedBaseType = (
                             !decl.isConst
                                 ? broadenTypeForMutation(baseType)
                                 : baseType
                         )
 
                         return {
-                            ...correctedBaseType,
+                            ...broadenedBaseType,
                             mutability
                         } as TypeExpression
-                    }
-                    case 'await-statement': {
-
-                        if (decl.type) {
-                            return decl.type
-                        }
-
-                        if (decl.name == null) {
-                            return UNKNOWN_TYPE
-                        }
-
-                        const planType = resolve(infer(decl.plan))
-
-                        if (planType.kind !== 'plan-type') {
-                            return UNKNOWN_TYPE
-                        } else {
-                            return planType.inner
-                        }
                     }
                     case 'func-declaration':
                     case 'proc-declaration':
@@ -390,6 +372,29 @@ const inferTypeInner = computedFn((
                             ...baseType,
                             mutability
                         } as TypeExpression
+                    }
+                    case 'await-statement': {
+
+                        if (decl.type) {
+                            return {
+                                ...decl.type,
+                                mutability: 'immutable'
+                            } as TypeExpression
+                        }
+
+                        if (decl.name == null) {
+                            return UNKNOWN_TYPE
+                        }
+
+                        const planType = resolve(infer(decl.plan))
+                        if (planType.kind !== 'plan-type') {
+                            return UNKNOWN_TYPE
+                        } else {
+                            return {
+                                ...planType.inner,
+                                mutability: 'immutable'
+                            } as TypeExpression
+                        }
                     }
                     case 'remote-declaration': {
                         const planGeneratorType = resolve(infer(decl.planGenerator))

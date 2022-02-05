@@ -176,9 +176,8 @@ Deno.test({
   name: "Empty proc",
   fn() {
     testCompile(
-      `proc foo() {
-            }`,
-      `const foo = (): void => { ; };`,
+      `proc foo() { }`,
+      `const foo = (): void => { };`,
     );
   },
 });
@@ -262,7 +261,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc doStuff(a) { }`,
-      `const doStuff = (a): void => { ; };`,
+      `const doStuff = (a): void => { };`,
     );
   },
 });
@@ -284,7 +283,7 @@ Deno.test({
       const doStuff = (items: ___Iter<number>): void => {
         let count = 0;
 
-        for (const item of items[___INNER_ITER]) { ;
+        for (const item of items[___INNER_ITER]) {
         };
 
         log(count);
@@ -372,7 +371,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc bar(a: string[], b: { foo: number }) { }`,
-      `const bar = (a: string[], b: {foo: number}): void => { ; };`,
+      `const bar = (a: string[], b: {foo: number}): void => { };`,
     );
   },
 });
@@ -479,7 +478,7 @@ Deno.test({
       foo.push(4);
     }`,
     `
-    const push = <T>(arr: T[], el: T): void => { ; };
+    const push = <T>(arr: T[], el: T): void => { };
 
     export const bar = (): void => {
       let foo = [1, 2, 3];

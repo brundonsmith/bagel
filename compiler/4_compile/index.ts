@@ -12,7 +12,7 @@ import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, TypeExpressi
 export function compile(module: Module, modulePath: ModuleName, includeTests?: boolean, excludeTypes = false): string {
     const runtimeCode = module.declarations
         .filter(decl => decl.kind !== 'test-expr-declaration' && decl.kind !== 'test-block-declaration')
-        .map(decl => compileOne(excludeTypes, modulePath, decl))
+        .map(decl => compileOne(excludeTypes, modulePath, decl) + ';')
         .join("\n\n") + (module.hasMain ? "\nsetTimeout(main, 0);\n" : "");
 
     if (includeTests) {
@@ -43,10 +43,10 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
     const c = (ast: AST) => compileOne(excludeTypes, module, ast)
 
     switch(ast.kind) {
-        case "import-all-declaration": return `import * as ${ast.alias.name} from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}";`;
+        case "import-all-declaration": return `import * as ${ast.alias.name} from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}"`;
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             c(name) + (alias ? ` as ${c(alias)}` : ``)
-        ).join(", ")} } from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}";`;
+        ).join(", ")} } from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}"`;
         case "type-declaration":  return (
             excludeTypes
                 ? ''
@@ -56,25 +56,28 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                     : '') +
                     `${exported(ast.exported)}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
                         ? `{ kind: typeof ${INT}${ast.name.name}, value: ${c(ast.type.inner)} }`
-                        : c(ast.type)};`
+                        : c(ast.type)}`
                 )
         );
         case "proc-declaration":
             return compileProcDeclaration(excludeTypes, module, ast)
         case "func-declaration":
             return compileFuncDeclaration(excludeTypes, module, ast)
-        case "value-declaration": {
-            const type = (
-                excludeTypes || !ast.type ? '' :
-                ast.isConst ? `: ${c(ast.type)}` :
-                `: { value: ${c(ast.type)} }`
-            )
+        case "value-declaration":
+        case "value-declaration-statement": {
+            const prefix = ast.kind === 'value-declaration' ? exported(ast.exported) : ''
 
-            const value = ast.isConst
-                ? c(ast.value)
-                : `{ value: ${c(ast.value)} }`
-            
-            return exported(ast.exported) + `const ${ast.name.name}${type} = ${value};`;
+            if (ast.kind === 'value-declaration' && !ast.isConst) {
+                const type = !excludeTypes && ast.type ? `: { value: ${c(ast.type)} }` : ''
+                const value = `{ value: ${c(ast.value)} }`
+
+                return prefix + `const ${ast.name.name}${type} = ${value}`
+            } else {
+                const type = !excludeTypes && ast.type ? `: ${c(ast.type)}` : ''
+                const value = c(ast.value)
+                
+                return prefix + (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${type} = ${value}`;
+            }
         }
         case "remote-declaration": {
             const planGeneratorType = resolveType(() => {}, inferType(() => {}, ast.planGenerator))
@@ -87,8 +90,6 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             )`
         }
         case "autorun-declaration": return `${INT}autorun(${c(ast.effect)})`;
-        case "value-declaration-statement":
-            return `${ast.isConst ? 'const' : 'let'} ${ast.name.name}${!excludeTypes && ast.type != null ? `: ${c(ast.type)}` : ''} = ${c(ast.value)}`;
         case "destructuring-declaration-statement":
         case "inline-destructuring-declaration": {
             const propsAndSpread = ast.properties.map(p => p.name).join(', ') + (ast.spread ? `, ...${ast.spread.name}` : '')
@@ -118,7 +119,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             }
         }
         case "await-statement": {
-            return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, ast.type)} = ` : '') + `await ${c(ast.plan)}();`
+            return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, ast.type)} = ` : '') + `await ${c(ast.plan)}()`
         }
         case "if-else-statement": return 'if ' + ast.cases
             .map(({ condition, outcome }) => 
@@ -224,7 +225,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
         case "indexer": return `${c(ast.subject)}[${c(ast.indexer)}]`;
-        case "block": return `{ ${blockContents(excludeTypes, module, ast)}; }`;
+        case "block": return `{ ${blockContents(excludeTypes, module, ast)} }`;
         case "element-tag": return `${INT}h('${ast.tagName.name}',{${
             objectEntries(excludeTypes, module, (ast.attributes as ([PlainIdentifier, Expression|Expression[]] | Spread)[]))}}, ${ast.children.map(c).join(', ')})`;
         case "union-type": return ast.members.map(c).join(" | ");
@@ -263,7 +264,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
 }
 
 function blockContents(excludeTypes: boolean, module: string, block: Block) {
-    return block.statements.map(s => compileOne(excludeTypes, module, s)).join("; ")
+    return block.statements.map(s => '\n' + compileOne(excludeTypes, module, s) + ';').join('') + '\n'
 }
 
 function objectEntries(excludeTypes: boolean, module: string, entries: readonly (readonly [PlainIdentifier, Expression | readonly Expression[]]|Spread)[]): string {
@@ -288,13 +289,13 @@ const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: Pro
     const baseProc = compileOne(excludeTypes, module, decl.value)
     const proc = decl.action ? `${INT}action(${baseProc})` : baseProc
     
-    return exported(decl.exported) + `const ${decl.name.name} = ` + proc + ';';
+    return exported(decl.exported) + `const ${decl.name.name} = ` + proc;
 }
 const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: FuncDeclaration): string => {
     const baseFunc = compileOne(excludeTypes, module, decl.value)
     const func = decl.memo ? `${INT}computedFn(${baseFunc})` : baseFunc
     
-    return exported(decl.exported) + `const ${decl.name.name} = ` + func + ';';
+    return exported(decl.exported) + `const ${decl.name.name} = ` + func;
 }
 
 function compileProc(excludeTypes: boolean, module: string, proc: Proc|JsProc): string {
