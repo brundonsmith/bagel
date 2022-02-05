@@ -5,7 +5,9 @@ export type Expression =
     | JavascriptEscape
     | Debug
     | Func
+    | JsFunc
     | Proc
+    | JsProc
     | Range
     | BinaryOperator
     | NegationOperator
@@ -38,6 +40,12 @@ export type Func = SourceInfo & {
     readonly body: Expression,
 }
 
+export type JsFunc = SourceInfo & {
+    readonly kind: "js-func",
+    readonly type: FuncType|GenericFuncType,
+    readonly body: string,
+}
+
 export type InlineConstGroup = SourceInfo & {
     readonly kind: "inline-const-group",
     readonly declarations: readonly (InlineConstDeclaration|InlineDestructuringDeclaration)[],
@@ -65,6 +73,12 @@ export type Proc = SourceInfo & {
     readonly kind: "proc",
     readonly type: ProcType|GenericProcType,
     readonly body: Block,
+}
+
+export type JsProc = SourceInfo & {
+    readonly kind: "js-proc",
+    readonly type: ProcType|GenericProcType,
+    readonly body: string,
 }
 
 export type Range = SourceInfo & {
@@ -161,15 +175,6 @@ export type SwitchCase = SourceInfo & {
     readonly outcome: Expression,
 }
 
-export type BooleanLiteral = SourceInfo & {
-    readonly kind: "boolean-literal",
-    readonly value: boolean,
-}
-
-export type NilLiteral = SourceInfo & {
-    readonly kind: "nil-literal",
-}
-
 export type ObjectLiteral = SourceInfo & {
     readonly kind: "object-literal",
     readonly entries: readonly (readonly [PlainIdentifier, Expression]|Spread)[],
@@ -200,6 +205,15 @@ export type NumberLiteral = SourceInfo & {
     readonly value: number,
 }
 
+export type BooleanLiteral = SourceInfo & {
+    readonly kind: "boolean-literal",
+    readonly value: boolean,
+}
+
+export type NilLiteral = SourceInfo & {
+    readonly kind: "nil-literal",
+}
+
 export type ElementTag = SourceInfo & {
     readonly kind: "element-tag",
     readonly tagName: PlainIdentifier,
@@ -215,7 +229,9 @@ export type AsCast = SourceInfo & {
 
 const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "proc": undefined,
+    "js-proc": undefined,
     "func": undefined,
+    "js-func": undefined,
     "binary-operator": undefined,
     "negation-operator": undefined,
     "invocation": undefined,

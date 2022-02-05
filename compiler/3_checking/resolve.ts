@@ -41,8 +41,6 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                     case "func-declaration":
                     case "proc-declaration":
                     case "value-declaration":
-                    case "js-func-declaration":
-                    case "js-proc-declaration": 
                     case "remote-declaration": {
                         if (declaration.name.name === name) {
                             if (resolved) {
@@ -97,9 +95,7 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                     const imported = otherModule.declarations.find(decl =>
                                         (decl.kind === 'value-declaration' || 
                                          decl.kind === 'func-declaration' || 
-                                         decl.kind === 'js-func-declaration' || 
                                          decl.kind === 'proc-declaration' || 
-                                         decl.kind === 'js-proc-declaration' || 
                                          decl.kind === 'type-declaration')
                                         && decl.name.name === importItem.name.name
                                         && decl.exported) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|undefined

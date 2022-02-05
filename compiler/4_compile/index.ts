@@ -4,8 +4,8 @@ import Store, { canonicalModuleName, Mode } from "../store.ts";
 import { jsFileLocation } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
-import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration, JsFuncDeclaration, JsProcDeclaration } from "../_model/declarations.ts";
-import { Expression, Proc, Func, Spread } from "../_model/expressions.ts";
+import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
+import { Expression, Proc, Func, Spread, JsFunc, JsProc } from "../_model/expressions.ts";
 import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
@@ -60,10 +60,8 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 )
         );
         case "proc-declaration":
-        case "js-proc-declaration":
             return compileProcDeclaration(excludeTypes, module, ast)
         case "func-declaration":
-        case "js-func-declaration":
             return compileFuncDeclaration(excludeTypes, module, ast)
         case "value-declaration": {
             const type = (
@@ -285,42 +283,27 @@ export const INT = `___`;
 
 const NIL = `undefined`;
 
-function compileProc(excludeTypes: boolean, module: string, proc: Proc): string {
-    const signature = compileProcOrFunctionSignature(excludeTypes, module, proc.type)
-    return signature + ` => ${compileOne(excludeTypes, module, proc.body)}`;
-}
 
-const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: ProcDeclaration|JsProcDeclaration): string => {
-    const baseProc = (
-        decl.kind === 'proc-declaration'
-            ? compileOne(excludeTypes, module, decl.value)
-            : compileProcOrFunctionSignature(excludeTypes, module, decl.type) + ` => {
-                ${decl.js}
-            }`)
-        
+const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: ProcDeclaration): string => {
+    const baseProc = compileOne(excludeTypes, module, decl.value)
     const proc = decl.action ? `${INT}action(${baseProc})` : baseProc
     
     return exported(decl.exported) + `const ${decl.name.name} = ` + proc + ';';
-
 }
-
-const compileFunc = (excludeTypes: boolean, module: string, func: Func): string => {
-    const signature = compileProcOrFunctionSignature(excludeTypes, module, func.type)
-    return signature + ` => (${compileOne(excludeTypes, module, func.body)})`
-}
-
-const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: FuncDeclaration|JsFuncDeclaration): string => {
-    const baseFunc = (
-        decl.kind === 'func-declaration'
-            ? compileOne(excludeTypes, module, decl.value)
-            : compileProcOrFunctionSignature(excludeTypes, module, decl.type) + ` => {
-                ${decl.js}
-            }`
-    )
-
+const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: FuncDeclaration): string => {
+    const baseFunc = compileOne(excludeTypes, module, decl.value)
     const func = decl.memo ? `${INT}computedFn(${baseFunc})` : baseFunc
     
     return exported(decl.exported) + `const ${decl.name.name} = ` + func + ';';
+}
+
+function compileProc(excludeTypes: boolean, module: string, proc: Proc|JsProc): string {
+    const signature = compileProcOrFunctionSignature(excludeTypes, module, proc.type)
+    return signature + ` => ${proc.kind === 'js-proc' ? `{${proc.body}}` : compileOne(excludeTypes, module, proc.body)}`;
+}
+const compileFunc = (excludeTypes: boolean, module: string, func: Func|JsFunc): string => {
+    const signature = compileProcOrFunctionSignature(excludeTypes, module, func.type)
+    return signature + ' => ' + (func.kind === 'js-func' ? `{${func.body}}` : `(${compileOne(excludeTypes, module, func.body)})`)
 }
 
 const compileProcOrFunctionSignature = (excludeTypes: boolean, module: string, subject: ProcType|GenericProcType|FuncType|GenericFuncType): string => {

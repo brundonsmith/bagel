@@ -43,29 +43,29 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "import-item":
             return ast.name.name + (ast.alias ? ' as ' + ast.alias.name : '')
         case "func-declaration":
-        case "js-func-declaration":
-        case "proc-declaration":
-        case "js-proc-declaration": {
+        case "proc-declaration": {
             const front = 
-                (ast.kind === 'js-func-declaration' || ast.kind === 'js-proc-declaration' ? 'js ' : '') +
+                (ast.value.kind === 'js-func' || ast.value.kind === 'js-proc' ? 'js ' : '') +
                 exported(ast.exported) + 
-                (ast.kind === 'func-declaration' || ast.kind === 'js-func-declaration' ? 'func ' : 'proc ') +
-                ((ast.kind === 'func-declaration' || ast.kind === 'js-func-declaration') && ast.memo ? 'memo ' : '') +
-                ((ast.kind === 'proc-declaration' || ast.kind === 'js-proc-declaration') && ast.action ? 'action ' : '') +
+                (ast.kind === 'func-declaration' ? 'func ' : 'proc ') +
+                (ast.kind === 'func-declaration' && ast.memo ? 'memo ' : '') +
+                (ast.kind === 'proc-declaration' && ast.action ? 'action ' : '') +
                 ast.name.name
 
-            const rawSubjectType = ast.kind === 'func-declaration' || ast.kind === 'proc-declaration' ? ast.value.type : ast.type
-            const subjectType = rawSubjectType.kind === 'generic-type' ? rawSubjectType.inner : rawSubjectType
+            const subjectType = ast.value.type.kind === 'generic-type' ? ast.value.type.inner : ast.value.type
 
             return front + 
-                (rawSubjectType.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, rawSubjectType.typeParams) : '') +
+                (ast.value.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.value.type.typeParams) : '') +
                 `(${subjectType.args.map(f).join(', ')})` +
                 (subjectType.kind === 'func-type' ? maybeTypeAnnotation(options, indent, parent, subjectType.returnType) : '') +
                 (subjectType.kind === 'func-type' ? ' => ' : '') +
-                (ast.kind === 'js-func-declaration' || ast.kind === 'js-proc-declaration'
-                    ? `{#${ast.js}#}`
+                (ast.value.kind === 'js-func' || ast.value.kind === 'js-proc'
+                    ? `{#${ast.value.body}#}`
                     : f(ast.value.body))
         }
+        case "js-func":
+        case "js-proc":
+            throw Error(ast.kind + ` should always be handled at the declaration level!`)
         case "arg":
             return ast.name.name + maybeTypeAnnotation(options, indent, parent, ast.type)
         case "block":

@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-fallthrough
 import { AwaitStatement, DestructuringDeclarationStatement, ValueDeclarationStatement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
-import { ValueDeclaration, FuncDeclaration, ProcDeclaration, JsFuncDeclaration, JsProcDeclaration, ImportAllDeclaration, RemoteDeclaration } from "./declarations.ts";
+import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration } from "./declarations.ts";
 import { Expression, Func, InlineConstDeclaration, InlineDestructuringDeclaration, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
@@ -15,7 +15,7 @@ export type ReportError = (error: BagelError) => void
 export type Binding = ValueBinding|TypeBinding
 
 export type ValueBinding =
-    | { readonly kind: "basic", readonly ast: ValueDeclaration|ProcDeclaration|JsProcDeclaration|FuncDeclaration|JsFuncDeclaration|ValueDeclarationStatement|InlineConstDeclaration|RemoteDeclaration|AwaitStatement }
+    | { readonly kind: "basic", readonly ast: ValueDeclaration|ProcDeclaration|FuncDeclaration|ValueDeclarationStatement|InlineConstDeclaration|RemoteDeclaration|AwaitStatement }
     | { readonly kind: "iterator", readonly iterator: Expression }
     | { readonly kind: "arg", readonly holder: Func|Proc, readonly argIndex: number }
     | { readonly kind: "module", readonly imported: ImportAllDeclaration }
@@ -35,9 +35,7 @@ export function getBindingMutability(binding: ValueBinding, from: AST): "immutab
                         ? 'immutable'
                         : 'assignable'
                 case 'func-declaration':
-                case 'js-func-declaration':
                 case 'proc-declaration':
-                case 'js-proc-declaration':
                 case 'inline-const-declaration':
                 case 'remote-declaration':
                 case 'await-statement':

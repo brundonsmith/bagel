@@ -285,25 +285,18 @@ autorun(() => {
 
 async function cleanCache() {
     const dir = cacheDir()
+
     let numFiles = 0;
     for await (const file of Deno.readDir(dir)) {
         numFiles++
         await Deno.remove(path.resolve(dir, file.name))
     }
-    // for (const module of Store.modules) {
-    //     const cachedPath = cachedFilePath(module)
-    //     try {
-    //         Deno.remove(cachedPath)
-    //     } catch {
-    //     }
-    // }
 
     return numFiles
 }
 
 
 // Utils
-
 const bundleOutput = async (entryFile: string, outfile: string) => {
 
     // const result = await Deno.emit(windowsPathToModulePath(bagelFileToTsFile(entryFile)), {

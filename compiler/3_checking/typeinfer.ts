@@ -56,6 +56,8 @@ const inferTypeInner = computedFn((
 
     switch(ast.kind) {
         case "proc":
+        case "js-proc":
+        case "js-func":
             return ast.type
         case "func": {
             
@@ -391,9 +393,6 @@ const inferTypeInner = computedFn((
                                     mutability
                                 } as TypeExpression
                             }
-                            case 'js-func-declaration':
-                            case 'js-proc-declaration':
-                                return resolve(decl.type)
                             case 'remote-declaration': {
                                 const planGeneratorType = resolve(infer(decl.planGenerator))
 

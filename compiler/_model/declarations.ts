@@ -1,6 +1,6 @@
 import { Block, Debug, PlainIdentifier, SourceInfo } from "./ast.ts";
-import { ExactStringLiteral, Expression, Func, JavascriptEscape, Proc } from "./expressions.ts";
-import { FuncType, GenericFuncType, GenericProcType, ProcType, TypeExpression } from "./type-expressions.ts";
+import { ExactStringLiteral, Expression, Func, JavascriptEscape, JsFunc, JsProc, Proc } from "./expressions.ts";
+import { TypeExpression } from "./type-expressions.ts";
 
 export type Declaration =
     | JavascriptEscape
@@ -8,9 +8,7 @@ export type Declaration =
     | ImportDeclaration
     | TypeDeclaration
     | ProcDeclaration
-    | JsProcDeclaration
     | FuncDeclaration
-    | JsFuncDeclaration
     | ValueDeclaration
     | RemoteDeclaration
     | AutorunDeclaration
@@ -48,30 +46,14 @@ export type ProcDeclaration = SourceInfo & Exported & {
     readonly kind: "proc-declaration",
     readonly action: boolean,
     readonly name: PlainIdentifier,
-    readonly value: Proc,
-}
-
-export type JsProcDeclaration = SourceInfo & Exported & {
-    readonly kind: "js-proc-declaration",
-    readonly action: boolean,
-    readonly name: PlainIdentifier,
-    readonly type: ProcType|GenericProcType,
-    readonly js: string,
+    readonly value: Proc|JsProc,
 }
 
 export type FuncDeclaration = SourceInfo & Exported & {
     readonly kind: "func-declaration",
     readonly memo: boolean,
     readonly name: PlainIdentifier,
-    readonly value: Func,
-}
-
-export type JsFuncDeclaration = SourceInfo & Exported & {
-    readonly kind: "js-func-declaration",
-    readonly memo: boolean,
-    readonly name: PlainIdentifier,
-    readonly type: FuncType|GenericFuncType,
-    readonly js: string,
+    readonly value: Func|JsFunc,
 }
 
 export type ValueDeclaration = SourceInfo & {

@@ -385,8 +385,8 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "import-item":
             case "proc-declaration":
             case "func-declaration":
-            case "js-proc-declaration":
-            case "js-func-declaration":
+            case "js-proc":
+            case "js-func":
             case "type-declaration":
             case "test-block-declaration":
             case "inline-const-group":
