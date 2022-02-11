@@ -523,10 +523,10 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
         }
         if (resolvedValue.kind === "object-type") {
             // TODO: Spreads
-            subsumes(reportError, resolvedDestination.keyType, STRING_TYPE)
-            return resolvedValue.entries.every(({ type }) =>
-                // TODO: Optionals
-                subsumes(reportError, resolvedDestination.keyType, type))
+            return subsumes(reportError, resolvedDestination.keyType, STRING_TYPE)
+                && resolvedValue.entries.every(({ type }) =>
+                    // TODO: Optionals
+                    subsumes(reportError, resolvedDestination.valueType, type))
         }
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
         // TODO: Spreads
