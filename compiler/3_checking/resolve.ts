@@ -58,8 +58,23 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                     reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
                                 }
 
-                                if (!declaration.isConst && from.kind === 'value-declaration' && from.isConst) {
-                                    reportError(miscError(originator, `Can't reference let-declarations from constants`))
+                                if (!declaration.isConst) {
+
+                                    // lets can only be referenced by procs, autoruns, derives, remotes
+                                    if (from.kind !== 'proc-declaration' 
+                                     && from.kind !== 'autorun-declaration' 
+                                     && from.kind !== 'derive-declaration' 
+                                     && from.kind !== 'remote-declaration') {
+                                        // TODO: check against lambdas too. move to typecheck.ts? 
+                                        const declName = (
+                                            from.kind === 'value-declaration' && from.isConst ? 'constants' :
+                                            from.kind === 'value-declaration' && !from.isConst ? 'let declarations' :
+                                            from.kind === 'func-declaration' ? 'funcs' :
+                                            'this declaration'
+                                        )
+
+                                        reportError(miscError(originator, `Can't reference let-declarations from ${declName}`))
+                                    }
                                 }
                             }
     
