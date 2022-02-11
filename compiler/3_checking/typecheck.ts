@@ -571,6 +571,17 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
             return resolve(type.extends ?? UNKNOWN_TYPE)
         case "parenthesized-type":
             return resolve(type.inner)
+        case "plan-type": {
+            let inner = type.inner
+            while (inner.kind === 'plan-type') {
+                inner = inner.inner
+            }
+
+            return {
+                ...type,
+                inner: resolve(inner)
+            }
+        }
         case "maybe-type": {
             const { mutability, parent, module, code, startIndex, endIndex } = type
 
@@ -596,7 +607,7 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
         case "union-type": {
             const resolved = {
                 ...type,
-                members: type.members.map(member => resolve(member))
+                members: type.members.map(resolve)
             }
 
             const simplified = simplifyUnions(reportError, resolved)
