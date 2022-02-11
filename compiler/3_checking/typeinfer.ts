@@ -368,6 +368,14 @@ const inferTypeInner = computedFn((
                                 ? 'immutable'
                                 : 'readonly')
 
+                        if (decl.kind === 'inline-const-declaration' && decl.awaited) {
+                            if (baseType.kind === 'plan-type') {
+                                return baseType.inner
+                            } else {
+                                return UNKNOWN_TYPE
+                            }
+                        }
+                        
                         return {
                             ...baseType,
                             mutability
