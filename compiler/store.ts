@@ -214,6 +214,7 @@ export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn', 'autorun'
 
 const JS_PRELUDE = `
 import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/core.ts";
+
 `
 
 const BGL_PRELUDE_DATA = [
