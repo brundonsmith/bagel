@@ -48,14 +48,18 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                 reportError(alreadyDeclared(declaration.name))
                             }
     
-                            // detect value being referenced before it's available
                             if (declaration.kind === 'value-declaration') { 
+
+                                // detect value being referenced before it's available
                                 const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
-    
                                 if (comingFromIndex < declarationIndex) {
                                     reportError(miscError(originator, `Can't reference "${name}" before initialization`))
                                 } else if (comingFromIndex === declarationIndex) {
                                     reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
+                                }
+
+                                if (!declaration.isConst && from.kind === 'value-declaration' && from.isConst) {
+                                    reportError(miscError(originator, `Can't reference let-declarations from constants`))
                                 }
                             }
     
