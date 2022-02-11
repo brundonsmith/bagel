@@ -658,11 +658,11 @@ function broadenTypeForMutation(type: TypeExpression): TypeExpression {
         if (type.value.kind === 'boolean-literal') {
             return BOOLEAN_TYPE
         }
-    } else if (type.kind === 'tuple-type') {
+    } else if (type.kind === 'tuple-type' && type.mutability === 'mutable') {
         return { ...type, kind: 'array-type', element: { kind: 'union-type', members: type.members.map(broadenTypeForMutation), parent: type.parent, ...TYPE_AST_NOISE } }
-    } else if (type.kind === 'array-type') {
+    } else if (type.kind === 'array-type'&& type.mutability === 'mutable') {
         return { ...type, element: broadenTypeForMutation(type.element) }
-    } else if (type.kind === 'object-type') {
+    } else if (type.kind === 'object-type' && type.mutability === 'mutable') {
         return { ...type, entries: type.entries.map(attribute => ({ ...attribute, type: broadenTypeForMutation(attribute.type) })) }
     }
 
