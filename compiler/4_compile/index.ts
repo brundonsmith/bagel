@@ -130,8 +130,12 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             + (ast.defaultCase ? ` else ${c(ast.defaultCase)}` : '');
         case "for-loop": return `for (const ${c(ast.itemIdentifier)} of ${c(ast.iterator)}[${INT}INNER_ITER]) ${c(ast.body)}`;
         case "while-loop": return `while (${c(ast.condition)}) ${c(ast.body)}`;
-        case "proc": return compileProc(excludeTypes, module, ast);
-        case "func": return compileFunc(excludeTypes, module, ast);
+        case "proc":
+        case "js-proc":
+            return compileProc(excludeTypes, module, ast);
+        case "func":
+        case "js-func":
+            return compileFunc(excludeTypes, module, ast);
         case "inline-const-group": {
             const awaited = ast.declarations.some(d => d.awaited)
 
