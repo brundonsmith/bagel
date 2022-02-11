@@ -75,8 +75,12 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return (ast.kind === 'value-declaration' ? exported(ast.exported) : '') + 
                 (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${f(ast.value)}` +
                 (ast.kind === 'value-declaration-statement' ? ';' : '')
-        case "remote-declaration":
-            return exported(ast.exported) + `remote ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${format(ast.planGenerator)}`
+        case "derive-declaration":
+        case "remote-declaration": {
+            const keyword = ast.kind === 'derive-declaration' ? 'derive' : 'remote'
+            const fn = format(ast.kind === 'derive-declaration' ? ast.computeFn : ast.planGenerator)
+            return exported(ast.exported) + `${keyword} ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} ${fn}`
+        }
         case "await-statement":
             return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ` : '') + `await ${f(ast.plan)};`
         case "type-declaration":

@@ -33,7 +33,7 @@ export type JavascriptEscape = SourceInfo & {
     readonly kind: "javascript-escape",
     readonly js: string,
 }
-  
+
 export type Func = SourceInfo & {
     readonly kind: "func",
     readonly type: FuncType|GenericFuncType,

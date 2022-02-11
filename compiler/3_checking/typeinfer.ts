@@ -396,6 +396,18 @@ const inferTypeInner = computedFn((
                             } as TypeExpression
                         }
                     }
+                    case 'derive-declaration': {
+                        if (decl.type) {
+                            return decl.type
+                        }
+
+                        const computeFnType = resolve(infer(decl.computeFn))
+                        if (computeFnType.kind === 'func-type' && computeFnType.returnType) {
+                            return computeFnType.returnType
+                        }
+
+                        return UNKNOWN_TYPE
+                    }
                     case 'remote-declaration': {
                         const planGeneratorType = resolve(infer(decl.planGenerator))
 

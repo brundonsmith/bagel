@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-fallthrough
 import { AwaitStatement, DestructuringDeclarationStatement, ForLoop, ValueDeclarationStatement } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
-import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration } from "./declarations.ts";
+import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration } from "./declarations.ts";
 import { Expression, Func, InlineConstDeclaration, InlineDestructuringDeclaration, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
@@ -21,6 +21,7 @@ export type ValueBinding = {
         | FuncDeclaration
         | ValueDeclarationStatement
         | InlineConstDeclaration
+        | DeriveDeclaration
         | RemoteDeclaration
         | AwaitStatement
         | ForLoop

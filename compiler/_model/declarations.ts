@@ -10,6 +10,7 @@ export type Declaration =
     | ProcDeclaration
     | FuncDeclaration
     | ValueDeclaration
+    | DeriveDeclaration
     | RemoteDeclaration
     | AutorunDeclaration
     | TestExprDeclaration
@@ -63,6 +64,13 @@ export type ValueDeclaration = SourceInfo & {
     readonly value: Expression,
     readonly isConst: boolean,
     readonly exported: undefined|'export'|'expose',
+}
+
+export type DeriveDeclaration = SourceInfo & Exported & {
+    readonly kind: "derive-declaration",
+    readonly name: PlainIdentifier,
+    readonly type: TypeExpression|undefined,
+    readonly computeFn: Expression,
 }
 
 export type RemoteDeclaration = SourceInfo & Exported & {

@@ -7,8 +7,8 @@ import { getBindingMutability, ReportError } from "../_model/common.ts";
 import { iterateParseTree, typesEqual } from "../utils/ast.ts";
 import Store from "../store.ts";
 import { format } from "../other/format.ts";
-import { stripSourceInfo } from "../utils/debugging.ts";
 import { ExactStringLiteral, Expression } from "../_model/expressions.ts";
+import { stripSourceInfo } from "../utils/debugging.ts";
 
 /**
  * Walk an entire AST and report all issues that we find
@@ -88,6 +88,25 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     }
                 }
             } break;
+            case "derive-declaration": {
+                const computeFnType = resolve(infer(current.computeFn))
+
+                if (computeFnType.kind === 'func-type') {
+                    if (computeFnType.args.length > 0) {
+                        reportError(miscError(current.computeFn, `Derive functions shouldn't take any arguments`))
+                    }
+
+                    if (current.type != null) {
+                        // make sure value fits declared type, if there is one
+                        if (!subsumes(reportError, current.type, computeFnType.returnType ?? UNKNOWN_TYPE)) {
+                            reportError(assignmentError(current.computeFn, current.type, computeFnType.returnType ?? UNKNOWN_TYPE))
+                        }
+                    }
+                } else {
+                    // make sure value is a plan
+                    reportError(miscError(current.computeFn, `Remote declarations must be defined with either a Plan or a function that returns a Plan; found type '${format(computeFnType)}'`))
+                }
+            } break;
             case "remote-declaration": {
                 const planGeneratorType = resolve(infer(current.planGenerator))
 
@@ -99,6 +118,10 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         }
                     }
                 } else if (planGeneratorType.kind === 'func-type' && planGeneratorType.returnType?.kind === 'plan-type') {
+                    if (planGeneratorType.args.length > 0) {
+                        reportError(miscError(current.planGenerator, `Remote functions shouldn't take any arguments`))
+                    }
+
                     if (current.type != null) {
                         // make sure value fits declared type, if there is one
                         if (!subsumes(reportError, current.type, planGeneratorType.returnType.inner)) {

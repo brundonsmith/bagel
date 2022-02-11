@@ -79,6 +79,8 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 return prefix + (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${type} = ${value}`;
             }
         }
+        case "derive-declaration": 
+            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `() => ${c(ast.type)}` : ``} = ${INT}computedFn(${c(ast.computeFn)})`
         case "remote-declaration": {
             const planGeneratorType = resolveType(() => {}, inferType(() => {}, ast.planGenerator))
             const compiledPlanGenerator = c(ast.planGenerator)
@@ -189,11 +191,13 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
 
             if (binding && binding.kind === 'value-binding' && binding.owner.kind === 'value-declaration' && !binding.owner.isConst) {
                 return `${INT}observe(${ast.name}, 'value')`
+            } else if (binding && binding.kind === 'value-binding' && binding.owner.kind === 'derive-declaration') {
+                return `${ast.name}()`
             } else {
                 return ast.name
             }
         }
-        case "property-accessor":{
+        case "property-accessor": {
 
             // HACK: let-declarations accessed from whole-module imports need special treatment!
             // will this break if the module import gets aliased so something else?

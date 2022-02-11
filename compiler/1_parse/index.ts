@@ -3,7 +3,7 @@ import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration } from "../_model/declarations.ts";
+import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam } from "../_model/type-expressions.ts";
@@ -61,6 +61,7 @@ const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     ?? procDeclaration(module, code, startIndex)
     ?? funcDeclaration(module, code, startIndex)
     ?? valueDeclaration(module, code, startIndex)
+    ?? deriveDelcaration(module, code, startIndex)
     ?? remoteDeclaration(module, code, startIndex)
     ?? autorunDeclaration(module, code, startIndex)
     ?? testExprDeclaration(module, code, startIndex)
@@ -772,6 +773,29 @@ const valueDeclaration: ParseFunction<ValueDeclaration> = (module, code, startIn
             index,
     })))))))))))
 
+const deriveDelcaration: ParseFunction<DeriveDeclaration> = (module, code, startIndex) =>
+    given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
+    given(consume(code, index, "derive"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(expression(module, code, index), ({ parsed: computeFn, index }) => ({
+        parsed: {
+            kind: 'derive-declaration',
+            name,
+            type,
+            computeFn,
+            exported,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    })))))))))
+
 const remoteDeclaration: ParseFunction<RemoteDeclaration> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
     given(consume(code, index, "remote"), index =>
@@ -779,8 +803,6 @@ const remoteDeclaration: ParseFunction<RemoteDeclaration> = (module, code, start
     given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, "="), index =>
     given(consumeWhitespace(code, index), index =>
     given(expression(module, code, index), ({ parsed: planGenerator, index }) => ({
         parsed: {
@@ -795,7 +817,7 @@ const remoteDeclaration: ParseFunction<RemoteDeclaration> = (module, code, start
             endIndex: index,
         },
         index
-    })))))))))))
+    })))))))))
 
 const _maybeTypeAnnotation: ParseFunction<TypeExpression|undefined> = (module, code, startIndex) =>{
     const result = (

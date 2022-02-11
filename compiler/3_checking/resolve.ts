@@ -41,6 +41,7 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                     case "func-declaration":
                     case "proc-declaration":
                     case "value-declaration":
+                    case "derive-declaration":
                     case "remote-declaration": {
                         if (declaration.name.name === name) {
                             if (resolved) {
