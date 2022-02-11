@@ -80,13 +80,13 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             }
         }
         case "derive-declaration": 
-            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `() => ${c(ast.type)}` : ``} = ${INT}computedFn(${c(ast.computeFn)})`
+            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `() => ${c(ast.type)}` : ``} = ${INT}computedFn(${c(ast.fn)})`
         case "remote-declaration": {
-            const planGeneratorType = resolveType(() => {}, inferType(() => {}, ast.planGenerator))
-            const compiledPlanGenerator = c(ast.planGenerator)
+            const fnType = resolveType(() => {}, inferType(() => {}, ast.fn))
+            const compiledPlanGenerator = c(ast.fn)
 
             return exported(ast.exported) + `const ${ast.name.name} = new ${INT}Remote${ast.type ? `<${c(ast.type)}>` : ``}(
-                ${planGeneratorType.kind === 'plan-type'
+                ${fnType.kind === 'plan-type'
                     ? `() => ${compiledPlanGenerator}`
                     : compiledPlanGenerator}
             )`

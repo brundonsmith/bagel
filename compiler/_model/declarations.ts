@@ -70,14 +70,14 @@ export type DeriveDeclaration = SourceInfo & Exported & {
     readonly kind: "derive-declaration",
     readonly name: PlainIdentifier,
     readonly type: TypeExpression|undefined,
-    readonly computeFn: Expression,
+    readonly fn: Func,
 }
 
 export type RemoteDeclaration = SourceInfo & Exported & {
     readonly kind: "remote-declaration",
     readonly name: PlainIdentifier,
     readonly type: TypeExpression|undefined,
-    readonly planGenerator: Expression,
+    readonly fn: Func,
 }
 
 export type TestExprDeclaration = SourceInfo & {

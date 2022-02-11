@@ -409,21 +409,20 @@ const inferTypeInner = computedFn((
                             return decl.type
                         }
 
-                        const computeFnType = resolve(infer(decl.computeFn))
-                        if (computeFnType.kind === 'func-type' && computeFnType.returnType) {
-                            return computeFnType.returnType
+                        const fnType = resolve(infer(decl.fn))
+                        if (fnType.kind === 'func-type' && fnType.returnType) {
+                            return fnType.returnType
                         }
 
                         return UNKNOWN_TYPE
                     }
                     case 'remote-declaration': {
-                        const planGeneratorType = resolve(infer(decl.planGenerator))
+                        const fnType = resolve(infer(decl.fn))
 
                         let inner;
-                        if (planGeneratorType.kind === 'plan-type') {
-                            inner = planGeneratorType.inner
-                        } else if (planGeneratorType.kind === 'func-type') {
-
+                        if (fnType.kind === 'plan-type') {
+                            inner = fnType.inner
+                        } else if (fnType.kind === 'func-type') {
                             inner = UNKNOWN_TYPE
                         } else {
                             inner = UNKNOWN_TYPE

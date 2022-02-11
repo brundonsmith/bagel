@@ -61,8 +61,7 @@ const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     ?? procDeclaration(module, code, startIndex)
     ?? funcDeclaration(module, code, startIndex)
     ?? valueDeclaration(module, code, startIndex)
-    ?? deriveDelcaration(module, code, startIndex)
-    ?? remoteDeclaration(module, code, startIndex)
+    ?? deriveOrRemoteDelcaration(module, code, startIndex)
     ?? autorunDeclaration(module, code, startIndex)
     ?? testExprDeclaration(module, code, startIndex)
     ?? testBlockDeclaration(module, code, startIndex)
@@ -773,43 +772,20 @@ const valueDeclaration: ParseFunction<ValueDeclaration> = (module, code, startIn
             index,
     })))))))))))
 
-const deriveDelcaration: ParseFunction<DeriveDeclaration> = (module, code, startIndex) =>
+const deriveOrRemoteDelcaration: ParseFunction<DeriveDeclaration|RemoteDeclaration> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
-    given(consume(code, index, "derive"), index =>
+    given(parseExact("derive")(module, code, index) ?? parseExact("remote")(module, code, index), ({ parsed: kind, index }) =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) =>
     given(consumeWhitespace(code, index), index =>
-    given(expression(module, code, index), ({ parsed: computeFn, index }) => ({
+    given(func(module, code, index), ({ parsed: fn, index }) => ({
         parsed: {
-            kind: 'derive-declaration',
+            kind: kind === 'derive' ? 'derive-declaration' : 'remote-declaration',
             name,
             type,
-            computeFn,
-            exported,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        index
-    })))))))))
-
-const remoteDeclaration: ParseFunction<RemoteDeclaration> = (module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
-    given(consume(code, index, "remote"), index =>
-    given(consumeWhitespaceRequired(code, index), index =>
-    given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(expression(module, code, index), ({ parsed: planGenerator, index }) => ({
-        parsed: {
-            kind: 'remote-declaration',
-            name,
-            type,
-            planGenerator,
+            fn,
             exported,
             module,
             code,

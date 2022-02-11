@@ -89,48 +89,48 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "derive-declaration": {
-                const computeFnType = resolve(infer(current.computeFn))
+                const fnType = resolve(infer(current.fn))
 
-                if (computeFnType.kind === 'func-type') {
-                    if (computeFnType.args.length > 0) {
-                        reportError(miscError(current.computeFn, `Derive functions shouldn't take any arguments`))
+                if (fnType.kind === 'func-type') {
+                    if (fnType.args.length > 0) {
+                        reportError(miscError(current.fn, `Derive functions shouldn't take any arguments`))
                     }
 
                     if (current.type != null) {
                         // make sure value fits declared type, if there is one
-                        if (!subsumes(reportError, current.type, computeFnType.returnType ?? UNKNOWN_TYPE)) {
-                            reportError(assignmentError(current.computeFn, current.type, computeFnType.returnType ?? UNKNOWN_TYPE))
+                        if (!subsumes(reportError, current.type, fnType.returnType ?? UNKNOWN_TYPE)) {
+                            reportError(assignmentError(current.fn, current.type, fnType.returnType ?? UNKNOWN_TYPE))
                         }
                     }
                 } else {
                     // make sure value is a plan
-                    reportError(miscError(current.computeFn, `Remote declarations must be defined with either a Plan or a function that returns a Plan; found type '${format(computeFnType)}'`))
+                    reportError(miscError(current.fn, `Remote declarations must be defined with either a Plan or a function that returns a Plan; found type '${format(fnType)}'`))
                 }
             } break;
             case "remote-declaration": {
-                const planGeneratorType = resolve(infer(current.planGenerator))
+                const fnType = resolve(infer(current.fn))
 
-                if (planGeneratorType.kind === 'plan-type') {
+                if (fnType.kind === 'plan-type') {
                     if (current.type != null) {
                         // make sure value fits declared type, if there is one
-                        if (!subsumes(reportError, current.type, planGeneratorType.inner)) {
-                            reportError(assignmentError(current.planGenerator, current.type, planGeneratorType.inner))
+                        if (!subsumes(reportError, current.type, fnType.inner)) {
+                            reportError(assignmentError(current.fn, current.type, fnType.inner))
                         }
                     }
-                } else if (planGeneratorType.kind === 'func-type' && planGeneratorType.returnType?.kind === 'plan-type') {
-                    if (planGeneratorType.args.length > 0) {
-                        reportError(miscError(current.planGenerator, `Remote functions shouldn't take any arguments`))
+                } else if (fnType.kind === 'func-type' && fnType.returnType?.kind === 'plan-type') {
+                    if (fnType.args.length > 0) {
+                        reportError(miscError(current.fn, `Remote functions shouldn't take any arguments`))
                     }
 
                     if (current.type != null) {
                         // make sure value fits declared type, if there is one
-                        if (!subsumes(reportError, current.type, planGeneratorType.returnType.inner)) {
-                            reportError(assignmentError(current.planGenerator, current.type, planGeneratorType.returnType.inner))
+                        if (!subsumes(reportError, current.type, fnType.returnType.inner)) {
+                            reportError(assignmentError(current.fn, current.type, fnType.returnType.inner))
                         }
                     }
                 } else {
                     // make sure value is a plan
-                    reportError(miscError(current.planGenerator, `Remote declarations must be defined with either a Plan or a function that returns a Plan; found type '${format(planGeneratorType)}'`))
+                    reportError(miscError(current.fn, `Remote declarations must be defined with either a Plan or a function that returns a Plan; found type '${format(fnType)}'`))
                 }
             } break;
             case "test-expr-declaration": {
