@@ -236,6 +236,14 @@ export class Iter<T> {
     map = <R>(fn: (el: T) => R): Iter<R> => {
         return new Iter(map(fn, (this as Iter<any>)[INNER_ITER]))
     }
+
+    reduce = <R>(init: R, fn: (acc: R, el: T) => R): R => {
+        let acc = init
+        for (const el of this[INNER_ITER]) {
+            acc = fn(acc, el)
+        }
+        return acc
+    }
     
     filter = (fn: (el: T) => boolean): Iter<T> => {
         return new Iter(filter(fn, (this as Iter<any>)[INNER_ITER]))
