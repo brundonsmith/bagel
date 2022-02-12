@@ -75,7 +75,13 @@ export function observe<O extends object, K extends typeof COMPUTED_RESULT>(obj:
 export function observe<O extends object, K extends (keyof O & string|number) | typeof COMPUTED_RESULT | typeof WHOLE_OBJECT>(obj: O, prop: K)
         // @ts-ignore
         : O[K] | O | undefined {
-    if (reportObservableAccessed && typeof obj === 'object' && obj != null) {
+
+    // tolerate optional-chaining
+    if (obj == null) {
+        return undefined
+    }
+
+    if (reportObservableAccessed) {
         // console.log('observe(', obj, prop, ')')
         // console.log(`observe()`, { obj, prop })
         reportObservableAccessed({ obj: new WeakRef(obj), prop })
