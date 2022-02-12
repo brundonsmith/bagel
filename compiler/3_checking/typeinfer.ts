@@ -1183,6 +1183,10 @@ export function invocationFromMethodCall(expr: Expression): Invocation|undefined
 
             const inv: Invocation = {
                 ...expr,
+                module,
+                code,
+                startIndex,
+                endIndex,
                 subject: {
                     kind: 'local-identifier',
                     name: fnName,
