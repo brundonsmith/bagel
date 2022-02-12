@@ -218,7 +218,7 @@ import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "https:
 `
 
 const BGL_PRELUDE_DATA = [
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/core.bgl' as ModuleName, imports: [ 'log', 'iter' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/core.bgl' as ModuleName, imports: [ 'log', 'iter', 'UnknownObject' ] },
     { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/bagel.bgl' as ModuleName, imports: [ 'BagelConfig' ] },
     { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/arrays.bgl' as ModuleName, imports: [ 'push', 'unshift', 'pop', 'shift', 'splice' ] },
     { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/strings.bgl' as ModuleName, imports: [ 'includes', 'indexOf', 'replace', 'split', 'startsWith', 'substring', 'toLowerCase', 'toUpperCase', 'trim' ] },

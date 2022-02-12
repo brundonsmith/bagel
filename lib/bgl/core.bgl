@@ -16,4 +16,4 @@ export js func iter<T>(x: const T[]): Iterator<T> => {#
     return ___iter(x)
 #}
 
-export type Object = {[string]: unknown}
+export type UnknownObject = {[string]: unknown}
