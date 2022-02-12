@@ -1,4 +1,8 @@
 
+js#
+import { invalidate as ___invalidate } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/core.ts'
+#js
+
 export js proc push<T>(a: T[], el: T) {#
     a.push(el); ___invalidate(a, ___WHOLE_OBJECT)
 #}
