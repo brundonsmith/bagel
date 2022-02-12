@@ -2,8 +2,3 @@
 MVP:
 - async/await (function keyword? what about async procs?)
 - passing foreign objects to pure functions (dirty function calls?)
-
-Later:
-- handling concurrent functions when classes are allowed to be passed to 
-functions (limit to serializable only? automatically reapply prototype on the 
-other side?)

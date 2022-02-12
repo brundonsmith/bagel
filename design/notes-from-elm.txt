@@ -1,26 +1,7 @@
 Notes from Elm:
-- Ergonomic symbols/symbol-types?
-- Enshrine root view as a special declaration instead of just the main() proc?
 - Events like onClick in Elm just take a value (msg); we take a proc
-- Thorough body of convenience functions like String.reverse
-- Nominal types == symbols?
-- Elm calls generics "type variables"
-- Constrained generics/type variables
-    - Only four different pre-defined "constrainted type variables" exist; no 
-    custom ones allowed. Like poor-man's traits/typeclasses. `number`, 
-    `appendable`, `comparable`, `compappend`. These are basically just for 
-    operators!
-- Type variables are not necessarily used inside an alias; they are 
-syntactically distinguished using lowercase names (Int, Float, number)
 - Elm has no optional arguments?
 - classList function is built-in
 - Deeper type inference- Elm allows the total absence of type declarations
 even on top-level declarations
-- Enums with associated data instead of discriminated object unions?
-- Need a case expression of some kind
-- Enums with associated data + basic pattern matching is probably _much_ easier 
-than discriminated object unions with type refinement. Though we might need
-type refinement no matter what...
-- Allow namespacing for module imports? (Module.foo)
 - Automatic decoding should allow us to skip hand-written decoders
-- Pivotal CLI command with sub-commands for different things
