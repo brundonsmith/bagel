@@ -262,7 +262,7 @@ const watchers = new Map<ModuleName, Deno.FsWatcher>()
 autorun(() => {
     if (Store.mode?.watch) {
         for (const module of Store.modules) {
-            if (watchers.get(module) == null) {
+            if (!pathIsRemote(module) && watchers.get(module) == null) {
                 const watcher = Deno.watchFs(module);
                 watchers.set(module, watcher);
 
