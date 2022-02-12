@@ -255,7 +255,7 @@ export function bagelFileToTsFile(module: ModuleName, isBundle?: boolean): strin
             ? filename
             : path.basename(path.dirname(module))
 
-        bundleFile = bundleName + '.bundle.bgl.js'
+        bundleFile = bundleName + '.bundle.js'
     }
 
     return path.resolve(
