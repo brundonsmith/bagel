@@ -15,3 +15,5 @@ export js func logf<T>(x: T): T => {#
 export js func iter<T>(x: const T[]): Iterator<T> => {#
     return ___iter(x)
 #}
+
+export type Object = {[string]: unknown}
