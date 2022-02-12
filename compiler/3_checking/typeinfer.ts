@@ -422,8 +422,8 @@ const inferTypeInner = computedFn((
                         let inner;
                         if (fnType.kind === 'plan-type') {
                             inner = fnType.inner
-                        } else if (fnType.kind === 'func-type') {
-                            inner = UNKNOWN_TYPE
+                        } else if (fnType.kind === 'func-type' && fnType.returnType?.kind === 'plan-type') {
+                            inner = fnType.returnType.inner
                         } else {
                             inner = UNKNOWN_TYPE
                         }
