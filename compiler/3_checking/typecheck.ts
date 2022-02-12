@@ -251,7 +251,8 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     // check that the right number of arguments are passed
                     if (invocation.args.length > invoked.args.length || invocation.args.length < nonOptionalArgs) {
                         const functionOrProcedure = invoked.kind === "func-type" ? "Function" : "Procedure"
-                        reportError(miscError(invocation, `${functionOrProcedure} expected ${nonOptionalArgs}-${invoked.args.length} arguments but got ${invocation.args.length}`));
+                        const argsStr = nonOptionalArgs !== invoked.args.length ? `${nonOptionalArgs}-${invoked.args.length}` : invoked.args.length
+                        reportError(miscError(invocation, `${functionOrProcedure} expected ${argsStr} arguments but got ${invocation.args.length}`));
                     } else { // check that each argument matches the expected type
                         for (let i = 0; i < invocation.args.length; i++) {
                             const arg = invocation.args[i]
