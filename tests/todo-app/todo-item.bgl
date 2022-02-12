@@ -1,5 +1,5 @@
 
-from '../../lib/bgl/html' import { Event }
+from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/html.bgl' import { Event }
 
 export type TodoItem = {
     text: string,

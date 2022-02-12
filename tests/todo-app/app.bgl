@@ -1,13 +1,12 @@
 
-import './store' as store
-from './todo-item' import { TodoItem, renderTodoItem }
+from './todo-item.bgl' import { TodoItem, renderTodoItem }
 
-export func renderApp() =>
+export func renderApp(items: const TodoItem[], addItem: () {}, clearDone: () {}) =>
     <div>
-        {iter<TodoItem>(store.items)
-            .map<Element>(renderTodoItem)
-            .array()}
+        {iter(items)
+            .map<TodoItem, Element>(renderTodoItem)
+            .collectArray()}
 
-        <button onClick={store.addItem}>{'Add'}</button>
-        <button onClick={store.clearDone}>{'Clear done'}</button>
+        <button onClick={addItem}>{'Add'}</button>
+        <button onClick={clearDone}>{'Clear done'}</button>
     </div>

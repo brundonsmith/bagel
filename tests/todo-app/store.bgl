@@ -1,5 +1,5 @@
 
-from './todo-item' import { makeTodoItem, TodoItem }
+from './todo-item.bgl' import { makeTodoItem, TodoItem }
 
 expose let items: TodoItem[] = []
 
@@ -8,5 +8,10 @@ export proc addItem() {
 }
 
 export proc clearDone() {
-    items = iter(items).filter(item => !item.done).array();
+    items = iter(items)
+        .filter((item: TodoItem) => !item.done)
+        .collectArray();
 }
+
+// TODO: ^ type inference, ugh
+// TODO: guards against using `let`s are bypassed when doing a full-module import
