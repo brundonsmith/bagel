@@ -522,12 +522,15 @@ const inferTypeInner = computedFn((
                             return {
                                 kind: 'object-type',
                                 spreads: [],
-                                entries: exportedDeclarations.map(decl =>
-                                    attribute(
+                                entries: exportedDeclarations.map(decl => {
+                                    const declaredType = decl.kind === 'value-declaration' ? decl.type : decl.value.type
+
+                                    return attribute(
                                         decl.name.name, 
-                                        infer(decl.value),
+                                        declaredType ?? infer(decl.value),
                                         decl.kind !== 'value-declaration' || decl.isConst || decl.exported === 'expose'
-                                    )),
+                                    )
+                                }),
                                 mutability: 'mutable',
                                 parent,
                                 ...AST_NOISE
