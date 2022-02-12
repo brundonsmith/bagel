@@ -321,12 +321,26 @@ const bundleOutput = async (entryFile: string, outfile: string) => {
             outfile
         })
 
-        console.log(Colors.green('Bundled ') + outfile)
+        const bundleSize = (await Deno.stat(outfile)).size
+        console.log(Colors.green('Bundled ') + outfile + ` (${prettysize(bundleSize)})`)
     } catch (e) {
         console.error(e)
     } finally {
         esbuild.stop()
     }
+}
+
+function prettysize(bytes: number): string {
+    if (bytes < 1_000) {
+        return `${bytes} bytes`
+    }
+    if (bytes < 1_000_000) {
+        return `${(bytes / 1_000).toFixed(1)}KB`
+    }
+    if (bytes < 1_000_000_000) {
+        return `${(bytes / 1_000_000).toFixed(1)}MB`
+    }
+    return `${(bytes / 1_000_000_000).toFixed(1)}GB`
 }
 
 function windowsPathToModulePath(str: string) {
