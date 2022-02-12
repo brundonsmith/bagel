@@ -257,6 +257,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "tuple-type": return `[${ast.members.map(c).join(", ")}]`;
         case "iterator-type": return `${INT}Iter<${c(ast.inner)}>`;
         case "plan-type": return `${INT}Plan<${c(ast.inner)}>`;
+        case "remote-type": return `${INT}Remote<${c(ast.inner)}>`;
         case "literal-type": return `${c(ast.value)}`;
         case "string-type": return `string`;
         case "number-type": return `number`;

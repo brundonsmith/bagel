@@ -6,7 +6,7 @@ import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement } from "../_model/statements.ts";
-import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./common.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
 
@@ -514,7 +514,7 @@ const _typeParam: ParseFunction<TypeParam> = (module, code, startIndex) =>
         index: indexAfterExtends ?? index
     }))))
 
-const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType> = (module, code, startIndex) =>
+const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType|RemoteType> = (module, code, startIndex) =>
     given(TYPE_PARSER.beneath(boundGenericType)(module, code, startIndex), ({ parsed: generic, index }) =>
     given(_typeArgs(module, code, index), ({ parsed: typeArgs, index }) => 
         generic.kind === 'named-type' && generic.name.name === 'Iterator' ?
@@ -538,6 +538,21 @@ const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType> = 
                 : {
                     parsed: {
                         kind: "plan-type",
+                        inner: typeArgs[0],
+                        mutability: undefined,
+                        module,
+                        code,
+                        startIndex,
+                        endIndex: index,
+                    },
+                    index
+                })
+        : generic.kind === 'named-type' && generic.name.name === 'Remote' ?
+            (typeArgs.length !== 1
+                ? syntaxError(code, index, `Remote types must have exactly one type parameter; found ${typeArgs.length}`)
+                : {
+                    parsed: {
+                        kind: "remote-type",
                         inner: typeArgs[0],
                         mutability: undefined,
                         module,
