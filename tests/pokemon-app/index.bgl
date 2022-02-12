@@ -1,0 +1,14 @@
+
+from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/html.bgl' import { render }
+
+from './api.bgl' import { searchCards }
+from './app.bgl' import { renderApp }
+
+let searchString = 'charizard'
+
+remote searchResults () => searchCards(searchString)
+
+autorun () {
+    log('Rendering');
+    render(renderApp(searchResults, searchString, (val: string) { searchString = val; }));
+}

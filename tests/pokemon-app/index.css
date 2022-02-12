@@ -1,0 +1,144 @@
+
+.card {
+    position:relative;
+    display:inline-block;
+    --width-normal: 100px;
+    width: var(--width-normal);
+    height: calc(1.4 * var(--width-normal));
+    animation:float 1.3s ease-in-out infinite;
+    transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
+    margin:10px 5px;
+    transition:transform 0.3s ease-out;
+    transform:rotateY(0deg);
+}
+
+.card.flipped {
+    animation-name:none;
+    transform:rotateY(180deg);
+}
+    
+.card .side {
+    display:block;
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    border-radius:3%;
+    background-size:cover;
+    background-position:center;
+    background-repeat:no-repeat;
+    backface-visibility:hidden;
+    -webkit-backface-visibility:hidden;
+}   
+
+.card .front {
+    background-color:rgb(23,49,106);
+    transition:width 0.2s ease-out, height 0.2s ease-out, top 0.2s ease-out, left 0.2s ease-out;
+}
+
+.card .back {
+    transform:rotateY(180deg);
+    background-image:url('https://poketaz.weebly.com/uploads/4/9/7/8/4978776/6169581_orig.jpg');
+    background-size:102% 102%;
+}
+    
+.card:hover {
+    animation:none;
+    z-index: 100;
+}
+
+.card:hover .side.front {
+    --width-large: 300px;
+    width: var(--width-large);
+    height: calc(1.4 * var(--width-large));
+    position:relative;
+    top:calc((-1 * (1.4 * var(--width-large)) / 2) + ((1.4 * var(--width-normal)) / 2));
+    left:calc((-1 * var(--width-large) / 2) + (var(--width-normal) / 2));
+}
+  
+  
+.container {
+    height:100%;
+    transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
+    text-align:center;
+}
+
+.cards-container {
+    margin: 0 auto;
+    max-width: 1000px;
+    display:flex;
+    flex-direction:row;
+    justify-content:flex-start;
+    flex-wrap:wrap;
+    align-items:top;
+    padding:30px 100px;
+    filter:drop-shadow(25px 25px 10px grey);
+}
+
+body {
+    perspective:10px;
+    height:100vh;
+    overflow:auto;
+    transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
+}
+  
+.input-wrapper {
+    display:inline-block;
+    position:relative;
+    text-align:center;
+    margin:50px auto;
+}
+    
+.input-wrapper input {
+    display:inline-block;
+    -webkit-appearance:none;
+    -moz-appearance:none;
+    border:none;
+    border-bottom:3px solid #888;
+    background-color:transparent;
+    font-size:32px;
+    padding:10px;
+}
+.input-wrapper input:focus {
+    outline: none;
+}
+.input-wrapper::after {
+    content:'';
+    display:block;
+    background: url('http://pre04.deviantart.net/d8c4/th/pre/i/2016/158/e/0/flat_pokeball_by_himitsunochikara-d6v7eyk.png') center/125% no-repeat;
+    position:absolute;
+    right:0px;
+    bottom: 16.5%;
+    height: 66%;
+    width: 40px;
+    animation:spinner 0.8s ease-in-out infinite;
+    border-radius:50%;
+    box-shadow:0px 0px 3px grey;
+    opacity:0;
+    transition: opacity 0.3s ease-out;
+}
+.input-wrapper.loading::after {
+    opacity:1;
+}
+  
+@keyframes rotate {
+    0% { transform: rotateY(-70deg); }
+    90% { transform: rotateY(70deg); }
+    100% { transform: rotateY(290deg); }
+}
+@keyframes float {
+    0% { top: -5px; }
+    50% { top: 5px; }
+    100% { top: -5px; }
+}
+@keyframes spinner {
+    0% {transform: rotateZ(0deg); }
+    100% {transform: rotateZ(360deg); }
+}
+
+* { box-sizing:border-box; }
+html, body { width:100%; height:100%; margin:0; font-family:arial; }
