@@ -4,48 +4,30 @@
 Bagel is a strongly-typed, JavaScript-targeted programming language designed 
 around two main ideas:
 1) Pure **functions** and stateful **procedures** are separate concepts. Functions cannot affect app state, and procedures cannot return values.
-2) Reactivity is built-in at the language level. All state (variables, etc) can be **observed** and reacted to automatically by the rest of the app. This is naturally relevant to front-end UIs, but it's useful for other things as well. For an introduction to the general concept, see this [blog post](https://hackernoon.com/the-fundamental-principles-behind-mobx-7a725f71f3e8).
+2) Reactivity is built-in at the language level. All mutable state (variables, etc) can be **observed** and reacted to automatically by the rest of the app. This is naturally relevant to front-end UIs, but it's useful for other things as well. For an introduction to the general concept, see this [blog post](https://hackernoon.com/the-fundamental-principles-behind-mobx-7a725f71f3e8).
 
-More details on these ideas can be found [here](https://www.brandons.me/blog/the-bagel-language).
+Other goals include:
+- Being familiar and instantly comfortable for JavaScript/TypeScript developers, while simplifying certain things and sanding off many of JS's rougher edges
+- Being practical for real-world development with a comprehensive set of built-in tooling, ergonomic JS interop, etc
+- Having a sound (informally, at least for now) static type system with more powerful and reliable guarantees than TypeScript can provide, because it's working with a fresh language instead of being layered over JavaScript
 
-<hr>
+Blog posts on the language:
+- [The Bagel Language](https://www.brandons.me/blog/the-bagel-language)
+- [Bagel Bites (Update on the Bagel Language)](https://www.brandons.me/blog/bagel-bites)
 
-## NOTE: This is a work in progress, and many of the described features are not implemented yet
+## Trying it out
 
-<hr> 
+> Note! Bagel is still pre-v0.1 and constantly in flux. No guarantees are made about anything continuing to work the way it does right now, or even working at all right now. These instructions are purely for the curious!
 
-As much as possible Bagel aims to remain comfortable and familiar for people who 
-have worked with JavaScript/TypeScript. It has the same basic data types, 
-syntax, and semantics, and compiles to JS very predictably. What it doesn't have
-is many of JS's footguns, and some of its more dynamic features that make static
-types leaky.
+Bagel runs on Deno, so you'll first need that [installed](https://deno.land/#installation).
 
-Bagel is statically-typed, and most of the types it has (syntax and semantics) 
-aim to be almost interchangeable with TypeScript's. With that said, the type 
-system is not nearly as rich or as complex as TypeScript's; it doesn't implement 
-advanced features like string-template-types and intersection types. It also 
-forbids generic type aliases. The goal is for the 
-type system (like the language itself) to be simple and practical, discouraging 
-excessive cleverness in favor of straightforward application code that has 
-strong guarantees.
+If you're using VSCode, there's a (very much in-progress) extension [here](https://github.com/brundonsmith/bagel-language) which will provide some basic syntax highlighting. It includes scripts for automatically installing it on Windows or macOS.
 
-Other notable features:
-- A [pipeline operator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Pipeline_operator)
-- `null`/`undefined` have been replaced with a unified `nil` to avoid confusion
-- JavaScript's implicit casting is prevented in most cases
-- Iterator versions of core array methods (map/filter/slice/etc) are made 
-available to avoid copying arrays over and over
-- There is no global state; global values are all immutable. A main() procedure 
-is called when the app starts, and any mutable state has to be initialized 
-there and passed down to sub-procedures.
+You can run the Bagel compiler directly via Deno, but that can be a little annoying, so `compiler/run.sh` and `compiler/run.bat` are provided. For the optimal experience, I recommend symlinking one of these scripts into your path under the name `bagel`.
 
-<h2>Trying it out</h2>
+With that, you should be able to do the following:
+```bash
+bagel build tests/todo-app
+```
 
-This is in an extremely rough state right now, but if you're determined to 
-delve into the deep, you can run `compiler/run <file-or-dir> --watch` to watch 
-and convert `.bgl` files into corresponding `.bgl.ts`
-files. You can also run `compiler/run <file-or-dir> --bundle` to bundle 
-a `.bgl` file up with all its dependencies into a single JS file.
-
-The VSCode extension [here](https://github.com/brundonsmith/bagel-language) will
-provide syntax highlighting.
+And then you can open `tests/todo-app/index.html` in a web browser and see a functioning todo app.
