@@ -4,8 +4,8 @@ import { autorun, invalidate, observe, WHOLE_OBJECT } from "./_reactivity.ts";
 // Preact
 export {
     h
-} from "preact"
-import { render as prender } from "preact"
+} from "https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js"
+import { render as prender } from "https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js"
 export function render(el: unknown) {
     // @ts-ignore
     prender(el, document.body)
