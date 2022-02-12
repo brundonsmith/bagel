@@ -517,42 +517,17 @@ const _typeParam: ParseFunction<TypeParam> = (module, code, startIndex) =>
 const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType|RemoteType> = (module, code, startIndex) =>
     given(TYPE_PARSER.beneath(boundGenericType)(module, code, startIndex), ({ parsed: generic, index }) =>
     given(_typeArgs(module, code, index), ({ parsed: typeArgs, index }) => 
-        generic.kind === 'named-type' && generic.name.name === 'Iterator' ?
+        generic.kind === 'named-type' && (generic.name.name === 'Iterator' || generic.name.name === 'Plan' || generic.name.name === 'Remote') ?
             (typeArgs.length !== 1
-                ? syntaxError(code, index, `Iterator types must have exactly one type parameter; found ${typeArgs.length}`)
+                ? syntaxError(code, index, `${generic.name.name} types must have exactly one type parameter; found ${typeArgs.length}`)
                 : {
                     parsed: {
-                        kind: "iterator-type",
-                        inner: typeArgs[0],
-                        mutability: undefined,
-                        module,
-                        code,
-                        startIndex,
-                        endIndex: index,
-                    },
-                    index
-                })
-        : generic.kind === 'named-type' && generic.name.name === 'Plan' ?
-            (typeArgs.length !== 1
-                ? syntaxError(code, index, `Plan types must have exactly one type parameter; found ${typeArgs.length}`)
-                : {
-                    parsed: {
-                        kind: "plan-type",
-                        inner: typeArgs[0],
-                        mutability: undefined,
-                        module,
-                        code,
-                        startIndex,
-                        endIndex: index,
-                    },
-                    index
-                })
-        : generic.kind === 'named-type' && generic.name.name === 'Remote' ?
-            (typeArgs.length !== 1
-                ? syntaxError(code, index, `Remote types must have exactly one type parameter; found ${typeArgs.length}`)
-                : {
-                    parsed: {
-                        kind: "remote-type",
+                        kind: (
+                            generic.name.name === 'Iterator' ? "iterator-type" :
+                            generic.name.name === 'Plan' ? "plan-type" :
+                            generic.name.name === 'Remote' ? "remote-type" :
+                            "remote-type" // unreachable
+                        ),
                         inner: typeArgs[0],
                         mutability: undefined,
                         module,
