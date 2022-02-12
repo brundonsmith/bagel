@@ -327,6 +327,9 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 expect(reportError, current.type, current.inner,
                     (dest, val) => `Expression of type ${format(val)} cannot be expanded to type ${format(dest)}`)
             } break;
+            case "named-type":
+                Store.getBinding(reportError, current.name.name, current)
+                break;
             case "local-identifier": {
                 // make sure we err if identifier can't be resolved, even if it isn't used
                 Store.getBinding(reportError, current.name, current)
@@ -431,7 +434,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "debug":
             case "union-type":
             case "maybe-type":
-            case "named-type":
             case "generic-param-type":
             case "generic-type":
             case "bound-generic-type":
