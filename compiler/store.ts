@@ -227,7 +227,7 @@ const BGL_PRELUDE_DATA = [
     { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/booleans.bgl' as ModuleName, imports: [ 'parseBoolean', 'stringifyBoolean' ] },
     { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/iterators.bgl' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'collectArray', 'collectObject' ] },
     { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/plans.bgl' as ModuleName, imports: [ 'timeout' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/plans.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSON' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/json.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSON' ] },
 ] as const
 
 function normalizeName(module: ModuleName): string {
