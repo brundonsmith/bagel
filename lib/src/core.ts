@@ -389,7 +389,7 @@ type RuntimeType =
     }
     | RuntimeType[] // union
     | { kind: typeof RT_RECORD, key: RuntimeType, value: RuntimeType }
-    | { kind: typeof RT_OBJECT, entries: { key: RuntimeType, value: RuntimeType, optional: boolean }[] }
+    | { kind: typeof RT_OBJECT, entries: { key: string, value: RuntimeType, optional: boolean }[] }
 
 
 export function instanceOf(val: any, type: RuntimeType): boolean {
@@ -427,8 +427,16 @@ export function instanceOf(val: any, type: RuntimeType): boolean {
                     if (typeof val !== 'object' || val == null) {
                         return false
                     } else {
-                        for (const key in val) {
-                            if (!type.entries.some(e => instanceOf(key, e.key) && (instanceOf(val[key], e.value) || (e.optional && val[key] == null)))) {
+                        for (const entry of type.entries) {
+                            for (const key in val) {
+                                if (key === entry.key && !instanceOf(val[key], entry.value)) {
+                                    // found and doesn't match type
+                                    return false
+                                }
+                            }
+
+                            if (!entry.optional) {
+                                // not found
                                 return false
                             }
                         }
