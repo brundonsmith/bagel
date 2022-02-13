@@ -915,41 +915,22 @@ function resolveRefinements(expr: Expression): Refinement[] {
     while (parent != null) {
         if (parent.kind === 'case') {
             if (grandparent?.kind === 'if-else-expression' && areSame(current, parent.outcome)) {
+                
+                for (let i = 0; i < grandparent.cases.indexOf(parent); i++) {
+                    const condition = grandparent.cases[i]?.condition
+
+                    // conditions for all past clauses are false
+                    const refinement = conditionToRefinement(condition, false)
+                    if (refinement) {
+                        refinements.push(refinement)
+                    }
+                }
+                
+                // condition for current clause is true
                 const condition = parent.condition.kind === 'parenthesized-expression' ? parent.condition.inner : parent.condition;
-
-                if (condition.kind === "binary-operator" && condition.ops[0][0].op === "!=") {
-                    const targetExpression = 
-                        condition.ops[0][1].kind === 'nil-literal' ? condition.base :
-                        condition.base.kind === "nil-literal" ? condition.ops[0][1] :
-                        undefined;
-
-                    if (targetExpression != null) {
-                        refinements.push({ kind: "subtraction", type: NIL_TYPE, targetExpression })
-                    }
-                }
-
-                if (condition.kind === "binary-operator" && condition.ops[0][0].op === "==") {
-                    const bits = (
-                        condition.base.kind === "invocation" && condition.base.subject.kind === "local-identifier" && condition.base.subject.name === "typeof" 
-                        && condition.ops[0][1].kind === "string-literal" && typeof condition.ops[0][1].segments[0] === "string" ? [condition.base.args[0], condition.ops[0][1].segments[0]] as const :
-                        condition.base.kind === "string-literal" && typeof condition.base.segments[0] === "string"
-                        && condition.ops[0][1].kind === "invocation" && condition.ops[0][1].subject.kind === "local-identifier" && condition.ops[0][1].subject.name === "typeof" ? [condition.ops[0][1].args[0], condition.base.segments[0]] as const :
-                        undefined
-                    )
-                    
-                    if (bits) {
-                        const [targetExpression, typeofStr] = bits
-    
-                        const refinedType = typeFromTypeof(typeofStr)
-                        
-                        if (refinedType) {
-                            refinements.push({ kind: "narrowing", type: refinedType, targetExpression })
-                        }
-                    }
-                }
-
-                if (condition.kind === 'instance-of') {
-                    refinements.push({ kind: "narrowing", type: condition.type, targetExpression: condition.expr })
+                const refinement = conditionToRefinement(condition, true)
+                if (refinement) {
+                    refinements.push(refinement)
                 }
             } else if (grandparent?.kind === "switch-expression") {
                 if (grandparent.value.kind === "invocation" &&
@@ -969,6 +950,15 @@ function resolveRefinements(expr: Expression): Refinement[] {
                     }
                 }
             }
+        } else if (parent.kind === 'if-else-expression' && current === parent.defaultCase) {
+            for (const { condition } of parent.cases) {
+
+                // conditions for all past clauses are false
+                const refinement = conditionToRefinement(condition, false)
+                if (refinement) {
+                    refinements.push(refinement)
+                }
+            }
         }
 
         current = parent
@@ -977,6 +967,43 @@ function resolveRefinements(expr: Expression): Refinement[] {
     }
 
     return refinements
+}
+
+function conditionToRefinement(condition: Expression, conditionIsTrue: boolean): Refinement|undefined {
+    if (condition.kind === "binary-operator" && condition.ops[0][0].op === "!=") {
+        const targetExpression = 
+            condition.ops[0][1].kind === 'nil-literal' ? condition.base :
+            condition.base.kind === "nil-literal" ? condition.ops[0][1] :
+            undefined;
+
+        if (targetExpression != null) {
+            return { kind: conditionIsTrue ? "subtraction" : "narrowing", type: NIL_TYPE, targetExpression }
+        }
+    }
+
+    if (condition.kind === "binary-operator" && condition.ops[0][0].op === "==") {
+        const bits = (
+            condition.base.kind === "invocation" && condition.base.subject.kind === "local-identifier" && condition.base.subject.name === "typeof" 
+            && condition.ops[0][1].kind === "string-literal" && typeof condition.ops[0][1].segments[0] === "string" ? [condition.base.args[0], condition.ops[0][1].segments[0]] as const :
+            condition.base.kind === "string-literal" && typeof condition.base.segments[0] === "string"
+            && condition.ops[0][1].kind === "invocation" && condition.ops[0][1].subject.kind === "local-identifier" && condition.ops[0][1].subject.name === "typeof" ? [condition.ops[0][1].args[0], condition.base.segments[0]] as const :
+            undefined
+        )
+        
+        if (bits) {
+            const [targetExpression, typeofStr] = bits
+
+            const refinedType = typeFromTypeof(typeofStr)
+            
+            if (refinedType) {
+                return { kind: conditionIsTrue ? "narrowing" : "subtraction", type: refinedType, targetExpression }
+            }
+        }
+    }
+
+    if (condition.kind === 'instance-of') {
+        return { kind: conditionIsTrue ? "narrowing" : "subtraction", type: condition.type, targetExpression: condition.expr }
+    }
 }
 
 function typeFromTypeof(typeofStr: string): TypeExpression|undefined {
