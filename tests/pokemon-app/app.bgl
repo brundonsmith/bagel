@@ -3,26 +3,29 @@ from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/html.b
 
 from './api.bgl' import { CardsResponse, Card }
 
-export func renderApp(data: Remote<CardsResponse>, searchString: string, onChange: (val: string) {}) =>
+export func renderApp(data: Remote<CardsResponse?>, searchString: string, onChange: (val: string) {}) =>
     const handleChange = (e: Event) {
         onChange(e.target.value);
     },
+    const inputClass = if data.loading { 'loading' } else { '' },
     <div className={'container'}>
-        <div className={'input-wrapper ${if data.loading { 'loading' } else { '' }}'}>
+        <div className={'input-wrapper ${inputClass}'}>
             <input placeholder={'Search for a pokemon...'} value={searchString} onChange={handleChange}></input>
         </div>
 
         <div className={'cards-container'}>
-            {iter<Card>(data.value?.cards ?? [])
-                .map<Card, Element>(renderCard)
-                .collectArray<Element>()}
+            {
+                if data.value != nil {
+                    iter<Card>(data.value.cards)
+                        .map<Card, Element>(renderCard)
+                        .collectArray<Element>()
+                } else if !data.loading {
+                    <div>{'Error loading data!'}</div>
+                }
+            }
         </div>
     </div>
-
-            // <a class={'card'}>
-            //     <div class={'side front'} style="background-image:url('//assets.pokemon.com/assets/cms2/img/cards/web/BW7/BW7_EN_31.png')"></div>
-            //     <div class={'side back'}></div>
-            // </a>
+    
 func renderCard(card: Card) =>
     <a className={'card'}>
         <div className={'side front'} style={'background-image:url("${card.imageUrl}")'}></div>

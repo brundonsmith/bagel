@@ -9,6 +9,5 @@ let searchString = 'charizard'
 remote searchResults () => searchCards(searchString)
 
 autorun () {
-    log('Rendering');
     render(renderApp(searchResults, searchString, (val: string) { searchString = val; }));
 }

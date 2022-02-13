@@ -7,6 +7,8 @@ export type CardsResponse = {
     cards: Card[]
 }
 
-export func searchCards(str: string): Plan<CardsResponse> =>
+export func searchCards(str: string): Plan<CardsResponse?> =>
     const res = await get('https://api.pokemontcg.io/v1/cards?name=${str}'),
-    res
+    if res instanceof CardsResponse {
+        res
+    }
