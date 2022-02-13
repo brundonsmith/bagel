@@ -428,14 +428,20 @@ export function instanceOf(val: any, type: RuntimeType): boolean {
                         return false
                     } else {
                         for (const entry of type.entries) {
+                            let found = false
+                            
                             for (const key in val) {
-                                if (key === entry.key && !instanceOf(val[key], entry.value)) {
-                                    // found and doesn't match type
-                                    return false
+                                if (key === entry.key) {
+                                    found = true
+
+                                    if (!instanceOf(val[key], entry.value)) {
+                                        // found and doesn't match type
+                                        return false
+                                    }
                                 }
                             }
 
-                            if (!entry.optional) {
+                            if (!found && !entry.optional) {
                                 // not found
                                 return false
                             }
