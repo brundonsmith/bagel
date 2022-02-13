@@ -363,31 +363,99 @@ export class Remote<T> {
     public loading = false;
 }
 
-// misc
-export function ___typeof(val: unknown) {
-    const to = typeof val;
+export const RT_UNKNOWN = Symbol('RT_UNKNOWN')
+export const RT_NIL = Symbol('RT_NIL')
+export const RT_BOOLEAN = Symbol('RT_BOOLEAN')
+export const RT_NUMBER = Symbol('RT_NUMBER')
+export const RT_STRING = Symbol('RT_STRING')
+export const RT_LITERAL = Symbol('RT_LITERAL')
+export const RT_ITERATOR = Symbol('RT_ITERATOR')
+export const RT_PLAN = Symbol('RT_PLAN')
+export const RT_REMOTE = Symbol('RT_REMOTE')
+export const RT_ARRAY = Symbol('RT_ARRAY')
+export const RT_RECORD = Symbol('RT_RECORD')
+export const RT_OBJECT = Symbol('RT_OBJECT')
 
-    switch (to) {
-        case "string":
-        case "number":
-        case "boolean":
-            return to
-        case "undefined":
-            return "nil"
-        case "object":
-            if (val === null) {
-                return "nil"
-            } else if (Array.isArray(val)) {
-                return "array"
-            } else if (val instanceof Set) {
-                return "set"
-            } else if (Object.getPrototypeOf(val).constructor.name === "object") {
-                return "object"
-            } else {
-                // class instance
-                return "class-instance"
+type RuntimeType =
+    | typeof RT_UNKNOWN
+    | typeof RT_NIL
+    | typeof RT_BOOLEAN
+    | typeof RT_NUMBER
+    | typeof RT_STRING
+    | { kind: typeof RT_LITERAL, value: string|number|boolean }
+    | {
+        kind: typeof RT_ITERATOR | typeof RT_PLAN | typeof RT_REMOTE | typeof RT_ARRAY,
+        inner: RuntimeType
+    }
+    | RuntimeType[] // union
+    | { kind: typeof RT_RECORD, key: RuntimeType, value: RuntimeType }
+    | { kind: typeof RT_OBJECT, entries: { key: RuntimeType, value: RuntimeType, optional: boolean }[] }
+
+
+export function instanceOf(val: any, type: RuntimeType): boolean {
+    switch (type) {
+        case RT_UNKNOWN: return true;
+        case RT_NIL: return val == null;
+        case RT_BOOLEAN: return typeof val === 'boolean';
+        case RT_NUMBER: return typeof val === 'number';
+        case RT_STRING: return typeof val === 'string';
+        default: {
+            if (Array.isArray(type)) {
+                return type.some(member => instanceOf(val, member))
             }
+
+            switch (type.kind) {
+                case RT_LITERAL: return val === type.value;
+                case RT_ARRAY: return Array.isArray(val) && val.every(member => instanceOf(member, type.inner));
+                case RT_RECORD: {
+                    if (typeof val !== 'object' || val == null) {
+                        return false
+                    } else {
+                        for (const key in val) {
+                            if (!instanceOf(key, type.key)) {
+                                return false
+                            }
+                            if (!instanceOf(val[key], type.value)) {
+                                return false
+                            }
+                        }
+
+                        return true
+                    }
+                }
+                case RT_OBJECT: {
+                    if (typeof val !== 'object' || val == null) {
+                        return false
+                    } else {
+                        for (const key in val) {
+                            if (!type.entries.some(e => instanceOf(key, e.key) && (instanceOf(val[key], e.value) || (e.optional && val[key] == null)))) {
+                                return false
+                            }
+                        }
+
+                        return true
+                    }
+                }
+
+                // TODO:
+                // case RT_ITERATOR: return val instanceof Iter;
+                // case RT_PLAN: return false
+                // case RT_REMOTE: return val instanceof Remote;
+            }
+        }
     }
 
-    throw Error("Failed to determine a typeof for " + val)
+    throw Error('Received invalid runtime type')
 }
+
+// | MaybeType
+// | GenericParamType
+// | ProcType
+// | FuncType
+// | GenericType
+// | BoundGenericType
+// | ElementType
+// | TupleType
+// | NominalType
+// | AnyType
+// | JavascriptEscapeType
