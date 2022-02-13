@@ -4,7 +4,7 @@ import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./common.ts";
@@ -1424,6 +1424,25 @@ const _segmentsToOps = (segments: (Operator|Expression)[]): BagelError | { base:
 
     return { base, ops }
 }
+
+
+const instanceOf: ParseFunction<InstanceOf> = (module, code, startIndex) =>
+    given(EXPRESSION_PARSER.beneath(instanceOf)(module, code, startIndex), ({ parsed: expr, index }) =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(consume(code, index, "instanceof"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(typeExpression(module, code, index), err(code, index, '"Type expression"'), ({ parsed: type, index }) => ({
+        parsed: {
+            kind: "instance-of",
+            expr,
+            type,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    }))))))
     
 
 const asCast: ParseFunction<AsCast> = (module, code, startIndex) =>
@@ -2049,7 +2068,7 @@ const debug: ParseFunction<Debug> = (module, code, startIndex) =>
 const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ debug, javascriptEscape, elementTag ],
     [ func, proc ],
-    [ asCast ],
+    [ asCast, instanceOf ],
     [ binaryOperator(0) ],
     [ binaryOperator(1) ],
     [ binaryOperator(2) ],

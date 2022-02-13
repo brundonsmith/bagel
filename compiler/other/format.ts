@@ -145,6 +145,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             const procType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
             return `${ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''}(${procType.args.map(f).join(', ')}) ${f(ast.body)}`
         }
+        case "instance-of":
+            return `${f(ast.expr)} instanceof ${f(ast.type)}`
         case "as-cast":
             return `${f(ast.inner)} as ${f(ast.type)}`
         case "range":

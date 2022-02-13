@@ -639,6 +639,7 @@ const inferTypeInner = computedFn((
         };
         case "nil-literal": return NIL_TYPE;
         case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
+        case "instance-of": return BOOLEAN_TYPE;
         case "as-cast": return ast.type;
         default:
             // @ts-expect-error
@@ -892,6 +893,8 @@ function narrow(reportError: ReportError, type: TypeExpression, fit: TypeExpress
             ...type,
             members: type.members.filter(member => subsumes(reportError, fit, member))
         })
+    } else if (type.kind === 'unknown-type') {
+        return fit
     } else { // TODO: There's probably more we can do here
         return type
     }
@@ -943,7 +946,10 @@ function resolveRefinements(expr: Expression): Refinement[] {
                             refinements.push({ kind: "narrowing", type: refinedType, targetExpression })
                         }
                     }
-                    
+                }
+
+                if (condition.kind === 'instance-of') {
+                    refinements.push({ kind: "narrowing", type: condition.type, targetExpression: condition.expr })
                 }
             } else if (grandparent?.kind === "switch-expression") {
                 if (grandparent.value.kind === "invocation" &&

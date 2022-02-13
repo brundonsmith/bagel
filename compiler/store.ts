@@ -208,12 +208,16 @@ class _Store {
 const Store = new _Store()
 export default Store
 
-export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'WHOLE_OBJECT', 'h',
-'range', 'entries', 'Iter', 'RawIter', 'Plan', 'Remote', 'INNER_ITER'
-]
+export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn', 
+'autorun', 'action', 'WHOLE_OBJECT', 'h', 'range', 'entries', 'Iter',
+'RawIter', 'Plan', 'Remote', 'INNER_ITER', 'instanceOf', 'RT_UNKNOWN', 
+'RT_NIL', 'RT_BOOLEAN', 'RT_NUMBER', 'RT_STRING', 'RT_LITERAL', 'RT_ITERATOR',
+'RT_PLAN', 'RT_REMOTE', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT' ]
 
 const JS_PRELUDE = `
-import { ${IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')} } from "https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/core.ts";
+import { ${
+    IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')
+} } from "https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/core.ts";
 
 `
 

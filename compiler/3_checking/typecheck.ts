@@ -326,6 +326,10 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "as-cast": {
                 expect(reportError, current.type, current.inner,
                     (dest, val) => `Expression of type ${format(val)} cannot be expanded to type ${format(dest)}`)
+
+                if (typesEqual(resolve(current.type), resolve(infer(current.inner)))) {
+                    reportError(miscError(current, `Casting here is redundant, because ${format(current.inner)} is already of type ${format(current.type)}`))
+                }
             } break;
             case "named-type":
                 Store.getBinding(reportError, current.name.name, current)
@@ -402,6 +406,15 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     if (!subsumes(reportError, OBJECT_OF_ANY, resolved)) {
                         reportError(miscError(spread, `${format(resolved)} is not an object type; can only spread object types into object types`))
                     }
+                }
+            } break;
+            case "instance-of": {
+                const exprType = resolve(infer(current.expr))
+
+                if (!subsumes(reportError, exprType, current.type)) {
+                    reportError(miscError(current, `This check will always be false, because ${format(current.expr)} can never be a ${format(current.type)}`))
+                } else if (typesEqual(resolve(exprType), resolve(current.type))) {
+                    reportError(miscError(current, `This check will always be true, because ${format(current.expr)} will always be a ${format(current.type)}`))
                 }
             } break;
             case "module":
@@ -642,6 +655,34 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
                 return simplified
             } else {
                 return resolve(simplified)
+            }
+        }
+        case "array-type": {
+            return {
+                ...type,
+                element: resolve(type.element)
+            }
+        }
+        case "tuple-type": {
+            return {
+                ...type,
+                members: type.members.map(resolve)
+            }
+        }
+        case "record-type": {
+            return {
+                ...type,
+                keyType: resolve(type.keyType),
+                valueType: resolve(type.valueType)
+            }
+        }
+        case "object-type": {
+            return {
+                ...type,
+                entries: type.entries.map(entry => ({
+                    ...entry,
+                    type: resolve(entry.type)
+                }))
             }
         }
     }

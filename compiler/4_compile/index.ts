@@ -1,5 +1,6 @@
 import { resolveType } from "../3_checking/typecheck.ts";
 import { inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
+import { format } from "../other/format.ts";
 import Store, { canonicalModuleName, Mode } from "../store.ts";
 import { jsFileLocation } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
@@ -265,11 +266,31 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "nil-type": return `(null | undefined)`;
         case "unknown-type": return `unknown`;
         case "parenthesized-type": return `(${c(ast.inner)})`
+        case "instance-of": return `${INT}instanceOf(${c(ast.expr)}, ${compileRuntimeType(resolveType(() => {}, ast.type))})`
+        case "as-cast": return `${c(ast.inner)} as ${c(ast.type)}`
 
         default:
             throw Error("Couldn't compile '" + ast.kind + "'");
     }
+}
 
+function compileRuntimeType(type: TypeExpression): string {
+    switch (type.kind) {
+        case 'unknown-type': return INT + 'RT_UNKNOWN';
+        case 'nil-type': return INT + 'RT_NIL';
+        case 'boolean-type': return INT + 'RT_BOOLEAN';
+        case 'number-type': return INT + 'RT_NUMBER';
+        case 'string-type': return INT + 'RT_STRING';
+        case 'literal-type': return `{ kind: ${INT}RT_LITERAL, value: ${JSON.stringify(type.value.value)} }`;
+        case 'array-type': return `{ kind: ${INT}RT_ARRAY, inner: ${compileRuntimeType(type.element)} }`;
+        case 'record-type': return `{ kind: ${INT}RT_RECORD, key: ${compileRuntimeType(type.keyType)}, value: ${compileRuntimeType(type.valueType)} }`;
+        case 'object-type': return `{ kind: ${INT}RT_OBJECT, entries: [${type.entries.map(({ name, type, optional }) =>
+            `{ key: '${name.name}', value: ${compileRuntimeType(type)}, optional: ${optional} }`
+        )}] }`;
+        case 'union-type': return `[ ${type.members.map(compileRuntimeType).join(', ')} ]`;
+    }
+
+    throw Error(`Couldn't runtime-compile type ${format(type)}`)
 }
 
 function blockContents(excludeTypes: boolean, module: string, block: Block) {

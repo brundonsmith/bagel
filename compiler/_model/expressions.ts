@@ -27,6 +27,7 @@ export type Expression =
     | NumberLiteral
     | ElementTag
     | InlineConstGroup
+    | InstanceOf
     | AsCast
 
 export type JavascriptEscape = SourceInfo & {
@@ -221,6 +222,12 @@ export type ElementTag = SourceInfo & {
     readonly children: readonly Expression[],
 }
 
+export type InstanceOf = SourceInfo & {
+    readonly kind: "instance-of",
+    readonly expr: Expression,
+    readonly type: TypeExpression,
+}
+
 export type AsCast = SourceInfo & {
     readonly kind: "as-cast",
     readonly inner: Expression,
@@ -253,6 +260,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "javascript-escape": undefined,
     "debug": undefined,
     "inline-const-group": undefined,
+    "instance-of": undefined,
     "as-cast": undefined,
 };
 
