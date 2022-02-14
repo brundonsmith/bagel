@@ -375,6 +375,7 @@ export const RT_REMOTE = Symbol('RT_REMOTE')
 export const RT_ARRAY = Symbol('RT_ARRAY')
 export const RT_RECORD = Symbol('RT_RECORD')
 export const RT_OBJECT = Symbol('RT_OBJECT')
+export const RT_NOMINAL = Symbol('RT_NOMINAL')
 
 type RuntimeType =
     | typeof RT_UNKNOWN
@@ -383,6 +384,7 @@ type RuntimeType =
     | typeof RT_NUMBER
     | typeof RT_STRING
     | { kind: typeof RT_LITERAL, value: string|number|boolean }
+    | { kind: typeof RT_NOMINAL, nominal: symbol }
     | {
         kind: typeof RT_ITERATOR | typeof RT_PLAN | typeof RT_REMOTE | typeof RT_ARRAY,
         inner: RuntimeType
@@ -407,6 +409,7 @@ export function instanceOf(val: any, type: RuntimeType): boolean {
             switch (type.kind) {
                 case RT_LITERAL: return val === type.value;
                 case RT_ARRAY: return Array.isArray(val) && val.every(member => instanceOf(member, type.inner));
+                case RT_NOMINAL: return typeof val === 'object' || val != null && val.kind === type.nominal
                 case RT_RECORD: {
                     if (typeof val !== 'object' || val == null) {
                         return false
