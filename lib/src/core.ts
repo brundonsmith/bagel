@@ -2,28 +2,28 @@
 import { autorun, invalidate, observe, WHOLE_OBJECT } from "./_reactivity.ts";
 
 // Preact
-export {
-    h
-} from "https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js"
-import { render as prender } from "https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js"
-export function render(el: unknown) {
-    // @ts-ignore
-    prender(el, document.body)
+// export {
+//     h
+// } from "https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js"
+// import { render as prender } from "https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js"
+// export function render(el: unknown) {
+//     // @ts-ignore
+//     prender(el, document.body)
+// }
+
+type Element = { tagName: string, attributes: object, children: Element[] }
+
+export function h(tagName: string, attributes: object, ...children: Element[]): Element {
+    return { tagName, attributes, children }
 }
 
-// type Element = { tagName: string, attributes: object, children: Element[] }
-
-// export function h(tagName: string, attributes: object, ...children: Element[]): Element {
-//     return { tagName, attributes, children }
-// }
-
-// export function render(el: Element) {
-//     // @ts-ignore
-//     document.body.innerHTML = _renderInner(el)
-// }
-// function _renderInner({ tagName, attributes, children }: Element): string {
-//     return `<${tagName} ${Object.entries(attributes ?? {}).map(([key, value]) => `${key}="${value}"`)}>${children.map(render)}</${tagName}>`
-// }
+export function render(el: Element) {
+    // @ts-ignore
+    document.body.innerHTML = _renderInner(el)
+}
+function _renderInner({ tagName, attributes, children }: Element): string {
+    return `<${tagName} ${Object.entries(attributes ?? {}).map(([key, value]) => `${key}="${value}"`)}>${children.map(render)}</${tagName}>`
+}
 
 // Custom reactivity
 export {
@@ -74,6 +74,20 @@ export function slice<T>(start: number|undefined) {
                 }
                 index++;
             }
+        }
+    }
+}
+
+export function* takeWhile<T>(iter: RawIter<T>, fn: (el: T) => boolean): RawIter<T> {
+    if (iter[Symbol.iterator]) {
+        observe(iter, WHOLE_OBJECT)
+    }
+
+    for (const el of iter) {
+        if (fn(el)) {
+            yield el;
+        } else {
+            return
         }
     }
 }
@@ -251,6 +265,10 @@ export class Iter<T> {
 
     slice = (start: number, end?: number): Iter<T> => {
         return new Iter(slice(start)(end)((this as Iter<any>)[INNER_ITER])) as Iter<T>
+    }
+
+    takeWhile = (fn: (el: T) => boolean): Iter<T> => {
+        return new Iter(takeWhile((this as Iter<any>)[INNER_ITER], fn))
     }
 
     sorted = (fn: (a: T, b: T) => number): Iter<T> => {
