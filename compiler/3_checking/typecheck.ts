@@ -602,6 +602,7 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
 
             if (binding?.kind !== 'type-binding') {
                 reportError(miscError(type, `${type.name.name} is not a type`))
+                return UNKNOWN_TYPE
             }
 
             return resolve(binding?.kind === 'type-binding' ? binding.type : UNKNOWN_TYPE)
