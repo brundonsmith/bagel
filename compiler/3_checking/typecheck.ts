@@ -605,7 +605,7 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
                 return UNKNOWN_TYPE
             }
 
-            return resolve(binding?.kind === 'type-binding' ? binding.type : UNKNOWN_TYPE)
+            return resolve(binding.type)
         }
         case "generic-param-type":
             return resolve(type.extends ?? UNKNOWN_TYPE)
