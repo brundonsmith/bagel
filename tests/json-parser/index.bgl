@@ -1,4 +1,8 @@
 
+from './parse.bgl' import { json }
+
 proc main() {
-    
+    log(json('null'));
+    log(json('true'));
+    log(json('false'));
 }

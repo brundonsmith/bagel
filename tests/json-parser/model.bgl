@@ -1,37 +1,16 @@
 
 export type AST = JSONObject | JSONArray | JSONString | JSONNumber | JSONBoolean | JSONNull
 
-export type JSONObject = {
-    kind: 'json-object',
-    entries: { key: string, value: AST }
-}
+export nominal type JSONObject({ [string]: AST })
+export nominal type JSONArray(AST[])
+export nominal type JSONString(string)
+export nominal type JSONNumber(number)
+export nominal type JSONBoolean(boolean)
+export nominal type JSONNull(nil)
 
-export type JSONArray = {
-    kind: 'json-array',
-    entries: AST[]
-}
-
-export type JSONString = {
-    kind: 'json-string',
-    value: string
-}
-
-export type JSONNumber = {
-    kind: 'json-number',
-    value: number
-}
-
-export type JSONBoolean = {
-    kind: 'json-boolean',
-    value: boolean
-}
-
-export type JSONNull = {
-    kind: 'json-null'
-}
-
-export type Error = {
+export nominal type ParseError({
     str: string,
     index: number,
     message: string
-}
+})
+// falsy?

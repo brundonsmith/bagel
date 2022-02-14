@@ -1,41 +1,47 @@
 
-from './model' import { AST, JSONObject, JSONArray, JSONString, JSONNumber, JSONBoolean, JSONNull, Error }
+from './model.bgl' import { AST, JSONObject, JSONArray, JSONString, JSONNumber, JSONBoolean, JSONNull, ParseError }
 
-export const parse = json
+export func json(str: string): AST? =>
+    const res = jsonParse(str, 0),
+    if res != nil {
+        res[0]
+    }
 
-func json(str: string, index: number): AST? =>
-    const obj = object(str, index),
-    if obj != nil {
-        obj
+func jsonParse(str: string, index: number): [AST, number]? =>
+    jsonParseObject(str, index) ??
+    jsonParseArray(str, index) ??
+    jsonParseString(str, index) ??
+    jsonParseNumber(str, index) ??
+    jsonParseBoolean(str, index) ??
+    jsonParseNull(str, index)
+
+func jsonParseObject(str: string, index: number): [JSONObject, number]? => nil
+
+func jsonParseArray(str: string, index: number): [JSONArray, number]? => nil
+
+func jsonParseString(str: string, index: number): [JSONString, number]? => nil
+
+func jsonParseNumber(str: string, index: number): [JSONNumber, number]? => nil
+
+func jsonParseBoolean(str: string, index: number): [JSONBoolean, number]? =>
+    const trueEnd = consume(str, index, 'true'),
+    if trueEnd != nil {
+        [JSONBoolean(true), trueEnd]
     } else {
-        const arr = array(str, index),
-        if arr != nil {
-            arr
-        } else {
-            const s = strin(str, index),
-            if s != nil {
-                s
-            } else {
-                const n = num(str, index),
-
-                if n != nil {
-                    n
-                } else {
-                    const b = bool(str, index),
-
-                    if b != nil {
-                        b
-                    } else {
-                        null(str, index)
-                    }
-                }
-            }
+        const falseEnd = consume(str, index, 'false'),
+        if falseEnd != nil {
+            [JSONBoolean(false), falseEnd]
         }
     }
 
-func object(str: string, index: number): JSONObject? => nil
-func array(str: string, index: number): JSONArray? => nil
-func strin(str: string, index: number): JSONString? => nil
-func num(str: string, index: number): JSONNumber? => nil
-func bool(str: string, index: number): JSONBoolean? => nil
-func null(str: string, index: number): JSONNull? => nil
+func jsonParseNull(str: string, index: number): [JSONNull, number]? =>
+    const end = consume(str, index, 'null'),
+    if end != nil {
+        [JSONNull(nil), end]
+    }
+
+func consume(str: string, index: number, exact: string): number? =>
+    const end = index + exact.length,
+    if str.substring(index, index + exact.length) == exact {
+        end
+    }
