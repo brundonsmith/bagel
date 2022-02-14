@@ -53,7 +53,10 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 ? ''
                 : (
                     (ast.type.kind === 'nominal-type' ?
-                        `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n${exported(ast.exported)}function ${ast.name.name}(value: ${c(ast.type.inner)}): ${ast.name.name} { return { kind: ${INT}${ast.name.name}, value } }\n`
+                        `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n` +
+                        `${exported(ast.exported)}const ${ast.name.name} = ((value: ${c(ast.type.inner)}): ${ast.name.name} => ({ kind: ${INT}${ast.name.name}, value })) as (((value: ${c(ast.type.inner)}) => ${ast.name.name}) & { sym: typeof ${INT}${ast.name.name} });\n` +
+                        `${ast.name.name}.sym = ${INT}${ast.name.name};\n` +
+                        `(${ast.name.name} as any).sym = ${INT}${ast.name.name};\n`
                     : '') +
                     `${exported(ast.exported)}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
                         ? `{ kind: typeof ${INT}${ast.name.name}, value: ${c(ast.type.inner)} }`
@@ -287,6 +290,7 @@ function compileRuntimeType(type: TypeExpression): string {
         case 'object-type': return `{ kind: ${INT}RT_OBJECT, entries: [${type.entries.map(({ name, type, optional }) =>
             `{ key: '${name.name}', value: ${compileRuntimeType(type)}, optional: ${optional} }`
         )}] }`;
+        case 'nominal-type': return `{ kind: ${INT}RT_NOMINAL, nominal: ${type.name.description}.sym }`
         case 'union-type': return `[ ${type.members.map(compileRuntimeType).join(', ')} ]`;
     }
 

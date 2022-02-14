@@ -212,7 +212,7 @@ export const IMPORTED_ITEMS = [ 'observe', 'invalidate', 'computedFn',
 'autorun', 'action', 'WHOLE_OBJECT', 'h', 'range', 'entries', 'Iter',
 'RawIter', 'Plan', 'Remote', 'INNER_ITER', 'instanceOf', 'RT_UNKNOWN', 
 'RT_NIL', 'RT_BOOLEAN', 'RT_NUMBER', 'RT_STRING', 'RT_LITERAL', 'RT_ITERATOR',
-'RT_PLAN', 'RT_REMOTE', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT' ]
+'RT_PLAN', 'RT_REMOTE', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT', 'RT_NOMINAL' ]
 
 const JS_PRELUDE = `
 import { ${
