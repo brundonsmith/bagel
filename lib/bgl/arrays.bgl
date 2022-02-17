@@ -1,6 +1,6 @@
 
 js#
-import { invalidate as ___invalidate, WHOLE_OBJECT as ___WHOLE_OBJECT } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/core.ts'
+import { invalidate as ___invalidate, WHOLE_OBJECT as ___WHOLE_OBJECT } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts'
 #js
 
 export js proc push<T>(a: T[], el: T) {#

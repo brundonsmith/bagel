@@ -1,5 +1,5 @@
 
-from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/http.bgl' import { get }
+from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/http.bgl' import { fetch }
 
 export type Card = { imageUrl: string }
 
@@ -8,7 +8,7 @@ export type CardsResponse = {
 }
 
 export func searchCards(str: string): Plan<CardsResponse?> =>
-    const res = await get('https://api.pokemontcg.io/v1/cards?name=${str}'),
+    const res = await fetch('https://api.pokemontcg.io/v1/cards?name=${str}'),
     if res instanceof CardsResponse {
         res
     }

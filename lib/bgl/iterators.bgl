@@ -1,6 +1,6 @@
 
 js#
-import { repeat as ___repeat } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/core.ts'
+import { repeat as ___repeat } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts'
 #js
 
 export js func repeat<T>(val: T, count: number): Iterator<T> => {#
@@ -11,22 +11,16 @@ export js func join(iter: Iterator<string>, delimiter: string): string => {#
     return iter.array().join(delimiter)
 #}
 
-export js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> => {# return iter.map(fn) #}
+export js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> =>            {# return iter.map(fn) #}
 export js func reduce<T, R>(iter: Iterator<T>, init: R, fn: (acc: R, el: T) => R): R => {# return iter.reduce(init, fn) #}
-export js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> => {# return iter.filter(fn) #}
+export js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>     {# return iter.filter(fn) #}
 export js func slice<T>(iter: Iterator<T>, start: number, end?: number): Iterator<T> => {# return iter.slice(start, end) #}
-export js func takeWhile<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> => {# return iter.takeWhile(fn) #}
+export js func takeWhile<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>  {# return iter.takeWhile(fn) #}
 export js func sorted<T>(iter: Iterator<T>, fn: (a: T, b: T) => number): Iterator<T> => {# return iter.sorted(fn) #}
-export js func every<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean => {# return iter.every(fn) #}
-export js func some<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean => {# return iter.some(fn) #}
-export js func count<T>(iter: Iterator<T>): number => {# return iter.count() #}
-export js func concat<T>(iter: Iterator<T>, other: Iterator<T>): Iterator<T> => {# return iter.concat(other) #}
-export js func zip<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<[T?, R?]> => {# return iter.zip(other) #}
-export js func collectArray<T>(iter: Iterator<T>): T[] => {# return iter.array() #}
-export js func collectObject<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} => {#
-    return Object.fromEntries(iter.collectArray())
-#}
-
-// const a: string[] = repeat(0, 10)
-//     .map<number, string>((n: number): string => 'number' + n)
-//     .collectArray<string>()
+export js func every<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean =>          {# return iter.every(fn) #}
+export js func some<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean =>           {# return iter.some(fn) #}
+export js func count<T>(iter: Iterator<T>): number =>                                   {# return iter.count() #}
+export js func concat<T>(iter: Iterator<T>, other: Iterator<T>): Iterator<T> =>         {# return iter.concat(other) #}
+export js func zip<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<[T?, R?]> =>   {# return iter.zip(other) #}
+export js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
+export js func collectObject<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} =>  {# return iter.collectObject()) #}

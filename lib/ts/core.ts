@@ -22,7 +22,7 @@ export function render(el: Element) {
     document.body.innerHTML = _renderInner(el)
 }
 function _renderInner({ tagName, attributes, children }: Element): string {
-    return `<${tagName} ${Object.entries(attributes ?? {}).map(([key, value]) => `${key}="${value}"`)}>${children.map(render)}</${tagName}>`
+    return `<${tagName} ${Object.entries(attributes ?? {}).map(([key, value]) => `${key}="${value}"`)}>${children.map(_renderInner)}</${tagName}>`
 }
 
 // Custom reactivity
@@ -36,7 +36,16 @@ export {
 } from './_reactivity.ts'
 
 
-// Custom
+// Iterators
+function* _range(start: number, end: number): RawIter<number> {
+    for (let i = start; i < end; i++) {
+        yield i;
+    }
+}
+export function range(start: number, end: number): Iter<number> {
+    return new Iter(_range(start, end))
+}
+
 function* _repeat<T>(val: T, count: number): RawIter<T> {
     for (let i = 0; i < count; i++) {
         yield val
@@ -46,39 +55,178 @@ export function repeat<T>(val: T, count: number): Iter<T> {
     return new Iter(_repeat(val, count))
 }
 
-function _range(start: number) {
-    return function*(end: number): RawIter<number> {
-        for (let i = start; i < end; i++) {
-            yield i;
+export function* entries<V>(obj: {[key: string]: V}): RawIter<[string, V]> {
+    observe(obj, WHOLE_OBJECT)
+    for (const key in obj) {
+        yield [key, obj[key]];
+    }
+}
+
+
+const INNER_ITER = Symbol('INNER_ITER')
+
+type RawIter<T> = Iterable<T>|Generator<T>
+
+export function iter<T>(inner: RawIter<T>): Iter<T> {
+    return new Iter(inner)
+}
+
+export class Iter<T> {
+
+    [INNER_ITER]: RawIter<T>
+
+    constructor(inner: RawIter<T>) {
+        this[INNER_ITER] = inner
+    }
+    
+    map<R>(fn: (el: T) => R): Iter<R> {
+        return new Iter(map(fn, this[INNER_ITER]))
+    }
+
+    reduce<R>(init: R, fn: (acc: R, el: T) => R): R {
+        let acc = init
+        for (const el of this[INNER_ITER]) {
+            acc = fn(acc, el)
         }
+        return acc
     }
-}
-
-export function range(start: number) {
-    return function(end: number): Iter<number> {
-        return new Iter(_range(start)(end))
+    
+    filter(fn: (el: T) => boolean): Iter<T> {
+        return new Iter(filter(fn, this[INNER_ITER]))
     }
-}
 
-export function slice<T>(start: number|undefined) {
-    return function(end: number|undefined) {
-        return function*(iter: RawIter<T>): RawIter<T> {
-            if (iter[Symbol.iterator]) {
-                observe(iter, WHOLE_OBJECT)
+    slice(start: number, end?: number): Iter<T> {
+        return new Iter(slice(start, end, this[INNER_ITER]))
+    }
+
+    takeWhile(fn: (el: T) => boolean): Iter<T> {
+        return new Iter(takeWhile(this[INNER_ITER], fn))
+    }
+
+    sorted(fn: (a: T, b: T) => number): Iter<T> {
+        return new Iter(Array.from(this[INNER_ITER]).sort(fn))
+    }
+
+    every(fn: (a: T) => boolean): boolean {
+        if (this[INNER_ITER][Symbol.iterator]) {
+            observe(this[INNER_ITER], WHOLE_OBJECT)
+        }
+    
+        for (const el of this[INNER_ITER]) {
+            if (!fn(el)) {
+                return false
+            }
+        }
+    
+        return true
+    }
+
+    some(fn: (a: T) => boolean): boolean {
+        if (this[INNER_ITER][Symbol.iterator]) {
+            observe(this[INNER_ITER], WHOLE_OBJECT)
+        }
+    
+        for (const el of this[INNER_ITER]) {
+            if (fn(el)) {
+                return true
+            }
+        }
+    
+        return false
+    }
+
+    count(): number {
+        if (this[INNER_ITER][Symbol.iterator]) {
+            observe(this[INNER_ITER], WHOLE_OBJECT)
+        }
+    
+        let count = 0;
+    
+        for (const _ of this[INNER_ITER]) {
+            count++;
+        }
+    
+        return count;
+    }
+
+    concat(other: Iter<T>): Iter<T> {
+        return new Iter(concat(this[INNER_ITER], other[INNER_ITER] ?? other))
+    }
+
+    zip<R>(other: Iter<R>): Iter<[T|null|undefined, R|null|undefined]> {
+        return new Iter(zip(this[INNER_ITER], other[INNER_ITER] ?? other))
+    }
+
+    collectArray(): T[] {
+        if (this[INNER_ITER][Symbol.iterator]) {
+            observe(this[INNER_ITER], WHOLE_OBJECT)
+        }
+
+        return Array.from(this[INNER_ITER])
+    }
+
+    collectObject(): {[key: string]: unknown} {
+        if (this[INNER_ITER][Symbol.iterator]) {
+            observe(this[INNER_ITER], WHOLE_OBJECT)
+        }
+        
+        const obj = {} as {[key: string]: unknown}
+        for (const entry of this[INNER_ITER]) {
+            if (Array.isArray(entry)) {
+                const [key, value] = entry
+
+                obj[key] = value
+            }
+        }
+
+        return obj
+    }
+
+    set(): Set<T> {
+        if (this[INNER_ITER][Symbol.iterator]) {
+            observe(this[INNER_ITER], WHOLE_OBJECT)
+        }
+        return new Set(this[INNER_ITER])
+    }
+
+    // Bagel will ensure this is an Iter<string>
+    join(delimiter: string): string {
+        if (this[INNER_ITER][Symbol.iterator]) {
+            observe(this[INNER_ITER], WHOLE_OBJECT)
+        }
+
+        let str = "";
+        let first = true;
+
+        for (const el of this[INNER_ITER]) {
+            if (first) {
+                first = false;
+            } else {
+                str += delimiter;
             }
 
-            let index = 0;
-            for (const el of iter) {
-                if ((start == null || index >= start) && (end == null || index < end)) {
-                    yield el;
-                }
-                index++;
-            }
+            str += el;
         }
+
+        return str;
     }
 }
 
-export function* takeWhile<T>(iter: RawIter<T>, fn: (el: T) => boolean): RawIter<T> {
+function* slice<T>(start: number|undefined, end: number|undefined, iter: RawIter<T>): RawIter<T> {
+    if (iter[Symbol.iterator]) {
+        observe(iter, WHOLE_OBJECT)
+    }
+
+    let index = 0;
+    for (const el of iter) {
+        if ((start == null || index >= start) && (end == null || index < end)) {
+            yield el;
+        }
+        index++;
+    }
+}
+
+function* takeWhile<T>(iter: RawIter<T>, fn: (el: T) => boolean): RawIter<T> {
     if (iter[Symbol.iterator]) {
         observe(iter, WHOLE_OBJECT)
     }
@@ -91,9 +239,6 @@ export function* takeWhile<T>(iter: RawIter<T>, fn: (el: T) => boolean): RawIter
         }
     }
 }
-
-
-export type RawIter<T> = Iterable<T>|Generator<T>
 
 function* map<T, R>(fn: (el: T) => R, iter: RawIter<T>): RawIter<R> {
     if (iter[Symbol.iterator]) {
@@ -117,206 +262,44 @@ function* filter<T>(fn: (el: T) => boolean, iter: RawIter<T>): RawIter<T> {
     }
 }
 
-function every<T>(fn: (el: T) => boolean, iter: RawIter<T>): boolean {
-    if (iter[Symbol.iterator]) {
-        observe(iter, WHOLE_OBJECT)
+function* concat<T>(iter1: RawIter<T>, iter2: RawIter<T>): RawIter<T> {
+    if (iter1[Symbol.iterator]) {
+        observe(iter1, WHOLE_OBJECT)
     }
-
-    for (const el of iter) {
-        if (!fn(el)) {
-            return false
-        }
+    if (iter2[Symbol.iterator]) {
+        observe(iter2, WHOLE_OBJECT)
     }
-
-    return true
-}
-
-function some<T>(fn: (el: T) => boolean, iter: RawIter<T>): boolean {
-    if (iter[Symbol.iterator]) {
-        observe(iter, WHOLE_OBJECT)
-    }
-
-    for (const el of iter) {
-        if (fn(el)) {
-            return true
-        }
-    }
-
-    return false
-}
-
-export function* entries<V>(obj: {[key: string]: V}): RawIter<[string, V]> {
-    observe(obj, WHOLE_OBJECT)
-    for (const key in obj) {
-        yield [key, obj[key]];
-    }
-}
-
-function count<T>(iter: RawIter<T>): number {
-    if (iter[Symbol.iterator]) {
-        observe(iter, WHOLE_OBJECT)
-    }
-
-    let count = 0;
-
-    for (const _ of iter) {
-        count++;
-    }
-
-    return count;
-}
-
-function concat<T>(iter1: RawIter<T>) {
-    return function*(iter2: RawIter<T>): RawIter<T> {
-        if (iter1[Symbol.iterator]) {
-            observe(iter1, WHOLE_OBJECT)
-        }
-        if (iter2[Symbol.iterator]) {
-            observe(iter2, WHOLE_OBJECT)
-        }
-            
-        for (const el of iter1) {
-            yield el;
-        }
-    
-        for (const el of iter2) {
-            yield el;
-        }
-    }
-}
-
-function zip<T>(iter1: RawIter<T>) {
-    return function*<R>(iter2: RawIter<R>): RawIter<[T|undefined, R|undefined]> {
-        if (iter1[Symbol.iterator]) {
-            observe(iter1, WHOLE_OBJECT)
-        }
-        if (iter2[Symbol.iterator]) {
-            observe(iter2, WHOLE_OBJECT)
-        }
-
-
-        const a = iter1[Symbol.iterator]();
-        const b = iter2[Symbol.iterator]();
-
-        let nextA = a.next();
-        let nextB = b.next();
         
-        while (!nextA.done || !nextB.done) {
-            yield [nextA.value, nextB.value];
+    for (const el of iter1) {
+        yield el;
+    }
 
-            nextA = a.next();
-            nextB = b.next();
-        }
+    for (const el of iter2) {
+        yield el;
     }
 }
 
-function join<T extends string>(delimiter: string) {
-    return function(iter: RawIter<T>) {
-        if (iter[Symbol.iterator]) {
-            observe(iter, WHOLE_OBJECT)
-        }
-
-        let str = "";
-        let first = true;
-
-        for (const el of iter) {
-            if (first) {
-                first = false;
-            } else {
-                str += delimiter;
-            }
-
-            str += el;
-        }
-
-        return str;
+function* zip<T, R>(iter1: RawIter<T>, iter2: RawIter<R>): RawIter<[T|null|undefined, R|null|undefined]> {
+    if (iter1[Symbol.iterator]) {
+        observe(iter1, WHOLE_OBJECT)
     }
-}
-
-export const INNER_ITER = Symbol('INNER_ITER')
-
-export function iter<T>(inner: RawIter<T>): Iter<T> {
-    return new Iter(inner)
-}
-
-export class Iter<T> {
-
-    [INNER_ITER]: RawIter<T>
-
-    constructor(inner: RawIter<T>) {
-        this[INNER_ITER] = inner
+    if (iter2[Symbol.iterator]) {
+        observe(iter2, WHOLE_OBJECT)
     }
+
+
+    const a = iter1[Symbol.iterator]();
+    const b = iter2[Symbol.iterator]();
+
+    let nextA = a.next();
+    let nextB = b.next();
     
-    map = <R>(fn: (el: T) => R): Iter<R> => {
-        return new Iter(map(fn, (this as Iter<any>)[INNER_ITER]))
-    }
+    while (!nextA.done || !nextB.done) {
+        yield [nextA.value, nextB.value];
 
-    reduce = <R>(init: R, fn: (acc: R, el: T) => R): R => {
-        let acc = init
-        for (const el of this[INNER_ITER]) {
-            acc = fn(acc, el)
-        }
-        return acc
+        nextA = a.next();
+        nextB = b.next();
     }
-    
-    filter = (fn: (el: T) => boolean): Iter<T> => {
-        return new Iter(filter(fn, (this as Iter<any>)[INNER_ITER]))
-    }
-
-    slice = (start: number, end?: number): Iter<T> => {
-        return new Iter(slice(start)(end)((this as Iter<any>)[INNER_ITER])) as Iter<T>
-    }
-
-    takeWhile = (fn: (el: T) => boolean): Iter<T> => {
-        return new Iter(takeWhile((this as Iter<any>)[INNER_ITER], fn))
-    }
-
-    sorted = (fn: (a: T, b: T) => number): Iter<T> => {
-        return new Iter(Array.from((this as Iter<any>)[INNER_ITER]).sort(fn))
-    }
-
-    every = (fn: (a: T) => boolean): boolean => {
-        return every(fn, (this as Iter<any>)[INNER_ITER])
-    }
-
-    some = (fn: (a: T) => boolean): boolean => {
-        return some(fn, (this as Iter<any>)[INNER_ITER])
-    }
-
-    count = (): number => {
-        return count((this as Iter<any>)[INNER_ITER])
-    }
-
-    concat = (other: RawIter<T>|Iter<T>): Iter<T> => {
-        return new Iter(concat((this as Iter<any>)[INNER_ITER])((other as any)[INNER_ITER] ?? other))
-    }
-
-    zip = <R>(other: RawIter<R>|Iter<R>): Iter<[T|null|undefined, R|null|undefined]> => {
-        return new Iter(zip((this as Iter<any>)[INNER_ITER])((other as any)[INNER_ITER] ?? other))
-    }
-
-    array = (): T[] => {
-        if (this[INNER_ITER][Symbol.iterator]) {
-            observe(this[INNER_ITER], WHOLE_OBJECT)
-        }
-        return Array.from((this as Iter<any>)[INNER_ITER])
-    }
-
-    set = (): Set<T> => {
-        if (this[INNER_ITER][Symbol.iterator]) {
-            observe(this[INNER_ITER], WHOLE_OBJECT)
-        }
-        return new Set((this as Iter<any>)[INNER_ITER])
-    }
-
-    // TODO: These two are only available for certain types of iterators. Need a way to specify that at a type level.
-    // object = (): {[left]: right} => {
-    //
-    // }
-    //
-    // join = (delimiter: string): string => {
-    //     return join(delimiter)((this as unknown as Iter<string>)[INNER_ITER])
-    // }
 }
 
 
@@ -381,6 +364,8 @@ export class Remote<T> {
     public loading = false;
 }
 
+
+// Runtime type checking
 export const RT_UNKNOWN = Symbol('RT_UNKNOWN')
 export const RT_NIL = Symbol('RT_NIL')
 export const RT_BOOLEAN = Symbol('RT_BOOLEAN')

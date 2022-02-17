@@ -190,7 +190,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 + ` ? ${c(outcome)} : `)
             .join('\n')
         + (ast.defaultCase ? c(ast.defaultCase) : NIL) + ')'
-        case "range": return `${INT}range(${c(ast.start)})(${c(ast.end)})`;
+        case "range": return `${INT}range(${c(ast.start)}, ${c(ast.end)})`;
         case "parenthesized-expression": return `(${c(ast.inner)})`;
         case "debug": return c(ast.inner);
         case "plain-identifier": return ast.name;

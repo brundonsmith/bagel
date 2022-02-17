@@ -1,6 +1,6 @@
 
 js#
-import { iter as ___iter } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/core.ts'
+import { iter as ___iter, entries as ___entries } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts'
 #js
 
 export js proc assign<B extends UnknownObject, A extends B>(a: A, b: B) {#
@@ -19,5 +19,5 @@ export js func values<O extends UnknownObject>(obj: O): Iterator<unknown> => {#
 #}
 
 export js func entries<O extends UnknownObject>(obj: O): Iterator<[string, unknown]> => {#
-    return ___iter(Object.entries(obj))
+    return ___iter(___entries(obj))
 #}

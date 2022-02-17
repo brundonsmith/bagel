@@ -99,7 +99,7 @@ async function testSideEffects(bgl: string, expected: any[]) {
     await eval(
         `(async function() {
             const { ${IMPORTED_ITEMS.map((s) => `${s}: ${INT}${s}`).join(", ")
-        } } = await import("../lib/src/core.ts");
+        } } = await import("../lib/ts/core.ts");
             ` + compiled + `
             runTest();
         })();`

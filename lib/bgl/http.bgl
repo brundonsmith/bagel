@@ -1,9 +1,4 @@
-js#
-import * as http from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/src/http.ts'
-#js
 
-export func get(url: string): Plan<unknown> =>     js# http.get(url) #js
-export func post(url: string): Plan<unknown> =>    js# http.post(url) #js
-export func put(url: string): Plan<unknown> =>     js# http.put(url) #js
-export func del(url: string): Plan<unknown> =>     js# http.del(url) #js
-export func options(url: string): Plan<unknown> => js# http.options(url) #js
+export func fetch(url: string): Plan<unknown> => {#
+    return fetch(url).then(res => res.json())
+#}
