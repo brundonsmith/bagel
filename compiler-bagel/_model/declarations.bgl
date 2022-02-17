@@ -1,0 +1,105 @@
+from './ast.bgl' import { Block, Debug, PlainIdentifier, SourceInfo }
+from './expressions.bgl' import { ExactStringLiteral, Expression, Func, JavascriptEscape, JsFunc, JsProc, Proc }
+from './type-expressions.bgl' import { TypeExpression }
+
+export type Declaration =
+    | JavascriptEscape
+    | ImportAllDeclaration
+    | ImportDeclaration
+    | TypeDeclaration
+    | ProcDeclaration
+    | FuncDeclaration
+    | ValueDeclaration
+    | DeriveDeclaration
+    | RemoteDeclaration
+    | AutorunDeclaration
+    | TestExprDeclaration
+    | TestBlockDeclaration
+    | Debug
+
+type Exported = { exported: boolean }
+
+export nominal type ImportAllDeclaration(const {
+    ...SourceInfo,
+    alias: PlainIdentifier,
+    path: ExactStringLiteral,
+})
+
+export nominal type ImportDeclaration(const {
+    ...SourceInfo,
+    imports: ImportItem[],
+    path: ExactStringLiteral,
+})
+
+export nominal type ImportItem(const {
+    ...SourceInfo,
+    name: PlainIdentifier,
+    alias?: PlainIdentifier,
+})
+
+export nominal type TypeDeclaration(const {
+    ...SourceInfo,
+    ...Exported,
+    name: PlainIdentifier,
+    type: TypeExpression,
+})
+
+export nominal type ProcDeclaration(const {
+    ...SourceInfo,
+    ...Exported,
+    action: boolean,
+    name: PlainIdentifier,
+    value: Proc|JsProc,
+})
+
+export nominal type FuncDeclaration(const {
+    ...SourceInfo,
+    ...Exported,
+    memo: boolean,
+    name: PlainIdentifier,
+    value: Func|JsFunc,
+})
+
+export nominal type ValueDeclaration(const {
+    ...SourceInfo,
+    name: PlainIdentifier,
+    type: TypeExpression?,
+    value: Expression,
+    isConst: boolean,
+    exported: nil|'export'|'expose',
+})
+
+export nominal type DeriveDeclaration(const {
+    ...SourceInfo,
+    ...Exported,
+    name: PlainIdentifier,
+    type: TypeExpression?,
+    fn: Func,
+})
+
+export nominal type RemoteDeclaration(const {
+    ...SourceInfo,
+    ...Exported,
+    name: PlainIdentifier,
+    type: TypeExpression?,
+    fn: Func,
+})
+
+export nominal type TestExprDeclaration(const {
+    ...SourceInfo,
+    name: ExactStringLiteral,
+    expr: Expression,
+})
+
+export nominal type TestBlockDeclaration(const {
+    ...SourceInfo,
+    name: ExactStringLiteral,
+    block: Block,
+})
+
+export nominal type AutorunDeclaration(const {
+    ...SourceInfo,
+    effect: Expression
+})
+
+// TODO: ClassReaction

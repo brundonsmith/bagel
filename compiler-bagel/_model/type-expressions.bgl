@@ -1,0 +1,364 @@
+
+from './ast.bgl' import { SourceInfo, PlainIdentifier }
+from './expressions.bgl' import { ExactStringLiteral, NumberLiteral, BooleanLiteral }
+
+export type TypeExpression =
+    | UnionType
+    | MaybeType
+    | NamedType
+    | GenericParamType
+    | ProcType
+    | FuncType
+    | GenericType
+    | BoundGenericType
+    | ElementType
+    | ObjectType
+    | RecordType
+    | ArrayType
+    | TupleType
+    | StringType
+    | NumberType
+    | BooleanType
+    | NilType
+    | LiteralType
+    | NominalType
+    | IteratorType
+    | PlanType
+    | RemoteType
+    | ParenthesizedType
+    | UnknownType
+    | AnyType
+    | JavascriptEscapeType
+
+export nominal type UnionType(const {
+    ...SourceInfo,
+    members: TypeExpression[],
+    mutability: nil,
+})
+
+export nominal type MaybeType(const {
+    ...SourceInfo,
+    inner: TypeExpression,
+    mutability: nil,
+})
+
+export nominal type NamedType(const {
+    ...SourceInfo,
+    name: PlainIdentifier,
+    mutability: nil,
+})
+
+export nominal type GenericParamType(const {
+    ...SourceInfo,
+    name: PlainIdentifier,
+    extends: TypeExpression|nil,
+    mutability: nil,
+})
+
+export nominal type ProcType(const {
+    ...SourceInfo,
+    args: Arg[],
+    invalidatesParent: boolean,
+    isAsync: boolean|nil,
+    mutability: nil,
+})
+
+export nominal type FuncType(const {
+    ...SourceInfo,
+    args: Arg[],
+    returnType?: TypeExpression,
+    mutability: nil,
+})
+
+export nominal type GenericType(const {
+    ...SourceInfo,
+    typeParams: TypeParam[],
+    inner: TypeExpression,
+    mutability: nil,
+})
+
+export nominal type TypeParam(const {
+    ...SourceInfo,
+    name: PlainIdentifier,
+    extends: TypeExpression|nil
+})
+
+// These two types are special cases of GenericType that allow us to encode 
+// additional guarantees at certain spots in the AST, and thereby avoid some 
+// as-casting later on
+export nominal type GenericFuncType(const {
+    ...SourceInfo,
+    typeParams: TypeParam[],
+    inner: FuncType,
+    mutability: nil,
+})
+export nominal type GenericProcType(const {
+    ...SourceInfo,
+    typeParams: TypeParam[],
+    inner: ProcType,
+    mutability: nil,
+})
+
+export nominal type BoundGenericType(const {
+    ...SourceInfo,
+    typeArgs: TypeExpression[],
+    generic: TypeExpression,
+    mutability: nil,
+})
+
+export nominal type Arg(const {
+    ...SourceInfo,
+    name: PlainIdentifier,
+    type?: TypeExpression,
+    optional: boolean,
+})
+
+export nominal type ElementType(const {
+    ...SourceInfo,
+    // tagName: PlainIdentifier,
+    // attributes: [PlainIdentifier, Expression][],
+    mutability: nil,
+})
+
+export nominal type ObjectType(const {
+    ...SourceInfo,
+    ...Mutability,
+    spreads: NamedType[],
+    entries: Attribute[],
+})
+
+export nominal type Attribute(const {
+    ...SourceInfo,
+    name: PlainIdentifier,
+    type: TypeExpression,
+    optional: boolean,
+    forceReadonly: boolean,
+    mutability: nil,
+})
+
+export nominal type RecordType(const {
+    ...SourceInfo,
+    ...Mutability,
+    keyType: TypeExpression,
+    valueType: TypeExpression,
+})
+
+export nominal type ArrayType(const {
+    ...SourceInfo,
+    ...Mutability,
+    element: TypeExpression,
+})
+
+export nominal type TupleType(const {
+    ...SourceInfo,
+    ...Mutability,
+    members: TypeExpression[],
+})
+
+export type PrimitiveType = 
+    | StringType
+    | NumberType
+    | BooleanType
+    | NilType
+    | UnknownType
+
+export nominal type StringType(const {
+    ...SourceInfo,
+    mutability: nil,
+})
+
+export nominal type NumberType(const {
+    ...SourceInfo,
+    mutability: nil,
+})
+
+export nominal type BooleanType(const {
+    ...SourceInfo,
+    mutability: nil,
+})
+
+export nominal type NilType(const {
+    ...SourceInfo,
+    mutability: nil,
+})
+
+export nominal type LiteralType(const {
+    ...SourceInfo,
+    value: ExactStringLiteral | NumberLiteral | BooleanLiteral,
+    mutability: nil,
+})
+
+export nominal type NominalType(const {
+    ...SourceInfo,
+    // name: symbol,
+    inner: TypeExpression,
+    mutability: nil,
+})
+
+export nominal type IteratorType(const {
+    ...SourceInfo,
+    inner: TypeExpression,
+    mutability: nil,
+})
+
+export nominal type PlanType(const {
+    ...SourceInfo,
+    inner: TypeExpression,
+    mutability: nil,
+})
+
+export nominal type RemoteType(const {
+    ...SourceInfo,
+    inner: TypeExpression,
+    mutability: nil,
+})
+
+export nominal type ParenthesizedType(const {
+    ...SourceInfo,
+    inner: TypeExpression,
+    mutability: nil,
+})
+
+export nominal type UnknownType(const {
+    ...SourceInfo,
+    mutability: nil,
+})
+
+// Internal use only!
+export nominal type AnyType(const {
+    ...SourceInfo,
+    mutability: nil,
+})
+
+export nominal type JavascriptEscapeType(const {
+    ...SourceInfo,
+    mutability: nil,
+})
+
+export type Mutability = { mutability: 'immutable'|'readonly'|'mutable' }
+
+export const STRING_TYPE = StringType({
+    mutability: nil,
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const NUMBER_TYPE = NumberType({
+    mutability: nil,
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const BOOLEAN_TYPE = BooleanType({
+    mutability: nil,
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const NIL_TYPE = NilType({
+    mutability: nil,
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const UNKNOWN_TYPE = UnknownType({
+    mutability: nil,
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const ANY_TYPE = AnyType({
+    mutability: nil,
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const JAVASCRIPT_ESCAPE_TYPE = JavascriptEscapeType({
+    mutability: nil,
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const OBJECT_OF_ANY = RecordType({
+    keyType: ANY_TYPE,
+    valueType: ANY_TYPE,
+    mutability: 'immutable',
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const ARRAY_OF_ANY = ArrayType({
+    element: ANY_TYPE,
+    mutability: 'immutable',
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const ITERATOR_OF_ANY = IteratorType({
+    inner: ANY_TYPE,
+    mutability: nil,
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const STRING_TEMPLATE_INSERT_TYPE = UnionType({
+    members: [
+        STRING_TYPE,
+        NUMBER_TYPE,
+        BOOLEAN_TYPE,
+    ],
+    mutability: nil,
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})
+export const ELEMENT_TAG_CHILD_TYPE = UnionType({
+    members: [
+        STRING_TYPE,
+        NUMBER_TYPE,
+        NIL_TYPE,
+        ElementType({ mutability: nil, parent: nil, module: nil, code: nil, startIndex: nil, endIndex: nil }),
+        ArrayType({ element: UnionType({
+            members: [
+                STRING_TYPE,
+                NUMBER_TYPE,
+                NIL_TYPE,
+                ElementType({ mutability: nil, parent: nil, module: nil, code: nil, startIndex: nil, endIndex: nil }),
+            ],
+            code: nil,
+            parent: nil,
+            module: nil,
+            startIndex: nil,
+            endIndex: nil,
+            mutability: nil,
+        }), mutability: 'immutable', parent: nil, module: nil, code: nil, startIndex: nil, endIndex: nil})
+    ],
+    mutability: nil,
+    parent: nil,
+    module: nil,
+    code: nil,
+    startIndex: nil,
+    endIndex: nil,
+})

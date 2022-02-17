@@ -1,0 +1,52 @@
+
+
+export nominal type ModuleName(string)
+
+// export type ReportError = (error: BagelError) => void
+
+
+// bindings
+// export type Binding = ValueBinding | TypeBinding
+
+// export nominal type ValueBinding(const {
+//     owner: 
+//         | ValueDeclaration
+//         | ProcDeclaration
+//         | FuncDeclaration
+//         | ValueDeclarationStatement
+//         | InlineConstDeclaration
+//         | DeriveDeclaration
+//         | RemoteDeclaration
+//         | AwaitStatement
+//         | ForLoop
+//         | Func
+//         | Proc
+//         | ImportAllDeclaration
+//         | InlineDestructuringDeclaration
+//         | DestructuringDeclarationStatement
+//     identifier: PlainIdentifier
+// })
+
+// export nominal type TypeBinding(TypeExpression)
+
+// export func getBindingMutability(binding: ValueBinding, from: AST): 'immutable'|'readonly'|'mutable'|'assignable' =>
+//     if binding.owner instanceof ValueDeclaration {
+//         const owner = binding.owner.value,
+//         if owner.isConst || (owner.exported === 'expose' && owner.module !== from.value.module) {
+//             'immutable'
+//         } else {
+//             'assignable'
+//         }
+//     } else if
+//             binding.owner instanceof Func ||
+//             binding.owner instanceof Proc ||
+//             binding.owner instanceof ForLoop ||
+//             binding.owner instanceof ImportAllDeclaration {
+//         'mutable'
+//     }
+
+
+// refinement
+// export type Refinement = SubtractionRefinement | NarrowingRefinement
+// export nominal type SubtractionRefinement({ type: TypeExpression, targetExpression: Expression })
+// export nominal type NarrowingRefinement({ type: TypeExpression, targetExpression: Expression })
