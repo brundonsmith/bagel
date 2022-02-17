@@ -292,14 +292,14 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "proc-type": return `(${compileArgs(excludeTypes, module, ast.args)}) => void`;
         case "func-type": return `(${compileArgs(excludeTypes, module, ast.args)}) => ${c(ast.returnType ?? UNKNOWN_TYPE)}`;
         case "element-type": return `unknown`;
-        case "object-type": return `{${
-            ast.spreads
-            .map(s => '...' + c(s))
-            .concat(
+        case "object-type": return (
+            ast.spreads.map(s => c(s) + ' & ').join('') +
+            `{${
                 ast.entries.map(({ name, type }) =>
                     `${name.name}: ${c(type)}`)
-            )
-            .join(', ')}}`;
+                .join(', ')
+            }}`
+        );
         case "record-type": return `{[key: ${c(ast.keyType)}]: ${c(ast.valueType)}}`;
         case "array-type": return `${c(ast.element)}[]`;
         case "tuple-type": return `[${ast.members.map(c).join(", ")}]`;
