@@ -385,7 +385,7 @@ for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
                     throw `Reformatted AST did not match original:\noriginal:\n${BAGEL_SNIPPETS[i]}\nformatted:\n${formatted}`
                 }
             } else {
-                throw `Failed to parse`
+                throw `Failed to parse:\n${BAGEL_SNIPPETS[i]}`
             }
         }
     })
