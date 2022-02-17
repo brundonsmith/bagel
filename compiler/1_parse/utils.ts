@@ -1,6 +1,7 @@
-import { BagelError, isError } from "../errors.ts";
+import { INT } from "../4_compile/index.ts";
+import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize2, memoize3 } from "../utils/misc.ts";
-import { AST, KEYWORDS, PlainIdentifier } from "../_model/ast.ts";
+import { AST, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 
 export const consume = memoize3((code: string, index: number, segment: string): number|undefined => {
@@ -74,22 +75,6 @@ export function isAlpha(char: string): boolean {
 
 export function isNumeric(char: string): boolean {
     return char >= '0' && char <= '9';
-}
-
-export function isSymbol(str: string): boolean {
-    for (let index = 0; index < str.length; index++) {
-        if (!isSymbolic(str[index], index)) {
-            return false;
-        }
-    }
-
-    for (const keyword of KEYWORDS) {
-        if (str === keyword) {
-            return false;
-        }
-    }
-
-    return true;
 }
 
 export function isSymbolic(ch: string, index: number): boolean {
@@ -244,17 +229,20 @@ export function err(code: string|undefined, index: number|undefined, expected: s
 export type ParseFunction<T> = (module: ModuleName, code: string, index: number) => ParseResult<T> | BagelError | undefined;
 
 export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize3((module, code, startIndex) => 
-    given(identifierSegment(code, startIndex), ({ segment: name, index }) => ({
-        parsed: {
-            kind: "plain-identifier",
-            name,
-            module,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        index,
-    })))
+    given(identifierSegment(code, startIndex), ({ segment: name, index }) => 
+        name.startsWith(INT)
+            ? syntaxError(code, index, `Identifiers can't start with '${INT}'`)
+            : {
+                parsed: {
+                    kind: "plain-identifier",
+                    name,
+                    module,
+                    code,
+                    startIndex,
+                    endIndex: index,
+                },
+                index,
+            }))
 
 export const identifierSegment = memoize2((code: string, index: number): { segment: string, index: number} | undefined => {
     const startIndex = index;
@@ -264,12 +252,6 @@ export const identifierSegment = memoize2((code: string, index: number): { segme
     }
 
     const segment = code.substring(startIndex, index);
-
-    for (const keyword of KEYWORDS) {
-        if (segment === keyword) {
-            return undefined;
-        }
-    }
 
     if (index - startIndex > 0) {
         return { segment, index };

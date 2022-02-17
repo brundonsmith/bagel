@@ -53,10 +53,3 @@ export type SourceInfo = {
     readonly startIndex: number|undefined,
     readonly endIndex: number|undefined,
 }
-
-export const KEYWORDS = [ "func", "proc", "if", "else", "switch", "case",
-//"type", 
-"class", "let", "const", "for", "while", 
-"of", "nil", "public", "visible", "private", "reaction", 
-"triggers", "until", "true", "false", "import", "export", "from", "as", "test",
-"expr", "block" ] as const;
