@@ -1,5 +1,5 @@
 
-from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/http.bgl' import { fetch }
+from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/fetch.bgl' import { fetch }
 
 export type Card = { imageUrl: string }
 

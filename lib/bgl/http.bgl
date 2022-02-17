@@ -1,4 +1,0 @@
-
-export func fetch(url: string): Plan<unknown> => {#
-    return fetch(url).then(res => res.json())
-#}
