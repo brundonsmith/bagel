@@ -76,35 +76,33 @@ export function observe<O extends object, K extends (keyof O & string|number) | 
         // @ts-ignore
         : O[K] | O | undefined {
 
-    // tolerate optional-chaining
-    if (obj == null) {
-        return undefined
-    }
-
+    // if something is observing, report this obj/prop to it
     if (reportObservableAccessed) {
-        // console.log('observe(', obj, prop, ')')
-        // console.log(`observe()`, { obj, prop })
         reportObservableAccessed({ obj: new WeakRef(obj), prop })
     }
     
+    // return observed value
     if (prop === WHOLE_OBJECT) {
         return obj
-    }
-    if (prop === COMPUTED_RESULT) {
+    } else if (prop === COMPUTED_RESULT) {
         return undefined
+    } else {
+        // @ts-ignore
+        const val = obj?.[prop]
+        
+        if (typeof val === 'function') {
+            return val.bind(obj) // methods
+        } else {
+            return val
+        }
     }
-
-    // @ts-ignore
-    const val = obj[prop]
-    
-    return typeof val === 'function' ? val.bind(obj) : val
 }
 
 export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT = WHOLE_OBJECT) {
-    // console.log('invalidate(', obj, prop, ')')
     const topOfAction = queuedReactions == null
     const queue = queuedReactions = queuedReactions ?? new Set()
 
+    // invalidate cached function results that observed this obj/prop
     for (const entry of memoCache) {
         const entryIsInvalidated =
             entry.observables.some(o => 
@@ -116,12 +114,14 @@ export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESU
         }
     }
 
+    // queue up reactions that observed this obj/prop
     for (const entry of observablesToReactions) {
         if (obj === entry.obj.deref() && (prop === WHOLE_OBJECT || prop === entry.prop)) {
             queue.add(entry.effect)
         }
     }
     
+    // run queued reactions
     if (topOfAction) {
         for (const effect of queue) {
             effect()
@@ -130,10 +130,51 @@ export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESU
     }
 }
 
+export function computedFn<F extends Function>(fn: F): F {
+    return ((...args: any[]) => {
+        observe(fn, COMPUTED_RESULT)
+
+        // see if we have a cache entry for this function already
+        const cacheEntry = memoCache.find(cacheEntry =>
+            cacheEntry.fn === fn && args.every((_, index) => args[index] === cacheEntry.args[index]))
+
+        // if we have a valid cache entry, just return it
+        if (cacheEntry && cacheEntry.cached !== EMPTY_CACHE) {
+            return cacheEntry.cached
+        } else {
+
+            // call the function and collect the observables that were accessed
+            const previous = reportObservableAccessed
+            const observables: Observable[] = []
+            reportObservableAccessed = obs => observables.push(obs)
+            const result = fn(...args)
+            reportObservableAccessed = previous
+
+            // cache the result alongside the observables
+            if (!cacheEntry) {
+                memoCache.push({
+                    fn,
+                    args,
+                    observables,
+                    cached: result
+                })
+            } else {
+                cacheEntry.observables = observables
+                cacheEntry.cached = result
+            }
+
+            return result
+        }
+    }) as unknown as F
+}
+
 export function autorun(fn: Reaction) {
     function run() {
+
+        // remove this reaction's entries from the mapping
         observablesToReactions = observablesToReactions.filter(r => r.effect !== run)
 
+        // run the reaction and collect all new mappings
         const previous = reportObservableAccessed
         reportObservableAccessed = obs => observablesToReactions.push({ ...obs, effect: run })
         fn()
@@ -143,46 +184,8 @@ export function autorun(fn: Reaction) {
     run()
 }
 
-export function computedFn<F extends Function>(fn: F): F {
-    return ((...args: any[]) => {
-        observe(fn as any, COMPUTED_RESULT)
-
-        const cacheEntry = memoCache.find(cacheEntry =>
-            cacheEntry.fn === fn && args.every((_, index) => args[index] === cacheEntry.args[index]))
-
-        // console.log({ cacheEntry })
-
-        if (cacheEntry && cacheEntry.cached !== EMPTY_CACHE) {
-            // console.log('cache hit: ', cacheEntry.cached)
-            return cacheEntry.cached
-        } else {
-            const observables: Observable[] = []
-
-            const previous = reportObservableAccessed
-            reportObservableAccessed = (obs) => observables.push(obs)
-            const result = fn(...args)
-            reportObservableAccessed = previous
-
-            // console.log('caching: ', result)
-            if (!cacheEntry) {
-                memoCache.push({
-                    fn,
-                    args,
-                    observables,
-                    cached: result
-                })
-            } else {
-                cacheEntry.cached = result
-            }
-
-            // console.log('cache miss: ', result)
-            return result
-        }
-    }) as unknown as  F
-}
-
 export function action<F extends (...args: any[]) => void>(fn: F): F {
-    return ((...args: any[]) => {
+    return ((...args: unknown[]) => {
         const topOfAction = queuedReactions == null
         const queue = queuedReactions = queuedReactions ?? new Set()
     
