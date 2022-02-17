@@ -296,30 +296,27 @@ const unionType: ParseFunction<UnionType> = (module, code, startIndex) =>
             }
             : undefined)
 
-const elementType: ParseFunction<ElementType> = (module, code, startIndex) =>
-    given(consume(code, startIndex, "Element"), index => ({
-        parsed: {
-            kind: "element-type",
-            module,
-            mutability: undefined,
-            code,
-            startIndex,
-            endIndex: index,
-        },
-        index,
-    }))
-
-const namedType: ParseFunction<NamedType> = (module, code, startIndex) =>
+const namedType: ParseFunction<NamedType|ElementType> = (module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) => ({
-        parsed: {
-            kind: "named-type",
-            name,
-            module,
-            mutability: undefined,
-            code,
-            startIndex,
-            endIndex: index,
-        },
+        parsed: 
+            name.name === 'Element'
+                ? {
+                    kind: "element-type",
+                    module,
+                    mutability: undefined,
+                    code,
+                    startIndex,
+                    endIndex: index,
+                }
+                : {
+                    kind: "named-type",
+                    name,
+                    module,
+                    mutability: undefined,
+                    code,
+                    startIndex,
+                    endIndex: index,
+                },
         index,
     }))
 
@@ -348,7 +345,10 @@ const _typeSpreadOrEntry: ParseFunction<NamedType|Attribute> = (module, code, st
 
 const _objectTypeSpread: ParseFunction<NamedType> = (module, code, startIndex) =>
     given(consume(code, startIndex, '...'), index =>
-    expec(namedType(module, code, index), err(code,  index, 'Named type'), res => res))
+    expec(namedType(module, code, index), err(code,  index, 'Named type'), res =>
+        res.parsed.kind !== 'named-type'
+            ? syntaxError(code, index, `Can't spread type ${format(res.parsed)}`)
+            : res as ParseResult<NamedType>))
 
 const _objectTypeEntry: ParseFunction<Attribute> = (module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
@@ -2146,7 +2146,7 @@ const TYPE_PARSER = new TieredParser<TypeExpression>([
     [ boundGenericType ],
     [ maybeType ],
     [ arrayType ],
-    [ primitiveType, elementType, funcType, procType, 
+    [ primitiveType, funcType, procType, 
         literalType, namedType, recordType, objectType, parenthesizedType, 
         tupleType, unknownType ],
 ])
