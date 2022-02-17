@@ -1,5 +1,9 @@
 
+import { parsed } from "../1_parse/index.ts";
+import { computedFn } from "../mobx.ts";
+import { _Store } from "../store.ts";
 import { AST } from '../_model/ast.ts'
+import { ModuleName } from "../_model/common.ts";
 import { Spread } from "../_model/expressions.ts";
 import { TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
@@ -11,17 +15,20 @@ export const DEFAULT_OPTIONS: FormatOptions = {
     spaces: 4
 }
 
-function indentation(options: FormatOptions, indent: number) {
-    let str = ''
+export const formatted = computedFn((store: _Store, moduleName: ModuleName): string => {
+    const ast = parsed(store, moduleName, false)?.ast
 
-    for (let i = 0; i < indent; i++) {
-        for (let j = 0; j < options.spaces; j++) {
-            str += ' '
-        }
+    if (!ast) {
+        return ''
     }
-
-    return str
-}
+    
+    return (
+        format(
+            ast,
+            DEFAULT_OPTIONS
+        )
+    )
+})
 
 export function format(ast: AST, options: FormatOptions = DEFAULT_OPTIONS): string {
     return formatInner(options, 0, undefined)(ast)
@@ -260,4 +267,16 @@ function maybeTypeArgs(options: FormatOptions, indent: number, parent: AST|undef
 
 function maybeTypeAnnotation(options: FormatOptions, indent: number, parent: AST|undefined, type: TypeExpression|undefined): string {
     return type ? `: ${formatInner(options, indent, parent)(type)}` : ''
+}
+
+function indentation(options: FormatOptions, indent: number) {
+    let str = ''
+
+    for (let i = 0; i < indent; i++) {
+        for (let j = 0; j < options.spaces; j++) {
+            str += ' '
+        }
+    }
+
+    return str
 }

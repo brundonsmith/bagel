@@ -4,9 +4,12 @@ import { BagelError, prettyProblem } from "./errors.ts";
 import { all, cacheDir, cachedFilePath, esOrNone, on, pathIsRemote, sOrNone, bagelFileToTsFile, jsFileLocation } from "./utils/misc.ts";
 
 import { autorun, configure } from "./mobx.ts";
-import Store, { Mode } from "./store.ts";
+import Store, { allProblems, done, Mode } from "./store.ts";
 import { ModuleName } from "./_model/common.ts";
-import { LintProblem } from "./other/lint.ts";
+import { autofixed, LintProblem } from "./other/lint.ts";
+import { compiled } from "./4_compile/index.ts";
+import { formatted } from "./other/format.ts";
+import { parsed } from "./1_parse/index.ts";
 
 configure({
     enforceActions: "never",
@@ -117,10 +120,10 @@ autorun(async () => {
 // add imported modules to set
 autorun(() => {
     for (const module of Store.modules) {
-        const parsed = Store.parsed(module, true)
+        const parseResult = parsed(Store, module, true)
 
-        if (parsed) {
-            for (const decl of parsed.ast.declarations) {
+        if (parseResult) {
+            for (const decl of parseResult.ast.declarations) {
                 if (decl.kind === "import-declaration" || decl.kind === "import-all-declaration") {
                     const importedModule = canonicalModuleName(module, decl.path.value)
 
@@ -166,18 +169,18 @@ const printErrors = debounce((errors: Map<ModuleName, (BagelError|LintProblem)[]
     
 // print errors as they occur
 autorun(() => {
-    if (Store.done && Store.mode?.mode !== 'format' && Store.mode?.mode !== 'autofix') {
-        printErrors(Store.allProblems, Store.mode?.watch)
+    if (done(Store) && Store.mode?.mode !== 'format' && Store.mode?.mode !== 'autofix') {
+        printErrors(allProblems(Store), Store.mode?.watch)
     }
 })
 
 // write compiled code to disk
 autorun(() => {
     const mode = Store.mode;
-    if (Store.done && (mode?.mode === 'transpile' || mode?.mode === 'build' || mode?.mode === 'run')) {
+    if (done(Store) && (mode?.mode === 'transpile' || mode?.mode === 'build' || mode?.mode === 'run')) {
         const compiledModules = [...Store.modulesSource.keys()].map(module => ({
             jsPath: jsFileLocation(module, mode),
-            js: Store.compiled(module)
+            js: compiled(Store, module)
         }))
 
         Promise.all(compiledModules.map(({ jsPath, js }) =>
@@ -248,11 +251,11 @@ const bundle = debounce(async (mode: Mode) => {
 
 // write formatted bgl code to disk
 autorun(() => {
-    if (Store.done && (Store.mode?.mode === 'format' || Store.mode?.mode === 'autofix')) {
+    if (done(Store) && (Store.mode?.mode === 'format' || Store.mode?.mode === 'autofix')) {
         Promise.all([...Store.modules]
             .filter(module => !pathIsRemote(module))
             .map(module =>
-                Deno.writeTextFile(module, Store.mode?.mode === 'format' ? Store.formatted(module) : Store.autofixed(module))))
+                Deno.writeTextFile(module, Store.mode?.mode === 'format' ? formatted(Store, module) : autofixed(Store, module))))
     }
 })
 

@@ -1,13 +1,57 @@
+import { parsed } from "../1_parse/index.ts";
+import { resolve } from "../3_checking/resolve.ts";
 import { resolveType } from "../3_checking/typecheck.ts";
 import { inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
+import { computedFn } from "../mobx.ts";
 import { format } from "../other/format.ts";
-import Store, { canonicalModuleName, Mode } from "../store.ts";
+import Store, { canonicalModuleName, getModuleByName, Mode, _Store } from "../store.ts";
 import { jsFileLocation } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func, Spread, JsFunc, JsProc } from "../_model/expressions.ts";
 import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+
+
+export const compiled = computedFn((store: _Store, moduleName: ModuleName): string => {
+    const ast = parsed(store, moduleName, true)?.ast
+
+    if (!ast) {
+        return ''
+    }
+    
+    return (
+        JS_PRELUDE + 
+        compile(
+            ast, 
+            moduleName, 
+            store.mode?.mode === 'test'
+        )
+    )
+})
+
+export const IMPORTED_ITEMS = [
+    // reactivity
+    'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'WHOLE_OBJECT', 
+
+    // rendering; TODO: genericize somehow
+    'h',
+    
+    // used in compiler output
+    'range', 'Iter', 'Plan', 'Remote',
+    
+    // runtime type-checking 
+    'instanceOf', 'INNER_ITER', 'RT_UNKNOWN', 
+    'RT_NIL', 'RT_BOOLEAN', 'RT_NUMBER', 'RT_STRING', 'RT_LITERAL', 'RT_ITERATOR',
+    'RT_PLAN', 'RT_REMOTE', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT', 'RT_NOMINAL'
+]
+
+const JS_PRELUDE = `
+import { ${
+    IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')
+} } from "https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts";
+
+`
 
 
 export function compile(module: Module, modulePath: ModuleName, includeTests?: boolean, excludeTypes = false): string {
@@ -111,7 +155,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             const value = c(ast.value)
 
             if (ast.target.kind === 'local-identifier') {
-                const binding = Store.getBinding(() => {}, ast.target.name, ast.target)
+                const binding = resolve(() => {}, ast.target.name, ast.target)
 
                 if (binding && binding.kind === 'value-binding' && binding.owner.kind === 'value-declaration' && !binding.owner.isConst) {
                     return `${ast.target.name}.value = ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
@@ -195,7 +239,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "debug": return c(ast.inner);
         case "plain-identifier": return ast.name;
         case "local-identifier": {
-            const binding = Store.getBinding(() => {}, ast.name, ast)
+            const binding = resolve(() => {}, ast.name, ast)
 
             if (binding && binding.kind === 'value-binding' && binding.owner.kind === 'value-declaration' && !binding.owner.isConst) {
                 return `${INT}observe(${ast.name}, 'value')`
@@ -210,10 +254,10 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             // HACK: let-declarations accessed from whole-module imports need special treatment!
             // will this break if the module import gets aliased so something else?
             if (ast.subject.kind === 'local-identifier') {
-                const binding = Store.getBinding(() => {}, ast.subject.name, ast)
+                const binding = resolve(() => {}, ast.subject.name, ast)
 
                 if (binding?.kind === 'value-binding' && binding.owner.kind === 'import-all-declaration') {
-                    const module = Store.getModuleByName(binding.owner.module as ModuleName, binding.owner.path.value)
+                    const module = getModuleByName(Store, binding.owner.module as ModuleName, binding.owner.path.value)
                     
                     if (module?.declarations.find(decl =>
                             decl.kind === 'value-declaration' && !decl.isConst && decl.name.name === ast.property.name)) {

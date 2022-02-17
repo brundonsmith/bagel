@@ -1,15 +1,20 @@
 import { alreadyDeclared, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
-import Store from "../store.ts";
+import { computedFn } from "../mobx.ts";
+import Store, { getModuleByName } from "../store.ts";
 import { areSame } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
 import { Binding, ModuleName, ReportError } from "../_model/common.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration,TypeDeclaration } from "../_model/declarations.ts";
 
+export const resolve = computedFn((reportError: ReportError, name: string, from: AST): Binding|undefined => {
+    return resolveInner(reportError, name, from, from)
+})
+
 /**
  * Given some identifier and some AST context, look upwards until a binding is
  * found for the identifier (or the root is reached)
  */
-export function resolve(reportError: ReportError, name: string, from: AST, originator: AST): Binding|undefined {
+const resolveInner = (reportError: ReportError, name: string, from: AST, originator: AST): Binding|undefined => {
     const parent = from.parent
 
     // if we've reached the root of the AST, there's no binding
@@ -108,7 +113,7 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
                                     reportError(alreadyDeclared(nameAst))
                                 }
 
-                                const otherModule = Store.getModuleByName(declaration.module as ModuleName, declaration.path.value)
+                                const otherModule = getModuleByName(Store, declaration.module as ModuleName, declaration.path.value)
 
                                 if (otherModule == null) {
                                     // other module doesn't exist
@@ -331,5 +336,5 @@ export function resolve(reportError: ReportError, name: string, from: AST, origi
     }
 
     // if not resolved, recurse upward to the next AST node
-    return resolved ?? resolve(reportError, name, parent, originator)
+    return resolved ?? resolveInner(reportError, name, parent, originator)
 }

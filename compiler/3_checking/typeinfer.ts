@@ -1,6 +1,6 @@
 import { Refinement, ReportError, ModuleName } from "../_model/common.ts";
 import { BinaryOp, Expression, Invocation, isExpression, Spread } from "../_model/expressions.ts";
-import { ANY_TYPE, ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
 import { assignmentError, cannotFindModule } from "../errors.ts";
@@ -8,9 +8,10 @@ import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
 import { areSame, mapParseTree, typesEqual } from "../utils/ast.ts";
-import Store from "../store.ts";
+import Store, { getModuleByName } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
+import { resolve } from "./resolve.ts";
 
 export function inferType(
     reportError: ReportError,
@@ -44,7 +45,7 @@ const inferTypeInner = computedFn((
     previouslyVisited: readonly AST[],
 ): TypeExpression => {
     const infer = (expr: Expression) => inferType(reportError, expr, visited)
-    const resolve = (type: TypeExpression) => resolveType(reportError, type)
+    const resolveT = (type: TypeExpression) => resolveType(reportError, type)
 
     const { parent, module, code, startIndex, endIndex, ..._rest } = ast
 
@@ -66,7 +67,7 @@ const inferTypeInner = computedFn((
                 const parent = ast.parent
 
                 if (parent?.kind === "invocation") {
-                    const parentSubjectType = resolve(infer(parent.subject))
+                    const parentSubjectType = resolveT(infer(parent.subject))
                     const thisArgIndex = parent.args.findIndex(a => areSame(a, ast))
 
                     if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
@@ -106,9 +107,9 @@ const inferTypeInner = computedFn((
             let leftType = infer(ast.base)
 
             for (const [op, expr] of ast.ops) {
-                const leftTypeResolved = resolve(leftType)
+                const leftTypeResolved = resolveT(leftType)
                 const rightType = infer(expr)
-                const rightTypeResolved = resolve(rightType)
+                const rightTypeResolved = resolveT(rightType)
 
                 if (op.op === '??') {
                     leftType = {
@@ -140,9 +141,9 @@ const inferTypeInner = computedFn((
             // Creation of nominal values looks like/parses as function 
             // invocation, but needs to be treated differently
             if (ast.subject.kind === "local-identifier") {
-                const binding = Store.getBinding(() => {}, ast.subject.name, ast.subject)
+                const binding = resolve(() => {}, ast.subject.name, ast.subject)
                 if (binding?.kind === 'type-binding') {
-                    const resolvedType = resolve(binding.type)
+                    const resolvedType = resolveT(binding.type)
 
                     if (resolvedType.kind === "nominal-type") {
                         return resolvedType
@@ -165,8 +166,8 @@ const inferTypeInner = computedFn((
             }
         }
         case "indexer": {
-            const baseType = resolve(infer(ast.subject));
-            const indexType = resolve(infer(ast.indexer));
+            const baseType = resolveT(infer(ast.subject));
+            const indexType = resolveT(infer(ast.indexer));
 
             const indexIsNumber = subsumes(reportError, NUMBER_TYPE, indexType)
             
@@ -297,7 +298,7 @@ const inferTypeInner = computedFn((
             return innerType
         }
         case "property-accessor": {
-            const subjectType = resolve(infer(ast.subject));
+            const subjectType = resolveT(infer(ast.subject));
             const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
                 ? subtract(reportError, subjectType, NIL_TYPE)
                 : subjectType;
@@ -333,7 +334,7 @@ const inferTypeInner = computedFn((
             }
         }
         case "local-identifier": {
-            const binding = Store.getBinding(reportError, ast.name, ast)
+            const binding = resolve(reportError, ast.name, ast)
 
             if (binding?.kind === 'value-binding') {
                 const decl = binding.owner
@@ -341,7 +342,7 @@ const inferTypeInner = computedFn((
                 switch (decl.kind) {
                     case 'value-declaration':
                     case 'value-declaration-statement': {
-                        const baseType = decl.type ?? resolve(infer(decl.value))
+                        const baseType = decl.type ?? resolveT(infer(decl.value))
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
                             decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== ast.module)
                                 ? 'immutable'
@@ -362,7 +363,7 @@ const inferTypeInner = computedFn((
                     case 'func-declaration':
                     case 'proc-declaration':
                     case 'inline-const-declaration': {
-                        const baseType = resolve(infer(decl.value))
+                        const baseType = resolveT(infer(decl.value))
                         const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
                             decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
                                 ? 'immutable'
@@ -394,7 +395,7 @@ const inferTypeInner = computedFn((
                             return UNKNOWN_TYPE
                         }
 
-                        const planType = resolve(infer(decl.plan))
+                        const planType = resolveT(infer(decl.plan))
                         if (planType.kind !== 'plan-type') {
                             return UNKNOWN_TYPE
                         } else {
@@ -409,7 +410,7 @@ const inferTypeInner = computedFn((
                             return decl.type
                         }
 
-                        const fnType = resolve(infer(decl.fn))
+                        const fnType = resolveT(infer(decl.fn))
                         if (fnType.kind === 'func-type' && fnType.returnType) {
                             return fnType.returnType
                         }
@@ -417,7 +418,7 @@ const inferTypeInner = computedFn((
                         return UNKNOWN_TYPE
                     }
                     case 'remote-declaration': {
-                        const fnType = resolve(infer(decl.fn))
+                        const fnType = resolveT(infer(decl.fn))
 
                         let inner;
                         if (fnType.kind === 'plan-type') {
@@ -439,7 +440,7 @@ const inferTypeInner = computedFn((
                     }
                     case 'inline-destructuring-declaration':
                     case 'destructuring-declaration-statement': {
-                        const objectOrArrayType = resolve(infer(decl.value))
+                        const objectOrArrayType = resolveT(infer(decl.value))
 
                         if (decl.destructureKind === 'object' && objectOrArrayType.kind === 'object-type') {
                             const props = propertiesOf(reportError, objectOrArrayType)
@@ -494,14 +495,14 @@ const inferTypeInner = computedFn((
                         return UNKNOWN_TYPE
                     }
                     case 'for-loop': {
-                        const iteratorType = resolve(infer(decl.iterator))
+                        const iteratorType = resolveT(infer(decl.iterator))
 
                         return iteratorType.kind === 'iterator-type'
                             ? iteratorType.inner
                             : UNKNOWN_TYPE
                     }
                     case 'import-all-declaration': {
-                        const otherModule = Store.getModuleByName(decl.module as ModuleName, decl.path.value)
+                        const otherModule = getModuleByName(Store, decl.module as ModuleName, decl.path.value)
 
                         if (otherModule == null) {
                             // other module doesn't exist
@@ -559,7 +560,7 @@ const inferTypeInner = computedFn((
                 if (Array.isArray(entry)) {
                     const [name, value] = entry
 
-                    const type = resolve(infer(value));
+                    const type = resolveT(infer(value));
                     return {
                         kind: "attribute",
                         name,
@@ -569,7 +570,7 @@ const inferTypeInner = computedFn((
                     }
                 } else {
                     const spreadObj = (entry as Spread).expr
-                    const spreadObjType = resolve(infer(spreadObj));
+                    const spreadObjType = resolveT(infer(spreadObj));
 
                     if (spreadObjType.kind !== 'object-type') {
                         return undefined
@@ -593,7 +594,7 @@ const inferTypeInner = computedFn((
 
             for (const entry of ast.entries) {
                 if (entry.kind === 'spread') {
-                    const spreadType = resolve(infer(entry.expr))
+                    const spreadType = resolveT(infer(entry.expr))
 
                     if (spreadType.kind === 'array-type') {
                         arraySpreads.push(spreadType)
@@ -770,7 +771,7 @@ export function parameterizedGenericType(reportError: ReportError, generic: Gene
 
         // if we've found one of the generic params, substitute it
         if (ast.kind === 'named-type') {
-            const resolved = Store.getBinding(reportError, ast.name.name, ast)
+            const resolved = resolve(reportError, ast.name.name, ast)
 
             if (resolved?.kind === 'type-binding' && resolved.type.kind === 'generic-param-type' && bindings[resolved.type.name.name]) {
                 return bindings[resolved.type.name.name]
@@ -991,7 +992,7 @@ export const propertiesOf = computedFn((
             const attrs = [...resolvedType.entries]
 
             for (const spread of resolvedType.spreads) {
-                const resolved = Store.getBinding(reportError, spread.name.name, spread)
+                const resolved = resolve(reportError, spread.name.name, spread)
 
                 if (resolved != null && resolved.kind === 'type-binding' && resolved.type.kind === 'object-type') {
                     attrs.push(...(propertiesOf(reportError, resolved.type) ?? []))
@@ -1059,7 +1060,7 @@ function fitTemplate(
 
     function isGenericParam(type: TypeExpression): type is NamedType {
         if (type.kind === 'named-type') {
-            const binding = Store.getBinding(reportError, type.name.name, type)
+            const binding = resolve(reportError, type.name.name, type)
             return binding?.kind === 'type-binding' && binding.type.kind === 'generic-param-type'
         }
 

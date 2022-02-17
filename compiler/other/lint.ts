@@ -1,7 +1,12 @@
+import { parsed } from "../1_parse/index.ts";
+import { computedFn } from "../mobx.ts";
+import { _Store } from "../store.ts";
 import { iterateParseTree, mapParseTree } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
+import { ModuleName } from "../_model/common.ts";
 import { FuncDeclaration, ProcDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 import { Func, Proc } from "../_model/expressions.ts";
+import { format,DEFAULT_OPTIONS } from "./format.ts";
 
 export function lint(ast: AST): LintProblem[] {
     const problems: LintProblem[] = []
@@ -24,6 +29,21 @@ export function lint(ast: AST): LintProblem[] {
 
     return problems
 }
+
+export const autofixed = computedFn((store: _Store, moduleName: ModuleName): string => {
+    const ast = parsed(store, moduleName, false)?.ast
+
+    if (!ast) {
+        return ''
+    }
+    
+    return (
+        format(
+            autofix(ast),
+            DEFAULT_OPTIONS
+        )
+    )
+})
 
 export function autofix(ast: AST): AST {
     const rules = Object.values(RULES)

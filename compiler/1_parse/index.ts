@@ -7,8 +7,62 @@ import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, Imp
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType } from "../_model/type-expressions.ts";
-import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./common.ts";
+import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./utils.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
+import { reshape } from "../2_reshape/index.ts";
+import { computedFn } from "../mobx.ts";
+import { _Store } from "../store.ts";
+import { format } from "../other/format.ts";
+
+export const parsed = computedFn((store: _Store, moduleName: ModuleName, typecheckReady: boolean): { ast: Module, errors: readonly BagelError[] } | undefined => {
+    const source = store.modulesSource.get(moduleName)
+    if (source) {
+        const errors: BagelError[] = []
+        const ast = parse(
+            moduleName,  
+            source + (typecheckReady ? preludeFor(moduleName) : ''), 
+            err => errors.push(err)
+        )
+
+        if (typecheckReady) {
+            return { ast: reshape(ast), errors }
+        } else {
+            return { ast, errors }
+        }
+    }
+})
+
+function preludeFor(module: ModuleName) {
+    const normalizedModule = normalizeName(module)
+
+    return '\n\n' + BGL_PRELUDE_DATA
+        .filter(m => normalizeName(m.module) !== normalizedModule)
+        .map(({ module, imports }) =>
+            `from '${module}' import { ${imports.join(', ')} }`)
+        .join('\n')
+}
+
+const BGL_PRELUDE_DATA = [
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/core.bgl' as ModuleName, imports: [ 'log', 'logf', 'iter', 'UnknownObject' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/bagel.bgl' as ModuleName, imports: [ 'BagelConfig' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/arrays.bgl' as ModuleName, imports: [ 'push', 'unshift', 'pop', 'shift', 'splice' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/strings.bgl' as ModuleName, imports: [ 'includes', 'indexOf', 'replace', 'split', 'startsWith', 'substring', 'toLowerCase', 'toUpperCase', 'trim' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/objects.bgl' as ModuleName, imports: [ 'keys', 'values', 'entries' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/numbers.bgl' as ModuleName, imports: [ 'parseNumber', 'stringifyNumber', 'abs', 'pow', 'sqrt', 'ceil', 'floor', 'sin', 'cos', 'tan' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/booleans.bgl' as ModuleName, imports: [ 'parseBoolean', 'stringifyBoolean' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/iterators.bgl' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'collectArray', 'collectObject' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/plans.bgl' as ModuleName, imports: [ 'timeout' ] },
+    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/json.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSON' ] },
+] as const
+
+function normalizeName(module: ModuleName): string {
+    return module
+        .replace(/^[a-zA-Z]:/, '')
+        .split(/[\\/]+/)
+        .filter(s => !!s)
+        .map(s => s.split('.')[0])
+        .join('/')
+}
 
 export function parse(module: ModuleName, code: string, reportError: ReportError): Module {
     let index = 0;
