@@ -2135,9 +2135,9 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ invocationAccessorChain ],
     [ range ],
     [ parenthesized ],
-    [ localIdentifier ],
     [ ifElseExpression, switchExpression, inlineConstGroup, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
         stringLiteral, numberLiteral ],
+    [ localIdentifier ],
 ])
 
 const TYPE_PARSER = new TieredParser<TypeExpression>([
@@ -2147,6 +2147,7 @@ const TYPE_PARSER = new TieredParser<TypeExpression>([
     [ maybeType ],
     [ arrayType ],
     [ primitiveType, funcType, procType, 
-        literalType, namedType, recordType, objectType, parenthesizedType, 
+        literalType, recordType, objectType, parenthesizedType, 
         tupleType, unknownType ],
+    [ namedType ]
 ])
