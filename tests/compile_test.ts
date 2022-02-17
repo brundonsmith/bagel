@@ -1,3 +1,4 @@
+import { parsed } from "../compiler/1_parse/index.ts";
 import { compile } from "../compiler/4_compile/index.ts";
 import { prettyProblem } from "../compiler/errors.ts";
 import Store from "../compiler/store.ts";
@@ -498,10 +499,10 @@ function testCompile(code: string, exp: string) {
     watch: undefined
   })
   
-  const parsed = Store.parsed(moduleName, false)
+  const parseResult = parsed(Store, moduleName, false)
 
-  if (parsed) {
-    const { ast, errors } = parsed
+  if (parseResult) {
+    const { ast, errors } = parseResult
 
     const compiled = compile(ast, moduleName)
   

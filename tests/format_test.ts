@@ -1,3 +1,4 @@
+import { parsed } from "../compiler/1_parse/index.ts";
 import { DEFAULT_OPTIONS, format } from "../compiler/other/format.ts";
 import Store from "../compiler/store.ts";
 import { stripSourceInfo } from "../compiler/utils/debugging.ts";
@@ -367,7 +368,7 @@ for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
     Deno.test({
         name: 'snippet ' + i,
         fn() {
-            const { ast, errors } = Store.parsed(('snippet ' + i) as ModuleName, false) ?? {}
+            const { ast, errors } = parsed(Store, ('snippet ' + i) as ModuleName, false) ?? {}
 
             if (ast && errors && errors.length === 0) {
                 const formattedModuleName = ('formatted snippet ' + i) as ModuleName
@@ -375,7 +376,7 @@ for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
 
                 Store.setSource(formattedModuleName, formatted)
 
-                const reParsed = Store.parsed(formattedModuleName, false)?.ast as Module
+                const reParsed = parsed(Store, formattedModuleName, false)?.ast as Module
 
                 stripSourceInfo(ast)
                 stripSourceInfo(reParsed)

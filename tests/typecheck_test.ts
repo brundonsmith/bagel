@@ -1,5 +1,6 @@
+import { parsed } from "../compiler/1_parse/index.ts";
 import { BagelError, prettyProblem } from "../compiler/errors.ts";
-import Store, { canonicalModuleName } from "../compiler/store.ts";
+import Store, { allProblems, canonicalModuleName } from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
@@ -501,7 +502,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Complex generic",
+  name: "Complex genericz",
   fn() {
     testTypecheck(
       `
@@ -1180,10 +1181,10 @@ function testTypecheck(code: string, shouldFail: boolean): void {
     watch: undefined
   })
   
-  const parsed = Store.parsed(moduleName, true)
+  const parseResult = parsed(Store, moduleName, true)
 
-  if (parsed) {
-    const errors = Store.allProblems.get(moduleName)
+  if (parseResult) {
+    const errors = allProblems(Store).get(moduleName)
 
     if (!errors) throw Error('Bwahhhh!')
   
@@ -1209,7 +1210,7 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
     watch: undefined
   })
   
-  const errors = [...Store.allProblems.values()].flat()
+  const errors = [...allProblems(Store).values()].flat()
 
   if (!shouldFail && errors.length > 0) {
     throw `Type check should have succeeded but failed with errors\n\n` +
