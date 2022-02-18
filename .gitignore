@@ -4,3 +4,4 @@ node_modules
 *.bgl.ts
 *.bundle.js
 tests/sample-files*/*.js
+coverage
