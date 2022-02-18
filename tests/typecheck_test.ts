@@ -777,6 +777,44 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Destructure success",
+  fn() {
+    testTypecheck(`
+      type Obj = {
+        foo: {
+          bar: number
+        }
+      }
+
+      func fn(obj: Obj): number =>
+        const { foo } = obj,
+        foo.bar
+      `,
+      false
+    )
+  }
+})
+
+Deno.test({
+  name: "Destructure failure",
+  fn() {
+    testTypecheck(`
+      type Obj = {
+        foo: {
+          bar: number
+        }
+      }
+
+      func fn(obj: Obj): string =>
+        const { foo } = obj,
+        foo.bar
+      `,
+      true
+    )
+  }
+})
+
+Deno.test({
   name: "Optional chain success",
   fn() {
     testTypecheck(
