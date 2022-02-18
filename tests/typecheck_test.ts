@@ -502,7 +502,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Complex genericz",
+  name: "Complex generic",
   fn() {
     testTypecheck(
       `
@@ -537,53 +537,17 @@ Deno.test({
 //   }
 // })
 
-// Deno.test({
-//   name: "Union generic param inference mismatch",
-//   fn() {
-//     testTypecheck(
-//       `
-//       func other<T>(a: T|nil): T|nil => a
-//       const c: number = other(12)`,
-//       true
-//     )
-//   }
-// })
-
-// Deno.test({
-//   name: "Virtual property type resolution when using named type",
-//   fn() {
-//     testTypecheck(
-//       `
-//       type TodoItem = {
-//         text: string,
-//         done: boolean
-//       }
-    
-//       func renderApp(iter: Iterator<TodoItem>) =>
-//         iter.map<string>(item => item.text).array()`,
-//       false
-//     )
-//   }
-// })
-
-// Deno.test({
-//   name: "Weird stack overflow!",
-//   fn() {
-//     testTypecheck(
-//       `
-//       func foo<T>(items: T[]): T[] => items
-
-//       store AppStore {
-          
-//           private items = []
-
-//           func allValid() => foo(this.items)
-//       }
-//       `,
-//       false
-//     )
-//   }
-// })
+Deno.test({
+  name: "Union generic param inference mismatch",
+  fn() {
+    testTypecheck(
+      `
+      func other<T>(a: T|nil): T|nil => a
+      const c: number = other(12)`,
+      true
+    )
+  }
+})
 
 Deno.test({
   name: "Function consts out of order",

@@ -228,10 +228,11 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "plan-type":     return ast.inner.kind === 'any-type' ? `Plan` : `Plan<${f(ast.inner)}>`;
         case "remote-type":   return ast.inner.kind === 'any-type' ? `Remote` : `Remote<${f(ast.inner)}>`
         case "unknown-type": return "unknown";
-        case "any-type": return "any";
+        case "any-type": return "<any>";
         case "element-type": return `Element`;
         case "parenthesized-type": return `(${f(ast.inner)})`;
         // case "element-type": return `<${ast.tagName}>`;
+        case "property-type": return `${f(ast.subject)}${ast.optional ? '?' : ''}.${ast.property.name}`;
         case "javascript-escape-type": return "<js escape>";
         default:
             // @ts-expect-error

@@ -485,6 +485,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "parenthesized-type":
             case "unknown-type":
             case "any-type":
+            case "property-type":
             case "javascript-escape-type":
                 break;
             default:
@@ -496,7 +497,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
 function expect(reportError: ReportError, destinationType: TypeExpression, value: Expression, generateMessage?: (dest: TypeExpression, val: TypeExpression) => string) {
     const inferredType = inferType(reportError, value);
-    if (!subsumes(reportError,  destinationType, inferredType)) {
+    if (!subsumes(reportError, destinationType, inferredType)) {
         reportError(
             generateMessage
                 ? miscError(value, generateMessage(destinationType, inferredType))
@@ -703,6 +704,44 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
                     ...entry,
                     type: resolveT(entry.type)
                 }))
+            }
+        }
+        case "property-type": {
+            const subjectType = resolveT(type.subject)
+            const nilTolerantSubjectType = type.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
+                ? subtract(reportError, subjectType, NIL_TYPE)
+                : subjectType;
+            const property = propertiesOf(reportError, nilTolerantSubjectType)?.find(entry => entry.name.name === type.property.name)
+            
+            const { parent, module, code, startIndex, endIndex } = type
+            if (type.optional && property) {
+                return resolveT({
+                    kind: "maybe-type",
+                    inner: property.type,
+                    mutability: undefined,
+                    parent, module, code, startIndex, endIndex
+                })
+            } else {
+                const mutability = (
+                    property?.type?.mutability == null ? undefined :
+                    property.type.mutability === "mutable" && subjectType.mutability === "mutable" && !property.forceReadonly ? "mutable" :
+                    subjectType.mutability === "immutable" ? "immutable" :
+                    "readonly"
+                )
+    
+                return (
+                    given(property, property => resolveT((
+                            property.optional
+                                ?  {
+                                    kind: "maybe-type",
+                                    inner: { ...property.type, mutability },
+                                    mutability: undefined,
+                                    module, code, startIndex, endIndex
+                                }
+                                : { ...property.type, mutability }
+                            ) as TypeExpression)) 
+                        ?? UNKNOWN_TYPE
+                )
             }
         }
     }

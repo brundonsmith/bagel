@@ -298,39 +298,17 @@ const inferTypeInner = computedFn((
             return innerType
         }
         case "property-accessor": {
-            const subjectType = resolveT(infer(ast.subject));
-            const nilTolerantSubjectType = ast.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-                ? subtract(reportError, subjectType, NIL_TYPE)
-                : subjectType;
-            const property = propertiesOf(reportError, nilTolerantSubjectType)?.find(entry => entry.name.name === ast.property.name)
-
-            if (ast.optional && property) {
-                return {
-                    kind: "maybe-type",
-                    inner: property.type,
-                    mutability: undefined,
-                    parent, module, code, startIndex, endIndex
-                }
-            } else {
-                const mutability = (
-                    property?.type?.mutability == null ? undefined :
-                    property.type.mutability === "mutable" && subjectType.mutability === "mutable" && !property.forceReadonly ? "mutable" :
-                    subjectType.mutability === "immutable" ? "immutable" :
-                    "readonly"
-                )
-    
-                return (
-                    given(property, property => (
-                        property.optional
-                            ?  {
-                                kind: "maybe-type",
-                                inner: { ...property.type, mutability },
-                                mutability: undefined,
-                                module, code, startIndex, endIndex
-                            }
-                            : { ...property.type, mutability }) as TypeExpression) 
-                        ?? UNKNOWN_TYPE
-                )
+            return {
+                kind: "property-type",
+                subject: infer(ast.subject),
+                property: ast.property,
+                optional: ast.optional,
+                parent: ast.parent,
+                module: ast.module,
+                code: ast.code,
+                startIndex: ast.startIndex,
+                endIndex: ast.endIndex,
+                mutability: undefined
             }
         }
         case "local-identifier": {
@@ -1111,6 +1089,38 @@ function fitTemplate(
 
     if (parameterized.kind === "array-type" && reified.kind === "array-type") {
         return fitTemplate(reportError, parameterized.element, reified.element);
+    }
+
+    if (parameterized.kind === "tuple-type" && reified.kind === "tuple-type" && parameterized.members.length === reified.members.length) {
+        const all = new Map<string, TypeExpression>()
+
+        for (let i = 0; i < parameterized.members.length; i++) {
+            const matches = fitTemplate(reportError, parameterized.members[i], reified.members[i]);
+
+            for (const key in matches) {
+                all.set(key, matches.get(key) as TypeExpression)
+            }
+        }
+
+        return all
+    }
+
+    if (parameterized.kind === "object-type" && reified.kind === "object-type") {
+        const all = new Map<string, TypeExpression>()
+
+        for (const entry of parameterized.entries) {
+            const other = reified.entries.find(e => entry.name.name === e.name.name)
+
+            if (other) {
+                const matches = fitTemplate(reportError, entry.type, other.type);
+
+                for (const key in matches) {
+                    all.set(key, matches.get(key) as TypeExpression)
+                }
+            }
+        }
+
+        return all
     }
 
     if ((parameterized.kind === "iterator-type" && reified.kind === "iterator-type") 

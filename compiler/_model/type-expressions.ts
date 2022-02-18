@@ -27,6 +27,7 @@ export type TypeExpression =
     | ParenthesizedType
     | UnknownType
     | AnyType
+    | PropertyType
     | JavascriptEscapeType
 
 export type UnionType = SourceInfo & {
@@ -224,6 +225,14 @@ export type AnyType = SourceInfo & {
     readonly mutability: undefined,
 }
 
+export type PropertyType = SourceInfo & {
+    readonly kind: "property-type",
+    readonly subject: TypeExpression,
+    readonly property: PlainIdentifier,
+    readonly optional: boolean,
+    readonly mutability: undefined,
+}
+
 export type JavascriptEscapeType = SourceInfo & {
     readonly kind: "javascript-escape-type",
     readonly mutability: undefined,
@@ -389,6 +398,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "nil-type": undefined,
     "unknown-type": undefined,
     "any-type": undefined,
+    "property-type": undefined,
     "iterator-type": undefined,
     "plan-type": undefined,
     "remote-type": undefined,
