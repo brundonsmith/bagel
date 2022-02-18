@@ -92,3 +92,14 @@ Things we know about a value:
             overall goal more complicated (but still possible!)
 
 - Imba has explicit calls for starting a server, mounting an app, or even appending a child to an existing element
+
+Features that exist but need more cases covered:
+  - Type refinements (resolveRefinements/conditionToRefinement)
+  - Generic inference (fitTemplate)
+  - Type-resolution (resolveType)
+  - Compiling static types to runtime types for instanceof calls (compileRuntimeType)
+    - Need to also statically check that type used in instanceof is supported at runtime
+    - Need to also normalize runtime types for aliased types
+  - propertiesOf, for some more things like object-unions
+
+- `if (cond) a else b` instead of `if cond { a } else { b }`?

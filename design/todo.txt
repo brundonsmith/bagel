@@ -26,10 +26,6 @@ MVP:
 - alternate number syntaxes like hex?
 - array slices?
 - tail recursion?
-- flesh out type-expression parsing
-    - precedence
-    - parens
 
 Long-term:
-- full build system
 - language server
