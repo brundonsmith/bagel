@@ -14,6 +14,7 @@ Other goals include:
 Blog posts on the language:
 - [The Bagel Language](https://www.brandons.me/blog/the-bagel-language)
 - [Bagel Bites (Update on the Bagel Language)](https://www.brandons.me/blog/bagel-bites)
+- [Bagel Bites: Type Refinement](https://www.brandons.me/blog/bagel-bites-refinement)
 
 ## Trying it out
 
