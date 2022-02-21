@@ -98,7 +98,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "parenthesized-expression":
             return `(${f(ast.inner)})`
         case "binary-operator":
-            return `${f(ast.base)} ${ast.ops.map(([op, expr]) => f(op) + ' ' + f(expr)).join(' ')}`
+            return `${f(ast.left)} ${ast.op.op} ${f(ast.right)}`
         case "negation-operator":
             return `!${f(ast.base)}`
         case "operator":

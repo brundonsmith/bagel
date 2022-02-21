@@ -104,36 +104,38 @@ const inferTypeInner = computedFn((
             }
         }
         case "binary-operator": {
-            let leftType = infer(ast.base)
+            const leftType = resolveT(infer(ast.left))
+            const rightType = resolveT(infer(ast.right))
+            
+            if (ast.op.op === '??') {
+                return {
+                    kind: "union-type",
+                    members: [
+                        subtract(reportError, leftType, NIL_TYPE),
+                        rightType
+                    ],
+                    mutability: undefined, parent, module, code, startIndex, endIndex
+                }
+            } else if (ast.op.op === '&&') {
+                return {
+                    kind: "union-type",
+                    members: [
+                        leftType,
+                        rightType
+                    ],
+                    mutability: undefined, parent, module, code, startIndex, endIndex
+                }
+            } else {
+                const types = BINARY_OPERATOR_TYPES[ast.op.op]?.find(({ left, right }) =>
+                    subsumes(reportError, left, leftType) && 
+                    subsumes(reportError, right, rightType))
 
-            for (const [op, expr] of ast.ops) {
-                const leftTypeResolved = resolveT(leftType)
-                const rightType = infer(expr)
-                const rightTypeResolved = resolveT(rightType)
-
-                if (op.op === '??') {
-                    leftType = {
-                        kind: "union-type",
-                        members: [
-                            subtract(reportError, leftTypeResolved, NIL_TYPE),
-                            rightTypeResolved
-                        ],
-                        mutability: undefined, parent, module, code, startIndex, endIndex
-                    }
+                if (types == null) {
+                    return BINARY_OPERATOR_TYPES[ast.op.op]?.[0].output ?? UNKNOWN_TYPE
                 } else {
-                    const types = BINARY_OPERATOR_TYPES[op.op]?.find(({ left, right }) =>
-                        subsumes(reportError, left, leftTypeResolved) && 
-                        subsumes(reportError, right, rightTypeResolved))
-
-                    if (types == null) {
-                        return BINARY_OPERATOR_TYPES[op.op]?.[0].output ?? UNKNOWN_TYPE
-                    } else {
-                        leftType = types.output;
-                    }
+                    return types.output;
                 }
             }
-
-            return leftType;
         }
         case "negation-operator": return BOOLEAN_TYPE;
         case "invocation": {
@@ -934,10 +936,10 @@ function resolveRefinements(expr: Expression): Refinement[] {
 }
 
 function conditionToRefinement(condition: Expression, conditionIsTrue: boolean): Refinement|undefined {
-    if (condition.kind === "binary-operator" && condition.ops[0][0].op === "!=") {
+    if (condition.kind === "binary-operator" && condition.op.op === "!=") {
         const targetExpression = 
-            condition.ops[0][1].kind === 'nil-literal' ? condition.base :
-            condition.base.kind === "nil-literal" ? condition.ops[0][1] :
+            condition.right.kind === 'nil-literal' ? condition.left :
+            condition.left.kind === "nil-literal" ? condition.right :
             undefined;
 
         if (targetExpression != null) {
@@ -945,7 +947,7 @@ function conditionToRefinement(condition: Expression, conditionIsTrue: boolean):
         }
     }
 
-    if (condition.kind === "binary-operator" && condition.ops[0][0].op === "==") {
+    if (condition.kind === "binary-operator" && condition.op.op === "==") {
         // TODO: Exact-value refinements
     }
 

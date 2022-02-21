@@ -90,9 +90,9 @@ export type Range = SourceInfo & {
 
 export type BinaryOperator = SourceInfo & {
     readonly kind: "binary-operator",
-    readonly base: Expression,
-    readonly ops: readonly [readonly [Operator, Expression], ...readonly [Operator, Expression][]],
-    // TODO: Once generics are fully functional, create a `type: FuncType` property
+    readonly left: Expression,
+    readonly op: Operator,
+    readonly right: Expression
 }
 
 export type NegationOperator = SourceInfo & {

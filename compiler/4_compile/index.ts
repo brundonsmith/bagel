@@ -222,7 +222,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
 
             return `${c(invocation.subject)}${invocation.kind === "invocation" && invocation.typeArgs.length > 0 ? `<${invocation.typeArgs.map(c).join(',')}>` : ''}(${invocation.args.map(c).join(', ')})` + invalidation;
         }
-        case "binary-operator": return `(${c(ast.base)} ${ast.ops.map(([op, expr]) => c(op) + ' ' + c(expr)).join(' ')})`;
+        case "binary-operator": return `(${c(ast.left)} ${ast.op.op} ${c(ast.right)})`;
         case "negation-operator": return `!(${c(ast.base)})`;
         case "operator": return ast.op;
         case "if-else-expression":

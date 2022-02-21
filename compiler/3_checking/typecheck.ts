@@ -190,30 +190,21 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "binary-operator": {
-                let leftType = infer(current.base)
+                const leftType = infer(current.left)
+                const rightType = infer(current.right)
 
-                for (const [op, expr] of current.ops) {
-                    const leftTypeResolved = resolveT(leftType)
-                    const rightType = infer(expr)
-                    const rightTypeResolved = resolveT(rightType)
+                if (current.op.op === '==' || current.op.op === '!=') {
+                    if (!subsumes(reportError, leftType, rightType) 
+                     && !subsumes(reportError, rightType, leftType)) {
+                        reportError(miscError(current, `Can't compare types ${format(leftType)} and ${format(rightType)} because they have no overlap`))
+                    }
+                } else if (current.op.op !== '??') {
+                    const types = BINARY_OPERATOR_TYPES[current.op.op]?.find(({ left, right }) =>
+                        subsumes(reportError, left, leftType) && 
+                        subsumes(reportError, right, rightType))
 
-                    if (op.op === '==' || op.op === '!=') {
-                        if (!subsumes(reportError, leftTypeResolved, rightTypeResolved) 
-                        && !subsumes(reportError, rightTypeResolved, leftTypeResolved)) {
-                            reportError(miscError(current, `Can't compare types ${format(leftTypeResolved)} and ${format(rightTypeResolved)} because they have no overlap`))
-                        }
-
-                        leftType = BOOLEAN_TYPE
-                    } else if (op.op !== '??') {
-                        const types = BINARY_OPERATOR_TYPES[op.op]?.find(({ left, right }) =>
-                            subsumes(reportError, left, leftTypeResolved) && 
-                            subsumes(reportError, right, rightTypeResolved))
-    
-                        if (types == null) {
-                            reportError(miscError(op, `Operator '${op.op}' cannot be applied to types '${format(leftType)}' and '${format(rightType)}'`));
-                        } else {
-                            leftType = types.output;
-                        }
+                    if (types == null) {
+                        reportError(miscError(current.op, `Operator '${current.op.op}' cannot be applied to types '${format(leftType)}' and '${format(rightType)}'`));
                     }
                 }
             } break;

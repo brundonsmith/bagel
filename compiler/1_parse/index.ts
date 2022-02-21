@@ -1405,16 +1405,8 @@ const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => 
         { leadingDelimiter: "forbidden", trailingDelimiter: "forbidden" }
     ), ({ parsed: segments, index }) => 
         segments.length >= 3 ? 
-            given(_segmentsToOps(segments), ({ base, ops }) => ({
-                parsed: {
-                    kind: "binary-operator",
-                    base,
-                    ops,
-                    module,
-                    code,
-                    startIndex,
-                    endIndex: index,
-                },
+            given(_segmentsToOps(segments), parsed => ({
+                parsed,
                 index,
             }))
         : undefined
@@ -1442,41 +1434,38 @@ const _binaryOperatorSymbol = memoize((tier: number): ParseFunction<Operator> =>
     return undefined;
 })
 
-const _segmentsToOps = (segments: (Operator|Expression)[]): BagelError | { base: Expression, ops: readonly [readonly [Operator, Expression], ...readonly [Operator, Expression][]] } => {
-    const [base, firstOp, firstExpr] = segments
+const _segmentsToOps = (segments: (Operator|Expression)[]): BagelError|BinaryOperator => {
+    let result: BinaryOperator|undefined;
+    const base = segments[0] as Expression
+    const { parent, module, code, startIndex } = base
 
-    if (base.kind === "operator") {
-        return err(base.code, base.startIndex, "Expression")
-    }
-
-    if (firstOp.kind !== "operator") {
-        return err(firstOp.code, firstOp.startIndex, "Operator")
-    }
-
-    if (firstExpr.kind === "operator") {
-        return err(firstExpr.code, firstExpr.startIndex, "Expression")
-    }
-
-    const ops: [readonly [Operator, Expression], ...readonly [Operator, Expression][]] = [[firstOp, firstExpr] as const]
-
-    for (let i = 3; i < segments.length; i += 2) {
+    for (let i = 1; i < segments.length; i += 2) {
+        const left = result ?? base
         const op = segments[i]
-        const expr = segments[i+1]
+        const right = segments[i+1]
 
         if (op.kind !== "operator") {
             return err(op.code, op.startIndex, "Operator")
         }
-        if (expr.kind === "operator") {
-            return err(expr.code, expr.startIndex, "Expression")
+
+        if (right.kind === "operator") {
+            return err(right.code, right.startIndex, "Expression")
         }
 
-        ops.push([
+        result = {
+            kind: "binary-operator",
+            left,
             op,
-            expr
-        ])
+            right,
+            parent,
+            module,
+            code,
+            startIndex,
+            endIndex: right.endIndex
+        }
     }
 
-    return { base, ops }
+    return result as BinaryOperator
 }
 
 
