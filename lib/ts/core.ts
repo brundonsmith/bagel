@@ -382,6 +382,7 @@ export const RT_REMOTE = Symbol('RT_REMOTE')
 export const RT_ARRAY = Symbol('RT_ARRAY')
 export const RT_RECORD = Symbol('RT_RECORD')
 export const RT_OBJECT = Symbol('RT_OBJECT')
+export const RT_ERROR = Symbol('RT_ERROR')
 export const RT_NOMINAL = Symbol('RT_NOMINAL')
 
 type RuntimeType =
@@ -399,6 +400,7 @@ type RuntimeType =
     | RuntimeType[] // union
     | { kind: typeof RT_RECORD, key: RuntimeType, value: RuntimeType }
     | { kind: typeof RT_OBJECT, entries: { key: string, value: RuntimeType, optional: boolean }[] }
+    | { kind: typeof RT_ERROR, inner: RuntimeType }
 
 
 export function instanceOf(val: any, type: RuntimeType): boolean {
@@ -416,7 +418,7 @@ export function instanceOf(val: any, type: RuntimeType): boolean {
             switch (type.kind) {
                 case RT_LITERAL: return val === type.value;
                 case RT_ARRAY: return Array.isArray(val) && val.every(member => instanceOf(member, type.inner));
-                case RT_NOMINAL: return typeof val === 'object' || val != null && val.kind === type.nominal
+                case RT_NOMINAL: return typeof val === 'object' && val != null && val.kind === type.nominal
                 case RT_RECORD: {
                     if (typeof val !== 'object' || val == null) {
                         return false
@@ -460,6 +462,7 @@ export function instanceOf(val: any, type: RuntimeType): boolean {
                         return true
                     }
                 }
+                case RT_ERROR: return typeof val === 'object' && val != null && val.kind === ERROR_SYM && instanceOf(val.value, type.inner)
 
                 // TODO:
                 // case RT_ITERATOR: return val instanceof Iter;

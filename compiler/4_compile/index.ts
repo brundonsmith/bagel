@@ -43,7 +43,8 @@ export const IMPORTED_ITEMS = [
     // runtime type-checking 
     'instanceOf', 'INNER_ITER', 'RT_UNKNOWN', 
     'RT_NIL', 'RT_BOOLEAN', 'RT_NUMBER', 'RT_STRING', 'RT_LITERAL', 'RT_ITERATOR',
-    'RT_PLAN', 'RT_REMOTE', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT', 'RT_NOMINAL'
+    'RT_PLAN', 'RT_REMOTE', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT', 'RT_NOMINAL',
+    'RT_ERROR'
 ]
 
 const JS_PRELUDE = `
@@ -351,6 +352,7 @@ function compileRuntimeType(type: TypeExpression): string {
             `{ key: '${name.name}', value: ${compileRuntimeType(type)}, optional: ${optional} }`
         )}] }`;
         case 'nominal-type': return `{ kind: ${INT}RT_NOMINAL, nominal: ${type.name.description}.sym }`
+        case 'error-type': return `{ kind: ${INT}RT_ERROR, inner: ${compileRuntimeType(type.inner)} }`
         case 'union-type': return `[ ${type.members.map(compileRuntimeType).join(', ')} ]`;
     }
 
