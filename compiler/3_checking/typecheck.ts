@@ -231,9 +231,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     }
                 }
             } break;
-            case "negation-operator": {
-                expect(reportError, TRUTHINESS_SAFE_TYPES, current.base)
-            } break;
             case "invocation": {
 
                 // Creation of nominal values looks like/parses as function 
@@ -445,15 +442,11 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "if-else-expression":
             case "if-else-statement":
             case "while-loop":
+            case "negation-operator":
             case "module":
-            case "import-all-declaration":
-            case "import-declaration":
             case "import-item":
-            case "proc-declaration":
-            case "func-declaration":
             case "js-proc":
             case "js-func":
-            case "type-declaration":
             case "test-block-declaration":
             case "inline-const-group":
             case "block":
