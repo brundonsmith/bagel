@@ -33,10 +33,10 @@ export const parsed = computedFn((store: _Store, moduleName: ModuleName, typeche
 })
 
 function preludeFor(module: ModuleName) {
-    const normalizedModule = normalizeName(module)
+    const normalizedModule = canonicalLibName(module)
 
     return '\n\n' + BGL_PRELUDE_DATA
-        .filter(m => normalizeName(m.module) !== normalizedModule)
+        .filter(m => canonicalLibName(m.module) !== normalizedModule)
         .map(({ module, imports }) =>
             `from '${module}' import { ${imports.join(', ')} }`)
         .join('\n')
@@ -57,13 +57,8 @@ const BGL_PRELUDE_DATA = [
     { module: LIB_LOCATION + '/json.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSONValue' ] },
 ] as const
 
-function normalizeName(module: ModuleName): string {
-    return module
-        .replace(/^[a-zA-Z]:/, '')
-        .split(/[\\/]+/)
-        .filter(s => !!s)
-        .map(s => s.split('.')[0])
-        .join('/')
+function canonicalLibName(module: ModuleName): string {
+    return module.match(/lib\/bgl\/(.*)/)?.[1] as string
 }
 
 export function parse(module: ModuleName, code: string, reportError: ReportError): Module {
@@ -2153,8 +2148,8 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
 const TYPE_PARSER = new TieredParser<TypeExpression>([
     [ genericType ],
     [ unionType ],
-    [ boundGenericType ],
     [ maybeType ],
+    [ boundGenericType ],
     [ arrayType ],
     [ primitiveType, funcType, procType, 
         literalType, recordType, objectType, parenthesizedType, 
