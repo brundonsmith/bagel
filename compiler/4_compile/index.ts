@@ -227,6 +227,14 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 return truthify(excludeTypes, module, ast.left, ast.op.op, ast.right)
             }
 
+            if (ast.op.op === '==') {
+                return `(${c(ast.left)} === ${c(ast.right)})`;
+            }
+
+            if (ast.op.op === '!=') {
+                return `(${c(ast.left)} !== ${c(ast.right)})`;
+            }
+
             return `(${c(ast.left)} ${ast.op.op} ${c(ast.right)})`;
         }
         case "negation-operator": return `!(${fixTruthinessIfNeeded(excludeTypes, module, ast.base)})`;
@@ -448,5 +456,4 @@ const truthify = (excludeTypes: boolean, module: string, leftExpr: Expression, o
     return `(${negation + truthinessOf(compiledExpr)} ? ${compileOne(excludeTypes, module, rest)} : ${compiledExpr})`
 }
 
-// TODO: Are we compiling == and != correctly?
 // TODO: const nominal types (generalized const wrapper for any given type?)

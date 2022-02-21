@@ -308,6 +308,8 @@ Deno.test({
 
             if count > 12 {
                 log(items);
+            } else if count != 10 {
+                log('not 10!');
             } else {
                 log(nil);
             }
@@ -326,6 +328,8 @@ Deno.test({
             
             if ((count > 12)) {
                 log(items);
+            } else if ((count !== 10)) {
+                log("not 10!");
             } else {
                 log(undefined);
             };
