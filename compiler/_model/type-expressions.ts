@@ -28,6 +28,7 @@ export type TypeExpression =
     | ParenthesizedType
     | UnknownType
     | AnyType
+    | NeverType
     | PropertyType
     | JavascriptEscapeType
 
@@ -232,6 +233,11 @@ export type AnyType = SourceInfo & {
     readonly mutability: undefined,
 }
 
+export type NeverType = SourceInfo & {
+    readonly kind: "never-type",
+    readonly mutability: undefined,
+}
+
 export type PropertyType = SourceInfo & {
     readonly kind: "property-type",
     readonly subject: TypeExpression,
@@ -330,6 +336,15 @@ export const UNKNOWN_TYPE: UnknownType = {
 }
 export const ANY_TYPE: AnyType = {
     kind: "any-type",
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const NEVER_TYPE: NeverType = {
+    kind: "never-type",
     mutability: undefined,
     parent: undefined,
     module: undefined,
@@ -579,6 +594,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "nil-type": undefined,
     "unknown-type": undefined,
     "any-type": undefined,
+    "never-type": undefined,
     "property-type": undefined,
     "iterator-type": undefined,
     "plan-type": undefined,

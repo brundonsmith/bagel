@@ -471,6 +471,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "parenthesized-type":
             case "unknown-type":
             case "any-type":
+            case "never-type":
             case "property-type":
             case "javascript-escape-type":
             case "error-type":
@@ -520,6 +521,8 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
     ) {
         return true;
     } else if (resolvedValue.kind === "unknown-type") {
+        return false;
+    } else if (resolvedValue.kind === 'never-type' || resolvedDestination.kind === 'never-type') {
         return false;
     } else if (
         (resolvedDestination.kind === "number-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "number-literal") ||

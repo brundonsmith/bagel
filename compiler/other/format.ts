@@ -232,6 +232,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "remote-type":   return ast.inner.kind === 'any-type' ? `Remote` : `Remote<${f(ast.inner)}>`
         case "unknown-type": return "unknown";
         case "any-type": return "<any>";
+        case "never-type": return "<never>";
         case "element-type": return `Element`;
         case "parenthesized-type": return `(${f(ast.inner)})`;
         // case "element-type": return `<${ast.tagName}>`;

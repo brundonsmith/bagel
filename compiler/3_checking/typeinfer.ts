@@ -1,6 +1,6 @@
 import { Refinement, ReportError, ModuleName } from "../_model/common.ts";
 import { BinaryOp, Expression, Invocation, isExpression, Spread } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TRUTHINESS_SAFE_TYPES, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NEVER_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TRUTHINESS_SAFE_TYPES, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
 import { assignmentError, cannotFindModule } from "../errors.ts";
@@ -863,7 +863,7 @@ function distillUnion(reportError: ReportError, type: TypeExpression): TypeExpre
             return type.members[0];
         }
         if (type.members.length === 0) {
-            return UNKNOWN_TYPE
+            return NEVER_TYPE
         }
     }
     
