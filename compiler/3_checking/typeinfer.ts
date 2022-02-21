@@ -7,7 +7,7 @@ import { assignmentError, cannotFindModule } from "../errors.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
-import { areSame, mapParseTree, typesEqual } from "../utils/ast.ts";
+import { areSame, expressionsEqual, mapParseTree, typesEqual } from "../utils/ast.ts";
 import Store, { getModuleByName } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
@@ -25,13 +25,15 @@ export function inferType(
         const refinements = resolveRefinements(ast)
 
         for (const refinement of refinements ?? []) {
-            switch (refinement.kind) {
-                case "subtraction": {
-                    refinedType = subtract(reportError, refinedType, refinement.type)
-                } break;
-                case "narrowing": {
-                    refinedType = narrow(reportError, refinedType, refinement.type)
-                } break;
+            if (expressionsEqual(refinement.targetExpression, ast)) {
+                switch (refinement.kind) {
+                    case "subtraction": {
+                        refinedType = subtract(reportError, refinedType, refinement.type)
+                    } break;
+                    case "narrowing": {
+                        refinedType = narrow(reportError, refinedType, refinement.type)
+                    } break;
+                }
             }
         }
     }
@@ -930,8 +932,7 @@ function resolveRefinements(expr: Expression): Refinement[] {
                 }
                 
                 // condition for current clause is true
-                const condition = parent.condition.kind === 'parenthesized-expression' ? parent.condition.inner : parent.condition;
-                const refinement = conditionToRefinement(condition, true)
+                const refinement = conditionToRefinement(parent.condition, true)
                 if (refinement) {
                     refinements.push(refinement)
                 }

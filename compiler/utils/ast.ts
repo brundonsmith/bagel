@@ -1,4 +1,5 @@
 import { AST,SourceInfo } from "../_model/ast.ts";
+import { Expression } from "../_model/expressions.ts";
 import { TypeExpression } from "../_model/type-expressions.ts";
 import { deepEquals } from "./misc.ts";
 
@@ -25,6 +26,10 @@ export function moreSpecificThan(a: Partial<SourceInfo>, b: Partial<SourceInfo>)
     }
 
     return (a.startIndex as number) >= (b.startIndex as number) && (a.endIndex as number) <= (b.endIndex as number)
+}
+
+export function expressionsEqual(a: Expression, b: Expression): boolean {
+    return deepEquals(a, b, SOURCE_INFO_PROPERTIES)
 }
 
 export function typesEqual(a: TypeExpression, b: TypeExpression): boolean {
