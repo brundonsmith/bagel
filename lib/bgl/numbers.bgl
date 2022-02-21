@@ -24,7 +24,7 @@ export const exp:   (x: number) => number = js# Math.exp #js
 export const expm1: (x: number) => number = js# Math.expm1 #js
 export const floor: (x: number) => number = js# Math.floor #js
 export const hypot: (x: number) => number = js# Math.hypot #js
-export const log:   (x: number) => number = js# Math.log #js
+export const logE:  (x: number) => number = js# Math.log #js
 export const log1p: (x: number) => number = js# Math.log1p #js
 export const log10: (x: number) => number = js# Math.log10 #js
 export const log2:  (x: number) => number = js# Math.log2 #js
