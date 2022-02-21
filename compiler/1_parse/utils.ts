@@ -77,8 +77,8 @@ export function isNumeric(char: string): boolean {
     return char >= '0' && char <= '9';
 }
 
-export function isSymbolic(ch: string, index: number): boolean {
-    return ch != null && (isAlpha(ch) || ch === "_" || (index > 0 && (isNumeric(ch) || ch === "$")));
+export function isSymbolic(ch: string, isFirstCharacter: boolean): boolean {
+    return ch != null && (isAlpha(ch) || ch === "_" || (!isFirstCharacter && (isNumeric(ch) || ch === "$")));
 }
 
 export type ParseResult<T> = { parsed: T, index: number };
@@ -247,7 +247,7 @@ export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize3((module,
 export const identifierSegment = memoize2((code: string, index: number): { segment: string, index: number} | undefined => {
     const startIndex = index;
 
-    while (isSymbolic(code[index], index - startIndex)) {
+    while (isSymbolic(code[index], index - startIndex === 0)) {
         index++;
     }
 

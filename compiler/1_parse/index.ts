@@ -7,7 +7,7 @@ import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, Imp
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf, ErrorExpression } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType } from "../_model/type-expressions.ts";
-import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./utils.ts";
+import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
 import { reshape } from "../2_reshape/index.ts";
 import { computedFn } from "../mobx.ts";
@@ -568,8 +568,8 @@ const _typeParam: ParseFunction<TypeParam> = (module, code, startIndex) =>
 const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType|ErrorType|RemoteType> = (module, code, startIndex) =>
     given(TYPE_PARSER.beneath(boundGenericType)(module, code, startIndex), ({ parsed: generic, index }) =>
     given(_typeArgs(module, code, index), ({ parsed: typeArgs, index }) => 
-        generic.kind === 'named-type' && (generic.name.name === 'Iterator' || generic.name.name === 'Plan' || generic.name.name === 'Error' || generic.name.name === 'Remote') ?
-            (typeArgs.length !== 1
+        generic.kind === 'named-type' && (generic.name.name === 'Iterator' || generic.name.name === 'Plan' || generic.name.name === 'Error' || generic.name.name === 'Remote')
+            ? (typeArgs.length !== 1
                 ? syntaxError(code, index, `${generic.name.name} types must have exactly one type parameter; found ${typeArgs.length}`)
                 : {
                     parsed: {
@@ -2036,7 +2036,7 @@ const booleanLiteral: ParseFunction<BooleanLiteral> = (module, code, startIndex)
 
     {
         const index = consume(code, startIndex, "true");
-        if (index != null) {
+        if (index != null && !isSymbolic(code[index], false)) {
             return {
                 parsed: {
                     kind: "boolean-literal",
@@ -2053,7 +2053,7 @@ const booleanLiteral: ParseFunction<BooleanLiteral> = (module, code, startIndex)
     
     {
         const index = consume(code, startIndex, "false");
-        if (index != null) {
+        if (index != null && !isSymbolic(code[index], false)) {
             return {
                 parsed: {
                     kind: "boolean-literal",
