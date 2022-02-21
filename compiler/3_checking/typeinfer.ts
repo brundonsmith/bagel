@@ -989,7 +989,9 @@ function conditionToRefinement(condition: Expression, conditionIsTrue: boolean):
         return { kind: conditionIsTrue ? "narrowing" : "subtraction", type: condition.type, targetExpression: condition.expr }
     }
 
-    // TODO: negation-truthiness
+    if (condition.kind === 'negation-operator') {
+        return { kind: conditionIsTrue ? "narrowing" : "subtraction", type: FALSY, targetExpression: condition.base }
+    }
 
     // condition is truthy or falsy
     return { kind: conditionIsTrue ? "subtraction" : "narrowing", type: FALSY, targetExpression: condition }
