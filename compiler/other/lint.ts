@@ -144,8 +144,9 @@ const RULES = {
     },
     'redundant-conditional': {
         message: (ast: AST) => {
+            const condType = resolveType(() => {}, inferType(() => {}, ast as Expression))
             const always = isAlways(ast as Expression)
-            return `This condition is redundant, because it can only ever be ${String(always)}`
+            return `This condition is redundant, because it can only ever be ${String(always)} (type: '${format(condType)}')`
         },
         match: (ast: AST) => {
             const condition = conditionFrom(ast)
