@@ -120,8 +120,8 @@ const inferTypeInner = computedFn((
                 return {
                     kind: "union-type",
                     members: [
-                        narrow(reportError, leftType, FALSY),
-                        rightType
+                        rightType,
+                        narrow(reportError, leftType, FALSY)
                     ],
                     mutability: undefined, parent, module, code, startIndex, endIndex
                 }
@@ -970,19 +970,23 @@ function resolveRefinements(expr: Expression): Refinement[] {
 }
 
 function conditionToRefinement(condition: Expression, conditionIsTrue: boolean): Refinement|undefined {
-    if (condition.kind === "binary-operator" && condition.op.op === "!=") {
-        const targetExpression = 
-            condition.right.kind === 'nil-literal' ? condition.left :
-            condition.left.kind === "nil-literal" ? condition.right :
-            undefined;
+    if (condition.kind === "binary-operator") {
 
-        if (targetExpression != null) {
-            return { kind: conditionIsTrue ? "subtraction" : "narrowing", type: NIL_TYPE, targetExpression }
+        if (condition.op.op === '!=') {
+            const targetExpression = 
+                condition.right.kind === 'nil-literal' ? condition.left :
+                condition.left.kind === "nil-literal" ? condition.right :
+                undefined;
+
+            if (targetExpression != null) {
+                return { kind: conditionIsTrue ? "subtraction" : "narrowing", type: NIL_TYPE, targetExpression }
+            }
         }
-    }
 
-    if (condition.kind === "binary-operator" && condition.op.op === "==") {
-        // TODO: Exact-value refinements
+        if (condition.op.op === '==') {
+            // TODO: Somehow assert that both of these types are the same... combine their refinements? intersection? etc
+            // TODO: Translate this more general logic to the '!=' case too
+        }
     }
 
     if (condition.kind === 'instance-of') {
@@ -1041,6 +1045,11 @@ export const propertiesOf = computedFn((
                     parent: resolvedType.parent,
                     ...TYPE_AST_NOISE
                 }, true)
+            ]
+        }
+        case "error-type": {
+            return [
+                attribute("value", resolvedType.inner, true),
             ]
         }
         case "remote-type": {

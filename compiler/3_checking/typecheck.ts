@@ -660,6 +660,14 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
             return resolveT(type.extends ?? UNKNOWN_TYPE)
         case "parenthesized-type":
             return resolveT(type.inner)
+        case "error-type":
+        case "remote-type":
+        case "iterator-type": {
+            return {
+                ...type,
+                inner: resolveT(type.inner)
+            }
+        }
         case "plan-type": {
             let inner = type.inner
             while (inner.kind === 'plan-type') {
