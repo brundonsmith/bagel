@@ -4,9 +4,9 @@ import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf, ErrorExpression } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement } from "../_model/statements.ts";
-import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser } from "./utils.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
 import { reshape } from "../2_reshape/index.ts";
@@ -42,17 +42,19 @@ function preludeFor(module: ModuleName) {
         .join('\n')
 }
 
+const LIB_LOCATION = 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl'
+
 const BGL_PRELUDE_DATA = [
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/core.bgl' as ModuleName, imports: [ 'log', 'logf', 'iter', 'UnknownObject' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/bagel.bgl' as ModuleName, imports: [ 'BagelConfig' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/arrays.bgl' as ModuleName, imports: [ 'push', 'unshift', 'pop', 'shift', 'splice' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/strings.bgl' as ModuleName, imports: [ 'includes', 'indexOf', 'replace', 'split', 'startsWith', 'substring', 'toLowerCase', 'toUpperCase', 'trim' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/objects.bgl' as ModuleName, imports: [ 'keys', 'values', 'entries' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/numbers.bgl' as ModuleName, imports: [ 'parseNumber', 'stringifyNumber', 'abs', 'pow', 'sqrt', 'ceil', 'floor', 'sin', 'cos', 'tan' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/booleans.bgl' as ModuleName, imports: [ 'parseBoolean', 'stringifyBoolean' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/iterators.bgl' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'collectArray', 'collectObject' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/plans.bgl' as ModuleName, imports: [ 'timeout' ] },
-    { module: 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/json.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSON' ] },
+    { module: LIB_LOCATION + '/core.bgl' as ModuleName, imports: [ 'log', 'logf', 'iter', 'UnknownObject' ] },
+    { module: LIB_LOCATION + '/bagel.bgl' as ModuleName, imports: [ 'BagelConfig' ] },
+    { module: LIB_LOCATION + '/arrays.bgl' as ModuleName, imports: [ 'push', 'unshift', 'pop', 'shift', 'splice' ] },
+    { module: LIB_LOCATION + '/strings.bgl' as ModuleName, imports: [ 'includes', 'indexOf', 'replace', 'split', 'startsWith', 'substring', 'toLowerCase', 'toUpperCase', 'trim' ] },
+    { module: LIB_LOCATION + '/objects.bgl' as ModuleName, imports: [ 'keys', 'values', 'entries' ] },
+    { module: LIB_LOCATION + '/numbers.bgl' as ModuleName, imports: [ 'parseNumber', 'stringifyNumber', 'abs', 'pow', 'sqrt', 'ceil', 'floor', 'sin', 'cos', 'tan' ] },
+    { module: LIB_LOCATION + '/booleans.bgl' as ModuleName, imports: [ 'parseBoolean', 'stringifyBoolean' ] },
+    { module: LIB_LOCATION + '/iterators.bgl' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'collectArray', 'collectObject' ] },
+    { module: LIB_LOCATION + '/plans.bgl' as ModuleName, imports: [ 'timeout' ] },
+    { module: LIB_LOCATION + '/json.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSONValue' ] },
 ] as const
 
 function normalizeName(module: ModuleName): string {
@@ -568,10 +570,10 @@ const _typeParam: ParseFunction<TypeParam> = (module, code, startIndex) =>
         index: indexAfterExtends ?? index
     }))))
 
-const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType|RemoteType> = (module, code, startIndex) =>
+const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType|ErrorType|RemoteType> = (module, code, startIndex) =>
     given(TYPE_PARSER.beneath(boundGenericType)(module, code, startIndex), ({ parsed: generic, index }) =>
     given(_typeArgs(module, code, index), ({ parsed: typeArgs, index }) => 
-        generic.kind === 'named-type' && (generic.name.name === 'Iterator' || generic.name.name === 'Plan' || generic.name.name === 'Remote') ?
+        generic.kind === 'named-type' && (generic.name.name === 'Iterator' || generic.name.name === 'Plan' || generic.name.name === 'Error' || generic.name.name === 'Remote') ?
             (typeArgs.length !== 1
                 ? syntaxError(code, index, `${generic.name.name} types must have exactly one type parameter; found ${typeArgs.length}`)
                 : {
@@ -579,6 +581,7 @@ const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType|Rem
                         kind: (
                             generic.name.name === 'Iterator' ? "iterator-type" :
                             generic.name.name === 'Plan' ? "plan-type" :
+                            generic.name.name === 'Error' ? "error-type" :
                             generic.name.name === 'Remote' ? "remote-type" :
                             "remote-type" // unreachable
                         ),
@@ -1849,6 +1852,23 @@ const _elementEmbeddedExpression: ParseFunction<Expression> = (module, code, sta
         index,
     }))))))
 
+const error: ParseFunction<ErrorExpression> = (module, code, startIndex) =>
+    given(consume(code, startIndex, "Error("), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(expression(module, code, index), err(code, index, "Expression"), ({ parsed: inner, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
+        parsed: {
+            kind: "error-expression",
+            inner,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    }))))))
+
 export const objectLiteral: ParseFunction<ObjectLiteral> = (module, code, startIndex) =>
     given(consume(code, startIndex, "{"), index =>
     given(parseSeries(module, code, index, _spreadOrEntry, ","), ({ parsed: entries, index }) =>
@@ -2121,6 +2141,7 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ binaryOperator(6) ],
     [ negationOperator ],
     [ indexer ],
+    [ error ],
     [ invocationAccessorChain ],
     [ range ],
     [ parenthesized ],

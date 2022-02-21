@@ -16,11 +16,11 @@ export type URI = const {
     password: string?,
 }
 
-export js func parseUri(str: string): URI? => {#
+export js func parseUri(str: string): URI|Error<string> => {#
     try {
         const url = new URL(str);
-    } catch {
-        return undefined;
+    } catch (e) {
+        return { kind: ___ERROR_SYM, value: String(e) };
     }
 
     const { href, protocol, origin, host, hostname, pathname, 

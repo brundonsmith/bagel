@@ -36,6 +36,10 @@ export {
 } from './_reactivity.ts'
 
 
+// Errors
+export type Error<T> = { kind: typeof ERROR_SYM, value: T }
+export const ERROR_SYM = Symbol('ERROR_SYM')
+
 // Iterators
 function* _range(start: number, end: number): RawIter<number> {
     for (let i = start; i < end; i++) {

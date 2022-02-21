@@ -222,7 +222,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
     
                         if (resolvedType.kind === "nominal-type") {
                             expect(reportError, resolvedType.inner, current.args[0])
-                            continue;
+                            break;
                         }
                     }
                 }
@@ -473,6 +473,8 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "any-type":
             case "property-type":
             case "javascript-escape-type":
+            case "error-type":
+            case "error-expression":
                 break;
             default:
                 // @ts-expect-error
@@ -585,7 +587,9 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
                     subsumes(reportError,  destinationValue, value)))
         );
     } else if ((resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") ||
-                (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type")) {
+                (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") ||
+                (resolvedDestination.kind === "error-type" && resolvedValue.kind === "error-type") ||
+                (resolvedDestination.kind === "remote-type" && resolvedValue.kind === "remote-type")) {
         return subsumes(reportError, resolvedDestination.inner, resolvedValue.inner);
     } else if (resolvedDestination.kind === 'nominal-type' && resolvedValue.kind === 'nominal-type') {
         return resolvedDestination.name === resolvedValue.name;

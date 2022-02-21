@@ -156,6 +156,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return `${f(ast.expr)} instanceof ${f(ast.type)}`
         case "as-cast":
             return `${f(ast.inner)} as ${f(ast.type)}`
+        case "error-expression":
+            return `Error(${f(ast.inner)})`
         case "range":
             return `${f(ast.start)}..${f(ast.end)}`
         case "spread":
@@ -226,6 +228,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "nominal-type": return ast.name.description ?? '<unnamed nominal>';
         case "iterator-type": return ast.inner.kind === 'any-type' ? `Iterator` : `Iterator<${f(ast.inner)}>`;
         case "plan-type":     return ast.inner.kind === 'any-type' ? `Plan` : `Plan<${f(ast.inner)}>`;
+        case "error-type":    return ast.inner.kind === 'any-type' ? `Error` : `Error<${f(ast.inner)}>`;
         case "remote-type":   return ast.inner.kind === 'any-type' ? `Remote` : `Remote<${f(ast.inner)}>`
         case "unknown-type": return "unknown";
         case "any-type": return "<any>";

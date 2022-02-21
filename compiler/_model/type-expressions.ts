@@ -24,6 +24,7 @@ export type TypeExpression =
     | IteratorType
     | PlanType
     | RemoteType
+    | ErrorType
     | ParenthesizedType
     | UnknownType
     | AnyType
@@ -208,6 +209,12 @@ export type RemoteType = SourceInfo & {
     readonly mutability: undefined,
 }
 
+export type ErrorType = SourceInfo & {
+    readonly kind: "error-type",
+    readonly inner: TypeExpression,
+    readonly mutability: undefined,
+}
+
 export type ParenthesizedType = SourceInfo & {
     readonly kind: "parenthesized-type",
     readonly inner: TypeExpression,
@@ -380,6 +387,16 @@ export const PLAN_OF_ANY: PlanType = {
     startIndex: undefined,
     endIndex: undefined,
 }
+export const ERROR_OF_ANY: ErrorType = {
+    kind: "error-type",
+    inner: ANY_TYPE,
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
 export const REMOTE_OF_ANY: RemoteType = {
     kind: "remote-type",
     inner: ANY_TYPE,
@@ -390,6 +407,9 @@ export const REMOTE_OF_ANY: RemoteType = {
     startIndex: undefined,
     endIndex: undefined,
 }
+
+// TODO: These produce weird error messages with their 100 arguments; come up 
+// with a better way to represent "all functions" and "all procs"
 export const FUNC: FuncType = {
     kind: "func-type",
     args: new Array(100).fill({
@@ -528,7 +548,7 @@ export const FALSY: UnionType = {
     members: [
         FALSE_TYPE,
         NIL_TYPE,
-        // TODO: Error type
+        ERROR_OF_ANY
     ],
     mutability: undefined,
     parent: undefined,
@@ -562,6 +582,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "property-type": undefined,
     "iterator-type": undefined,
     "plan-type": undefined,
+    "error-type": undefined,
     "remote-type": undefined,
     "parenthesized-type": undefined,
     "literal-type": undefined,

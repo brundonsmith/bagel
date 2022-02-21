@@ -38,7 +38,7 @@ export const IMPORTED_ITEMS = [
     'h',
     
     // used in compiler output
-    'range', 'Iter', 'Plan', 'Remote',
+    'range', 'Iter', 'Plan', 'Error', 'ERROR_SYM', 'Remote',
     
     // runtime type-checking 
     'instanceOf', 'INNER_ITER', 'RT_UNKNOWN', 
@@ -319,6 +319,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "tuple-type": return `[${ast.members.map(c).join(", ")}]`;
         case "iterator-type": return `${INT}Iter<${c(ast.inner)}>`;
         case "plan-type": return `${INT}Plan<${c(ast.inner)}>`;
+        case "error-type": return `${INT}Error<${c(ast.inner)}>`;
         case "remote-type": return `${INT}Remote<${c(ast.inner)}>`;
         case "literal-type": return `${c(ast.value)}`;
         case "string-type": return `string`;
@@ -329,6 +330,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "parenthesized-type": return `(${c(ast.inner)})`
         case "instance-of": return `${INT}instanceOf(${c(ast.expr)}, ${compileRuntimeType(resolveType(() => {}, ast.type))})`
         case "as-cast": return `${c(ast.inner)} as ${c(ast.type)}`
+        case "error-expression": return `{ kind: ${INT}ERROR_SYM, value: ${c(ast.inner)} }`
 
         default:
             throw Error("Couldn't compile '" + ast.kind + "'");
@@ -371,7 +373,6 @@ function objectEntries(excludeTypes: boolean, module: string, entries: readonly 
         .join(", ")
 }
 
-// TODO: Forbid this in user-defined identifers
 export const INT = `___`;
 
 const NIL = `undefined`;
@@ -448,7 +449,7 @@ const needsTruthinessFix = (expr: Expression) => {
 }
 
 const truthinessOf = (compiledExpr: string) => 
-    `(${compiledExpr} != null && ${compiledExpr} !== false)` // TODO: && compiledExpr is not Error
+    `(${compiledExpr} != null && (${compiledExpr} as unknown) !== false && (${compiledExpr} as any).kind !== ${INT}ERROR_SYM)`
 
 const truthify = (excludeTypes: boolean, module: string, leftExpr: Expression, op: "&&"|"||", rest: Expression) => {
     const compiledExpr = compileOne(excludeTypes, module, leftExpr)

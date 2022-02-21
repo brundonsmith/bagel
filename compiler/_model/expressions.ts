@@ -29,6 +29,7 @@ export type Expression =
     | InlineConstGroup
     | InstanceOf
     | AsCast
+    | ErrorExpression
 
 export type JavascriptEscape = SourceInfo & {
     readonly kind: "javascript-escape",
@@ -234,6 +235,11 @@ export type AsCast = SourceInfo & {
     readonly type: TypeExpression,
 }
 
+export type ErrorExpression = SourceInfo & {
+    readonly kind: "error-expression",
+    readonly inner: Expression,
+}
+
 const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "proc": undefined,
     "js-proc": undefined,
@@ -262,6 +268,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "inline-const-group": undefined,
     "instance-of": undefined,
     "as-cast": undefined,
+    "error-expression": undefined,
 };
 
 export function isExpression(ast: AST): ast is Expression {

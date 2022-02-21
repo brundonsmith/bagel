@@ -631,6 +631,13 @@ const inferTypeInner = computedFn((
         case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
         case "instance-of": return BOOLEAN_TYPE;
         case "as-cast": return ast.type;
+        case "error-expression":
+            return {
+                kind: "error-type",
+                inner: infer(ast.inner),
+                mutability: undefined,
+                parent, module, code, startIndex, endIndex
+            }
         default:
             // @ts-expect-error
             throw Error(ast.kind)
@@ -981,6 +988,8 @@ function conditionToRefinement(condition: Expression, conditionIsTrue: boolean):
     if (condition.kind === 'instance-of') {
         return { kind: conditionIsTrue ? "narrowing" : "subtraction", type: condition.type, targetExpression: condition.expr }
     }
+
+    // TODO: negation-truthiness
 
     // condition is truthy or falsy
     return { kind: conditionIsTrue ? "subtraction" : "narrowing", type: FALSY, targetExpression: condition }

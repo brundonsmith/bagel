@@ -322,7 +322,7 @@ Deno.test({
         let count = 0;
     
         for (const item of items[___INNER_ITER]) {
-            if ((___observe(item, 'foo') != null && ___observe(item, 'foo') !== false)) {
+            if ((___observe(item, 'foo') != null && (___observe(item, 'foo') as unknown) !== false && (___observe(item, 'foo') as any).kind !== ___ERROR_SYM)) {
               count = (count + 1);
             };
             
