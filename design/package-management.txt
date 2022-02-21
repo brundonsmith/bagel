@@ -1,0 +1,9 @@
+Modules are loaded by URL; Bagel knows nothing of repositories, versioning, or even packages
+
+*However*, std lib needs to be hosted and will also serve as a reference-implementation for "properly" serving up Bagel modules
+
+Current plan:
+- Put it in its own repository, like a third-party library would be
+- Tag commits with semver
+- Pipeline to push new versions to Cloudflare CDN, organized by *exact* version number
+- Cloudflare worker (source kept in the same repository) will accept semver *patterns*, and serve up the appropriate version based on what's on the CDN
