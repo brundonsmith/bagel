@@ -39,9 +39,32 @@ export function typecheck(reportError: ReportError, ast: Module): void {
     for (const { current, parent } of iterateParseTree(ast)) {
             
         switch(current.kind) {
+            // check all imports and declarations to make sure they aren't 
+            // re-defining anything, even if they don't get used right now
+            case "import-all-declaration": {
+                const declarations = (current.parent as Module).declarations
+                resolve(reportError, current.alias.name, declarations[declarations.length - 1])
+            } break;
+            case "import-declaration": {
+                const declarations = (current.parent as Module).declarations
+                for (const { name, alias } of current.imports) {
+                    resolve(reportError, alias?.name ?? name.name, declarations[declarations.length - 1])
+                }
+            } break;
+            case "proc-declaration":
+            case "func-declaration":
+            case "type-declaration": {
+                const declarations = (current.parent as Module).declarations
+                resolve(reportError, current.name.name, declarations[declarations.length - 1])
+            } break;
             case "value-declaration":
             case "value-declaration-statement":
             case "inline-const-declaration": {
+                if (current.kind === "value-declaration") {
+                    const declarations = (current.parent as Module).declarations
+                    resolve(reportError, current.name.name, declarations[declarations.length - 1])
+                }
+
                 if (current.kind === 'inline-const-declaration' && current.awaited) {
                     const valueType = resolveT(infer(current.value))
 
