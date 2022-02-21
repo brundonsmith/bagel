@@ -1,6 +1,6 @@
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "../3_checking/resolve.ts";
-import { resolveType } from "../3_checking/typecheck.ts";
+import { resolveType, subsumes } from "../3_checking/typecheck.ts";
 import { inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
 import { computedFn } from "../mobx.ts";
 import { format } from "../other/format.ts";
@@ -10,7 +10,7 @@ import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func, Spread, JsFunc, JsProc } from "../_model/expressions.ts";
-import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, TRUTHINESS_SAFE_TYPES, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
 export const compiled = computedFn((store: _Store, moduleName: ModuleName): string => {
@@ -173,11 +173,11 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         }
         case "if-else-statement": return 'if ' + ast.cases
             .map(({ condition, outcome }) => 
-                `(${c(condition)}) ${c(outcome)}`)
+                `(${fixTruthinessIfNeeded(excludeTypes, module, condition)}) ${c(outcome)}`)
             .join(' else if ')
             + (ast.defaultCase ? ` else ${c(ast.defaultCase)}` : '');
         case "for-loop": return `for (const ${c(ast.itemIdentifier)} of ${c(ast.iterator)}[${INT}INNER_ITER]) ${c(ast.body)}`;
-        case "while-loop": return `while (${c(ast.condition)}) ${c(ast.body)}`;
+        case "while-loop": return `while (${fixTruthinessIfNeeded(excludeTypes, module, ast.condition)}) ${c(ast.body)}`;
         case "proc":
         case "js-proc":
             return compileProc(excludeTypes, module, ast);
@@ -222,14 +222,20 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
 
             return `${c(invocation.subject)}${invocation.kind === "invocation" && invocation.typeArgs.length > 0 ? `<${invocation.typeArgs.map(c).join(',')}>` : ''}(${invocation.args.map(c).join(', ')})` + invalidation;
         }
-        case "binary-operator": return `(${c(ast.left)} ${ast.op.op} ${c(ast.right)})`;
-        case "negation-operator": return `!(${c(ast.base)})`;
+        case "binary-operator": {
+            if ((ast.op.op === '&&' || ast.op.op === '||') && needsTruthinessFix(ast.left)) {
+                return truthify(excludeTypes, module, ast.left, ast.op.op, ast.right)
+            }
+
+            return `(${c(ast.left)} ${ast.op.op} ${c(ast.right)})`;
+        }
+        case "negation-operator": return `!(${fixTruthinessIfNeeded(excludeTypes, module, ast.base)})`;
         case "operator": return ast.op;
         case "if-else-expression":
         case "switch-expression": return '(' + ast.cases
             .map(({ condition, outcome }) => 
                 (ast.kind === "if-else-expression"
-                    ? c(condition)
+                    ? fixTruthinessIfNeeded(excludeTypes, module, condition)
                     : c(ast.value) + ' === ' + c(condition))
                 + ` ? ${c(outcome)} : `)
             .join('\n')
@@ -422,3 +428,25 @@ function maybeTypeParams(excludeTypes: boolean, module: string, typeParams: read
 function maybeTypeAnnotation(excludeTypes: boolean, module: string, type: TypeExpression|undefined): string {
     return !excludeTypes && type ? `: ${compileOne(excludeTypes, module, type)}` : ''
 }
+
+const fixTruthinessIfNeeded = (excludeTypes: boolean, module: string, expr: Expression) =>
+    needsTruthinessFix(expr)
+        ? truthinessOf(compileOne(excludeTypes, module, expr))
+        : compileOne(excludeTypes, module, expr)
+
+const needsTruthinessFix = (expr: Expression) => {
+    const type = inferType(() => {}, expr)
+    return !subsumes(() => {}, TRUTHINESS_SAFE_TYPES, type)
+}
+
+const truthinessOf = (compiledExpr: string) => 
+    `(${compiledExpr} != null && ${compiledExpr} !== false)` // TODO: && compiledExpr is not Error
+
+const truthify = (excludeTypes: boolean, module: string, leftExpr: Expression, op: "&&"|"||", rest: Expression) => {
+    const compiledExpr = compileOne(excludeTypes, module, leftExpr)
+    const negation = op === "&&" ? "" : "!"
+    return `(${negation + truthinessOf(compiledExpr)} ? ${compileOne(excludeTypes, module, rest)} : ${compiledExpr})`
+}
+
+// TODO: Are we compiling == and != correctly?
+// TODO: const nominal types (generalized const wrapper for any given type?)

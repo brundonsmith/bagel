@@ -1,5 +1,5 @@
 import { Module } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, OBJECT_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE, TRUTHINESS_SAFE_TYPES } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { assignmentError,BagelError,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES } from "./typeinfer.ts";
@@ -198,7 +198,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                      && !subsumes(reportError, rightType, leftType)) {
                         reportError(miscError(current, `Can't compare types ${format(leftType)} and ${format(rightType)} because they have no overlap`))
                     }
-                } else if (current.op.op !== '??') {
+                } else if (current.op.op !== '??' && current.op.op !== '&&' && current.op.op !== '||') {
                     const types = BINARY_OPERATOR_TYPES[current.op.op]?.find(({ left, right }) =>
                         subsumes(reportError, left, leftType) && 
                         subsumes(reportError, right, rightType))
@@ -209,7 +209,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "negation-operator": {
-                expect(reportError, BOOLEAN_TYPE, current.base)
+                expect(reportError, TRUTHINESS_SAFE_TYPES, current.base)
             } break;
             case "invocation": {
 
@@ -272,13 +272,9 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     }
                 }
             } break;
-            case "if-else-expression":
-            case "if-else-statement":
             case "switch-expression": {
-                const valueType = current.kind === "if-else-expression" || current.kind === "if-else-statement" ? BOOLEAN_TYPE : infer(current.value);
-
                 for (const { condition } of current.cases) {
-                    expect(reportError, valueType, condition)
+                    expect(reportError, infer(current.value), condition)
                 }
             } break;
             case "indexer": {
@@ -377,10 +373,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 expect(reportError, ITERATOR_OF_ANY, current.iterator, 
                     () => `Expected iterator after "of" in for loop`)
             } break;
-            case "while-loop": {
-                expect(reportError, BOOLEAN_TYPE, current.condition, 
-                    () => `Condition for while loop must be boolean`)
-            } break;
             case "element-tag": {
                 for (const child of current.children) {
                     expect(reportError, ELEMENT_TAG_CHILD_TYPE, child)
@@ -388,7 +380,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "spread": {
                 if (parent?.kind === 'object-literal') {
-                    expect(reportError, OBJECT_OF_ANY, current.expr, 
+                    expect(reportError, RECORD_OF_ANY, current.expr, 
                         (_, val) => `Only objects can be spread into an object; found ${format(val)}`)
                 } else if (parent?.kind === 'array-literal') {
                     expect(reportError, ARRAY_OF_ANY, current.expr, 
@@ -413,7 +405,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 for (const spread of current.spreads) {
                     const resolved = resolveT(spread)
 
-                    if (!subsumes(reportError, OBJECT_OF_ANY, resolved)) {
+                    if (!subsumes(reportError, RECORD_OF_ANY, resolved)) {
                         reportError(miscError(spread, `${format(resolved)} is not an object type; can only spread object types into object types`))
                     }
                 }
@@ -427,6 +419,9 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     reportError(miscError(current, `This check will always be true, because ${format(current.expr)} will always be a ${format(current.type)}`))
                 }
             } break;
+            case "if-else-expression":
+            case "if-else-statement":
+            case "while-loop":
             case "module":
             case "import-all-declaration":
             case "import-declaration":
@@ -597,6 +592,26 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
     }
 
     return false;
+}
+
+/**
+ * Determine whether or not two types have any overlap at all
+ */
+export function overlaps(reportError: ReportError, a: TypeExpression, b: TypeExpression): boolean {
+    const resolvedA = resolveType(reportError, a)
+    const resolvedB = resolveType(reportError, b)
+
+    if (subsumes(reportError, resolvedA, resolvedB) || subsumes(reportError, resolvedB, resolvedA)) {
+        return true
+    } else if (resolvedA.kind === 'union-type' && resolvedB.kind === 'union-type') {
+        return resolvedA.members.some(memberA => resolvedB.members.some(memberB => overlaps(reportError, memberA, memberB)))
+    } else if (resolvedA.kind === 'union-type') {
+        return resolvedA.members.some(memberA => overlaps(reportError, memberA, resolvedB))
+    } else if (resolvedB.kind === 'union-type') {
+        return resolvedB.members.some(memberB => overlaps(reportError, memberB, resolvedA))
+    }
+
+    return false
 }
 
 /**

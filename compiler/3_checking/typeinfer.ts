@@ -1,6 +1,6 @@
 import { Refinement, ReportError, ModuleName } from "../_model/common.ts";
 import { BinaryOp, Expression, Invocation, isExpression, Spread } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TRUTHINESS_SAFE_TYPES, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
 import { assignmentError, cannotFindModule } from "../errors.ts";
@@ -120,7 +120,16 @@ const inferTypeInner = computedFn((
                 return {
                     kind: "union-type",
                     members: [
-                        leftType,
+                        narrow(reportError, leftType, FALSY),
+                        rightType
+                    ],
+                    mutability: undefined, parent, module, code, startIndex, endIndex
+                }
+            } else if (ast.op.op === '||') {
+                return {
+                    kind: "union-type",
+                    members: [
+                        subtract(reportError, leftType, FALSY),
                         rightType
                     ],
                     mutability: undefined, parent, module, code, startIndex, endIndex
@@ -859,10 +868,16 @@ export function subtract(reportError: ReportError, type: TypeExpression, without
     without = resolveType(reportError, without)
 
     if (type.kind === "union-type") {
-        return simplifyUnions(reportError, {
+        return {
             ...type,
             members: type.members.filter(member => !subsumes(reportError, without, member))
-        })
+        }
+    } else if(type.kind === 'boolean-type' && without.kind === 'literal-type' && without.value.kind === 'boolean-literal') {
+        if (without.value.value) {
+            return FALSE_TYPE
+        } else {
+            return TRUE_TYPE
+        }
     } else { // TODO: There's probably more we can do here
         return type
     }
@@ -870,10 +885,10 @@ export function subtract(reportError: ReportError, type: TypeExpression, without
 
 function narrow(reportError: ReportError, type: TypeExpression, fit: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
-        return simplifyUnions(reportError, {
+        return {
             ...type,
             members: type.members.filter(member => subsumes(reportError, fit, member))
-        })
+        }
     } else if (type.kind === 'unknown-type') {
         return fit
     } else { // TODO: There's probably more we can do here
@@ -925,6 +940,18 @@ function resolveRefinements(expr: Expression): Refinement[] {
                     refinements.push(refinement)
                 }
             }
+        } else if (parent.kind === 'binary-operator' && current === parent.right) {
+            if (parent.op.op === '&&') {
+                const refinement = conditionToRefinement(parent.left, true)
+                if (refinement) {
+                    refinements.push(refinement)
+                }
+            } else if (parent.op.op === '||') {
+                const refinement = conditionToRefinement(parent.left, false)
+                if (refinement) {
+                    refinements.push(refinement)
+                }
+            }
         }
 
         current = parent
@@ -954,6 +981,9 @@ function conditionToRefinement(condition: Expression, conditionIsTrue: boolean):
     if (condition.kind === 'instance-of') {
         return { kind: conditionIsTrue ? "narrowing" : "subtraction", type: condition.type, targetExpression: condition.expr }
     }
+
+    // condition is truthy or falsy
+    return { kind: conditionIsTrue ? "subtraction" : "narrowing", type: FALSY, targetExpression: condition }
 }
 
 export const propertiesOf = computedFn((
@@ -1012,6 +1042,9 @@ export const propertiesOf = computedFn((
     }
 })
 
+/**
+ * Convenience function for creating a simple Attribute
+ */
 function attribute(name: string, type: TypeExpression, forceReadonly: boolean): Attribute {
     return {
         kind: "attribute",
@@ -1176,6 +1209,9 @@ function fitTemplate(
     return new Map();
 }
 
+/**
+ * Convert a.foo() to foo(a)
+ */
 export function invocationFromMethodCall(expr: Expression): Invocation|undefined {
     if (expr.kind === 'invocation' && expr.subject.kind === 'property-accessor') {
         const fnName = expr.subject.property.name
@@ -1237,12 +1273,6 @@ export const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExp
     ],
     ">=": [
         { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "&&": [
-        { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "||": [
-        { left: BOOLEAN_TYPE, right: BOOLEAN_TYPE, output: BOOLEAN_TYPE }
     ],
     "==": [
         { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }

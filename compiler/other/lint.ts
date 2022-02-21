@@ -1,16 +1,19 @@
 import { parsed } from "../1_parse/index.ts";
+import { overlaps, resolveType, subsumes } from "../3_checking/typecheck.ts";
+import { inferType } from "../3_checking/typeinfer.ts";
 import { computedFn } from "../mobx.ts";
 import { _Store } from "../store.ts";
 import { iterateParseTree, mapParseTree } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { FuncDeclaration, ProcDeclaration, ValueDeclaration } from "../_model/declarations.ts";
-import { Func, Proc } from "../_model/expressions.ts";
+import { Expression, Func, Proc } from "../_model/expressions.ts";
+import { BOOLEAN_TYPE, FALSY, NUMBER_TYPE, STRING_TYPE } from "../_model/type-expressions.ts";
 import { format,DEFAULT_OPTIONS } from "./format.ts";
 
 export function lint(ast: AST): LintProblem[] {
     const problems: LintProblem[] = []
-    const rules = Object.entries(RULES) as [RuleName, LintRule][]
+    const rules = (Object.entries(RULES) as [RuleName, LintRule][]).filter(rule => DEFAULT_SEVERITY[rule[0]] !== 'off')
 
     for (const { current } of iterateParseTree(ast)) {
         for (const [name, rule] of rules) {
@@ -64,7 +67,7 @@ export function autofix(ast: AST): AST {
 type LintRule = {
     readonly message: (ast: AST) => string,
     readonly match: (ast: AST) => AST|undefined,
-    readonly autofix?: (ast: AST) => AST,
+    readonly autofix: ((ast: AST) => AST) | undefined,
 }
 
 type Severity = 'error'|'warning'|'info'|'off'
@@ -139,6 +142,51 @@ const RULES = {
             return ast
         }
     },
+    'redundant-conditional': {
+        message: (ast: AST) => {
+            const always = isAlways(ast as Expression)
+            return `This condition is redundant, because it can only ever be ${String(always)}`
+        },
+        match: (ast: AST) => {
+            const condition = conditionFrom(ast)
+
+            if (condition) {
+                const always = isAlways(condition)
+                if (always != null) {
+                    return condition
+                }
+            }
+        },
+        autofix: undefined
+    },
+    'string-number-conditional': {
+        message: (ast: AST) => `Condition has type '${format(inferType(() => {}, ast as Expression))}'. Beware using string or numbers in conditionals; in Bagel all strings and numbers are truthy!`,
+        match: (ast: AST) => {
+            const condition = conditionFrom(ast)
+
+            if (condition) {
+                const conditionType = inferType(() => {}, condition)
+                if (subsumes(() => {}, conditionType, STRING_TYPE) || subsumes(() => {}, conditionType, NUMBER_TYPE)) {
+                    return condition
+                }
+            }
+        },
+        autofix: undefined
+    },
+    'explicit-booleans-only': {
+        message: (ast: AST) => `Should only use explicit boolean expressions in conditionals; this expression is of type '${format(inferType(() => {}, ast as Expression))}'`,
+        match: (ast: AST) => {
+            const condition = conditionFrom(ast)
+
+            if (condition) {
+                const conditionType = inferType(() => {}, condition)
+                if (!subsumes(() => {}, BOOLEAN_TYPE, conditionType)) {
+                    return condition
+                }
+            }
+        },
+        autofix: undefined
+    }
     // 'unnecessary-nil-coalescing': {
     //     message: "Nil-coalescing operator is redundant because the left operand will never be nil",
     //     match: (ast: AST) => {
@@ -152,10 +200,50 @@ const RULES = {
 } as const
 const _rules: {[name: string]: LintRule} = RULES
 
+function conditionFrom(ast: AST): Expression|undefined {
+    if (ast.kind === 'if-else-expression' || ast.kind === 'if-else-statement') {
+        for (const { condition } of ast.cases) {
+            // TODO: Return multiple at once
+            return condition
+        }
+    }
+
+    if (ast.kind === 'while-loop') {
+        return ast.condition
+    }
+
+    if (ast.kind === 'binary-operator' && (ast.op.op === '&&' || ast.op.op === '||')) {
+        return ast.left
+    }
+
+    if (ast.kind === 'negation-operator') {
+        return ast.base
+    }
+}
+
+function isAlways(condition: Expression): boolean|undefined {
+    const condType = resolveType(() => {}, inferType(() => {}, condition))
+
+    if (subsumes(() => {}, FALSY, condType)) {
+        return false
+    }
+
+    if (!overlaps(() => {}, FALSY, condType)) {
+        return true
+    }
+
+    return undefined
+}
+
+// optional lint against all non-boolean conditionals?
+
 type RuleName = keyof typeof RULES
 
 const DEFAULT_SEVERITY: { readonly [rule in RuleName]: Severity } = {
     'unnecessary-parens': 'warning',
     'func-or-proc-as-value': 'warning',
+    'redundant-conditional': 'error',
+    'string-number-conditional': 'warning',
+    'explicit-booleans-only': 'off',
     // 'unnecessary-nil-coalescing': 'warning'
 }

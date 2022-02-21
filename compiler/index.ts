@@ -163,7 +163,7 @@ const printErrors = debounce((errors: Map<ModuleName, (BagelError|LintProblem)[]
             }
         }
 
-        console.log(`Found ${totalErrors} error${sOrNone(totalErrors)} across ${modulesWithErrors} module${sOrNone(modulesWithErrors)}`)
+        console.log(`Found ${totalErrors} problem${sOrNone(totalErrors)} across ${modulesWithErrors} module${sOrNone(modulesWithErrors)}`)
     }
 }, 500)
     

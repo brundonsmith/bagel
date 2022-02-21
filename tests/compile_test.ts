@@ -320,7 +320,7 @@ Deno.test({
         let count = 0;
     
         for (const item of items[___INNER_ITER]) {
-            if (___observe(item, 'foo')) {
+            if ((___observe(item, 'foo') != null && ___observe(item, 'foo') !== false)) {
               count = (count + 1);
             };
             

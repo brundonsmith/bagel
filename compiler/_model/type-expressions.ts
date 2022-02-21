@@ -267,6 +267,42 @@ export const BOOLEAN_TYPE: BooleanType = {
     startIndex: undefined,
     endIndex: undefined,
 }
+export const TRUE_TYPE: LiteralType = {
+    kind: "literal-type",
+    value: {
+        kind: "boolean-literal",
+        value: true,
+        parent: undefined,
+        module: undefined,
+        code: undefined,
+        startIndex: undefined,
+        endIndex: undefined,
+    },
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const FALSE_TYPE: LiteralType = {
+    kind: "literal-type",
+    value: {
+        kind: "boolean-literal",
+        value: false,
+        parent: undefined,
+        module: undefined,
+        code: undefined,
+        startIndex: undefined,
+        endIndex: undefined,
+    },
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
 export const NIL_TYPE: NilType = {
     kind: "nil-type",
     mutability: undefined,
@@ -303,7 +339,7 @@ export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
     startIndex: undefined,
     endIndex: undefined,
 }
-export const OBJECT_OF_ANY: RecordType = {
+export const RECORD_OF_ANY: RecordType = {
     kind: "record-type",
     keyType: ANY_TYPE,
     valueType: ANY_TYPE,
@@ -327,6 +363,85 @@ export const ARRAY_OF_ANY: ArrayType = {
 export const ITERATOR_OF_ANY: IteratorType = {
     kind: "iterator-type",
     inner: ANY_TYPE,
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const PLAN_OF_ANY: PlanType = {
+    kind: "plan-type",
+    inner: ANY_TYPE,
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const REMOTE_OF_ANY: RemoteType = {
+    kind: "remote-type",
+    inner: ANY_TYPE,
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const FUNC: FuncType = {
+    kind: "func-type",
+    args: new Array(100).fill({
+        kind: "arg",
+        name: {
+            kind: "plain-identifier",
+            name: '',
+            parent: undefined,
+            module: undefined,
+            code: undefined,
+            startIndex: undefined,
+            endIndex: undefined,
+        },
+        type: ANY_TYPE,
+        optional: true,
+        parent: undefined,
+        module: undefined,
+        code: undefined,
+        startIndex: undefined,
+        endIndex: undefined,
+    }),
+    returnType: ANY_TYPE,
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const PROC: ProcType = {
+    kind: "proc-type",
+    args: new Array(100).fill({
+        kind: "arg",
+        name: {
+            kind: "plain-identifier",
+            name: '',
+            parent: undefined,
+            module: undefined,
+            code: undefined,
+            startIndex: undefined,
+            endIndex: undefined,
+        },
+        type: ANY_TYPE,
+        optional: true,
+        parent: undefined,
+        module: undefined,
+        code: undefined,
+        startIndex: undefined,
+        endIndex: undefined,
+    }),
+    invalidatesParent: false,
+    isAsync: false,
     mutability: undefined,
     parent: undefined,
     module: undefined,
@@ -378,6 +493,52 @@ export const ELEMENT_TAG_CHILD_TYPE: TypeExpression = {
     startIndex: undefined,
     endIndex: undefined,
 }
+export const ELEMENT_TYPE: ElementType = {
+    kind: "element-type",
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const TRUTHINESS_SAFE_TYPES: UnionType = {
+    kind: "union-type",
+    members: [
+        BOOLEAN_TYPE,
+        NIL_TYPE,
+        RECORD_OF_ANY,
+        ARRAY_OF_ANY,
+        ELEMENT_TYPE,
+        ITERATOR_OF_ANY,
+        PLAN_OF_ANY,
+        REMOTE_OF_ANY,
+        PROC,
+        FUNC
+    ],
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const FALSY: UnionType = {
+    kind: "union-type",
+    members: [
+        FALSE_TYPE,
+        NIL_TYPE,
+        // TODO: Error type
+    ],
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+
+// TODO: Only allow known object properties when instantiating an object literal, like TypeScript does
 
 const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } = {
     "union-type": undefined,
