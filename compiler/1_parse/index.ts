@@ -54,7 +54,7 @@ const BGL_PRELUDE_DATA = [
     { module: LIB_LOCATION + '/booleans.bgl' as ModuleName, imports: [ 'parseBoolean', 'stringifyBoolean' ] },
     { module: LIB_LOCATION + '/iterators.bgl' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'collectArray', 'collectObject' ] },
     { module: LIB_LOCATION + '/plans.bgl' as ModuleName, imports: [ 'timeout' ] },
-    { module: LIB_LOCATION + '/json.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSONValue' ] },
+    { module: LIB_LOCATION + '/json.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSON' ] },
 ] as const
 
 function canonicalLibName(module: ModuleName): string {
