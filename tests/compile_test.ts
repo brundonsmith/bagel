@@ -503,7 +503,7 @@ function testCompile(code: string, exp: string) {
     watch: undefined
   })
   
-  const parseResult = parsed(Store, moduleName, false)
+  const parseResult = parsed(Store, moduleName)
 
   if (parseResult) {
     const { ast, errors } = parseResult

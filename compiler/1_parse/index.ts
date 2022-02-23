@@ -9,26 +9,21 @@ import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatem
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
-import { reshape } from "../2_reshape/index.ts";
 import { computedFn } from "../mobx.ts";
 import { _Store } from "../store.ts";
 import { format } from "../other/format.ts";
 
-export const parsed = computedFn((store: _Store, moduleName: ModuleName, typecheckReady: boolean): { ast: Module, errors: readonly BagelError[] } | undefined => {
+export const parsed = computedFn((store: _Store, moduleName: ModuleName): { ast: Module, errors: readonly BagelError[] } | undefined => {
     const source = store.modulesSource.get(moduleName)
     if (source) {
         const errors: BagelError[] = []
         const ast = parse(
             moduleName,  
-            source + (typecheckReady ? preludeFor(moduleName) : ''), 
+            source + (store.mode?.mode !== 'mock' ? preludeFor(moduleName) : ''), 
             err => errors.push(err)
         )
 
-        if (typecheckReady) {
-            return { ast: reshape(ast), errors }
-        } else {
-            return { ast, errors }
-        }
+        return { ast, errors }
     }
 })
 

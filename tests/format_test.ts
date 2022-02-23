@@ -368,7 +368,7 @@ for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
     Deno.test({
         name: 'snippet ' + i,
         fn() {
-            const { ast, errors } = parsed(Store, ('snippet ' + i) as ModuleName, false) ?? {}
+            const { ast, errors } = parsed(Store, ('snippet ' + i) as ModuleName) ?? {}
 
             if (ast && errors && errors.length === 0) {
                 const formattedModuleName = ('formatted snippet ' + i) as ModuleName
@@ -376,7 +376,7 @@ for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
 
                 Store.setSource(formattedModuleName, formatted)
 
-                const reParsed = parsed(Store, formattedModuleName, false)?.ast as Module
+                const reParsed = parsed(Store, formattedModuleName)?.ast as Module
 
                 stripSourceInfo(ast)
                 stripSourceInfo(reParsed)

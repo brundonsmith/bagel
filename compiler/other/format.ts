@@ -16,7 +16,7 @@ export const DEFAULT_OPTIONS: FormatOptions = {
 }
 
 export const formatted = computedFn((store: _Store, moduleName: ModuleName): string => {
-    const ast = parsed(store, moduleName, false)?.ast
+    const ast = parsed(store, moduleName)?.ast
 
     if (!ast) {
         return ''

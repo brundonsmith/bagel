@@ -15,7 +15,7 @@ import { resolve } from "./resolve.ts";
 
 
 export const typeerrors = computedFn((store: _Store, moduleName: ModuleName): BagelError[] => {
-    const ast = parsed(store, moduleName, true)?.ast
+    const ast = parsed(store, moduleName)?.ast
 
     if (!ast) {
         return []

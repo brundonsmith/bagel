@@ -85,7 +85,7 @@ async function testSideEffects(bgl: string, expected: any[]) {
         watch: undefined
     });
 
-    const { ast, errors } = parsed(Store, moduleName, false) as { ast: Module, errors: BagelError[] };
+    const { ast, errors } = parsed(Store, moduleName) as { ast: Module, errors: BagelError[] };
     const compiled = compile(ast, moduleName, false, true);
 
     if (errors.length > 0) {

@@ -83,7 +83,7 @@ export const allProblems = computedFn((store: _Store) => {
     }
 
     for (const module of store.modulesSource.keys()) {
-        const parseResult = parsed(store, module, true)
+        const parseResult = parsed(store, module)
         if (parseResult) {
             // console.log(withoutSourceInfo(parsed.ast))
             const { errors: parseErrors } = parseResult
@@ -103,7 +103,7 @@ export const allProblems = computedFn((store: _Store) => {
 export const getModuleByName = computedFn((store: _Store, importer: ModuleName, imported: string) => {
     const importedModuleName = canonicalModuleName(importer, imported)
 
-    return parsed(store, importedModuleName, true)?.ast
+    return parsed(store, importedModuleName)?.ast
 })
 
 export function canonicalModuleName(importerModule: string, importPath: string): ModuleName {

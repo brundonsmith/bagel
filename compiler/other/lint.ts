@@ -34,7 +34,7 @@ export function lint(ast: AST): LintProblem[] {
 }
 
 export const autofixed = computedFn((store: _Store, moduleName: ModuleName): string => {
-    const ast = parsed(store, moduleName, false)?.ast
+    const ast = parsed(store, moduleName)?.ast
 
     if (!ast) {
         return ''

@@ -14,7 +14,7 @@ import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, TRUTHINESS_S
 
 
 export const compiled = computedFn((store: _Store, moduleName: ModuleName): string => {
-    const ast = parsed(store, moduleName, true)?.ast
+    const ast = parsed(store, moduleName)?.ast
 
     if (!ast) {
         return ''

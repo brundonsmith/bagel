@@ -120,7 +120,7 @@ autorun(async () => {
 // add imported modules to set
 autorun(() => {
     for (const module of Store.modules) {
-        const parseResult = parsed(Store, module, true)
+        const parseResult = parsed(Store, module)
 
         if (parseResult) {
             for (const decl of parseResult.ast.declarations) {

@@ -1183,7 +1183,7 @@ function testTypecheck(code: string, shouldFail: boolean): void {
     watch: undefined
   })
   
-  const parseResult = parsed(Store, moduleName, true)
+  const parseResult = parsed(Store, moduleName)
 
   if (parseResult) {
     const errors = allProblems(Store).get(moduleName)
