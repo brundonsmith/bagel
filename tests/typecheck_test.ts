@@ -14,7 +14,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Basic constant mismatch",
+  name: "Basic constant fail",
   fn() {
     testTypecheck(
       `const x: number = 'foo'`,
@@ -124,17 +124,27 @@ Deno.test({
   name: "Basic function return",
   fn() {
     testTypecheck(
-      `func fn(_: string): string => 'foo'`,
+      `func fn(a: string): string => 'foo'`,
       false,
     );
   },
 });
 
 Deno.test({
-  name: "Basic function return mismatch",
+  name: "Basic function return fail",
   fn() {
     testTypecheck(
       `func fn(): number => 'foo'`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Basic function fail 2",
+  fn() {
+    testTypecheck(
+      `func fn(a: string, a: string) => 'foo'`,
       true,
     );
   },
@@ -153,7 +163,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Basic function return inference mismatch",
+  name: "Basic function return inference fail",
   fn() {
     testTypecheck(
       `
@@ -165,7 +175,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Object literal with spread success",
+  name: "Object literal with spread pass",
   fn() {
     testTypecheck(
       `
@@ -177,7 +187,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Object literal with spread mismatch",
+  name: "Object literal with spread fail",
   fn() {
     testTypecheck(
       `
@@ -189,7 +199,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Array literal with spread success 1",
+  name: "Array literal with spread pass 1",
   fn() {
     testTypecheck(
       `
@@ -201,7 +211,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Array literal with spread success 2",
+  name: "Array literal with spread pass 2",
   fn() {
     testTypecheck(
       `
@@ -225,7 +235,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Array literal with spread mismatch 1",
+  name: "Array literal with spread fail 1",
   fn() {
     testTypecheck(
       `
@@ -237,7 +247,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Array literal with spread mismatch 1",
+  name: "Array literal with spread fail 1",
   fn() {
     testTypecheck(
       `
@@ -271,7 +281,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Object type mismatch",
+  name: "Object type fail",
   fn() {
     testTypecheck(
       `type MyObj = {
@@ -317,7 +327,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Basic explicit generic mismatch argument",
+  name: "Basic explicit generic fail argument",
   fn() {
     testTypecheck(
       `
@@ -341,7 +351,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Basic explicit generic with outside extends mismatch",
+  name: "Basic explicit generic with outside extends fail",
   fn() {
     testTypecheck(
       `
@@ -353,7 +363,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Basic explicit generic with inside extends mismatch",
+  name: "Basic explicit generic with inside extends fail",
   fn() {
     testTypecheck(
       `
@@ -365,7 +375,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Basic explicit generic mismatch return",
+  name: "Basic explicit generic fail return",
   fn() {
     testTypecheck(
       `
@@ -402,7 +412,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Nested generic calls mismatch",
+  name: "Nested generic calls fail",
   fn() {
     testTypecheck(
       `
@@ -428,7 +438,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Nested generic calls with return inference mismatch",
+  name: "Nested generic calls with return inference fail",
   fn() {
     testTypecheck(
       `
@@ -466,7 +476,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Basic generic param inference mismatch",
+  name: "Basic generic param inference fail",
   fn() {
     testTypecheck(
       `
@@ -490,7 +500,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Union generic param inference mismatch",
+  name: "Union generic param inference fail",
   fn() {
     testTypecheck(
       `
@@ -514,7 +524,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Complex generic mismatch",
+  name: "Complex generic fail",
   fn() {
     testTypecheck(
       `
@@ -538,7 +548,7 @@ Deno.test({
 // })
 
 Deno.test({
-  name: "Union generic param inference mismatch",
+  name: "Union generic param inference fail",
   fn() {
     testTypecheck(
       `
@@ -709,7 +719,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Chained type refinement success",
+  name: "Chained type refinement pass",
   fn() {
     testTypecheck(
       `
@@ -766,7 +776,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Property access success",
+  name: "Property access pass",
   fn() {
     testTypecheck(`
       const obj = {
@@ -783,7 +793,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Property access failure",
+  name: "Property access fail",
   fn() {
     testTypecheck(`
       const obj = {
@@ -800,7 +810,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Property access named type success",
+  name: "Property access named type pass",
   fn() {
     testTypecheck(`
       type Obj = {
@@ -818,7 +828,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Destructure success",
+  name: "Destructure pass",
   fn() {
     testTypecheck(`
       type Obj = {
@@ -837,7 +847,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Destructure failure",
+  name: "Destructure fail",
   fn() {
     testTypecheck(`
       type Obj = {
@@ -856,7 +866,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Optional chain success",
+  name: "Optional chain pass",
   fn() {
     testTypecheck(
       `
@@ -874,7 +884,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Optional chain failure",
+  name: "Optional chain fail",
   fn() {
     testTypecheck(
       `
@@ -968,7 +978,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Negation mismatch",
+  name: "Negation fail",
   fn() {
     testTypecheck(`
     const a: number = 12
@@ -990,7 +1000,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "As-casting success",
+  name: "As-casting pass",
   fn() {
     testTypecheck(`
     func foo(val: number): number|string => val as number|string`,
@@ -999,7 +1009,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "As-casting failure",
+  name: "As-casting fail",
   fn() {
     testTypecheck(`
     func foo(val: number|string): number => val as number`,
@@ -1116,7 +1126,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Parentehsized type success",
+  name: "Parentehsized type pass",
   fn() {
     testTypecheck(`
     const foo: (string|number)[] = ['foo', 12, 14, 'bar']`,
@@ -1125,7 +1135,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Parentehsized type failure",
+  name: "Parentehsized type fail",
   fn() {
     testTypecheck(`
     const foo: (string|number)[] = ['foo', 12, true, 'bar']`,
@@ -1143,7 +1153,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Nullish-coalescing mismatch",
+  name: "Nullish-coalescing fail",
   fn() {
     testTypecheck(`
     func foo(a: string?, b: string?): string => a ?? b ?? 12`,
@@ -1162,7 +1172,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Function method call mismatch",
+  name: "Function method call fail",
   fn() {
     testTypecheck(`
     func foo(s: string) => s.length
@@ -1207,6 +1217,141 @@ Deno.test({
     func bar(s: T) => 12
     const a: number = t.bar()`,
     false)
+  }
+})
+
+Deno.test({
+  name: "Proc declaration with statements pass",
+  fn() {
+    testTypecheck(`
+    proc log(val: unknown) { }
+
+    proc doStuff(items: Iterator<{ foo: boolean }>) {
+      let count = 0;
+
+      for item of items {
+          if item.foo {
+              count = count + 1;
+          }
+
+          if count > 12 {
+              log(items);
+          } else if count != 10 {
+              log('not 10!');
+          } else {
+              log(nil);
+          }
+      }
+
+      log(count);
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Proc declaration with statements fail 1",
+  fn() {
+    testTypecheck(`
+    proc log(val: unknown) { }
+
+    proc doStuff(items: Iterator<{ foo: boolean }>) {
+      let count: string = 0;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Proc declaration with statements fail 2",
+  fn() {
+    testTypecheck(`
+    proc log(val: unknown) { }
+
+    proc doStuff(items: Iterator<{ foo: boolean }>) {
+      const count = 0;
+
+      for item of items {
+        count = count + 1;
+      }
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Proc declaration with statements fail 3",
+  fn() {
+    testTypecheck(`
+    proc doStuff(items: Iterator<{ foo: boolean }>) {
+      const count = count;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Destructuring statement pass",
+  fn() {
+    testTypecheck(`
+    proc doStuff(stuff: { foo: boolean }) {
+      const { foo } = stuff;
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Destructuring statement fail 1",
+  fn() {
+    testTypecheck(`
+    proc doStuff(stuff: { foo: boolean }) {
+      const { foo } = foo;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Destructuring statement fail 2",
+  fn() {
+    testTypecheck(`
+    proc doStuff(stuff: { foo: boolean }) {
+      const { bar } = stuff;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Destructuring statement fail 3",
+  fn() {
+    testTypecheck(`
+    proc doStuff(stuff: { foo: boolean }) {
+      const { foo } = stuff;
+      foo = true;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Derive declaration pass",
+  fn() {
+    testTypecheck(`
+    let bar = 12
+    derive foo: number () => 12 * 2`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Derive declaration fail",
+  fn() {
+    testTypecheck(`
+    let bar = 12
+    derive foo: string () => 12 * 2`,
+    true)
   }
 })
 
