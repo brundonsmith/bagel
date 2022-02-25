@@ -79,7 +79,7 @@ export function isError(x: unknown): x is BagelError {
 }
 
 export function errorsEquivalent(a: BagelError, b: BagelError): boolean {
-    return deepEquals(a, b, SOURCE_INFO_PROPERTIES)
+    return deepEquals(a, b, ["parent"])
 }
 
 export function errorMessage(error: BagelError): string {
@@ -91,7 +91,7 @@ export function errorMessage(error: BagelError): string {
         case "bagel-cannot-find-name-error":
             return `Cannot find name "${error.name}"`;
         case "bagel-already-declared-error":
-            return `Identifier "${error.ast.name}" has already been declared in this scope`;
+            return `Identifier "${error.ast.name}" declared multiple times in this scope`;
         case "bagel-misc-type-error":
             return error.message;
         case "bagel-cannot-find-module-error":
