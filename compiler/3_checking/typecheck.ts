@@ -736,8 +736,9 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
         }
     } else if (resolvedDestination.kind === "tuple-type") {
         if (resolvedValue.kind === 'tuple-type') {
-            return resolvedValue.members.every((member, index) =>
-                subsumes(reportError, resolvedDestination.members[index], member))
+            return resolvedValue.members.length === resolvedDestination.members.length
+                && resolvedValue.members.every((member, index) =>
+                    subsumes(reportError, resolvedDestination.members[index], member))
         }
     } else if (resolvedDestination.kind === "record-type") {
         if (resolvedValue.kind === "record-type") {
