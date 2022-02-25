@@ -1,4 +1,4 @@
-import { alreadyDeclared, cannotFindExport, cannotFindModule, cannotFindName, miscError } from "../errors.ts";
+import { alreadyDeclared, cannotFindExport, cannotFindModule, miscError } from "../errors.ts";
 import { computedFn } from "../mobx.ts";
 import Store, { getModuleByName } from "../store.ts";
 import { areSame } from "../utils/ast.ts";
@@ -19,7 +19,6 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
 
     // if we've reached the root of the AST, there's no binding
     if (parent == null) {
-        reportError(cannotFindName(originator, name))
         return undefined;
     }
 
@@ -27,19 +26,16 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
 
     switch (parent.kind) {
         case "module": {
+            const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
             for (let declarationIndex = 0; declarationIndex < parent.declarations.length; declarationIndex++) {
                 const declaration = parent.declarations[declarationIndex]
 
                 switch (declaration.kind) {
                     case "type-declaration": {
                         if (declaration.name.name === name) {
-                            if (resolved) {
-                                reportError(alreadyDeclared(declaration.name))
-                            }
-    
                             resolved = {
-                                kind: 'type-binding',
-                                type: declaration.type,
+                                identifier: declaration.name,
+                                owner: declaration,
                             }
                         }
                     } break;
@@ -48,12 +44,8 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                     case "value-declaration":
                     case "derive-declaration":
                     case "remote-declaration": {
-                        if (declaration.name.name === name) {
-                            if (resolved) {
-                                reportError(alreadyDeclared(declaration.name))
-                            }
-    
-                            if (declaration.kind === 'value-declaration') { 
+                        if (declaration.name.name === name && (declaration.kind !== 'value-declaration' || declarationIndex < comingFromIndex)) {
+                            if (declaration.kind === 'value-declaration') {
 
                                 // detect value being referenced before it's available
                                 const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
@@ -84,7 +76,6 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                             }
     
                             resolved = {
-                                kind: "value-binding",
                                 owner: declaration,
                                 identifier: declaration.name
                             }
@@ -92,12 +83,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                     } break;
                     case "import-all-declaration": {
                         if (declaration.alias.name === name) {
-                            if (resolved) {
-                                reportError(alreadyDeclared(declaration.alias))
-                            }
-
                             resolved = {
-                                kind: "value-binding",
                                 owner: declaration,
                                 identifier: declaration.alias
                             }
@@ -109,10 +95,6 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
 
                             // found the matching import
                             if (nameAst.name === name) {
-                                if (resolved) {
-                                    reportError(alreadyDeclared(nameAst))
-                                }
-
                                 const otherModule = getModuleByName(Store, declaration.module as ModuleName, declaration.path.value)
 
                                 if (otherModule == null) {
@@ -132,14 +114,13 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                                     } else {
                                         if (imported.kind === 'type-declaration') {
                                             resolved = {
-                                                kind: 'type-binding',
-                                                type: imported.type
+                                                identifier: nameAst,
+                                                owner: imported
                                             }
                                         } else {
                                             resolved = {
-                                                kind: "value-binding",
+                                                identifier: nameAst,
                                                 owner: imported,
-                                                identifier: imported.name
                                             }
                                         }
                                     }
@@ -153,13 +134,9 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
         case "generic-type": {
             for (const typeParam of parent.typeParams) {
                 if (typeParam.name.name === name) {
-                    if (resolved) {
-                        reportError(alreadyDeclared(typeParam.name))
-                    }
-                    
                     resolved = {
-                        kind: 'type-binding',
-                        type: {
+                        identifier: typeParam.name,
+                        owner: {
                             kind: "generic-param-type",
                             name: typeParam.name,
                             extends: typeParam.extends,
@@ -181,13 +158,9 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
             if (parent.type.kind === 'generic-type') {
                 for (const typeParam of parent.type.typeParams) {
                     if (typeParam.name.name === name) {
-                        if (resolved) {
-                            reportError(alreadyDeclared(typeParam.name))
-                        }
-
                         resolved = {
-                            kind: 'type-binding',
-                            type: {
+                            identifier: typeParam.name,
+                            owner: {
                                 kind: "generic-param-type",
                                 name: typeParam.name,
                                 extends: typeParam.extends,
@@ -209,12 +182,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                 const arg = funcOrProcType.args[i]
 
                 if (arg.name.name === name) {
-                    if (resolved) {
-                        reportError(alreadyDeclared(arg.name))
-                    }
-
                     resolved = {
-                        kind: "value-binding",
                         owner: parent,
                         identifier: arg.name
                     }
@@ -228,20 +196,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                 if (statement.kind === "value-declaration-statement" || statement.kind === 'destructuring-declaration-statement' || statement.kind === 'await-statement') {
                     if (statement.kind !== 'destructuring-declaration-statement') {
                         if (statement.name?.name === name) {
-                            if (resolved) {
-                                reportError(alreadyDeclared(statement.name))
-                            }
-                            
-                            // detect variable or const being referenced before it's available
-                            const comingFromIndex = parent.statements.findIndex(other => areSame(other, from))
-                            if (comingFromIndex < statementIndex) {
-                                reportError(miscError(originator, `Can't reference "${name}" before initialization`))
-                            } else if (comingFromIndex === statementIndex) {
-                                reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
-                            }
-
                             resolved = {
-                                kind: "value-binding",
                                 owner: statement,
                                 identifier: statement.name
                             }
@@ -249,19 +204,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                     } else {
                         for (const property of statement.properties) {
                             if (property.name === name) {
-                                if (resolved) {
-                                    reportError(alreadyDeclared(property))
-                                }
-
-                                const comingFromIndex = parent.statements.findIndex(other => areSame(other, from))
-                                if (comingFromIndex < statementIndex) {
-                                    reportError(miscError(originator, `Can't reference "${name}" before initialization`))
-                                } else if (comingFromIndex === statementIndex) {
-                                    reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
-                                }
-        
                                 resolved = {
-                                    kind: "value-binding",
                                     owner: statement,
                                     identifier: property
                                 }
@@ -274,7 +217,6 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
         case "for-loop": {
             if (parent.itemIdentifier.name === name) {
                 resolved = {
-                    kind: "value-binding",
                     owner: parent,
                     identifier: parent.itemIdentifier
                 }
@@ -301,7 +243,6 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                         }
 
                         resolved = {
-                            kind: "value-binding",
                             owner: declaration,
                             identifier: declaration.name
                         }
@@ -324,7 +265,6 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                             }
     
                             resolved = {
-                                kind: "value-binding",
                                 owner: declaration,
                                 identifier: property
                             }

@@ -1237,7 +1237,7 @@ const _funcHeader: ParseFunction<FuncType|GenericFuncType> = (module, code, star
     }))))))
 
 
-const _typeParams: ParseFunction<{ name: PlainIdentifier, extends: TypeExpression | undefined }[]> = (module, code, index) =>
+const _typeParams: ParseFunction<TypeParam[]> = (module, code, index) =>
     given(consume(code, index, "<"), index =>
     given(consumeWhitespace(code, index), index =>
     expec(parseSeries(module, code, index, _typeParam, ','), err(code, index, "Type parameters"), ({ parsed: typeParams, index }) =>

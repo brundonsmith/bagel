@@ -11,6 +11,24 @@ export function areSame(a: AST|undefined, b: AST|undefined) {
         a?.endIndex === b?.endIndex && a?.endIndex != null
 }
 
+export function within(a: AST|undefined, ancestor: AST|undefined) {
+    if (a) {
+        for (const node of ancestors(a)) {
+            if (areSame(node, ancestor)) {
+                return true
+            }
+        }
+    }
+
+    return false
+}
+
+export function* ancestors(a: AST) {
+    for (let node: AST|undefined = a; node != null; node = node.parent) {
+        yield node;
+    }
+}
+
 export function moreSpecificThan(a: Partial<SourceInfo>, b: Partial<SourceInfo>): boolean {
     const missingInA = a.code == null
     const missingInB = b.code == null

@@ -237,6 +237,7 @@ function isAlways(condition: Expression): boolean|undefined {
 }
 
 // optional lint against all non-boolean conditionals?
+// lint about declarations that can be hoisted because they don't reference anything in the inner scope
 
 type RuleName = keyof typeof RULES
 

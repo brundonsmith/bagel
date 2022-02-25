@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-fallthrough
 import { AwaitStatement, DestructuringDeclarationStatement, ForLoop, ValueDeclarationStatement } from "./statements.ts";
-import { TypeExpression } from "./type-expressions.ts";
-import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration } from "./declarations.ts";
+import { GenericParamType, TypeExpression, TypeParam } from "./type-expressions.ts";
+import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, TypeDeclaration } from "./declarations.ts";
 import { Expression, Func, InlineConstDeclaration, InlineDestructuringDeclaration, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
@@ -12,9 +12,8 @@ export type ModuleName = NominalType<string, typeof MODULE_NAME>
 
 export type ReportError = (error: BagelError) => void
 
-export type Binding = ValueBinding|TypeBinding
-export type ValueBinding = {
-    readonly kind: 'value-binding',
+export type Binding = {
+    readonly identifier: PlainIdentifier
     readonly owner:
         | ValueDeclaration
         | ProcDeclaration
@@ -30,15 +29,11 @@ export type ValueBinding = {
         | ImportAllDeclaration
         | InlineDestructuringDeclaration
         | DestructuringDeclarationStatement
-    readonly identifier: PlainIdentifier
+        | TypeDeclaration
+        | GenericParamType
 }
 
-export type TypeBinding = {
-    readonly kind: 'type-binding',
-    readonly type: TypeExpression,
-}
-
-export function getBindingMutability(binding: ValueBinding, from: AST): "immutable"|"readonly"|"mutable"|"assignable" {
+export function getBindingMutability(binding: Binding, from: AST): "immutable"|"readonly"|"mutable"|"assignable" {
     switch (binding.owner.kind) {
         case 'value-declaration':
             return binding.owner.isConst || (binding.owner.exported === 'expose' && binding.owner.module !== from.module)
@@ -59,6 +54,9 @@ export function getBindingMutability(binding: ValueBinding, from: AST): "immutab
             return 'immutable'
         case 'value-declaration-statement':
             return !binding.owner.isConst ? 'assignable' : 'immutable'
+        case 'type-declaration':
+        case 'generic-param-type':
+            return 'immutable'
         default:
             // @ts-expect-error
             throw Error('Unreachable!' + binding.ast.kind)

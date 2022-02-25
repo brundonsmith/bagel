@@ -1,10 +1,10 @@
-import { Module } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE, TRUTHINESS_SAFE_TYPES } from "../_model/type-expressions.ts";
+import { Block, Module, PlainIdentifier } from "../_model/ast.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
-import { assignmentError,BagelError,miscError } from "../errors.ts";
+import { alreadyDeclared, assignmentError,BagelError,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
-import { iterateParseTree, typesEqual } from "../utils/ast.ts";
+import { ancestors, iterateParseTree, typesEqual, within } from "../utils/ast.ts";
 import { _Store } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ExactStringLiteral, Expression } from "../_model/expressions.ts";
@@ -12,6 +12,8 @@ import { stripSourceInfo } from "../utils/debugging.ts";
 import { computedFn } from "../mobx.ts";
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "./resolve.ts";
+import { ValueDeclaration } from "../_model/declarations.ts";
+import { ValueDeclarationStatement } from "../_model/statements.ts";
 
 
 export const typeerrors = computedFn((store: _Store, moduleName: ModuleName): BagelError[] => {
@@ -39,31 +41,95 @@ export function typecheck(reportError: ReportError, ast: Module): void {
     for (const { current, parent } of iterateParseTree(ast)) {
             
         switch(current.kind) {
-            // check all imports and declarations to make sure they aren't 
-            // re-defining anything, even if they don't get used right now
-            case "import-all-declaration": {
-                const declarations = (current.parent as Module).declarations
-                resolve(reportError, current.alias.name, declarations[declarations.length - 1])
-            } break;
-            case "import-declaration": {
-                const declarations = (current.parent as Module).declarations
-                for (const { name, alias } of current.imports) {
-                    resolve(reportError, alias?.name ?? name.name, declarations[declarations.length - 1])
+            case "module": {
+                const seen = new Map<string, PlainIdentifier>()
+                const duplicates = new Set<PlainIdentifier>()
+
+                for (const decl of current.declarations) {
+                    const names = (() => {
+                        switch(decl.kind) {
+                            case "import-declaration":
+                                return decl.imports.map(i => i.alias ?? i.name)
+                            case "import-all-declaration":
+                                return [decl.alias]
+                            case "type-declaration":
+                            case "proc-declaration":
+                            case "func-declaration":
+                            case "value-declaration":
+                            case "derive-declaration":
+                            case "remote-declaration":
+                                return [decl.name]
+                            case "autorun-declaration":
+                            case "test-expr-declaration":
+                            case "test-block-declaration":
+                            case "debug":
+                            case "javascript-escape":
+                                return []
+                            default:
+                                // @ts-expect-error
+                                throw Error(decl.kind)
+                        }
+                    })()
+
+                    for (const name of names) {
+                        const existing = seen.get(name.name)
+                        if (existing) {
+                            duplicates.add(existing)
+                            duplicates.add(name)
+                        } else {
+                            seen.set(name.name, name)
+                        }
+                    }
+                }
+
+                for (const duplicate of duplicates) {
+                    reportError(alreadyDeclared(duplicate))
                 }
             } break;
-            case "proc-declaration":
-            case "func-declaration":
-            case "type-declaration": {
-                const declarations = (current.parent as Module).declarations
-                resolve(reportError, current.name.name, declarations[declarations.length - 1])
+            case "block": {
+                const seen = new Map<string, PlainIdentifier>()
+                const duplicates = new Set<PlainIdentifier>()
+
+                for (const stmt of current.statements) {
+                    const names = (() => {
+                        switch(stmt.kind) {
+                            case "value-declaration-statement":
+                                return [stmt.name]
+                            case "destructuring-declaration-statement":
+                                return stmt.properties
+                            case "await-statement":
+                                return stmt.name ? [stmt.name] : []
+                            case "invocation":
+                            case "if-else-statement":
+                            case "for-loop":
+                            case "while-loop":
+                            case "assignment":
+                            case "javascript-escape":
+                                return []
+                            default:
+                                // @ts-expect-error
+                                throw Error(stmt.kind)
+                        }
+                    })()
+
+                    for (const name of names) {
+                        const existing = seen.get(name.name)
+                        if (existing) {
+                            duplicates.add(existing)
+                            duplicates.add(name)
+                        } else {
+                            seen.set(name.name, name)
+                        }
+                    }
+                }
+
+                for (const duplicate of duplicates) {
+                    reportError(alreadyDeclared(duplicate))
+                }
             } break;
             case "value-declaration":
             case "value-declaration-statement":
             case "inline-const-declaration": {
-                if (current.kind === "value-declaration") {
-                    const declarations = (current.parent as Module).declarations
-                    resolve(reportError, current.name.name, declarations[declarations.length - 1])
-                }
 
                 if (current.kind === 'inline-const-declaration' && current.awaited) {
                     const valueType = resolveT(infer(current.value))
@@ -194,6 +260,25 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 const funcOrProcType = inferred.kind === 'generic-type' ? inferred.inner : inferred
 
                 {
+                    const seen = new Map<string, PlainIdentifier>()
+                    const duplicates = new Set<PlainIdentifier>()
+    
+                    for (const { name } of funcOrProcType.args) {
+                        const existing = seen.get(name.name)
+                        if (existing) {
+                            duplicates.add(existing)
+                            duplicates.add(name)
+                        } else {
+                            seen.set(name.name, name)
+                        }
+                    }
+
+                    for (const duplicate of duplicates) {
+                        reportError(alreadyDeclared(duplicate))
+                    }
+                }
+
+                {
                     let encounteredOptional = false;
 
                     for (const arg of funcOrProcType.args) {
@@ -237,8 +322,8 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 // invocation, but needs to be treated differently
                 if (current.subject.kind === "local-identifier") {
                     const binding = resolve(() => {}, current.subject.name, current.subject)
-                    if (binding?.kind === 'type-binding') {
-                        const resolvedType = resolveT(binding.type)
+                    if (binding?.owner.kind === 'type-declaration') {
+                        const resolvedType = resolveT(binding.owner.type)
     
                         if (resolvedType.kind === "nominal-type") {
                             expect(reportError, resolvedType.inner, current.args[0])
@@ -357,18 +442,57 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     reportError(miscError(current, `Casting here is redundant, because ${format(current.inner)} is already of type ${format(current.type)}`))
                 }
             } break;
-            case "named-type":
-                resolve(reportError, current.name.name, current)
-                break;
+            case "named-type": {
+                // make sure we err if identifier can't be resolved, even if it isn't used
+                const binding = resolve(reportError, current.name.name, current)
+
+                if (!binding) {
+                    reportError(cannotFindName(current, current.name.name))
+                }
+            } break;
             case "local-identifier": {
                 // make sure we err if identifier can't be resolved, even if it isn't used
-                resolve(reportError, current.name, current)
+                const binding = resolve(reportError, current.name, current)
+
+                if (binding) {
+                    if (binding.owner.kind === 'value-declaration') {
+                        if (within(current, binding.owner.value)) {
+                            reportError(miscError(current, `Can't reference "${current.name}" in its own initialization`))
+                        } else {
+                            const decl = [...ancestors(current)].find(a => a.kind === 'value-declaration') as ValueDeclaration|undefined
+
+                            if (decl) {
+                                const mod = binding.owner.parent as Module
+
+                                if (mod.declarations.indexOf(binding.owner) > mod.declarations.indexOf(decl)) {
+                                    reportError(miscError(current, `Can't reference "${current.name}" before initialization`))
+                                }
+                            }
+                        }
+                    } else if (binding.owner.kind === 'value-declaration-statement') {
+                        if (within(current, binding.owner.value)) {
+                            reportError(miscError(current, `Can't reference "${current.name}" in its own initialization`))
+                        } else {
+                            const decl = [...ancestors(current)].find(a => a.kind === 'value-declaration-statement') as ValueDeclarationStatement|undefined
+
+                            if (decl) {
+                                const mod = binding.owner.parent as Block
+
+                                if (mod.statements.indexOf(binding.owner) > mod.statements.indexOf(decl)) {
+                                    reportError(miscError(current, `Can't reference "${current.name}" before initialization`))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    reportError(cannotFindName(current, current.name))
+                }
             } break;
             case "assignment": {
 
                 // if assigning directly to variable, make sure it isn't a constant
                 const resolved = current.target.kind === "local-identifier" ? resolve(reportError, current.target.name, current.target) : undefined
-                if (current.target.kind === "local-identifier" && resolved != null && resolved.kind !== 'type-binding' && getBindingMutability(resolved, current.target) !== "assignable") {
+                if (current.target.kind === "local-identifier" && resolved != null && getBindingMutability(resolved, current.target) !== "assignable") {
                     reportError(miscError(current.target, `Cannot assign to '${current.target.name}' because it's constant`));
                 }
 
@@ -439,17 +563,33 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     reportError(miscError(current, `This check will always be true, because ${format(current.expr)} will always be a ${format(current.type)}`))
                 }
             } break;
+            case "generic-type": {
+                const seen = new Map<string, PlainIdentifier>()
+                const duplicates = new Set<PlainIdentifier>()
+
+                for (const { name } of current.typeParams) {
+                    const existing = seen.get(name.name)
+                    if (existing) {
+                        duplicates.add(existing)
+                        duplicates.add(name)
+                    } else {
+                        seen.set(name.name, name)
+                    }
+                }
+
+                for (const duplicate of duplicates) {
+                    reportError(alreadyDeclared(duplicate))
+                }
+            } break;
             case "if-else-expression":
             case "if-else-statement":
             case "while-loop":
             case "negation-operator":
-            case "module":
             case "import-item":
             case "js-proc":
             case "js-func":
             case "test-block-declaration":
             case "inline-const-group":
-            case "block":
             case "attribute":
             case "case":
             case "switch-case":
@@ -469,7 +609,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "union-type":
             case "maybe-type":
             case "generic-param-type":
-            case "generic-type":
             case "bound-generic-type":
             case "element-type":
             case "record-type":
@@ -492,6 +631,11 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "javascript-escape-type":
             case "error-type":
             case "error-expression":
+            case "import-declaration":
+            case "import-all-declaration":
+            case "type-declaration":
+            case "proc-declaration":
+            case "func-declaration":
                 break;
             default:
                 // @ts-expect-error
@@ -649,12 +793,19 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
         case "named-type": {
             const binding = resolve(reportError, type.name.name, type.name)
 
-            if (binding?.kind !== 'type-binding') {
+            if (binding) {
+                if (binding.owner.kind === 'type-declaration') {
+                    return resolveT(binding.owner.type)
+                }
+    
+                if (binding.owner.kind === 'generic-param-type') {
+                    return resolveT(binding.owner)
+                }
+
                 reportError(miscError(type, `${type.name.name} is not a type`))
-                return UNKNOWN_TYPE
             }
 
-            return resolveT(binding.type)
+            return UNKNOWN_TYPE
         }
         case "generic-param-type":
             return resolveT(type.extends ?? UNKNOWN_TYPE)

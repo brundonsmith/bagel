@@ -630,6 +630,35 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Duplicate declaration name 1",
+  fn() {
+    testTypecheck(
+      `
+      proc foo() {
+      }
+      
+      const foo = 12`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Duplicate declaration name 2",
+  fn() {
+    testMultiModuleTypecheck({
+        a: `export const a = 12`,
+        b: `
+        from 'a' import { a }
+        
+        func a() => nil`
+      },
+      true,
+    );
+  },
+});
+
+Deno.test({
   name: "Basic type refinement",
   fn() {
     testTypecheck(
@@ -674,6 +703,18 @@ Deno.test({
       `
       func foo(x: { bar: number|nil }): number|nil =>
         x.bar - 12`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Chained type refinement success",
+  fn() {
+    testTypecheck(
+      `
+      func foo(x: { bar: number|nil }): number|nil =>
+        x.bar && x.bar + `,
       true,
     );
   },

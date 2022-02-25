@@ -158,7 +158,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             if (ast.target.kind === 'local-identifier') {
                 const binding = resolve(() => {}, ast.target.name, ast.target)
 
-                if (binding && binding.kind === 'value-binding' && binding.owner.kind === 'value-declaration' && !binding.owner.isConst) {
+                if (binding?.owner.kind === 'value-declaration' && !binding.owner.isConst) {
                     return `${ast.target.name}.value = ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
                 } else {
                     return `${ast.target.name} = ${value}`
@@ -256,9 +256,9 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "local-identifier": {
             const binding = resolve(() => {}, ast.name, ast)
 
-            if (binding && binding.kind === 'value-binding' && binding.owner.kind === 'value-declaration' && !binding.owner.isConst) {
+            if (binding?.owner.kind === 'value-declaration' && !binding.owner.isConst) {
                 return `${INT}observe(${ast.name}, 'value')`
-            } else if (binding && binding.kind === 'value-binding' && binding.owner.kind === 'derive-declaration') {
+            } else if (binding?.owner.kind === 'derive-declaration') {
                 return `${ast.name}()`
             } else {
                 return ast.name
@@ -271,7 +271,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             if (ast.subject.kind === 'local-identifier') {
                 const binding = resolve(() => {}, ast.subject.name, ast)
 
-                if (binding?.kind === 'value-binding' && binding.owner.kind === 'import-all-declaration') {
+                if (binding?.owner.kind === 'import-all-declaration') {
                     const module = getModuleByName(Store, binding.owner.module as ModuleName, binding.owner.path.value)
                     
                     if (module?.declarations.find(decl =>

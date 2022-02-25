@@ -155,8 +155,8 @@ const inferTypeInner = computedFn((
             // invocation, but needs to be treated differently
             if (ast.subject.kind === "local-identifier") {
                 const binding = resolve(() => {}, ast.subject.name, ast.subject)
-                if (binding?.kind === 'type-binding') {
-                    const resolvedType = resolveT(binding.type)
+                if (binding?.owner.kind === 'type-declaration') {
+                    const resolvedType = resolveT(binding.owner.type)
 
                     if (resolvedType.kind === "nominal-type") {
                         return resolvedType
@@ -327,7 +327,7 @@ const inferTypeInner = computedFn((
         case "local-identifier": {
             const binding = resolve(reportError, ast.name, ast)
 
-            if (binding?.kind === 'value-binding') {
+            if (binding) {
                 const decl = binding.owner
 
                 switch (decl.kind) {
@@ -529,6 +529,9 @@ const inferTypeInner = computedFn((
                             }
                         }
                     }
+                    case 'type-declaration':
+                    case 'generic-param-type':
+                        return UNKNOWN_TYPE
                     default:
                         // @ts-expect-error
                         throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
@@ -771,8 +774,8 @@ export function parameterizedGenericType(reportError: ReportError, generic: Gene
         if (ast.kind === 'named-type') {
             const resolved = resolve(reportError, ast.name.name, ast)
 
-            if (resolved?.kind === 'type-binding' && resolved.type.kind === 'generic-param-type' && bindings[resolved.type.name.name]) {
-                return bindings[resolved.type.name.name]
+            if (resolved?.owner.kind === 'generic-param-type' && bindings[resolved.owner.name.name]) {
+                return bindings[resolved.owner.name.name]
             }
         }
 
@@ -1020,8 +1023,11 @@ export const propertiesOf = computedFn((
             for (const spread of resolvedType.spreads) {
                 const resolved = resolve(reportError, spread.name.name, spread)
 
-                if (resolved != null && resolved.kind === 'type-binding' && resolved.type.kind === 'object-type') {
-                    attrs.push(...(propertiesOf(reportError, resolved.type) ?? []))
+                if (resolved != null && (resolved.owner.kind === 'type-declaration' || resolved.owner.kind === 'generic-param-type')) {
+                    const type = resolved.owner.kind === 'type-declaration' ? resolved.owner.type : resolved.owner
+                    if (type.kind === 'object-type') {
+                        attrs.push(...(propertiesOf(reportError, type) ?? []))
+                    }
                 }
             }
 
@@ -1095,7 +1101,7 @@ function fitTemplate(
     function isGenericParam(type: TypeExpression): type is NamedType {
         if (type.kind === 'named-type') {
             const binding = resolve(reportError, type.name.name, type)
-            return binding?.kind === 'type-binding' && binding.type.kind === 'generic-param-type'
+            return binding?.owner.kind === 'generic-param-type'
         }
 
         return false
