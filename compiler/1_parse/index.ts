@@ -514,7 +514,9 @@ const procType: ParseFunction<ProcType|GenericProcType> = (module, code, startIn
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ")"), index =>
     given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, "{}"), index => {
+    given(consume(code, index, "{"), index =>
+    given(consumeWhitespace(code, index), index =>
+    given(consume(code, index, "}"), index => {
         const procType: ProcType = {
             kind: "proc-type",
             args,
@@ -544,7 +546,7 @@ const procType: ParseFunction<ProcType|GenericProcType> = (module, code, startIn
             ),
             index
         }
-    }))))))))
+    }))))))))))
 
 const _typeParam: ParseFunction<TypeParam> = (module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
