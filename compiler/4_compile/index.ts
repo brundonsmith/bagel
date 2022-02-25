@@ -353,6 +353,9 @@ function compileRuntimeType(type: TypeExpression): string {
         )}] }`;
         case 'nominal-type': return `{ kind: ${INT}RT_NOMINAL, nominal: ${type.name.description}.sym }`
         case 'error-type': return `{ kind: ${INT}RT_ERROR, inner: ${compileRuntimeType(type.inner)} }`
+        case 'iterator-type': return `{ kind: ${INT}RT_ITERATOR, inner: ${compileRuntimeType(type.inner)} }`
+        case 'plan-type': return `{ kind: ${INT}RT_PLAN, inner: ${compileRuntimeType(type.inner)} }`
+        case 'remote-type': return `{ kind: ${INT}RT_REMOTE, inner: ${compileRuntimeType(type.inner)} }`
         case 'union-type': return `[ ${type.members.map(compileRuntimeType).join(', ')} ]`;
     }
 
