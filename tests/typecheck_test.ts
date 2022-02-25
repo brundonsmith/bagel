@@ -1488,6 +1488,58 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Func type pass",
+  fn() {
+    testTypecheck(`
+    type Foo = (a: number, b: string) => number
+    const a: Foo = (a: number, b: string) => a
+    const b: Foo = (a: number) => a`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Func type fail 1",
+  fn() {
+    testTypecheck(`
+    type Foo = (a: number, b: string) => number
+    const a: Foo = (a: number, b: string) => b`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Func type fail 2",
+  fn() {
+    testTypecheck(`
+    type Foo = (a: number, b: string) => number
+    const a: Foo = (a: number, b: string, c: boolean) => a`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Proc type pass",
+  fn() {
+    testTypecheck(`
+    type Foo = (a: number, b: string) { }
+    const a: Foo = (a: number, b: string) { }
+    const b: Foo = (a: number) { }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Proc type fail 1",
+  fn() {
+    testTypecheck(`
+    type Foo = (a: number, b: string) { }
+    const a: Foo = (a: number, b: string, c: boolean) { }`,
+    true)
+  }
+})
+
 
 // TODO: Reactions
 // TODO: if/else/switch
@@ -1506,7 +1558,7 @@ function testTypecheck(code: string, shouldFail: boolean): void {
   const parseResult = parsed(Store, moduleName)
 
   if (parseResult) {
-    const errors = allProblems(Store).get(moduleName)
+    const errors = allProblems(Store).get(moduleName)?.filter(e => e.kind !== 'lint-problem' || e.severity === 'error')
 
     if (!errors) throw Error('Bwahhhh!')
   
@@ -1532,7 +1584,7 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
     watch: undefined
   })
   
-  const errors = [...allProblems(Store).values()].flat()
+  const errors = [...allProblems(Store).values()].flat()?.filter(e => e.kind !== 'lint-problem' || e.severity === 'error')
 
   if (!shouldFail && errors.length > 0) {
     throw `Type check should have succeeded but failed with errors\n\n` +

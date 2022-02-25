@@ -524,6 +524,24 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "While loop",
+  fn() {
+    testCompile(`
+    proc foo() {
+      while true {
+        log('stuff');
+      }
+    }`,
+    `
+    const foo = (): void => { 
+      while (true) { 
+        log("stuff");
+      };
+    };`)
+  }
+})
+
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>' as ModuleName
 
