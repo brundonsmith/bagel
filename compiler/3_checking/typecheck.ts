@@ -189,10 +189,23 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 if (current.destructureKind === 'object') {
                     if (valueType.kind !== 'object-type') {
                         reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${format(valueType)}'`))
+                    } else {
+                        const objectProperties = propertiesOf(reportError, valueType)
+                        for (const property of current.properties) {
+                            if (!objectProperties?.find(prop => prop.name.name === property.name)) {
+                                reportError(miscError(property, `Property '${property.name}' does not exist on type '${format(valueType)}'`))
+                            }
+                        }
                     }
                 } else {
                     if (valueType.kind !== 'array-type' && valueType.kind !== 'tuple-type') {
                         reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type '${format(valueType)}'`))
+                    } else {
+                        if (valueType.kind === 'tuple-type') {
+                            for (let i = valueType.members.length; i < current.properties.length; i++) {
+                                reportError(miscError(current.properties[i], `Can't destructure element in index ${i}, because the provided tuple only has ${valueType.members.length} elements`))
+                            }
+                        }
                     }
                 }
             } break;
