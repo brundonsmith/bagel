@@ -718,13 +718,17 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
     } else if(typesEqual(resolvedDestination, resolvedValue)) {
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
-            // NOTE: Value and destination are flipped on purpose for args!
-            && resolvedDestination.args.every((_, i) => subsumes(reportError, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))
+            && resolvedValue.args.length <= resolvedDestination.args.length
+            && resolvedDestination.args.every((_, i) => 
+                // NOTE: Value and destination are flipped on purpose for args!
+                subsumes(reportError, resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE))
             && subsumes(reportError, resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)) {
         return true;
     } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" 
-            // NOTE: Value and destination are flipped on purpose for args!
-            && resolvedDestination.args.every((_, i) => subsumes(reportError, resolvedValue.args[i].type ?? UNKNOWN_TYPE, resolvedDestination.args[i].type ?? UNKNOWN_TYPE))) {
+            && resolvedValue.args.length <= resolvedDestination.args.length
+            && resolvedDestination.args.every((_, i) => 
+                // NOTE: Value and destination are flipped on purpose for args!
+                subsumes(reportError, resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE))) {
         return true;
     } else if (resolvedDestination.kind === "array-type") {
         if (resolvedValue.kind === "array-type") {
