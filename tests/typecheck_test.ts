@@ -1355,6 +1355,140 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Import all pass",
+  fn() {
+    testMultiModuleTypecheck({
+      'a': `export func foo(a: number) => a + 'stuff'`,
+      'b': `
+      import 'a' as moduleA
+      const x = moduleA.foo(12)`
+    },
+    false)
+  }
+})
+
+Deno.test({
+  name: "Import all fail 1",
+  fn() {
+    testMultiModuleTypecheck({
+      'a': `export func foo2(a: number) => a + 'stuff'`,
+      'b': `
+      import 'a' as moduleA
+      const x = moduleA.foo(12)`
+    },
+    true)
+  }
+})
+
+Deno.test({
+  name: "Import all fail 2",
+  fn() {
+    testMultiModuleTypecheck({
+      'a': `export func foo(a: number) => a + 'stuff'`,
+      'b': `
+      import 'a' as moduleA
+      const x = foo(12)`
+    },
+    true)
+  }
+})
+
+Deno.test({
+  name: "Import all fail 3",
+  fn() {
+    testMultiModuleTypecheck({
+      'a': `export func foo(a: number) => a + 'stuff'`,
+      'b': `
+      import 'a' as moduleA
+      const x = moduleA.foo('stuff')`
+    },
+    true)
+  }
+})
+
+Deno.test({
+  name: "Record type pass",
+  fn() {
+    testTypecheck(`
+    type Foo = {[string]: boolean}
+    const a: Foo = { foo: true, bar: false }
+    const b: Foo = {}`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Record type fail",
+  fn() {
+    testTypecheck(`
+    type Foo = {[string]: boolean}
+    const a: Foo = { foo: true, bar: 12 }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Tuple type pass",
+  fn() {
+    testTypecheck(`
+    type Foo = [string, number, boolean]
+    const a: Foo = ['stuff', 12, true]`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Tuple type fail 1",
+  fn() {
+    testTypecheck(`
+    type Foo = [string, number, boolean]
+    const a: Foo = [4, 12, true]`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Tuple type fail 2",
+  fn() {
+    testTypecheck(`
+    type Foo = [string, number, boolean]
+    const a: Foo = ['stuff', 12, true, 'other']`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Tuple type fail 3",
+  fn() {
+    testTypecheck(`
+    type Foo = [string, number, boolean]
+    const a: Foo = ['stuff', 12]`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Tuple type fail 4",
+  fn() {
+    testTypecheck(`
+    type Foo = [string, number, boolean]
+    const a: Foo = []`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Tuple type fail 5",
+  fn() {
+    testTypecheck(`
+    type Foo = [string, number, boolean]
+    func foo(arr: (string|number|boolean)[]): Foo => arr`,
+    true)
+  }
+})
+
+
 // TODO: Reactions
 // TODO: if/else/switch
 
