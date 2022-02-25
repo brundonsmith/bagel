@@ -492,6 +492,38 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "JS func",
+  fn() {
+    testCompile(`
+    js func foo(a: number, b: string): string => {#
+      return a + b;
+    #}
+    `,
+    `
+    const foo = (a: number, b: string): string => {
+      return a + b;
+    };
+    `)
+  }
+})
+
+Deno.test({
+  name: "JS proc",
+  fn() {
+    testCompile(`
+    js proc foo(a: { foo: number }, b: number) {#
+      a.foo = b;
+    #}
+    `,
+    `
+    const foo = (a: {foo: number}, b: number): void => {
+      a.foo = b;
+    };
+    `)
+  }
+})
+
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>' as ModuleName
 
