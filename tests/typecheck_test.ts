@@ -588,6 +588,18 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Const declarations in order",
+  fn() {
+    testTypecheck(
+      `
+      const b = 12
+      const a = b + 2`,
+      false,
+    );
+  },
+});
+
+Deno.test({
   name: "Const declarations out of order",
   fn() {
     testTypecheck(
@@ -600,13 +612,12 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Const declarations in order",
+  name: "Const declaration referencing self",
   fn() {
     testTypecheck(
       `
-      const b = 12
-      const a = b + 2`,
-      false,
+      const a: number = a + 2`,
+      true,
     );
   },
 });

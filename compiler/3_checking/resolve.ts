@@ -1,7 +1,6 @@
-import { alreadyDeclared, cannotFindExport, cannotFindModule, miscError } from "../errors.ts";
+import { cannotFindExport, cannotFindModule, miscError } from "../errors.ts";
 import { computedFn } from "../mobx.ts";
 import Store, { getModuleByName } from "../store.ts";
-import { areSame } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
 import { Binding, ModuleName, ReportError } from "../_model/common.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration,TypeDeclaration } from "../_model/declarations.ts";
@@ -26,7 +25,6 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
 
     switch (parent.kind) {
         case "module": {
-            const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
             for (let declarationIndex = 0; declarationIndex < parent.declarations.length; declarationIndex++) {
                 const declaration = parent.declarations[declarationIndex]
 
@@ -44,16 +42,8 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                     case "value-declaration":
                     case "derive-declaration":
                     case "remote-declaration": {
-                        if (declaration.name.name === name && (declaration.kind !== 'value-declaration' || declarationIndex < comingFromIndex)) {
+                        if (declaration.name.name === name) {
                             if (declaration.kind === 'value-declaration') {
-
-                                // detect value being referenced before it's available
-                                const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
-                                if (comingFromIndex < declarationIndex) {
-                                    reportError(miscError(originator, `Can't reference "${name}" before initialization`))
-                                } else if (comingFromIndex === declarationIndex) {
-                                    reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
-                                }
 
                                 if (!declaration.isConst) {
 
@@ -228,20 +218,6 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
 
                 if (declaration.kind === 'inline-const-declaration') {
                     if (declaration.name.name === name) {
-                        if (resolved) {
-                            reportError(alreadyDeclared(declaration.name))
-                        }
-
-                        // detect value being referenced before it's available
-                        if (from.kind === 'inline-const-declaration') {
-                            const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
-                            if (comingFromIndex < declarationIndex) {
-                                reportError(miscError(originator, `Can't reference "${name}" before initialization`))
-                            } else if (comingFromIndex === declarationIndex) {
-                                reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
-                            }
-                        }
-
                         resolved = {
                             owner: declaration,
                             identifier: declaration.name
@@ -250,20 +226,6 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                 } else {
                     for (const property of declaration.properties) {
                         if (property.name === name) {
-                            if (resolved) {
-                                reportError(alreadyDeclared(property))
-                            }
-    
-                            // detect value being referenced before it's available
-                            if (from.kind === 'inline-const-declaration' || from.kind === 'destructuring-declaration-statement') {
-                                const comingFromIndex = parent.declarations.findIndex(other => areSame(other, from))
-                                if (comingFromIndex < declarationIndex) {
-                                    reportError(miscError(originator, `Can't reference "${name}" before initialization`))
-                                } else if (comingFromIndex === declarationIndex) {
-                                    reportError(miscError(originator, `Can't reference "${name}" in its own initialization`))
-                                }
-                            }
-    
                             resolved = {
                                 owner: declaration,
                                 identifier: property

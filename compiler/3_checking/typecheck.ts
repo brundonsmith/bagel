@@ -7,13 +7,11 @@ import { getBindingMutability, ModuleName, ReportError } from "../_model/common.
 import { ancestors, iterateParseTree, typesEqual, within } from "../utils/ast.ts";
 import { _Store } from "../store.ts";
 import { format } from "../other/format.ts";
-import { ExactStringLiteral, Expression } from "../_model/expressions.ts";
+import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { computedFn } from "../mobx.ts";
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "./resolve.ts";
-import { ValueDeclaration } from "../_model/declarations.ts";
-import { ValueDeclarationStatement } from "../_model/statements.ts";
 
 
 export const typeerrors = computedFn((store: _Store, moduleName: ModuleName): BagelError[] => {
@@ -127,6 +125,38 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     reportError(alreadyDeclared(duplicate))
                 }
             } break;
+            case "inline-const-group": {
+                const seen = new Map<string, PlainIdentifier>()
+                const duplicates = new Set<PlainIdentifier>()
+
+                for (const decl of current.declarations) {
+                    const names = (() => {
+                        switch(decl.kind) {
+                            case "inline-const-declaration":
+                                return [decl.name]
+                            case "inline-destructuring-declaration":
+                                return decl.properties
+                            default:
+                                // @ts-expect-error
+                                throw Error(decl.kind)
+                        }
+                    })()
+
+                    for (const name of names) {
+                        const existing = seen.get(name.name)
+                        if (existing) {
+                            duplicates.add(existing)
+                            duplicates.add(name)
+                        } else {
+                            seen.set(name.name, name)
+                        }
+                    }
+                }
+
+                for (const duplicate of duplicates) {
+                    reportError(alreadyDeclared(duplicate))
+                }
+            } break
             case "value-declaration":
             case "value-declaration-statement":
             case "inline-const-declaration": {
@@ -468,31 +498,29 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 const binding = resolve(reportError, current.name, current)
 
                 if (binding) {
-                    if (binding.owner.kind === 'value-declaration') {
-                        if (within(current, binding.owner.value)) {
-                            reportError(miscError(current, `Can't reference "${current.name}" in its own initialization`))
-                        } else {
-                            const decl = [...ancestors(current)].find(a => a.kind === 'value-declaration') as ValueDeclaration|undefined
+                    if (binding.owner.kind === 'value-declaration' || 
+                        binding.owner.kind === 'value-declaration-statement' ||
+                        binding.owner.kind === 'inline-const-declaration' ||
+                        binding.owner.kind === 'inline-destructuring-declaration') {
 
-                            if (decl) {
-                                const mod = binding.owner.parent as Module
+                        const declarations = (
+                            binding.owner.kind === 'value-declaration' ? (binding.owner.parent as Module).declarations :
+                            binding.owner.kind === 'value-declaration-statement' ? (binding.owner.parent as Block).statements :
+                            binding.owner.kind === 'inline-const-declaration' ? (binding.owner.parent as InlineConstGroup).declarations :
+                            binding.owner.kind === 'inline-destructuring-declaration' ? (binding.owner.parent as InlineConstGroup).declarations :
+                            undefined
+                        )
 
-                                if (mod.declarations.indexOf(binding.owner) > mod.declarations.indexOf(decl)) {
-                                    reportError(miscError(current, `Can't reference "${current.name}" before initialization`))
-                                }
-                            }
-                        }
-                    } else if (binding.owner.kind === 'value-declaration-statement') {
-                        if (within(current, binding.owner.value)) {
-                            reportError(miscError(current, `Can't reference "${current.name}" in its own initialization`))
-                        } else {
-                            const decl = [...ancestors(current)].find(a => a.kind === 'value-declaration-statement') as ValueDeclarationStatement|undefined
+                        if (declarations) {
+                            if (within(current, binding.owner.value)) {
+                                reportError(miscError(current, `Can't reference "${current.name}" in its own initialization`))
+                            } else {
+                                const decl = [...ancestors(current)].find(a => a.kind === binding.owner.kind)
 
-                            if (decl) {
-                                const mod = binding.owner.parent as Block
-
-                                if (mod.statements.indexOf(binding.owner) > mod.statements.indexOf(decl)) {
-                                    reportError(miscError(current, `Can't reference "${current.name}" before initialization`))
+                                if (decl) {
+                                    if ((declarations as unknown[]).indexOf(binding.owner) > (declarations as unknown[]).indexOf(decl)) {
+                                        reportError(miscError(current, `Can't reference "${current.name}" before initialization`))
+                                    }
                                 }
                             }
                         }
@@ -602,7 +630,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "js-proc":
             case "js-func":
             case "test-block-declaration":
-            case "inline-const-group":
             case "attribute":
             case "case":
             case "switch-case":
