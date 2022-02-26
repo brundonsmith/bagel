@@ -67,7 +67,7 @@ export function* entries<V>(obj: {[key: string]: V}): RawIter<[string, V]> {
 }
 
 
-const INNER_ITER = Symbol('INNER_ITER')
+export const INNER_ITER = Symbol('INNER_ITER')
 
 type RawIter<T> = Iterable<T>|Generator<T>
 
@@ -330,6 +330,7 @@ function asWorker<P extends unknown[], R>(fn: (...params: P) => R): (...params: 
     return (...params) => new Promise(res => {
         worker.onmessage = function (event) {
             res(JSON.parse(event.data))
+            worker.terminate()
         }
 
         worker.postMessage(JSON.stringify(params))
@@ -379,11 +380,11 @@ export const RT_LITERAL = Symbol('RT_LITERAL')
 export const RT_ITERATOR = Symbol('RT_ITERATOR')
 export const RT_PLAN = Symbol('RT_PLAN')
 export const RT_REMOTE = Symbol('RT_REMOTE')
+export const RT_ERROR = Symbol('RT_ERROR')
+export const RT_NOMINAL = Symbol('RT_NOMINAL')
 export const RT_ARRAY = Symbol('RT_ARRAY')
 export const RT_RECORD = Symbol('RT_RECORD')
 export const RT_OBJECT = Symbol('RT_OBJECT')
-export const RT_ERROR = Symbol('RT_ERROR')
-export const RT_NOMINAL = Symbol('RT_NOMINAL')
 
 type RuntimeType =
     | typeof RT_UNKNOWN
