@@ -542,6 +542,57 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Runtime types",
+  fn() {
+    testCompile(`
+    const x = 12
+
+    nominal type FooNominal(string)
+
+    const a = x instanceof string
+    const b = x instanceof number
+    const c = x instanceof unknown
+    const d = x instanceof boolean
+    const e = x instanceof nil
+    const f = x instanceof 'stuff'
+    const g = x instanceof Iterator<number>
+    const h = x instanceof Plan<number>
+    const i = x instanceof Remote<number>
+    const j = x instanceof Error<number>
+    const k = x instanceof FooNominal
+    const l = x instanceof number[]
+    const m = x instanceof {[string]: number}
+    const n = x instanceof { a: string, b: number }
+    const o = x instanceof { a: string, b?: number }`,
+    `
+    const x = 12;
+
+    const ___FooNominal = Symbol('FooNominal');
+    const FooNominal = ((value: string): FooNominal => ({ kind: ___FooNominal, value })) as (((value: string) => FooNominal) & { sym: typeof ___FooNominal });
+    FooNominal.sym = ___FooNominal;
+    (FooNominal as any).sym = ___FooNominal;
+    type FooNominal = { kind: typeof ___FooNominal, value: string };
+
+    const a = ___instanceOf(x, ___RT_STRING);
+    const b = ___instanceOf(x, ___RT_NUMBER);
+    const c = ___instanceOf(x, ___RT_UNKNOWN);
+    const d = ___instanceOf(x, ___RT_BOOLEAN);
+    const e = ___instanceOf(x, ___RT_NIL);
+    const f = ___instanceOf(x, { kind: ___RT_LITERAL, value: "stuff" });
+    const g = ___instanceOf(x, { kind: ___RT_ITERATOR, inner: ___RT_NUMBER });
+    const h = ___instanceOf(x, { kind: ___RT_PLAN, inner: ___RT_NUMBER });
+    const i = ___instanceOf(x, { kind: ___RT_REMOTE, inner: ___RT_NUMBER });
+    const j = ___instanceOf(x, { kind: ___RT_ERROR, inner: ___RT_NUMBER });
+    const k = ___instanceOf(x, { kind: ___RT_NOMINAL, nominal: FooNominal.sym });
+    const l = ___instanceOf(x, { kind: ___RT_ARRAY, inner: ___RT_NUMBER });
+    const m = ___instanceOf(x, { kind: ___RT_RECORD, key: ___RT_STRING, value: ___RT_NUMBER });
+    const n = ___instanceOf(x, { kind: ___RT_OBJECT, entries: [{ key: 'a', value: ___RT_STRING, optional: false },{ key: 'b', value: ___RT_NUMBER, optional: false }] });
+    const o = ___instanceOf(x, { kind: ___RT_OBJECT, entries: [{ key: 'a', value: ___RT_STRING, optional: false },{ key: 'b', value: ___RT_NUMBER, optional: true }] });
+    `)
+  }
+})
+
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>' as ModuleName
 

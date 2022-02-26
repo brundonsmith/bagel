@@ -718,13 +718,61 @@ Deno.test({
   },
 });
 
+// Deno.test({
+//   name: "Chained type refinement pass",
+//   fn() {
+//     testTypecheck(
+//       `
+//       func foo(x: { bar: number|nil }): number|nil =>
+//         x.bar && x.bar + `,
+//       true,
+//     );
+//   },
+// });
+
 Deno.test({
-  name: "Chained type refinement pass",
+  name: "Chained if/else refinement pass",
   fn() {
     testTypecheck(
       `
-      func foo(x: { bar: number|nil }): number|nil =>
-        x.bar && x.bar + `,
+      func getOutcome(val: number | Error<string>): string =>
+        if val instanceof number {
+          'nothing wrong!'
+        } else {
+          val.value
+        }`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Chained if/else refinement fail 1",
+  fn() {
+    testTypecheck(
+      `
+      func getOutcome(val: number | Error<string>): number =>
+        if val instanceof number {
+          'nothing wrong!'
+        } else {
+          val.value
+        }`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Chained if/else refinement fail 2",
+  fn() {
+    testTypecheck(
+      `
+      func getOutcome(val: number | Error<string>): string =>
+        if val instanceof Error<string> {
+          'nothing wrong!'
+        } else {
+          val.value
+        }`,
       true,
     );
   },
@@ -1411,15 +1459,17 @@ Deno.test({
   name: "Record type pass",
   fn() {
     testTypecheck(`
-    type Foo = {[string]: boolean}
+    type Foo = const {[string]: boolean}
     const a: Foo = { foo: true, bar: false }
-    const b: Foo = {}`,
+    const b: Foo = {}
+    
+    func f(val: Foo): const {[string]: boolean|string} => val`,
     false)
   }
 })
 
 Deno.test({
-  name: "Record type fail",
+  name: "Record type fail 1",
   fn() {
     testTypecheck(`
     type Foo = {[string]: boolean}
@@ -1429,11 +1479,60 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Record type fail 2",
+  fn() {
+    testTypecheck(`
+    type Foo = {[string]: boolean}
+    func f(val: Foo): {[string]: boolean|string} => val`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Array type pass",
+  fn() {
+    testTypecheck(`
+    type Foo = const (number|string)[]
+    const a: Foo = [1, 'two', 3]
+    const b: Foo = [1, 2, 3]
+    const c: Foo = []
+    
+    func f(val: Foo): const (number|string|boolean)[] => val
+    `,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Array type fail 1",
+  fn() {
+    testTypecheck(`
+    type Foo = (number|string)[]
+    func f(val: Foo): (number|string|boolean)[] => val
+    `,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Array type fail 2",
+  fn() {
+    testTypecheck(`
+    type Foo = (number|string)[]
+    func f(val: Foo): number[] => val
+    `,
+    true)
+  }
+})
+
+Deno.test({
   name: "Tuple type pass",
   fn() {
     testTypecheck(`
-    type Foo = [string, number, boolean]
-    const a: Foo = ['stuff', 12, true]`,
+    type Foo = const [string, number, boolean]
+    const a: Foo = ['stuff', 12, true]
+    
+    func f(val: Foo): const [string, number, boolean|number] => val`,
     false)
   }
 })
@@ -1473,13 +1572,24 @@ Deno.test({
   fn() {
     testTypecheck(`
     type Foo = [string, number, boolean]
-    const a: Foo = []`,
+
+    func f(val: Foo): [string, number, boolean|number] => val`,
     true)
   }
 })
 
 Deno.test({
   name: "Tuple type fail 5",
+  fn() {
+    testTypecheck(`
+    type Foo = [string, number, boolean]
+    const a: Foo = []`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Tuple type fail 6",
   fn() {
     testTypecheck(`
     type Foo = [string, number, boolean]
@@ -1540,9 +1650,125 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Tuple length pass",
+  fn() {
+    testTypecheck(`
+    const a = ['a', 'b', 'c']
+    const len: 3 = a.length
+    const el: 'b' = a[1]`,
+    false)
+  }
+})
 
-// TODO: Reactions
-// TODO: if/else/switch
+Deno.test({
+  name: "Tuple length fail",
+  fn() {
+    testTypecheck(`
+    const a = ['a', 'b', 'c']
+    const len: 2 = a.length`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Switch expression pass",
+  fn() {
+    testTypecheck(`
+    func foo(n: number): string? =>
+      switch n {
+        case 0: 'zero',
+        case 1: 'one',
+        case 2: 'two'
+      }
+
+    func bar(n: number): string =>
+      switch n {
+        case 0: 'zero',
+        case 1: 'one',
+        case 2: 'two',
+        default: 'I dunno!'
+      }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Switch expression fail 1",
+  fn() {
+    testTypecheck(`
+    func foo(n: number): string =>
+      switch n {
+        case 0: 'zero',
+        case 1: 'one',
+        case 2: 'two'
+      }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Switch expression fail 2",
+  fn() {
+    testTypecheck(`
+    func foo(n: number): string? =>
+      switch n {
+        case 0: 'zero',
+        case 'a': 'one',
+        case 2: 'two'
+      }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Range expression pass",
+  fn() {
+    testTypecheck(`
+    const a: Iterator<number> = 0..10
+    
+    proc foo() {
+      for n of 5..15 {
+
+      }
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Range expression fail",
+  fn() {
+    testTypecheck(`
+    const a: Iterator<string> = 0..10`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "String interpolation pass",
+  fn() {
+    testTypecheck(`
+    const a = 12
+    const b = 'dlfkhg'
+    const c = true
+    const s: string = '\${a} - \${b} - \${c}'`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "String interpolation fail",
+  fn() {
+    testTypecheck(`
+    const a = { foo: 'bar' }
+    const s: string = '\${a}'`,
+    true)
+  }
+})
+
+
+
 
 function testTypecheck(code: string, shouldFail: boolean): void {
   const moduleName = "<test>" as ModuleName
