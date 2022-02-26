@@ -1,4 +1,4 @@
-import { cannotFindExport, cannotFindModule, miscError } from "../errors.ts";
+import { cannotFindExport, cannotFindModule } from "../errors.ts";
 import { computedFn } from "../mobx.ts";
 import Store, { getModuleByName } from "../store.ts";
 import { AST } from "../_model/ast.ts";

@@ -391,7 +391,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     } else if (subject.typeParams.length !== invocation.typeArgs.length) {
                         reportError(miscError(invocation, `Expected ${subject.typeParams.length} type arguments, but got ${invocation.typeArgs.length}`))
                     } else {
-                        reportError(miscError(invocation, `Something went wrong while binding generic args`))
+                        reportError(miscError(invocation, `Couldn't find a valid way to bind the provided generic args to this generic type`))
                     }
                 } else if ( // check that subject is callable
                     subjectType.kind !== "func-type" && subjectType.kind !== "proc-type" 
@@ -565,7 +565,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "for-loop": {
                 expect(reportError, ITERATOR_OF_ANY, current.iterator, 
-                    () => `Expected iterator after "of" in for loop`)
+                    (_, val) => `Expected iterator after "of" in for loop; found '${format(val)}'`)
             } break;
             case "element-tag": {
                 for (const child of current.children) {
