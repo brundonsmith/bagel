@@ -251,7 +251,7 @@ export type JavascriptEscapeType = SourceInfo & {
     readonly mutability: undefined,
 }
 
-export type Mutability = { readonly mutability: "immutable"|"readonly"|"mutable" }
+export type Mutability = { readonly mutability: "immutable"|"readonly"|"mutable"|"literal" }
 
 export const STRING_TYPE: StringType = {
     kind: "string-type",

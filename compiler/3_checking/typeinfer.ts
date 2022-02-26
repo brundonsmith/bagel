@@ -330,14 +330,17 @@ const inferTypeInner = computedFn((
             if (binding) {
                 const decl = binding.owner
 
+                type MutabilityKind = Mutability['mutability']|undefined
+
                 switch (decl.kind) {
                     case 'value-declaration':
                     case 'value-declaration-statement': {
                         const baseType = decl.type ?? resolveT(infer(decl.value))
-                        const mutability: Mutability['mutability']|undefined = given(baseType.mutability, mutability =>
+                        const mutability: MutabilityKind = given(baseType.mutability, mutability =>
                             decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== ast.module)
                                 ? 'immutable'
-                                : mutability)
+                                : mutability
+                        )
 
                         // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
                         const broadenedBaseType = (
@@ -348,14 +351,14 @@ const inferTypeInner = computedFn((
 
                         return {
                             ...broadenedBaseType,
-                            mutability
+                            mutability: mutability === 'literal' ? 'mutable' : mutability
                         } as TypeExpression
                     }
                     case 'func-declaration':
                     case 'proc-declaration':
                     case 'inline-const-declaration': {
                         const baseType = resolveT(infer(decl.value))
-                        const mutability: Mutability['mutability']|undefined = given(baseType.mutability, () =>
+                        const mutability: MutabilityKind = given(baseType.mutability, () =>
                             decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
                                 ? 'immutable'
                                 : 'readonly')
@@ -578,7 +581,7 @@ const inferTypeInner = computedFn((
                 kind: "object-type",
                 spreads: [],
                 entries,
-                mutability: "mutable",
+                mutability: "literal",
                 parent, module, code, startIndex, endIndex
             };
         }
@@ -606,7 +609,7 @@ const inferTypeInner = computedFn((
                 return {
                     kind: "tuple-type",
                     members: memberTypes,
-                    mutability: "mutable",
+                    mutability: "literal",
                     parent, module, code, startIndex, endIndex
                 }
             } else {
@@ -618,7 +621,7 @@ const inferTypeInner = computedFn((
                         mutability: undefined,
                         parent, module, code, startIndex, endIndex
                     }),
-                    mutability: "mutable",
+                    mutability: "literal",
                     parent, module, code, startIndex, endIndex
                 }
             }
@@ -922,7 +925,7 @@ function resolveRefinements(expr: Expression): Refinement[] {
     // of the current expression
     while (parent != null) {
         if (parent.kind === 'case') {
-            if (grandparent?.kind === 'if-else-expression' && areSame(current, parent.outcome)) {
+            if (grandparent?.kind === 'if-else-expression' && current === parent.outcome) {
                 
                 for (let i = 0; i < grandparent.cases.indexOf(parent); i++) {
                     const condition = grandparent.cases[i]?.condition

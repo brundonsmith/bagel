@@ -682,7 +682,7 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
     const resolvedValue = resolve(value)
 
     // constants can't be assigned to mutable slots
-    if (resolvedDestination.mutability === "mutable" && resolvedValue.mutability !== "mutable") {
+    if (resolvedDestination.mutability === "mutable" && (resolvedValue.mutability !== "mutable" && resolvedValue.mutability !== "literal")) {
         return false;
     }
 
@@ -732,29 +732,48 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
         return true;
     } else if (resolvedDestination.kind === "array-type") {
         if (resolvedValue.kind === "array-type") {
-            return subsumes(reportError, resolvedDestination.element, resolvedValue.element)
+            if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
+                return subsumes(reportError, resolvedDestination.element, resolvedValue.element)
+            } else {
+                return typesEqual(resolvedDestination.element, resolvedValue.element)
+            }
         }
         if (resolvedValue.kind === 'tuple-type') {
-            return resolvedValue.members.every(member =>
-                subsumes(reportError, resolvedDestination.element, member))
+            if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
+                return resolvedValue.members.every(member =>
+                    subsumes(reportError, resolvedDestination.element, member))
+            }
         }
     } else if (resolvedDestination.kind === "tuple-type") {
         if (resolvedValue.kind === 'tuple-type') {
-            return resolvedValue.members.length === resolvedDestination.members.length
-                && resolvedValue.members.every((member, index) =>
-                    subsumes(reportError, resolvedDestination.members[index], member))
+            if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
+                return resolvedValue.members.length === resolvedDestination.members.length
+                    && resolvedValue.members.every((member, index) =>
+                        subsumes(reportError, resolvedDestination.members[index], member))
+            } else {
+                return resolvedValue.members.length === resolvedDestination.members.length
+                    && resolvedValue.members.every((member, index) =>
+                        typesEqual(resolvedDestination.members[index], member))
+            }
         }
     } else if (resolvedDestination.kind === "record-type") {
         if (resolvedValue.kind === "record-type") {
-            return subsumes(reportError, resolvedDestination.keyType, resolvedValue.keyType)
-                && subsumes(reportError, resolvedDestination.valueType, resolvedValue.valueType)
+            if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
+                return subsumes(reportError, resolvedDestination.keyType, resolvedValue.keyType)
+                    && subsumes(reportError, resolvedDestination.valueType, resolvedValue.valueType)
+            } else {
+                return typesEqual(resolvedDestination.keyType, resolvedValue.keyType)
+                    && typesEqual(resolvedDestination.valueType, resolvedValue.valueType)
+            }
         }
         if (resolvedValue.kind === "object-type") {
-            // TODO: Spreads
-            return subsumes(reportError, resolvedDestination.keyType, STRING_TYPE)
-                && resolvedValue.entries.every(({ type }) =>
-                    // TODO: Optionals
-                    subsumes(reportError, resolvedDestination.valueType, type))
+            if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
+                // TODO: Spreads
+                return subsumes(reportError, resolvedDestination.keyType, STRING_TYPE)
+                    && resolvedValue.entries.every(({ type }) =>
+                        // TODO: Optionals
+                        subsumes(reportError, resolvedDestination.valueType, type))
+            }
         }
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
         // TODO: Spreads
@@ -849,7 +868,7 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
             }
         }
         case "maybe-type": {
-            const { mutability, parent, module, code, startIndex, endIndex } = type
+            const { parent, module, code, startIndex, endIndex } = type
 
             return resolveT({
                 kind: "union-type",
@@ -857,7 +876,8 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
                     type.inner,
                     NIL_TYPE
                 ],
-                mutability, parent, module, code, startIndex, endIndex
+                mutability: undefined,
+                parent, module, code, startIndex, endIndex
             })
         }
         case "bound-generic-type": {
