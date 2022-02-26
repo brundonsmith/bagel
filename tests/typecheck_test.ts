@@ -1814,11 +1814,7 @@ Deno.test({
   name: "Typeof type pass",
   fn() {
     testTypecheck(`
-    const a = {
-      a: 1,
-      b: 2,
-      c: 3
-    }
+    const a = { a: 1, b: 2, c: 3 }
     
     func foo(val: typeof a) => nil
     
@@ -1831,13 +1827,87 @@ Deno.test({
   name: "Typeof type fail",
   fn() {
     testTypecheck(`
-    const a = {
-      a: 1,
-      b: 2,
-      c: 3
-    }
+    const a = { a: 1, b: 2, c: 3 }
     
     func foo(val: typeof a) => nil
+    
+    const b = foo(12)`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Keyof type pass",
+  fn() {
+    testTypecheck(`
+    const a = { a: 1, b: 2, c: 3 }
+    
+    func foo(val: keyof typeof a) => nil
+    
+    const b = foo('a')`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Keyof type fail",
+  fn() {
+    testTypecheck(`
+    const a = { a: 1, b: 2, c: 3 }
+    
+    func foo(val: keyof typeof a) => nil
+    
+    const b = foo('other')`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Valueof type pass",
+  fn() {
+    testTypecheck(`
+    const a = { a: 1, b: 2, c: 3 }
+    
+    func foo(val: valueof typeof a) => nil
+    
+    const b = foo(1)`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Valueof type fail",
+  fn() {
+    testTypecheck(`
+    const a = { a: 1, b: 2, c: 3 }
+    
+    func foo(val: valueof typeof a) => nil
+    
+    const b = foo(12)`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Elementof type pass",
+  fn() {
+    testTypecheck(`
+    const a = [1, 2, 3]
+    
+    func foo(val: elementof typeof a) => nil
+    
+    const b = foo(1)`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Elementof type fail",
+  fn() {
+    testTypecheck(`
+    const a = [1, 2, 3]
+    
+    func foo(val: elementof typeof a) => nil
     
     const b = foo(12)`,
     true)

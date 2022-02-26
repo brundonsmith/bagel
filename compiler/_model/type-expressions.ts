@@ -27,6 +27,9 @@ export type TypeExpression =
     | ErrorType
     | ParenthesizedType
     | TypeofType
+    | KeyofType
+    | ValueofType
+    | ElementofType
     | UnknownType
     | AnyType
     | NeverType
@@ -226,6 +229,24 @@ export type ParenthesizedType = SourceInfo & {
 export type TypeofType = SourceInfo & {
     readonly kind: "typeof-type",
     readonly expr: Expression,
+    readonly mutability: undefined,
+}
+
+export type KeyofType = SourceInfo & {
+    readonly kind: "keyof-type",
+    readonly inner: TypeExpression,
+    readonly mutability: undefined,
+}
+
+export type ValueofType = SourceInfo & {
+    readonly kind: "valueof-type",
+    readonly inner: TypeExpression,
+    readonly mutability: undefined,
+}
+
+export type ElementofType = SourceInfo & {
+    readonly kind: "elementof-type",
+    readonly inner: TypeExpression,
     readonly mutability: undefined,
 }
 
@@ -609,6 +630,9 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "remote-type": undefined,
     "parenthesized-type": undefined,
     "typeof-type": undefined,
+    "keyof-type": undefined,
+    "valueof-type": undefined,
+    "elementof-type": undefined,
     "literal-type": undefined,
     "tuple-type": undefined,
     "nominal-type": undefined,

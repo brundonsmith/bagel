@@ -236,6 +236,9 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "element-type": return `Element`;
         case "parenthesized-type": return `(${f(ast.inner)})`;
         case "typeof-type": return `typeof ${f(ast.expr)}`;
+        case "keyof-type": return `keyof ${f(ast.inner)}`;
+        case "valueof-type": return `valueof ${f(ast.inner)}`;
+        case "elementof-type": return `elementof ${f(ast.inner)}`;
         // case "element-type": return `<${ast.tagName}>`;
         case "property-type": return `${f(ast.subject)}${ast.optional ? '?' : ''}.${ast.property.name}`;
         case "javascript-escape-type": return "<js escape>";

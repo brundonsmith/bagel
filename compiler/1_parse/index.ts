@@ -6,7 +6,7 @@ import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf, ErrorExpression } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement } from "../_model/statements.ts";
-import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
 import { computedFn } from "../mobx.ts";
@@ -618,7 +618,6 @@ const parenthesizedType: ParseFunction<ParenthesizedType> = (module, code, start
         index,
     }))))))
 
-
 const typeofType: ParseFunction<TypeofType> = (module, code, startIndex) =>
     given(consume(code, startIndex, "typeof"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
@@ -626,6 +625,22 @@ const typeofType: ParseFunction<TypeofType> = (module, code, startIndex) =>
         parsed: {
             kind: "typeof-type",
             expr,
+            mutability: undefined,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    }))))
+
+const keyofValueofElementofType: ParseFunction<KeyofType|ValueofType|ElementofType> = (module, code, startIndex) =>
+    given(parseExact("keyof")(module, code, startIndex) ?? parseExact("valueof")(module, code, startIndex) ?? parseExact("elementof")(module, code, startIndex), ({ parsed: keyword, index }) =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(typeExpression(module, code, index), err(code, index, 'Type expression'), ({ parsed: inner, index }) => ({
+        parsed: {
+            kind: keyword === 'keyof' ? 'keyof-type' : keyword === 'valueof' ? 'valueof-type' : 'elementof-type',
+            inner,
             mutability: undefined,
             module,
             code,
@@ -2160,7 +2175,7 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
 ])
 
 const TYPE_PARSER = new TieredParser<TypeExpression>([
-    [ typeofType ],
+    [ typeofType, keyofValueofElementofType ],
     [ genericType ],
     [ unionType ],
     [ maybeType ],

@@ -631,6 +631,18 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     reportError(alreadyDeclared(duplicate))
                 }
             } break;
+            case "keyof-type":
+            case "valueof-type":
+                if (!subsumes(reportError, RECORD_OF_ANY, current.inner)) {
+                    const keyword = current.kind === 'keyof-type' ? 'keyof' : 'valueof'
+                    reportError(miscError(current, `${keyword} can only be used on object types; found ${format(current.inner)}`))
+                }
+                break;
+            case "elementof-type":
+                if (!subsumes(reportError, ARRAY_OF_ANY, current.inner)) {
+                    reportError(miscError(current, `elementof can only be used on array types; found ${format(current.inner)}`))
+                }
+                break;
             case "if-else-expression":
             case "if-else-statement":
             case "while-loop":
@@ -887,6 +899,73 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
             return resolveT(type.inner)
         case "typeof-type":
             return inferType(reportError, type.expr)
+        case "keyof-type": {
+            const inner = resolveT(type.inner)
+
+            if (inner.kind === 'record-type') {
+                return inner.keyType
+            } else if (inner.kind === 'object-type') {
+                const { parent, module, code, startIndex, endIndex } = type
+
+                return {
+                    kind: 'union-type',
+                    members: inner.entries.map(entry => {
+                        const { parent, module, code, startIndex, endIndex } = entry.name
+
+                        return {
+                            kind: 'literal-type',
+                            value: {
+                                kind: 'exact-string-literal',
+                                value: entry.name.name,
+                                parent, module, code, startIndex, endIndex
+                            },
+                            mutability: undefined,
+                            parent, module, code, startIndex, endIndex
+                        }
+                    }),
+                    mutability: undefined,
+                    parent, module, code, startIndex, endIndex
+                }
+            } else {
+                return UNKNOWN_TYPE
+            }
+        }
+        case "valueof-type": {
+            const inner = resolveT(type.inner)
+            
+            if (inner.kind === 'record-type') {
+                return inner.valueType
+            } else if (inner.kind === 'object-type') {
+                const { parent, module, code, startIndex, endIndex } = type
+
+                return {
+                    kind: 'union-type',
+                    members: inner.entries.map(entry => entry.type),
+                    mutability: undefined,
+                    parent, module, code, startIndex, endIndex
+                }
+            } else {
+                return UNKNOWN_TYPE
+            }
+        }
+        case "elementof-type": {
+            const inner = resolveT(type.inner)
+            
+            if (inner.kind === 'array-type') {
+                return inner.element
+            } else if (inner.kind === 'tuple-type') {
+                const { parent, module, code, startIndex, endIndex } = type
+
+                return {
+                    kind: 'union-type',
+                    members: inner.members,
+                    mutability: undefined,
+                    parent, module, code, startIndex, endIndex
+                }
+            } else {
+                return UNKNOWN_TYPE
+            }
+        }
         case "error-type":
         case "remote-type":
         case "iterator-type": {
