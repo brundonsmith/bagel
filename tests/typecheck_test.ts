@@ -1840,7 +1840,7 @@ Deno.test({
     func foo(val: typeof a) => nil
     
     const b = foo(12)`,
-    false)
+    true)
   }
 })
 
