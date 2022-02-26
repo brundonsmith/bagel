@@ -12,15 +12,17 @@ export function areSame(a: AST|undefined, b: AST|undefined) {
 }
 
 export function within(a: AST|undefined, ancestor: AST|undefined) {
+    return findAncestor(a, other => other === ancestor) != null
+}
+
+export function findAncestor(a: AST|undefined, fn: (ast: AST) => boolean) {
     if (a) {
         for (const node of ancestors(a)) {
-            if (areSame(node, ancestor)) {
-                return true
+            if (fn(node)) {
+                return node
             }
         }
     }
-
-    return false
 }
 
 export function* ancestors(a: AST) {

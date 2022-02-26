@@ -1,9 +1,10 @@
 import { parsed } from "../1_parse/index.ts";
+import { resolve } from "../3_checking/resolve.ts";
 import { overlaps, resolveType, subsumes } from "../3_checking/typecheck.ts";
 import { inferType } from "../3_checking/typeinfer.ts";
 import { computedFn } from "../mobx.ts";
 import { _Store } from "../store.ts";
-import { iterateParseTree, mapParseTree } from "../utils/ast.ts";
+import { findAncestor, iterateParseTree, mapParseTree } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { FuncDeclaration, ProcDeclaration, ValueDeclaration } from "../_model/declarations.ts";
@@ -187,7 +188,25 @@ const RULES = {
             }
         },
         autofix: undefined
-    }
+    },
+    'pure-functions': {
+        message: (ast: AST) => `Function declarations should not reference global state (referencing '${format(ast)}'). Convert "let" to "const" if the value is never mutated, or consider passing state in as an explicit function argument.`,
+        match: (ast: AST) => {
+            
+            // local identifier, inside a func declaration
+            if (ast.kind === 'local-identifier' && findAncestor(ast, a => a.kind === 'func-declaration') != null) {
+                const binding = resolve(() => {}, ast.name, ast)
+
+                // bound to let-declaration
+                if (binding?.owner.kind === 'value-declaration' && !binding.owner.isConst) {
+                    return ast
+                }
+            }
+
+            return undefined
+        },
+        autofix: undefined
+    },
     // 'unnecessary-nil-coalescing': {
     //     message: "Nil-coalescing operator is redundant because the left operand will never be nil",
     //     match: (ast: AST) => {
@@ -247,5 +266,6 @@ const DEFAULT_SEVERITY: { readonly [rule in RuleName]: Severity } = {
     'redundant-conditional': 'error',
     'string-number-conditional': 'warning',
     'explicit-booleans-only': 'off',
+    'pure-functions': 'error',
     // 'unnecessary-nil-coalescing': 'warning'
 }

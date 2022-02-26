@@ -43,28 +43,6 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                     case "derive-declaration":
                     case "remote-declaration": {
                         if (declaration.name.name === name) {
-                            if (declaration.kind === 'value-declaration') {
-
-                                if (!declaration.isConst) {
-
-                                    // lets can only be referenced by procs, autoruns, derives, remotes
-                                    if (from.kind !== 'proc-declaration' 
-                                     && from.kind !== 'autorun-declaration' 
-                                     && from.kind !== 'derive-declaration' 
-                                     && from.kind !== 'remote-declaration') {
-                                        // TODO: check against lambdas too. move to typecheck.ts? 
-                                        const declName = (
-                                            from.kind === 'value-declaration' && from.isConst ? 'constants' :
-                                            from.kind === 'value-declaration' && !from.isConst ? 'let declarations' :
-                                            from.kind === 'func-declaration' ? 'funcs' :
-                                            'this declaration'
-                                        )
-
-                                        reportError(miscError(originator, `Can't reference let-declarations from ${declName}`))
-                                    }
-                                }
-                            }
-    
                             resolved = {
                                 owner: declaration,
                                 identifier: declaration.name

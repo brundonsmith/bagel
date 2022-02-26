@@ -623,6 +623,18 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Initializing a const from a let",
+  fn() {
+    testTypecheck(
+      `
+      let a = 12
+      const b = a`,
+      true,
+    );
+  },
+});
+
+Deno.test({
   name: "Let declarations out of order",
   fn() {
     testTypecheck(
@@ -1399,7 +1411,7 @@ Deno.test({
   fn() {
     testTypecheck(`
     let bar = 12
-    derive foo: number () => 12 * 2`,
+    derive foo: number () => bar * 2`,
     false)
   }
 })
@@ -1409,7 +1421,27 @@ Deno.test({
   fn() {
     testTypecheck(`
     let bar = 12
-    derive foo: string () => 12 * 2`,
+    derive foo: string () => bar * 2`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Pure function",
+  fn() {
+    testTypecheck(`
+    const a = 12
+    func foo(b: number) => a * b`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Impure function",
+  fn() {
+    testTypecheck(`
+    let a = 12
+    func foo(b: number) => a * b`,
     true)
   }
 })
