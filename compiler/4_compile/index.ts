@@ -41,7 +41,7 @@ export const IMPORTED_ITEMS = [
     'range', 'Iter', 'Plan', 'Error', 'ERROR_SYM', 'Remote',
     
     // runtime type-checking 
-    'instanceOf', 'INNER_ITER', 'RT_UNKNOWN', 
+    'instanceOf', 'RT_UNKNOWN', 
     'RT_NIL', 'RT_BOOLEAN', 'RT_NUMBER', 'RT_STRING', 'RT_LITERAL', 'RT_ITERATOR',
     'RT_PLAN', 'RT_REMOTE', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT', 'RT_NOMINAL',
     'RT_ERROR'
@@ -177,7 +177,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 `(${fixTruthinessIfNeeded(excludeTypes, module, condition)}) ${c(outcome)}`)
             .join(' else if ')
             + (ast.defaultCase ? ` else ${c(ast.defaultCase)}` : '');
-        case "for-loop": return `for (const ${c(ast.itemIdentifier)} of ${c(ast.iterator)}[${INT}INNER_ITER]) ${c(ast.body)}`;
+        case "for-loop": return `for (const ${c(ast.itemIdentifier)} of ${c(ast.iterator)}.inner) ${c(ast.body)}`;
         case "while-loop": return `while (${fixTruthinessIfNeeded(excludeTypes, module, ast.condition)}) ${c(ast.body)}`;
         case "proc":
         case "js-proc":

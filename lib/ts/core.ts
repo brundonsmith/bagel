@@ -92,7 +92,7 @@ export function values<V>(obj: {[key: string]: V}): Iter<V> {
     return new Iter(() => _values(obj))
 }
 
-export const INNER_ITER = Symbol('INNER_ITER')
+const INNER_ITER = Symbol('INNER_ITER')
 
 type RawIter<T> = Iterable<T>|(() => Generator<T>)
 
@@ -108,7 +108,7 @@ export class Iter<T> {
         this[INNER_ITER] = inner
     }
 
-    private get inner() {
+    get inner() {
         const inner = this[INNER_ITER]
         return typeof inner === 'function' ? inner() : inner
     }

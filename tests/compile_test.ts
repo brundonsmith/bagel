@@ -284,7 +284,7 @@ Deno.test({
       const doStuff = (items: ___Iter<number>): void => {
         let count = 0;
 
-        for (const item of items[___INNER_ITER]) {
+        for (const item of items.inner) {
         };
 
         log(count);
@@ -321,7 +321,7 @@ Deno.test({
       const doStuff = (items: ___Iter<number>): void => {
         let count = 0;
     
-        for (const item of items[___INNER_ITER]) {
+        for (const item of items.inner) {
             if ((___observe(item, 'foo') != null && (___observe(item, 'foo') as unknown) !== false && (___observe(item, 'foo') as any).kind !== ___ERROR_SYM)) {
               count = (count + 1);
             };
