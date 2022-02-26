@@ -1810,7 +1810,39 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Typeof type pass",
+  fn() {
+    testTypecheck(`
+    const a = {
+      a: 1,
+      b: 2,
+      c: 3
+    }
+    
+    func foo(val: typeof a) => nil
+    
+    const b = foo(a)`,
+    false)
+  }
+})
 
+Deno.test({
+  name: "Typeof type fail",
+  fn() {
+    testTypecheck(`
+    const a = {
+      a: 1,
+      b: 2,
+      c: 3
+    }
+    
+    func foo(val: typeof a) => nil
+    
+    const b = foo(12)`,
+    false)
+  }
+})
 
 
 function testTypecheck(code: string, shouldFail: boolean): void {

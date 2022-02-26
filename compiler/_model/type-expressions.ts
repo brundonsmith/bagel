@@ -1,5 +1,5 @@
 import { AST, PlainIdentifier, SourceInfo } from "./ast.ts";
-import { BooleanLiteral, ExactStringLiteral, NumberLiteral } from "./expressions.ts";
+import { BooleanLiteral, ExactStringLiteral, Expression, NumberLiteral } from "./expressions.ts";
 
 export type TypeExpression =
     | UnionType
@@ -26,6 +26,7 @@ export type TypeExpression =
     | RemoteType
     | ErrorType
     | ParenthesizedType
+    | TypeofType
     | UnknownType
     | AnyType
     | NeverType
@@ -219,6 +220,12 @@ export type ErrorType = SourceInfo & {
 export type ParenthesizedType = SourceInfo & {
     readonly kind: "parenthesized-type",
     readonly inner: TypeExpression,
+    readonly mutability: undefined,
+}
+
+export type TypeofType = SourceInfo & {
+    readonly kind: "typeof-type",
+    readonly expr: Expression,
     readonly mutability: undefined,
 }
 
@@ -601,6 +608,7 @@ const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } 
     "error-type": undefined,
     "remote-type": undefined,
     "parenthesized-type": undefined,
+    "typeof-type": undefined,
     "literal-type": undefined,
     "tuple-type": undefined,
     "nominal-type": undefined,

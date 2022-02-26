@@ -685,6 +685,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "type-declaration":
             case "proc-declaration":
             case "func-declaration":
+            case "typeof-type":
                 break;
             default:
                 // @ts-expect-error
@@ -884,6 +885,8 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
             return resolveT(type.extends ?? UNKNOWN_TYPE)
         case "parenthesized-type":
             return resolveT(type.inner)
+        case "typeof-type":
+            return inferType(reportError, type.expr)
         case "error-type":
         case "remote-type":
         case "iterator-type": {

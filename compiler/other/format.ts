@@ -235,6 +235,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "never-type": return "<never>";
         case "element-type": return `Element`;
         case "parenthesized-type": return `(${f(ast.inner)})`;
+        case "typeof-type": return `typeof ${f(ast.expr)}`;
         // case "element-type": return `<${ast.tagName}>`;
         case "property-type": return `${f(ast.subject)}${ast.optional ? '?' : ''}.${ast.property.name}`;
         case "javascript-escape-type": return "<js escape>";
