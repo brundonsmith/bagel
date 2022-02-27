@@ -6,6 +6,9 @@ import { computedFn, makeAutoObservable } from "./mobx.ts";
 import { pathIsRemote } from "./utils/misc.ts";
 import { ModuleName } from "./_model/common.ts";
 import { lint, LintProblem } from "./other/lint.ts";
+import { ValueDeclaration } from "./_model/declarations.ts";
+import { PlainIdentifier } from "./_model/ast.ts";
+import { ExactStringLiteral, Expression } from "./_model/expressions.ts";
 
 export type Mode =
     | { mode: "build", entryFile: ModuleName, watch: boolean }
@@ -72,6 +75,20 @@ export class _Store {
 const Store = new _Store()
 export default Store
 
+async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
+    for await (const file of Deno.readDir(dirPath)) {
+        const filePath = path.resolve(dirPath, file.name);
+
+        if ((await Deno.stat(filePath)).isDirectory) {
+            await getAllFiles(filePath, arrayOfFiles);
+        } else {
+            arrayOfFiles.push(filePath);
+        }
+    }
+  
+    return arrayOfFiles;
+}
+
 export const done = computedFn((store: _Store) =>
     store.mode != null && store.modules.size > 0 && store.modulesSource.size >= store.modules.size)
 
@@ -88,7 +105,7 @@ export const allProblems = computedFn((store: _Store) => {
             // console.log(withoutSourceInfo(parsed.ast))
             const { errors: parseErrors } = parseResult
             const typecheckErrors = typeerrors(store, module)
-            const lintProblems = lint(parseResult.ast)
+            const lintProblems = lint(getConfig(store), parseResult.ast)
 
             for (const err of [...parseErrors, ...typecheckErrors, ...lintProblems].filter((err, index, arr) => !isError(err) || arr.findIndex(other => isError(other) && errorsEquivalent(err, other)) === index)) {
                 const errorModule = err.ast?.module ?? module;
@@ -115,16 +132,64 @@ export function canonicalModuleName(importerModule: string, importPath: string):
     }
 }
 
-async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
-    for await (const file of Deno.readDir(dirPath)) {
-        const filePath = path.resolve(dirPath, file.name);
+export type BagelConfig = {
+    platforms: string[]|undefined,
+    markupFunction: Expression|undefined
+    lintRules: {[key: string]: string}|undefined
+}
 
-        if ((await Deno.stat(filePath)).isDirectory) {
-            await getAllFiles(filePath, arrayOfFiles);
-        } else {
-            arrayOfFiles.push(filePath);
+export function getConfig(store: _Store): BagelConfig|undefined {
+    if (store.mode?.mode === 'mock') {
+        return undefined
+    } else if (store.mode?.mode === 'build' || store.mode?.mode === 'run') {
+        const { entryFile } = store.mode
+        const res = parsed(store, entryFile)
+        const configDecl = res?.ast.declarations.find(decl =>
+            decl.kind === 'value-declaration' && decl.isConst && decl.name.name === 'config') as ValueDeclaration|undefined
+
+        // TODO: Eventually we want to actually evaluate the const, not
+        // just walk its AST
+        if (configDecl?.value.kind === 'object-literal') {
+            let platforms: string[]|undefined
+            let markupFunction: Expression|undefined
+            let lintRules: {[key: string]: string}|undefined
+            
+            {
+                const platformsExpr = (configDecl.value.entries.find(e =>
+                    Array.isArray(e) && (e[0] as PlainIdentifier).name === 'platforms') as any)?.[1] as Expression|undefined
+                
+                platforms = platformsExpr?.kind === 'array-literal' ?
+                    platformsExpr.entries.filter(e => e.kind === 'exact-string-literal').map(e => (e as ExactStringLiteral).value)
+                : undefined
+            }
+            
+            {
+                markupFunction = (configDecl.value.entries.find(e =>
+                    Array.isArray(e) && (e[0] as PlainIdentifier).name === 'markupFunction') as any)?.[1] as Expression|undefined
+            }
+
+            {
+                const lintRulesExpr = (configDecl.value.entries.find(e =>
+                    Array.isArray(e) && (e[0] as PlainIdentifier).name === 'lintRules') as any)?.[1] as Expression|undefined
+                
+                lintRules = lintRulesExpr?.kind === 'object-literal' ?
+                    Object.fromEntries(lintRulesExpr.entries
+                        .filter(e => Array.isArray(e) && (e[1] as Expression).kind === 'exact-string-literal')
+                        .map(e => [
+                            (e as [PlainIdentifier, ExactStringLiteral])[0].name,
+                            (e as [PlainIdentifier, ExactStringLiteral])[1].value,
+                        ]))
+                : undefined
+            }
+            
+            return {
+                platforms,
+                markupFunction,
+                lintRules
+            }
         }
+
+    } else {
+        // TODO: Look for index.bgl if directory was specified
     }
-  
-    return arrayOfFiles;
 }

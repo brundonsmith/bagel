@@ -3,7 +3,7 @@ import { resolve } from "../3_checking/resolve.ts";
 import { overlaps, resolveType, subsumes } from "../3_checking/typecheck.ts";
 import { inferType } from "../3_checking/typeinfer.ts";
 import { computedFn } from "../mobx.ts";
-import { _Store } from "../store.ts";
+import { BagelConfig, _Store } from "../store.ts";
 import { findAncestor, iterateParseTree, mapParseTree } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
@@ -12,9 +12,9 @@ import { Expression, Func, Proc } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, FALSY, NUMBER_TYPE, STRING_TYPE } from "../_model/type-expressions.ts";
 import { format,DEFAULT_OPTIONS } from "./format.ts";
 
-export function lint(ast: AST): LintProblem[] {
+export function lint(config: BagelConfig|undefined, ast: AST): LintProblem[] {
     const problems: LintProblem[] = []
-    const rules = (Object.entries(RULES) as [RuleName, LintRule][]).filter(rule => DEFAULT_SEVERITY[rule[0]] !== 'off')
+    const rules = (Object.entries(RULES) as [LintRuleName, LintRule][]).filter(rule => (config?.lintRules?.[rule[0]] ?? DEFAULT_SEVERITY[rule[0]]) !== 'off')
 
     for (const { current } of iterateParseTree(ast)) {
         for (const [name, rule] of rules) {
@@ -25,7 +25,7 @@ export function lint(ast: AST): LintProblem[] {
                     kind: 'lint-problem',
                     rule,
                     ast: problemNode,
-                    severity: DEFAULT_SEVERITY[name]
+                    severity: (config?.lintRules?.[name] as LintRuleSeverity|undefined ?? DEFAULT_SEVERITY[name])
                 })
             }
         }
@@ -71,17 +71,17 @@ type LintRule = {
     readonly autofix: ((ast: AST) => AST) | undefined,
 }
 
-type Severity = 'error'|'warning'|'info'|'off'
+export type LintRuleSeverity = 'error'|'warning'|'info'|'off'
 
 export type LintProblem = {
     readonly kind: 'lint-problem',
     readonly rule: LintRule,
     readonly ast: AST,
-    readonly severity: Severity,
+    readonly severity: LintRuleSeverity,
 }
 
 const RULES = {
-    'unnecessary-parens': {
+    'unnecessaryParens': {
         message: () => "Parenthesis aren't needed around this expression",
         match: (ast: AST) => {
             if ((ast.kind === 'case' || ast.kind === 'case-block') && ast.condition.kind === 'parenthesized-expression') {
@@ -99,7 +99,7 @@ const RULES = {
             return ast
         }
     },
-    'func-or-proc-as-value': {
+    'funcOrProcAsValue': {
         message: (ast: AST) => {
             const decl = ast as ValueDeclaration
             const val = decl.value as Proc|Func
@@ -143,7 +143,7 @@ const RULES = {
             return ast
         }
     },
-    'redundant-conditional': {
+    'redundantConditional': {
         message: (ast: AST) => {
             const condType = resolveType(() => {}, inferType(() => {}, ast as Expression))
             const always = isAlways(ast as Expression)
@@ -161,7 +161,7 @@ const RULES = {
         },
         autofix: undefined
     },
-    'string-number-conditional': {
+    'stringNumberConditional': {
         message: (ast: AST) => `Condition has type '${format(inferType(() => {}, ast as Expression))}'. Beware using string or numbers in conditionals; in Bagel all strings and numbers are truthy!`,
         match: (ast: AST) => {
             const condition = conditionFrom(ast)
@@ -175,7 +175,7 @@ const RULES = {
         },
         autofix: undefined
     },
-    'explicit-booleans-only': {
+    'explicitBooleansOnly': {
         message: (ast: AST) => `Should only use explicit boolean expressions in conditionals; this expression is of type '${format(inferType(() => {}, ast as Expression))}'`,
         match: (ast: AST) => {
             const condition = conditionFrom(ast)
@@ -189,7 +189,7 @@ const RULES = {
         },
         autofix: undefined
     },
-    'pure-functions': {
+    'pureFunctions': {
         message: (ast: AST) => `Function declarations should not reference global state (referencing '${format(ast)}'). Convert "let" to "const" if the value is never mutated, or consider passing state in as an explicit function argument.`,
         match: (ast: AST) => {
             
@@ -258,14 +258,14 @@ function isAlways(condition: Expression): boolean|undefined {
 // optional lint against all non-boolean conditionals?
 // lint about declarations that can be hoisted because they don't reference anything in the inner scope
 
-type RuleName = keyof typeof RULES
+export type LintRuleName = keyof typeof RULES
 
-const DEFAULT_SEVERITY: { readonly [rule in RuleName]: Severity } = {
-    'unnecessary-parens': 'warning',
-    'func-or-proc-as-value': 'warning',
-    'redundant-conditional': 'error',
-    'string-number-conditional': 'warning',
-    'explicit-booleans-only': 'off',
-    'pure-functions': 'error',
+const DEFAULT_SEVERITY: { readonly [rule in LintRuleName]: LintRuleSeverity } = {
+    'unnecessaryParens': 'warning',
+    'funcOrProcAsValue': 'warning',
+    'redundantConditional': 'error',
+    'stringNumberConditional': 'warning',
+    'explicitBooleansOnly': 'off',
+    'pureFunctions': 'error',
     // 'unnecessary-nil-coalescing': 'warning'
 }
