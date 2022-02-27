@@ -2,13 +2,13 @@ import { Block, Module, PlainIdentifier } from "../_model/ast.ts";
 import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, TYPE_AST_NOISE, AST_NOISE } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
 import { ancestors, findAncestor, iterateParseTree, typesEqual, within } from "../utils/ast.ts";
 import { _Store } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
-import { stripSourceInfo } from "../utils/debugging.ts";
+import { log, stripSourceInfo } from "../utils/debugging.ts";
 import { computedFn } from "../mobx.ts";
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "./resolve.ts";
@@ -818,10 +818,9 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
         if (resolvedValue.kind === "object-type") {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
                 // TODO: Spreads
-                return subsumes(reportError, resolvedDestination.keyType, STRING_TYPE)
-                    && resolvedValue.entries.every(({ type }) =>
-                        // TODO: Optionals
-                        subsumes(reportError, resolvedDestination.valueType, type))
+                return resolvedValue.entries.every(({ name, type }) =>
+                    subsumes(reportError, resolvedDestination.keyType, { kind: 'literal-type', value: { kind: 'exact-string-literal', value: name.name, ...AST_NOISE }, ...TYPE_AST_NOISE }) &&
+                    subsumes(reportError, resolvedDestination.valueType, type))
             }
         }
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
@@ -830,10 +829,15 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
         const valueEntries =       propertiesOf(reportError, resolvedValue)
 
         return (
-            !!destinationEntries?.every(({ name: key, type: destinationValue }) => 
-                given(valueEntries?.find(e => e.name.name === key.name)?.type, value =>
-                    // TODO: Optionals
-                    subsumes(reportError,  destinationValue, value)))
+            destinationEntries?.every(({ name: key, type: destinationValue, optional }) => {
+                const valueEntry = valueEntries?.find(e => e.name.name === key.name)
+
+                if (valueEntry == null) {
+                    return optional
+                } else {
+                    return subsumes(reportError,  destinationValue, valueEntry.type)
+                }
+            }) === true
         );
     } else if ((resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") ||
                 (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") ||

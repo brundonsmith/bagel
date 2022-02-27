@@ -5,7 +5,7 @@ import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
 import { assignmentError, cannotFindModule } from "../errors.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
-import { AST } from "../_model/ast.ts";
+import { AST, PlainIdentifier } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
 import { areSame, expressionsEqual, mapParseTree, typesEqual } from "../utils/ast.ts";
 import Store, { getModuleByName } from "../store.ts";
@@ -555,7 +555,7 @@ const inferTypeInner = computedFn((
         case "object-literal": {
             const entries = ast.entries.map(entry => {
                 if (Array.isArray(entry)) {
-                    const [name, value] = entry
+                    const [name, value] = entry as [PlainIdentifier, Expression]
 
                     const type = resolveT(infer(value));
                     return {
@@ -1087,8 +1087,8 @@ function attribute(name: string, type: TypeExpression, forceReadonly: boolean): 
     }
 }
 
-const AST_NOISE = { module: undefined, code: undefined, startIndex: undefined, endIndex: undefined }
-const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
+export const AST_NOISE = { module: undefined, code: undefined, startIndex: undefined, endIndex: undefined }
+export const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
 
 /**
  * Given some type containing generic type params, and some other type intended
