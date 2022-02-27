@@ -2,18 +2,19 @@
 import { autorun, invalidate, observe, WHOLE_OBJECT } from "./_reactivity.ts";
 
 // Preact
-// export {
-//     h
-// } from "https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js"
-// import { render as prender } from "https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js"
+// import { h as ph, render as prender } from "https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js"
+// export function h(tagName: string, attributes: object, children: Element[]) {
+//     ph(tagName, attributes, ...children)
+// }
 // export function render(el: unknown) {
 //     // @ts-ignore
 //     prender(el, document.body)
 // }
 
+
 type Element = { tagName: string, attributes: object, children: Element[] }
 
-export function h(tagName: string, attributes: object, ...children: Element[]): Element {
+export function h(tagName: string, attributes: object, children: Element[]): Element {
     return { tagName, attributes, children }
 }
 
