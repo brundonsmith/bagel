@@ -17,3 +17,19 @@ export js func iter<T>(x: const T[]): Iterator<T> => {#
 #}
 
 export type UnknownObject = {[string]: unknown} | (const {[string]: unknown})
+
+type LintRuleName =
+    | 'unnecessaryParens'
+    | 'funcOrProcAsValue'
+    | 'redundantConditional'
+    | 'stringNumberConditional'
+    | 'explicitBooleansOnly'
+    | 'pureFunctions'
+
+type LintRuleSeverity = 'error'|'warning'|'info'|'off'
+
+export type BagelConfig = {
+    platforms?: ('web'|'node'|'deno')[],
+    markupFunction?: (tag: string, props: UnknownObject, children: unknown[]) => unknown,
+    lintRules?: {[LintRuleName]: LintRuleSeverity}
+}
