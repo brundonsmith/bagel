@@ -103,3 +103,44 @@ Features that exist but need more cases covered:
   - propertiesOf, for some more things like object-unions
 
 - `if (cond) a else b` instead of `if cond { a } else { b }`?
+
+
+2/26/2022
+
+Improvement
+- Continue to flesh out various parts of type inference
+- Continue to increase test coverage
+- lint for identifier casing
+- built-in, safe but limited deep-equals (also deep-clone?)
+    - look at lodash for more builtins?
+
+MVP
+- configuration
+- generalize "JSX" syntax integration
+- implement more platform APIs, and gate behind specified platforms
+    - gate at the declaration level? deno js func foo() => ...
+- implement express integration
+- Regex
+- Errors and handling in procs
+- Bagel tests
+    - Mocking system
+- debugging utils (functional logging, etc)
+- parallel await
+- autoruns only allowed in index.bgl?
+    - maybe also in files that completely declare their "let" dependencies?
+- import non-bgl files as text or json
+
+Chores
+- Docs
+- TextMate language
+- sourcemaps
+
+Ideas
+- Decorators?
+- "impure" keyword for functions?
+- specific-length array and string types?
+- numeric types with range information?
+- intermediate representation to simplify compiling?
+- lint against shadowing?
+- "generator" iterator?
+- some sort of previewing of constant values, and/or "explain" CLI for declarations
