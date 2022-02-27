@@ -4,7 +4,7 @@ import { given } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, TYPE_AST_NOISE, AST_NOISE } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
-import { ancestors, findAncestor, iterateParseTree, typesEqual, within } from "../utils/ast.ts";
+import { ancestors, findAncestor, iterateParseTree, literalType, maybeOf, typesEqual, within } from "../utils/ast.ts";
 import Store, { getModuleByName, _Store } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
@@ -860,7 +860,7 @@ export function subsumes(destination: TypeExpression, value: TypeExpression): bo
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
                 // TODO: Spreads
                 return resolvedValue.entries.every(({ name, type }) =>
-                    subsumes(resolvedDestination.keyType, { kind: 'literal-type', value: { kind: 'exact-string-literal', value: name.name, ...AST_NOISE }, ...TYPE_AST_NOISE }) &&
+                    subsumes(resolvedDestination.keyType, literalType(name)) &&
                     subsumes(resolvedDestination.valueType, type))
             }
         }
@@ -950,20 +950,8 @@ export function resolveType(type: TypeExpression): TypeExpression {
 
                 return {
                     kind: 'union-type',
-                    members: inner.entries.map(entry => {
-                        const { parent, module, code, startIndex, endIndex } = entry.name
-
-                        return {
-                            kind: 'literal-type',
-                            value: {
-                                kind: 'exact-string-literal',
-                                value: entry.name.name,
-                                parent, module, code, startIndex, endIndex
-                            },
-                            mutability: undefined,
-                            parent, module, code, startIndex, endIndex
-                        }
-                    }),
+                    members: inner.entries.map(entry => 
+                        literalType(entry.name)),
                     mutability: undefined,
                     parent, module, code, startIndex, endIndex
                 }
@@ -1097,14 +1085,8 @@ export function resolveType(type: TypeExpression): TypeExpression {
                 : subjectType;
             const property = propertiesOf(nilTolerantSubjectType)?.find(entry => entry.name.name === type.property.name)
             
-            const { parent, module, code, startIndex, endIndex } = type
             if (type.optional && property) {
-                return resolveType({
-                    kind: "maybe-type",
-                    inner: property.type,
-                    mutability: undefined,
-                    parent, module, code, startIndex, endIndex
-                })
+                return resolveType(maybeOf(property.type))
             } else {
                 const mutability = (
                     property?.type?.mutability == null ? undefined :
@@ -1116,14 +1098,9 @@ export function resolveType(type: TypeExpression): TypeExpression {
                 return (
                     given(property, property => resolveType((
                             property.optional
-                                ?  {
-                                    kind: "maybe-type",
-                                    inner: { ...property.type, mutability },
-                                    mutability: undefined,
-                                    module, code, startIndex, endIndex
-                                }
-                                : { ...property.type, mutability }
-                            ) as TypeExpression)) 
+                                ?  maybeOf({ ...property.type, mutability } as TypeExpression)
+                                : { ...property.type, mutability } as TypeExpression
+                            ))) 
                         ?? UNKNOWN_TYPE
                 )
             }

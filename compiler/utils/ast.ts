@@ -1,6 +1,7 @@
-import { AST,SourceInfo } from "../_model/ast.ts";
-import { Expression } from "../_model/expressions.ts";
-import { TypeExpression } from "../_model/type-expressions.ts";
+import { AST_NOISE } from "../3_checking/typeinfer.ts";
+import { AST,PlainIdentifier,SourceInfo } from "../_model/ast.ts";
+import { BooleanLiteral, ExactStringLiteral, Expression, NumberLiteral } from "../_model/expressions.ts";
+import { LiteralType, MaybeType, PlanType, TypeExpression } from "../_model/type-expressions.ts";
 import { deepEquals } from "./misc.ts";
 
 export function areSame(a: AST|undefined, b: AST|undefined) {
@@ -119,5 +120,54 @@ function mapParseTreeInner<T extends AST|AST[]|[AST, AST][]|undefined|string|num
 export function setParents(ast: AST) {
     for (const { current, parent } of iterateParseTree(ast)) {
         (current as { parent: AST|undefined }).parent = parent
+    }
+}
+
+export function maybeOf(inner: TypeExpression): MaybeType {
+    const { parent, module, code, startIndex, endIndex } = inner
+
+    return {
+        kind: 'maybe-type',
+        inner,
+        mutability: undefined,
+        parent, module, code, startIndex, endIndex
+    }
+}
+
+export function literalType(value: ExactStringLiteral|NumberLiteral|BooleanLiteral|PlainIdentifier|string|number): LiteralType {
+    
+    if (typeof value === 'string' || typeof value === 'number') {
+        return {
+            kind: 'literal-type',
+            value: {
+                kind: typeof value === 'string' ? 'exact-string-literal' : 'number-literal',
+                value,
+                ...AST_NOISE
+            } as ExactStringLiteral|NumberLiteral,
+            mutability: undefined,
+            ...AST_NOISE
+        }
+    }
+    
+    const { parent, module, code, startIndex, endIndex } = value
+
+    if (value.kind === 'plain-identifier') {
+        return {
+            kind: 'literal-type',
+            value: {
+                kind: 'exact-string-literal',
+                value: value.name,
+                parent, module, code, startIndex, endIndex
+            },
+            mutability: undefined,
+            parent, module, code, startIndex, endIndex
+        }
+    } else {
+        return {
+            kind: 'literal-type',
+            value,
+            mutability: undefined,
+            parent, module, code, startIndex, endIndex
+        }
     }
 }

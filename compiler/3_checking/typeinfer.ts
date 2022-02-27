@@ -6,7 +6,7 @@ import { resolveType, subsumes } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, PlainIdentifier } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
-import { areSame, expressionsEqual, mapParseTree, typesEqual } from "../utils/ast.ts";
+import { areSame, expressionsEqual, literalType, mapParseTree, maybeOf, typesEqual } from "../utils/ast.ts";
 import Store, { getModuleByName } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration } from "../_model/declarations.ts";
@@ -187,20 +187,10 @@ const inferTypeInner = computedFn((
                 if (!subsumes(baseType.keyType, indexType)) {
                     return UNKNOWN_TYPE;
                 } else {
-                    return {
-                        kind: "maybe-type",
-                        inner: baseType.valueType,
-                        parent,
-                        ...TYPE_AST_NOISE
-                    };
+                    return maybeOf(baseType.valueType)
                 }
             } else if (baseType.kind === "array-type" && indexIsNumber) {
-                return {
-                    kind: "maybe-type",
-                    inner: baseType.element,
-                    parent,
-                    ...TYPE_AST_NOISE
-                }
+                return maybeOf(baseType.element)
             } else if (baseType.kind === "tuple-type" && indexIsNumber) {
                 if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
                     return baseType.members[indexType.value.value] ?? NIL_TYPE
@@ -213,38 +203,18 @@ const inferTypeInner = computedFn((
                     }
                 }
             } else if (baseType.kind === 'string-type' && indexIsNumber) {
-                return {
-                    kind: "maybe-type",
-                    inner: STRING_TYPE,
-                    parent,
-                    ...TYPE_AST_NOISE
-                }
+                return maybeOf(STRING_TYPE)
             } else if (baseType.kind === 'literal-type' && baseType.value.kind === 'exact-string-literal' && indexIsNumber) {
                 if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
                     const char = baseType.value.value[indexType.value.value]
 
                     if (char) {
-                        return {
-                            kind: 'literal-type',
-                            value: {
-                                kind: 'exact-string-literal',
-                                value: char,
-                                parent,
-                                ...AST_NOISE
-                            },
-                            parent,
-                            ...TYPE_AST_NOISE
-                        }
+                        return literalType(char)
                     } else {
                         return NIL_TYPE
                     }
                 } else {
-                    return {
-                        kind: "maybe-type",
-                        inner: STRING_TYPE,
-                        parent,
-                        ...TYPE_AST_NOISE
-                    }
+                    return maybeOf(STRING_TYPE)
                 }
             }
 
@@ -413,12 +383,7 @@ const inferTypeInner = computedFn((
         case "string-literal": return STRING_TYPE;
         case "exact-string-literal":
         case "number-literal":
-        case "boolean-literal": return {
-            kind: 'literal-type',
-            value: ast,
-            mutability: undefined,
-            parent, module, code, startIndex, endIndex
-        };
+        case "boolean-literal": return literalType(ast);
         case "nil-literal": return NIL_TYPE;
         case "javascript-escape": return JAVASCRIPT_ESCAPE_TYPE;
         case "instance-of": return BOOLEAN_TYPE;
@@ -553,12 +518,7 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
                 return props?.find(prop => prop.name.name === binding.identifier.name)?.type ?? UNKNOWN_TYPE
             } else if (decl.destructureKind === 'array') {
                 if (objectOrArrayType.kind === 'array-type') {
-                    return {
-                        kind: "maybe-type",
-                        inner: objectOrArrayType.element,
-                        parent,
-                        ...TYPE_AST_NOISE
-                    }
+                    return maybeOf(objectOrArrayType.element)
                 } else if (objectOrArrayType.kind === 'tuple-type') {
                     const index = decl.properties.findIndex(p => p.name === binding.identifier.name)
                     return objectOrArrayType.members[index] ?? UNKNOWN_TYPE
@@ -572,13 +532,7 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
 
             if (arg?.type) {
                 if (arg.optional) {
-                    const { parent, module, code, startIndex, endIndex } = arg
-                    return {
-                        kind: 'maybe-type',
-                        inner: arg.type,
-                        mutability: undefined,
-                        parent, module, code, startIndex, endIndex
-                    }
+                    return maybeOf(arg.type)
                 } else {
                     return arg.type
                 }
@@ -593,14 +547,7 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
                     if (!inferredArg?.optional) {
                         return declaredType
                     } else {
-                        const { module, code, startIndex, endIndex } = declaredType
-
-                        return {
-                            kind: 'maybe-type',
-                            inner: declaredType,
-                            mutability: undefined,
-                            module, code, startIndex, endIndex
-                        }
+                        return maybeOf(declaredType)
                     }
                 }
                 
@@ -1069,17 +1016,7 @@ export const propertiesOf = computedFn((
         }
         case "tuple-type": {
             return [
-                attribute("length", {
-                    kind: "literal-type",
-                    value: {
-                        kind: "number-literal",
-                        value: resolvedType.members.length,
-                        parent: resolvedType.parent,
-                        ...AST_NOISE
-                    },
-                    parent: resolvedType.parent,
-                    ...TYPE_AST_NOISE
-                }, true)
+                attribute("length", literalType(resolvedType.members.length), true)
             ]
         }
         case "error-type": {
