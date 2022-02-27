@@ -272,7 +272,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                 if (fnType.kind === 'func-type') {
                     if (fnType.args.length > 0) {
-                        reportError(miscError(current.fn, `Derive functions shouldn't take any arguments`))
+                        reportError(miscError(current.fn, `Derive declarations shouldn't take any arguments`))
                     }
 
                     if (current.type != null) {
@@ -298,7 +298,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     }
                 } else if (fnType.kind === 'func-type' && fnType.returnType?.kind === 'plan-type') {
                     if (fnType.args.length > 0) {
-                        reportError(miscError(current.fn, `Remote functions shouldn't take any arguments`))
+                        reportError(miscError(current.fn, `Remotes declarations shouldn't take any arguments`))
                     }
 
                     if (current.type != null) {
@@ -589,7 +589,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 if (current.target.kind === "property-accessor" || current.target.kind === "indexer") {
                     const subjectType = resolveType(inferType(current.target.subject))
                     if (subjectType.mutability !== "mutable") {
-                        reportError(miscError(current.target, `Cannot assign to '${format(current.target)}' because '${format(current.target.subject)}' is constant`));
+                        reportError(miscError(current.target, `Cannot assign to '${format(current.target)}' because '${format(current.target.subject)}' is immutable`));
                     }
                 }
 

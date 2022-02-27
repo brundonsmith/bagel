@@ -858,11 +858,19 @@ function distillUnion(type: TypeExpression): TypeExpression {
 export function subtract(type: TypeExpression, without: TypeExpression): TypeExpression {
     type = resolveType(type)
     without = resolveType(without)
+    
+    if (without.kind === 'union-type') {
+        let t = type
 
-    if (type.kind === "union-type") {
+        for (const member of without.members) {
+            t = subtract(t, member)
+        }
+
+        return t
+    } else if (type.kind === "union-type") {
         return {
             ...type,
-            members: type.members.filter(member => !subsumes(without, member))
+            members: type.members.filter(member => !typesEqual(member, without)).map(member => subtract(member, without))
         }
     } else if(type.kind === 'boolean-type' && without.kind === 'literal-type' && without.value.kind === 'boolean-literal') {
         if (without.value.value) {
@@ -876,10 +884,21 @@ export function subtract(type: TypeExpression, without: TypeExpression): TypeExp
 }
 
 function narrow(type: TypeExpression, fit: TypeExpression): TypeExpression {
-    if (type.kind === "union-type") {
+    type = resolveType(type)
+    fit = resolveType(fit)
+
+    if (fit.kind === 'union-type') {
+        let t = type
+
+        for (const member of fit.members) {
+            t = narrow(t, member)
+        }
+
+        return t
+    } else if (type.kind === "union-type") {
         return {
             ...type,
-            members: type.members.filter(member => subsumes(fit, member))
+            members: type.members.map(member => narrow(member, fit))
         }
     } else if (type.kind === 'unknown-type') {
         return fit
