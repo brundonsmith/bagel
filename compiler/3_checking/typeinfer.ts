@@ -644,12 +644,16 @@ function broadenTypeForMutation(type: TypeExpression): TypeExpression {
         if (type.value.kind === 'boolean-literal') {
             return BOOLEAN_TYPE
         }
-    } else if (type.kind === 'tuple-type' && type.mutability === 'mutable') {
-        return { ...type, kind: 'array-type', element: { kind: 'union-type', members: type.members.map(broadenTypeForMutation), parent: type.parent, ...TYPE_AST_NOISE } }
-    } else if (type.kind === 'array-type' && type.mutability === 'mutable') {
-        return { ...type, element: broadenTypeForMutation(type.element) }
-    } else if (type.kind === 'object-type' && type.mutability === 'mutable') {
-        return { ...type, entries: type.entries.map(attribute => ({ ...attribute, type: broadenTypeForMutation(attribute.type) })) }
+    } else if (type.mutability === 'mutable' || type.mutability === 'literal') {
+        if (type.kind === 'tuple-type') {
+            return { ...type, kind: 'array-type', element: { kind: 'union-type', members: type.members.map(broadenTypeForMutation), parent: type.parent, ...TYPE_AST_NOISE } }
+        } else if (type.kind === 'array-type') {
+            return { ...type, element: broadenTypeForMutation(type.element) }
+        } else if (type.kind === 'object-type') {
+            return { ...type, entries: type.entries.map(attribute => ({ ...attribute, type: broadenTypeForMutation(attribute.type) })) }
+        } else if (type.kind === 'record-type') {
+            return { ...type, keyType: broadenTypeForMutation(type.keyType), valueType: broadenTypeForMutation(type.valueType) }
+        }
     }
 
     return type

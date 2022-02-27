@@ -2125,6 +2125,28 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Mutability broadening",
+  fn() {
+    testTypecheck(`
+    proc push(arr: number[], el: number) {
+    }
+
+    proc foo() {
+      let obj = { a: 0, b: '' };
+      obj.a = 12;
+      obj.b = 'stuff';
+
+      let arr = [1, 2];
+      arr[1] = 3;
+      arr.push(4);
+    }`,
+    false)
+  }
+})
+
+
+
 
 
 function testTypecheck(code: string, shouldFail: boolean): void {
