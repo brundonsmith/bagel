@@ -2038,9 +2038,12 @@ const exactStringLiteral: ParseFunction<ExactStringLiteral> = (module, code, sta
 
 const numberLiteral: ParseFunction<NumberLiteral> = (module, code, startIndex) => {
     let index = startIndex;
-    if (isNumeric(code[index])) {
-        const numberStart = index;
 
+    if (code[index] === '-') {
+        index++
+    }
+
+    if (isNumeric(code[index])) {
         index++;
         while (isNumeric(code[index])) {
             index++;
@@ -2049,7 +2052,7 @@ const numberLiteral: ParseFunction<NumberLiteral> = (module, code, startIndex) =
         return {
             parsed: {
                 kind: "number-literal",
-                value: Number(code.substring(numberStart, index)),
+                value: Number(code.substring(startIndex, index)),
                 module,
                 code,
                 startIndex,
