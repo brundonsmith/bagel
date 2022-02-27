@@ -1,0 +1,12 @@
+
+js#
+import { h as ___h, render as ___render } from 'https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js'
+#js
+
+export js func markupFunction(tagName: string, attributes: UnknownObject, children: Element[]): Element => {#
+    return ___h(tagName, attributes, ...children)
+#}
+
+export js proc render(el: Element) {#
+    ___render(el, document.body)
+#}

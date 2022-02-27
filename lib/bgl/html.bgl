@@ -1,10 +1,10 @@
 
 js#
-import { render as ___render } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts'
+import { defaultRender as ___defaultRender } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts'
 #js
 
 export proc render(el: Element) {
-    js# ___render(el) #js
+    js# ___defaultRender(el) #js
 }
 
 export type Event = {

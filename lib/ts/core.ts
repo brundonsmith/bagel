@@ -1,24 +1,14 @@
 
 import { autorun, invalidate, observe, WHOLE_OBJECT } from "./_reactivity.ts";
 
-// Preact
-// import { h as ph, render as prender } from "https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js"
-// export function h(tagName: string, attributes: object, children: Element[]) {
-//     ph(tagName, attributes, ...children)
-// }
-// export function render(el: unknown) {
-//     // @ts-ignore
-//     prender(el, document.body)
-// }
-
 
 type Element = { tagName: string, attributes: object, children: Element[] }
 
-export function h(tagName: string, attributes: object, children: Element[]): Element {
+export function defaultMarkupFunction(tagName: string, attributes: object, children: Element[]): Element {
     return { tagName, attributes, children }
 }
 
-export function render(el: Element) {
+export function defaultRender(el: Element) {
     // @ts-ignore
     document.body.innerHTML = _renderInner(el)
 }

@@ -34,8 +34,8 @@ export const IMPORTED_ITEMS = [
     // reactivity
     'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'WHOLE_OBJECT', 
 
-    // rendering; TODO: genericize somehow
-    'h',
+    // rendering
+    'defaultMarkupFunction',
     
     // used in compiler output
     'range', 'Iter', 'Plan', 'Error', 'ERROR_SYM', 'Remote',
@@ -297,7 +297,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "javascript-escape": return ast.js;
         case "indexer": return `${c(ast.subject)}[${c(ast.indexer)}]`;
         case "block": return `{ ${blockContents(excludeTypes, module, ast)} }`;
-        case "element-tag": return `${INT}h('${ast.tagName.name}',{${
+        case "element-tag": return `${INT}defaultMarkupFunction('${ast.tagName.name}',{${
             objectEntries(excludeTypes, module, (ast.attributes as ([PlainIdentifier, Expression|Expression[]] | Spread)[]))}}, [ ${ast.children.map(c).join(', ')} ])`;
         case "union-type": return ast.members.map(c).join(" | ");
         case "maybe-type": return c(ast.inner) + '|null|undefined'
