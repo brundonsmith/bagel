@@ -568,10 +568,20 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
         case 'func':
         case 'proc': {
             const funcOrProcType = decl.type.kind === 'generic-type' ? decl.type.inner : decl.type
-            const argType = funcOrProcType.args.find(a => a.name.name === binding.identifier.name)?.type
+            const arg = funcOrProcType.args.find(a => a.name.name === binding.identifier.name)
 
-            if (argType) {
-                return argType
+            if (arg?.type) {
+                if (arg.optional) {
+                    const { parent, module, code, startIndex, endIndex } = arg
+                    return {
+                        kind: 'maybe-type',
+                        inner: arg.type,
+                        mutability: undefined,
+                        parent, module, code, startIndex, endIndex
+                    }
+                } else {
+                    return arg.type
+                }
             }
 
             const inferredHolderType = inferType(decl, visited)
