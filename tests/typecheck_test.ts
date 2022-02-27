@@ -812,6 +812,34 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Boolean refinement pass",
+  fn() {
+    testTypecheck(
+      `
+      func foo(val: boolean|string): true|string =>
+        if val {
+          val
+        } else {
+          'stuff'
+        }`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Boolean refinement fail",
+  fn() {
+    testTypecheck(
+      `
+      func foo(val: boolean|string): true|string =>
+        val`,
+      true,
+    );
+  },
+});
+
+Deno.test({
   name: "Object type spread 1",
   fn() {
     testTypecheck(
@@ -1045,6 +1073,18 @@ Deno.test({
     );
   },
 });
+
+Deno.test({
+  name: "Fail to import module",
+  fn() {
+    testMultiModuleTypecheck({
+      "module-1": `
+      export func foo(b: number) => b * 2`,
+      "module-2": `
+      from 'module-3' import { foo }`
+    }, true)
+  }
+})
 
 Deno.test({
   name: "Inferred type across modules",
@@ -1615,6 +1655,18 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Import all fail 4",
+  fn() {
+    testMultiModuleTypecheck({
+      'a': `export func foo(a: number) => a + 'stuff'`,
+      'b': `
+      import 'c' as moduleA`
+    },
+    true)
+  }
+})
+
+Deno.test({
   name: "Record type pass",
   fn() {
     testTypecheck(`
@@ -2133,7 +2185,7 @@ Deno.test({
     }
 
     proc foo() {
-      let obj = { a: 0, b: '' };
+      let obj = { a: 0, b: '', c: false };
       obj.a = 12;
       obj.b = 'stuff';
 
@@ -2145,7 +2197,122 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Remote pass",
+  fn() {
+    testTypecheck(`
+    proc log(val: unknown) { }
 
+    js func get(n: number): Plan<string> => {# #}
+
+    let incr = 0
+    remote foo: string () => get(incr)
+    
+    proc thing() {
+      if (!foo.loading) {
+        log(foo.value);
+      }
+
+      incr = incr + 1;
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Remote fail 1",
+  fn() {
+    testTypecheck(`
+    proc log(val: unknown) { }
+
+    js func get(n: number): Plan<string> => {# #}
+
+    let incr = 0
+    remote foo: number () => get(incr)
+    `,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Remote fail 2",
+  fn() {
+    testTypecheck(`
+    js func get(n: number): Plan<string> => {# #}
+
+    let incr = 0
+    remote foo: string () => get(incr)
+    
+    proc thing() {
+      foo.value = 'stuff';
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Remote fail 3",
+  fn() {
+    testTypecheck(`
+    js func get(n: number): Plan<string> => {# #}
+
+    let incr = 0
+    remote foo: string () => incr`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Remote fail 4",
+  fn() {
+    testTypecheck(`
+    js func get(n: number): Plan<string> => {# #}
+
+    let incr = 0
+    remote foo: string (x: string) => get(incr)`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Derive pass",
+  fn() {
+    testTypecheck(`
+    proc log(val: unknown) { }
+
+    let incr = 0
+    derive doubled: number () => incr * 2
+    
+    proc thing() {
+      log(doubled + incr);
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Derive fail 1",
+  fn() {
+    testTypecheck(`
+    proc log(val: unknown) { }
+
+    let incr = 0
+    derive doubled: boolean () => incr * 2`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Derive fail 2",
+  fn() {
+    testTypecheck(`
+    proc log(val: unknown) { }
+
+    let incr = 0
+    derive doubled: number (x: string) => incr * 2`,
+    true)
+  }
+})
 
 
 
