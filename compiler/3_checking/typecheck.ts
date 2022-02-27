@@ -375,7 +375,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 if (current.op.op === '==' || current.op.op === '!=') {
                     if (!subsumes(leftType, rightType) 
                      && !subsumes(rightType, leftType)) {
-                        reportError(miscError(current, `Can't compare types ${format(leftType)} and ${format(rightType)} because they have no overlap`))
+                        reportError(miscError(current, `Can't compare types '${format(leftType)}' and '${format(rightType)}' because they have no overlap`))
                     }
                 } else if (current.op.op !== '??' && current.op.op !== '&&' && current.op.op !== '||') {
                     const types = BINARY_OPERATOR_TYPES[current.op.op]?.find(({ left, right }) =>

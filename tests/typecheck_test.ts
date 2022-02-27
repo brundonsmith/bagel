@@ -1,5 +1,5 @@
 import { parsed } from "../compiler/1_parse/index.ts";
-import { BagelError, prettyProblem } from "../compiler/errors.ts";
+import { prettyProblem } from "../compiler/errors.ts";
 import Store, { allProblems, canonicalModuleName } from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
@@ -59,6 +59,16 @@ Deno.test({
     testTypecheck(
       `const x: number = 2 * 3 / 12`,
       false
+    )
+  }
+})
+
+Deno.test({
+  name: "Binary operators 5",
+  fn() {
+    testTypecheck(
+      `const x = 'foo' == 12`,
+      true
     )
   }
 })
@@ -1020,6 +1030,17 @@ Deno.test({
       
       const b = foo(12)
       const c = foo(12, 13, 14)`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Optional arguments fail 4",
+  fn() {
+    testTypecheck(
+      `
+      func foo(a: number, b?: string, c: boolean) => a + (b ?? 'foo')`,
       true,
     );
   },
@@ -2008,6 +2029,102 @@ Deno.test({
     true)
   }
 })
+
+Deno.test({
+  name: "Indexer pass",
+  fn() {
+    testTypecheck(`
+    func foo(record: {['foo'|'bar']: number}, obj: { prop1: string, prop2: number }, arr: number[], tuple: [number, number]) =>
+      const a: number? = record['foo'],
+      
+      const b: string = obj['prop1'],
+
+      const c: number? = arr[12],
+
+      const d: number = tuple[1],
+
+      nil`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Indexer fail 1",
+  fn() {
+    testTypecheck(`
+    func foo(record: {['foo'|'bar']: number}) =>
+      const a: number = record['foo'],
+      nil`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Indexer fail 2",
+  fn() {
+    testTypecheck(`
+    func foo(record: {['foo'|'bar']: number}) =>
+      const a = record['stuff'],
+      nil`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Indexer fail 3",
+  fn() {
+    testTypecheck(`
+    func foo(obj: { prop1: string, prop2: number }) =>
+      const a = obj['stuff'],
+      nil`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Indexer fail 4",
+  fn() {
+    testTypecheck(`
+    func foo(arr: number[]) =>
+      const a: number = arr[12],
+      nil`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Indexer fail 5",
+  fn() {
+    testTypecheck(`
+    func foo(arr: number[]) =>
+      const a = arr['stuff'],
+      nil`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Indexer fail 6",
+  fn() {
+    testTypecheck(`
+    func foo(tuple: [number, number]) =>
+      const a = tuple[2],
+      nil`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Indexer fail 7",
+  fn() {
+    testTypecheck(`
+    func foo(tuple: [number, number]) =>
+      const a = tuple[-1],
+      nil`,
+    true)
+  }
+})
+
 
 
 function testTypecheck(code: string, shouldFail: boolean): void {
