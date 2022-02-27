@@ -1,24 +1,22 @@
-import { Refinement, ReportError, ModuleName } from "../_model/common.ts";
-import { BinaryOp, Expression, Invocation, isExpression, Spread } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NEVER_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TRUTHINESS_SAFE_TYPES, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { Refinement, ModuleName, Binding } from "../_model/common.ts";
+import { BinaryOp, Expression, Invocation, isExpression, LocalIdentifier, Spread } from "../_model/expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NEVER_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
-import { assignmentError, cannotFindModule } from "../errors.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, PlainIdentifier } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
 import { areSame, expressionsEqual, mapParseTree, typesEqual } from "../utils/ast.ts";
 import Store, { getModuleByName } from "../store.ts";
 import { format } from "../other/format.ts";
-import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
+import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration } from "../_model/declarations.ts";
 import { resolve } from "./resolve.ts";
 
 export function inferType(
-    reportError: ReportError,
     ast: Expression,
     visited: readonly AST[] = [],
 ): TypeExpression {
-    const baseType = inferTypeInner(reportError, ast, visited)
+    const baseType = inferTypeInner(ast, visited)
 
     let refinedType = baseType
     {
@@ -28,27 +26,23 @@ export function inferType(
             if (expressionsEqual(refinement.targetExpression, ast)) {
                 switch (refinement.kind) {
                     case "subtraction": {
-                        refinedType = subtract(reportError, refinedType, refinement.type)
+                        refinedType = subtract(refinedType, refinement.type)
                     } break;
                     case "narrowing": {
-                        refinedType = narrow(reportError, refinedType, refinement.type)
+                        refinedType = narrow(refinedType, refinement.type)
                     } break;
                 }
             }
         }
     }
 
-    return simplifyUnions(reportError, refinedType)
+    return simplifyUnions(refinedType)
 }
 
 const inferTypeInner = computedFn((
-    reportError: ReportError,
     ast: Expression,
     previouslyVisited: readonly AST[],
 ): TypeExpression => {
-    const infer = (expr: Expression) => inferType(reportError, expr, visited)
-    const resolveT = (type: TypeExpression) => resolveType(reportError, type)
-
     const { parent, module, code, startIndex, endIndex, ..._rest } = ast
 
     if (previouslyVisited.includes(ast)) {
@@ -69,7 +63,7 @@ const inferTypeInner = computedFn((
                 const parent = ast.parent
 
                 if (parent?.kind === "invocation") {
-                    const parentSubjectType = resolveT(infer(parent.subject))
+                    const parentSubjectType = resolveType(inferType(parent.subject, visited))
                     const thisArgIndex = parent.args.findIndex(a => areSame(a, ast))
 
                     if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
@@ -92,7 +86,7 @@ const inferTypeInner = computedFn((
                     funcType.returnType ??
                     typeDictatedByParent?.returnType ??
                     // if no return-type is declared, try inferring the type from the inner expression
-                    infer(ast.body)
+                    inferType(ast.body, visited)
                 )
             }
     
@@ -106,14 +100,14 @@ const inferTypeInner = computedFn((
             }
         }
         case "binary-operator": {
-            const leftType = resolveT(infer(ast.left))
-            const rightType = resolveT(infer(ast.right))
+            const leftType = resolveType(inferType(ast.left, visited))
+            const rightType = resolveType(inferType(ast.right, visited))
             
             if (ast.op.op === '??') {
                 return {
                     kind: "union-type",
                     members: [
-                        subtract(reportError, leftType, NIL_TYPE),
+                        subtract(leftType, NIL_TYPE),
                         rightType
                     ],
                     mutability: undefined, parent, module, code, startIndex, endIndex
@@ -123,7 +117,7 @@ const inferTypeInner = computedFn((
                     kind: "union-type",
                     members: [
                         rightType,
-                        narrow(reportError, leftType, FALSY)
+                        narrow(leftType, FALSY)
                     ],
                     mutability: undefined, parent, module, code, startIndex, endIndex
                 }
@@ -131,15 +125,15 @@ const inferTypeInner = computedFn((
                 return {
                     kind: "union-type",
                     members: [
-                        subtract(reportError, leftType, FALSY),
+                        subtract(leftType, FALSY),
                         rightType
                     ],
                     mutability: undefined, parent, module, code, startIndex, endIndex
                 }
             } else {
                 const types = BINARY_OPERATOR_TYPES[ast.op.op]?.find(({ left, right }) =>
-                    subsumes(reportError, left, leftType) && 
-                    subsumes(reportError, right, rightType))
+                    subsumes(left, leftType) && 
+                    subsumes(right, rightType))
 
                 if (types == null) {
                     return BINARY_OPERATOR_TYPES[ast.op.op]?.[0].output ?? UNKNOWN_TYPE
@@ -154,9 +148,9 @@ const inferTypeInner = computedFn((
             // Creation of nominal values looks like/parses as function 
             // invocation, but needs to be treated differently
             if (ast.subject.kind === "local-identifier") {
-                const binding = resolve(() => {}, ast.subject.name, ast.subject)
+                const binding = resolve(ast.subject.name, ast.subject)
                 if (binding?.owner.kind === 'type-declaration') {
-                    const resolvedType = resolveT(binding.owner.type)
+                    const resolvedType = resolveType(binding.owner.type)
 
                     if (resolvedType.kind === "nominal-type") {
                         return resolvedType
@@ -167,11 +161,11 @@ const inferTypeInner = computedFn((
             // method call
             const inv = invocationFromMethodCall(ast)
             if (inv) {
-                return infer(inv)
+                return inferType(inv, visited)
             }
 
             // normal func or proc call
-            const subjectType = bindInvocationGenericArgs(reportError, ast)
+            const subjectType = bindInvocationGenericArgs(ast)
             if (subjectType?.kind === "func-type") {
                 return subjectType.returnType ?? UNKNOWN_TYPE;
             } else {
@@ -179,18 +173,18 @@ const inferTypeInner = computedFn((
             }
         }
         case "indexer": {
-            const baseType = resolveT(infer(ast.subject));
-            const indexType = resolveT(infer(ast.indexer));
+            const baseType = resolveType(inferType(ast.subject, visited));
+            const indexType = resolveType(inferType(ast.indexer, visited));
 
-            const indexIsNumber = subsumes(reportError, NUMBER_TYPE, indexType)
+            const indexIsNumber = subsumes(NUMBER_TYPE, indexType)
             
             if (baseType.kind === "object-type" && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
                 const key = indexType.value.value;
-                const valueType = propertiesOf(reportError, baseType)?.find(entry => entry.name.name === key)?.type;
+                const valueType = propertiesOf(baseType)?.find(entry => entry.name.name === key)?.type;
 
                 return valueType ?? UNKNOWN_TYPE;
             } else if (baseType.kind === "record-type") {
-                if (!subsumes(reportError, baseType.keyType, indexType)) {
+                if (!subsumes(baseType.keyType, indexType)) {
                     return UNKNOWN_TYPE;
                 } else {
                     return {
@@ -262,9 +256,9 @@ const inferTypeInner = computedFn((
                 kind: "union-type",
                 members: [
                     ...ast.cases.map(({ outcome }) => 
-                        infer(outcome)),
+                        inferType(outcome, visited), visited),
                     ast.defaultCase 
-                        ? infer(ast.defaultCase) 
+                        ? inferType(ast.defaultCase, visited) 
                         : NIL_TYPE
                 ],
                 mutability: undefined,
@@ -281,7 +275,7 @@ const inferTypeInner = computedFn((
         }
         case "debug": {
             if (isExpression(ast.inner)) {
-                const type = infer(ast.inner)
+                const type = inferType(ast.inner, visited)
                 stripSourceInfo(type)
                 console.log(JSON.stringify({
                     bgl: given(ast.inner.code, code =>
@@ -297,7 +291,7 @@ const inferTypeInner = computedFn((
         }
         case "parenthesized-expression":
         case "inline-const-group": {
-            const innerType = infer(ast.inner);
+            const innerType = inferType(ast.inner, visited);
 
             if (ast.kind === 'inline-const-group' && ast.declarations.some(d => d.awaited)) {
                 return {
@@ -313,7 +307,7 @@ const inferTypeInner = computedFn((
         case "property-accessor": {
             return {
                 kind: "property-type",
-                subject: infer(ast.subject),
+                subject: inferType(ast.subject, visited),
                 property: ast.property,
                 optional: ast.optional,
                 parent: ast.parent,
@@ -325,220 +319,10 @@ const inferTypeInner = computedFn((
             }
         }
         case "local-identifier": {
-            const binding = resolve(reportError, ast.name, ast)
+            const binding = resolve(ast.name, ast)
 
             if (binding) {
-                const decl = binding.owner
-
-                type MutabilityKind = Mutability['mutability']|undefined
-
-                switch (decl.kind) {
-                    case 'value-declaration':
-                    case 'value-declaration-statement': {
-                        const baseType = decl.type ?? resolveT(infer(decl.value))
-                        const mutability: MutabilityKind = given(baseType.mutability, mutability =>
-                            decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== ast.module)
-                                ? 'immutable'
-                                : mutability
-                        )
-
-                        // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
-                        const broadenedBaseType = (
-                            !decl.isConst
-                                ? broadenTypeForMutation(baseType)
-                                : baseType
-                        )
-
-                        return {
-                            ...broadenedBaseType,
-                            mutability: mutability === 'literal' ? 'mutable' : mutability
-                        } as TypeExpression
-                    }
-                    case 'func-declaration':
-                    case 'proc-declaration':
-                    case 'inline-const-declaration': {
-                        const baseType = resolveT(infer(decl.value))
-                        const mutability: MutabilityKind = given(baseType.mutability, () =>
-                            decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
-                                ? 'immutable'
-                                : 'readonly')
-
-                        if (decl.kind === 'inline-const-declaration' && decl.awaited) {
-                            if (baseType.kind === 'plan-type') {
-                                return baseType.inner
-                            } else {
-                                return UNKNOWN_TYPE
-                            }
-                        }
-                        
-                        return {
-                            ...baseType,
-                            mutability
-                        } as TypeExpression
-                    }
-                    case 'await-statement': {
-
-                        if (decl.type) {
-                            return {
-                                ...decl.type,
-                                mutability: 'immutable'
-                            } as TypeExpression
-                        }
-
-                        if (decl.name == null) {
-                            return UNKNOWN_TYPE
-                        }
-
-                        const planType = resolveT(infer(decl.plan))
-                        if (planType.kind !== 'plan-type') {
-                            return UNKNOWN_TYPE
-                        } else {
-                            return {
-                                ...planType.inner,
-                                mutability: 'immutable'
-                            } as TypeExpression
-                        }
-                    }
-                    case 'derive-declaration': {
-                        if (decl.type) {
-                            return decl.type
-                        }
-
-                        const fnType = resolveT(infer(decl.fn))
-                        if (fnType.kind === 'func-type' && fnType.returnType) {
-                            return fnType.returnType
-                        }
-
-                        return UNKNOWN_TYPE
-                    }
-                    case 'remote-declaration': {
-                        const fnType = resolveT(infer(decl.fn))
-
-                        let inner;
-                        if (fnType.kind === 'plan-type') {
-                            inner = fnType.inner
-                        } else if (fnType.kind === 'func-type' && fnType.returnType?.kind === 'plan-type') {
-                            inner = fnType.returnType.inner
-                        } else {
-                            inner = UNKNOWN_TYPE
-                        }
-
-                        const { module, code, startIndex, endIndex } = decl
-
-                        return {
-                            kind: 'remote-type',
-                            inner,
-                            mutability: undefined,
-                            module, code, startIndex, endIndex
-                        }
-                    }
-                    case 'inline-destructuring-declaration':
-                    case 'destructuring-declaration-statement': {
-                        const objectOrArrayType = resolveT(infer(decl.value))
-
-                        if (decl.destructureKind === 'object' && objectOrArrayType.kind === 'object-type') {
-                            const props = propertiesOf(reportError, objectOrArrayType)
-
-                            return props?.find(prop => prop.name.name === binding.identifier.name)?.type ?? UNKNOWN_TYPE
-                        } else if (decl.destructureKind === 'array') {
-                            if (objectOrArrayType.kind === 'array-type') {
-                                return {
-                                    kind: "maybe-type",
-                                    inner: objectOrArrayType.element,
-                                    parent,
-                                    ...TYPE_AST_NOISE
-                                }
-                            } else if (objectOrArrayType.kind === 'tuple-type') {
-                                const index = decl.properties.findIndex(p => p.name === binding.identifier.name)
-                                return objectOrArrayType.members[index] ?? UNKNOWN_TYPE
-                            }
-                        }
-                    } break;
-                    case 'func':
-                    case 'proc': {
-                        const funcOrProcType = decl.type.kind === 'generic-type' ? decl.type.inner : decl.type
-                        const argType = funcOrProcType.args.find(a => a.name.name === binding.identifier.name)?.type
-
-                        if (argType) {
-                            return argType
-                        }
-
-                        const inferredHolderType = infer(decl)
-                        if (inferredHolderType.kind === 'func-type' || inferredHolderType.kind === 'proc-type') {
-                            const inferredArg = inferredHolderType.args.find(a => a.name.name === binding.identifier.name)
-                            const declaredType = inferredArg?.type
-
-                            if (declaredType) {
-                                if (!inferredArg?.optional) {
-                                    return declaredType
-                                } else {
-                                    const { module, code, startIndex, endIndex } = declaredType
-
-                                    return {
-                                        kind: 'maybe-type',
-                                        inner: declaredType,
-                                        mutability: undefined,
-                                        module, code, startIndex, endIndex
-                                    }
-                                }
-                            }
-                            
-                            return UNKNOWN_TYPE
-                        }
-                        
-                        return UNKNOWN_TYPE
-                    }
-                    case 'for-loop': {
-                        const iteratorType = resolveT(infer(decl.iterator))
-
-                        return iteratorType.kind === 'iterator-type'
-                            ? iteratorType.inner
-                            : UNKNOWN_TYPE
-                    }
-                    case 'import-all-declaration': {
-                        const otherModule = getModuleByName(Store, decl.module as ModuleName, decl.path.value)
-
-                        if (otherModule == null) {
-                            // other module doesn't exist
-                            reportError(cannotFindModule(decl.path))
-                            return {
-                                kind: 'object-type',
-                                spreads: [],
-                                entries: [],
-                                mutability: 'immutable',
-                                parent,
-                                ...AST_NOISE
-                            }
-                        } else {
-                            const exportedDeclarations = otherModule.declarations.filter(decl =>
-                                (decl.kind === 'value-declaration' || decl.kind === 'func-declaration' || decl.kind === 'proc-declaration')
-                                && decl.exported) as (ValueDeclaration|FuncDeclaration|ProcDeclaration)[]
-
-                            return {
-                                kind: 'object-type',
-                                spreads: [],
-                                entries: exportedDeclarations.map(decl => {
-                                    const declaredType = decl.kind === 'value-declaration' ? decl.type : decl.value.type
-
-                                    return attribute(
-                                        decl.name.name, 
-                                        declaredType ?? infer(decl.value),
-                                        decl.kind !== 'value-declaration' || decl.isConst || decl.exported === 'expose'
-                                    )
-                                }),
-                                mutability: 'mutable',
-                                parent,
-                                ...AST_NOISE
-                            }
-                        }
-                    }
-                    case 'type-declaration':
-                    case 'generic-param-type':
-                        return UNKNOWN_TYPE
-                    default:
-                        // @ts-expect-error
-                        throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
-                }
+                return getBindingType(ast, binding, visited)
             }
 
             return UNKNOWN_TYPE
@@ -557,7 +341,7 @@ const inferTypeInner = computedFn((
                 if (Array.isArray(entry)) {
                     const [name, value] = entry as [PlainIdentifier, Expression]
 
-                    const type = resolveT(infer(value));
+                    const type = resolveType(inferType(value, visited));
                     return {
                         kind: "attribute",
                         name,
@@ -567,7 +351,7 @@ const inferTypeInner = computedFn((
                     }
                 } else {
                     const spreadObj = (entry as Spread).expr
-                    const spreadObjType = resolveT(infer(spreadObj));
+                    const spreadObjType = resolveType(inferType(spreadObj, visited));
 
                     if (spreadObjType.kind !== 'object-type') {
                         return undefined
@@ -591,7 +375,7 @@ const inferTypeInner = computedFn((
 
             for (const entry of ast.entries) {
                 if (entry.kind === 'spread') {
-                    const spreadType = resolveT(infer(entry.expr))
+                    const spreadType = resolveType(inferType(entry.expr, visited))
 
                     if (spreadType.kind === 'array-type') {
                         arraySpreads.push(spreadType)
@@ -601,7 +385,7 @@ const inferTypeInner = computedFn((
                         memberTypes.push(UNKNOWN_TYPE)
                     }
                 } else {
-                    memberTypes.push(infer(entry))
+                    memberTypes.push(inferType(entry, visited))
                 }
             }
 
@@ -615,7 +399,7 @@ const inferTypeInner = computedFn((
             } else {
                 return {
                     kind: "array-type",
-                    element: simplifyUnions(reportError, {
+                    element: simplifyUnions({
                         kind: "union-type",
                         members: [...memberTypes, ...arraySpreads.map(t => t.element)],
                         mutability: undefined,
@@ -642,15 +426,251 @@ const inferTypeInner = computedFn((
         case "error-expression":
             return {
                 kind: "error-type",
-                inner: infer(ast.inner),
+                inner: inferType(ast.inner, visited),
                 mutability: undefined,
                 parent, module, code, startIndex, endIndex
             }
         default:
-            // @ts-expect-error
+            // @ts-expect-error: exhaustiveness
             throw Error(ast.kind)
     }
 })
+
+function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited: readonly AST[]): TypeExpression {
+    const { parent, module, ..._rest } = importedFrom
+
+    type MutabilityKind = Mutability['mutability']|undefined
+
+    const decl = binding.owner
+
+    switch (decl.kind) {
+        case 'value-declaration':
+        case 'value-declaration-statement': {
+            const baseType = decl.type ?? resolveType(inferType(decl.value, visited))
+            const mutability: MutabilityKind = given(baseType.mutability, mutability =>
+                decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== module)
+                    ? 'immutable'
+                    : mutability
+            )
+
+            // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
+            const broadenedBaseType = (
+                !decl.isConst
+                    ? broadenTypeForMutation(baseType)
+                    : baseType
+            )
+
+            return {
+                ...broadenedBaseType,
+                mutability: mutability === 'literal' ? 'mutable' : mutability
+            } as TypeExpression
+        }
+        case 'func-declaration':
+        case 'proc-declaration':
+        case 'inline-const-declaration': {
+            const baseType = resolveType(inferType(decl.value, visited))
+            const mutability: MutabilityKind = given(baseType.mutability, () =>
+                decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
+                    ? 'immutable'
+                    : 'readonly')
+
+            if (decl.kind === 'inline-const-declaration' && decl.awaited) {
+                if (baseType.kind === 'plan-type') {
+                    return baseType.inner
+                } else {
+                    return UNKNOWN_TYPE
+                }
+            }
+            
+            return {
+                ...baseType,
+                mutability
+            } as TypeExpression
+        }
+        case 'derive-declaration': {
+            if (decl.type) {
+                return decl.type
+            }
+
+            const fnType = resolveType(inferType(decl.fn, visited))
+            if (fnType.kind === 'func-type' && fnType.returnType) {
+                return fnType.returnType
+            }
+
+            return UNKNOWN_TYPE
+        }
+        case 'remote-declaration': {
+            const fnType = resolveType(inferType(decl.fn, visited))
+
+            let inner;
+            if (fnType.kind === 'plan-type') {
+                inner = fnType.inner
+            } else if (fnType.kind === 'func-type' && fnType.returnType?.kind === 'plan-type') {
+                inner = fnType.returnType.inner
+            } else {
+                inner = UNKNOWN_TYPE
+            }
+
+            const { module, code, startIndex, endIndex } = decl
+
+            return {
+                kind: 'remote-type',
+                inner,
+                mutability: undefined,
+                module, code, startIndex, endIndex
+            }
+        }
+        case 'await-statement': {
+
+            if (decl.type) {
+                return {
+                    ...decl.type,
+                    mutability: 'immutable'
+                } as TypeExpression
+            }
+
+            if (decl.name == null) {
+                return UNKNOWN_TYPE
+            }
+
+            const planType = resolveType(inferType(decl.plan, visited))
+            if (planType.kind !== 'plan-type') {
+                return UNKNOWN_TYPE
+            } else {
+                return {
+                    ...planType.inner,
+                    mutability: 'immutable'
+                } as TypeExpression
+            }
+        }
+        case 'inline-destructuring-declaration':
+        case 'destructuring-declaration-statement': {
+            const objectOrArrayType = resolveType(inferType(decl.value, visited))
+
+            if (decl.destructureKind === 'object' && objectOrArrayType.kind === 'object-type') {
+                const props = propertiesOf(objectOrArrayType)
+
+                return props?.find(prop => prop.name.name === binding.identifier.name)?.type ?? UNKNOWN_TYPE
+            } else if (decl.destructureKind === 'array') {
+                if (objectOrArrayType.kind === 'array-type') {
+                    return {
+                        kind: "maybe-type",
+                        inner: objectOrArrayType.element,
+                        parent,
+                        ...TYPE_AST_NOISE
+                    }
+                } else if (objectOrArrayType.kind === 'tuple-type') {
+                    const index = decl.properties.findIndex(p => p.name === binding.identifier.name)
+                    return objectOrArrayType.members[index] ?? UNKNOWN_TYPE
+                }
+            }
+        } break;
+        case 'func':
+        case 'proc': {
+            const funcOrProcType = decl.type.kind === 'generic-type' ? decl.type.inner : decl.type
+            const argType = funcOrProcType.args.find(a => a.name.name === binding.identifier.name)?.type
+
+            if (argType) {
+                return argType
+            }
+
+            const inferredHolderType = inferType(decl, visited)
+            if (inferredHolderType.kind === 'func-type' || inferredHolderType.kind === 'proc-type') {
+                const inferredArg = inferredHolderType.args.find(a => a.name.name === binding.identifier.name)
+                const declaredType = inferredArg?.type
+
+                if (declaredType) {
+                    if (!inferredArg?.optional) {
+                        return declaredType
+                    } else {
+                        const { module, code, startIndex, endIndex } = declaredType
+
+                        return {
+                            kind: 'maybe-type',
+                            inner: declaredType,
+                            mutability: undefined,
+                            module, code, startIndex, endIndex
+                        }
+                    }
+                }
+                
+                return UNKNOWN_TYPE
+            }
+            
+            return UNKNOWN_TYPE
+        }
+        case 'for-loop': {
+            const iteratorType = resolveType(inferType(decl.iterator, visited))
+
+            return iteratorType.kind === 'iterator-type'
+                ? iteratorType.inner
+                : UNKNOWN_TYPE
+        }
+        case 'import-all-declaration': {
+            const otherModule = getModuleByName(Store, decl.module as ModuleName, decl.path.value)
+
+            if (otherModule == null) {
+                return {
+                    kind: 'object-type',
+                    spreads: [],
+                    entries: [],
+                    mutability: 'immutable',
+                    parent,
+                    ...AST_NOISE
+                }
+            } else {
+                const exportedDeclarations = otherModule.declarations.filter(decl =>
+                    (decl.kind === 'value-declaration' || decl.kind === 'func-declaration' || decl.kind === 'proc-declaration')
+                    && decl.exported) as (ValueDeclaration|FuncDeclaration|ProcDeclaration)[]
+
+                return {
+                    kind: 'object-type',
+                    spreads: [],
+                    entries: exportedDeclarations.map(decl => {
+                        const declaredType = decl.kind === 'value-declaration' ? decl.type : decl.value.type
+
+                        return attribute(
+                            decl.name.name, 
+                            declaredType ?? inferType(decl.value, visited),
+                            decl.kind !== 'value-declaration' || decl.isConst || decl.exported === 'expose'
+                        )
+                    }),
+                    mutability: 'mutable',
+                    parent,
+                    ...AST_NOISE
+                }
+            }
+        }
+        case 'import-item': {
+            const importDeclaration = (decl.parent as ImportDeclaration)
+            const otherModule = getModuleByName(Store, decl.module as ModuleName, importDeclaration.path.value)
+
+            if (otherModule != null) {
+                const imported = otherModule.declarations.find(other =>
+                    (other.kind === 'value-declaration' ||
+                    other.kind === 'func-declaration' ||
+                    other.kind === 'proc-declaration' ||
+                    other.kind === 'type-declaration' ||
+                    other.kind === 'derive-declaration' ||
+                    other.kind === 'remote-declaration')
+                    && other.name.name === decl.name.name
+                    && other.exported) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined
+
+                if (imported) {
+                    return getBindingType(importedFrom, { owner: imported, identifier: imported.name }, visited)
+                }
+            }
+        } break;
+        case 'type-declaration':
+        case 'generic-param-type':
+            return UNKNOWN_TYPE
+        default:
+            // @ts-expect-error: exhaustiveness
+            throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
+    }
+
+    return UNKNOWN_TYPE
+}
 
 /**
  * When initializing a mutable variable, sometimes we want to broaden the type
@@ -669,7 +689,7 @@ function broadenTypeForMutation(type: TypeExpression): TypeExpression {
         }
     } else if (type.kind === 'tuple-type' && type.mutability === 'mutable') {
         return { ...type, kind: 'array-type', element: { kind: 'union-type', members: type.members.map(broadenTypeForMutation), parent: type.parent, ...TYPE_AST_NOISE } }
-    } else if (type.kind === 'array-type'&& type.mutability === 'mutable') {
+    } else if (type.kind === 'array-type' && type.mutability === 'mutable') {
         return { ...type, element: broadenTypeForMutation(type.element) }
     } else if (type.kind === 'object-type' && type.mutability === 'mutable') {
         return { ...type, entries: type.entries.map(attribute => ({ ...attribute, type: broadenTypeForMutation(attribute.type) })) }
@@ -684,8 +704,8 @@ function broadenTypeForMutation(type: TypeExpression): TypeExpression {
  * b) if the subject is generic, bind its provided type args or try to infer 
  *    them
  */
-export function bindInvocationGenericArgs(reportError: ReportError, invocation: Invocation): TypeExpression|undefined {
-    const subjectType = resolveType(reportError, inferType(reportError, invocation.subject))
+export function bindInvocationGenericArgs(invocation: Invocation): TypeExpression|undefined {
+    const subjectType = resolveType(inferType(invocation.subject))
 
     if (subjectType.kind === 'generic-type' && subjectType.typeParams.length > 0 && (subjectType.inner.kind === "func-type" || subjectType.inner.kind === "proc-type")) {
         if (invocation.typeArgs.length > 0) { // explicit type arguments
@@ -700,14 +720,12 @@ export function bindInvocationGenericArgs(reportError: ReportError, invocation: 
                 const typeParam = subjectType.typeParams[i]
                 const typeArg = invocation.typeArgs[i]
                 
-                if (typeParam.extends && !subsumes(reportError, typeParam.extends, typeArg)) {
-                    reportError(assignmentError(typeArg, typeParam.extends, typeArg))
+                if (typeParam.extends && !subsumes(typeParam.extends, typeArg)) {
                     return undefined
                 }
             }
 
             return parameterizedGenericType(
-                reportError, 
                 subjectType, 
                 invocation.typeArgs
             )
@@ -718,14 +736,13 @@ export function bindInvocationGenericArgs(reportError: ReportError, invocation: 
                 ...funcOrProcType,
                 args: funcOrProcType.args.map((arg, index) => ({
                     ...arg,
-                    type: inferType(reportError, invocation.args[index])
+                    type: inferType(invocation.args[index])
                 }))
             }
 
                     
             // attempt to infer params for generic
             const inferredBindings = fitTemplate(
-                reportError, 
                 funcOrProcType, 
                 invocationSubjectType
             );
@@ -736,13 +753,12 @@ export function bindInvocationGenericArgs(reportError: ReportError, invocation: 
                 for (const param of subjectType.typeParams) {
                     const inferred = inferredBindings.get(param.name.name)
                     
-                    if (param.extends && inferred && !subsumes(reportError, param.extends, inferred)) {
+                    if (param.extends && inferred && !subsumes(param.extends, inferred)) {
                         return undefined
                     }
                 }
     
                 return parameterizedGenericType(
-                    reportError, 
                     subjectType, 
                     subjectType.typeParams.map(param =>
                         inferredBindings.get(param.name.name) ?? UNKNOWN_TYPE)
@@ -760,7 +776,7 @@ export function bindInvocationGenericArgs(reportError: ReportError, invocation: 
  * Given some generic type and a series of known type args, substitute the args 
  * into the type as appropriate, yielding a non-generic type.
  */
-export function parameterizedGenericType(reportError: ReportError, generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
+export function parameterizedGenericType(generic: GenericType, typeArgs: readonly TypeExpression[]): TypeExpression {
     
     // index bindings by name
     const bindings: Record<string, TypeExpression> = {}
@@ -775,7 +791,7 @@ export function parameterizedGenericType(reportError: ReportError, generic: Gene
 
         // if we've found one of the generic params, substitute it
         if (ast.kind === 'named-type') {
-            const resolved = resolve(reportError, ast.name.name, ast)
+            const resolved = resolve(ast.name.name, ast)
 
             if (resolved?.owner.kind === 'generic-param-type' && bindings[resolved.owner.name.name]) {
                 return bindings[resolved.owner.name.name]
@@ -789,9 +805,9 @@ export function parameterizedGenericType(reportError: ReportError, generic: Gene
 /**
  * Apply all union simplifications
  */
-export function simplifyUnions(reportError: ReportError, type: TypeExpression): TypeExpression {
+export function simplifyUnions(type: TypeExpression): TypeExpression {
     return handleSingletonUnion(
-        distillUnion(reportError,
+        distillUnion(
             flattenUnions(type)));
 }
 
@@ -828,7 +844,7 @@ function flattenUnions(type: TypeExpression): TypeExpression {
 /**
  * Remove redundant members in union type (members subsumed by other members)
  */
-function distillUnion(reportError: ReportError, type: TypeExpression): TypeExpression {
+function distillUnion(type: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         const indicesToDrop = new Set<number>();
 
@@ -838,7 +854,7 @@ function distillUnion(reportError: ReportError, type: TypeExpression): TypeExpre
                     const a = type.members[i];
                     const b = type.members[j];
 
-                    if (subsumes(reportError, b, a) && !indicesToDrop.has(j) && resolveType(reportError, b).kind !== 'unknown-type') {
+                    if (subsumes(b, a) && !indicesToDrop.has(j) && resolveType(b).kind !== 'unknown-type') {
                         indicesToDrop.add(i);
                     }
                 }
@@ -878,14 +894,14 @@ function distillUnion(reportError: ReportError, type: TypeExpression): TypeExpre
     return type;
 }
 
-export function subtract(reportError: ReportError, type: TypeExpression, without: TypeExpression): TypeExpression {
-    type = resolveType(reportError, type)
-    without = resolveType(reportError, without)
+export function subtract(type: TypeExpression, without: TypeExpression): TypeExpression {
+    type = resolveType(type)
+    without = resolveType(without)
 
     if (type.kind === "union-type") {
         return {
             ...type,
-            members: type.members.filter(member => !subsumes(reportError, without, member))
+            members: type.members.filter(member => !subsumes(without, member))
         }
     } else if(type.kind === 'boolean-type' && without.kind === 'literal-type' && without.value.kind === 'boolean-literal') {
         if (without.value.value) {
@@ -898,11 +914,11 @@ export function subtract(reportError: ReportError, type: TypeExpression, without
     }
 }
 
-function narrow(reportError: ReportError, type: TypeExpression, fit: TypeExpression): TypeExpression {
+function narrow(type: TypeExpression, fit: TypeExpression): TypeExpression {
     if (type.kind === "union-type") {
         return {
             ...type,
-            members: type.members.filter(member => subsumes(reportError, fit, member))
+            members: type.members.filter(member => subsumes(fit, member))
         }
     } else if (type.kind === 'unknown-type') {
         return fit
@@ -1009,10 +1025,9 @@ function conditionToRefinement(condition: Expression, conditionIsTrue: boolean):
 }
 
 export const propertiesOf = computedFn((
-    reportError: ReportError,
     type: TypeExpression
 ): readonly Attribute[] | undefined => {
-    const resolvedType = resolveType(reportError, type)
+    const resolvedType = resolveType(type)
 
     switch (resolvedType.kind) {
         case "nominal-type": {
@@ -1024,12 +1039,12 @@ export const propertiesOf = computedFn((
             const attrs = [...resolvedType.entries]
 
             for (const spread of resolvedType.spreads) {
-                const resolved = resolve(reportError, spread.name.name, spread)
+                const resolved = resolve(spread.name.name, spread)
 
                 if (resolved != null && (resolved.owner.kind === 'type-declaration' || resolved.owner.kind === 'generic-param-type')) {
                     const type = resolved.owner.kind === 'type-declaration' ? resolved.owner.type : resolved.owner
                     if (type.kind === 'object-type') {
-                        attrs.push(...(propertiesOf(reportError, type) ?? []))
+                        attrs.push(...(propertiesOf(type) ?? []))
                     }
                 }
             }
@@ -1096,14 +1111,13 @@ export const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
  * them. Used to infer generic args when not supplied.
  */
 function fitTemplate(
-    reportError: ReportError,
     parameterized: TypeExpression, 
     reified: TypeExpression, 
 ): ReadonlyMap<string, TypeExpression>|undefined {
 
     function isGenericParam(type: TypeExpression): type is NamedType {
         if (type.kind === 'named-type') {
-            const binding = resolve(reportError, type.name.name, type)
+            const binding = resolve(type.name.name, type)
             return binding?.owner.kind === 'generic-param-type'
         }
 
@@ -1120,13 +1134,13 @@ function fitTemplate(
      || (parameterized.kind === "proc-type" && reified.kind === "proc-type")) {
         const matchGroups = [
             ...parameterized.args.map((arg, index) =>
-                fitTemplate(reportError, arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE)),
+                fitTemplate(arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE)),
         ]
 
         // if (parameterized.kind === 'func-type' && reified.kind === 'func-type' &&
         //     parameterized.returnType && reified.returnType) {
         //     matchGroups.push(
-        //         fitTemplate(reportError, parameterized.returnType, reified.returnType)
+        //         fitTemplate(parameterized.returnType, reified.returnType)
         //     )
         // }
 
@@ -1140,7 +1154,7 @@ function fitTemplate(
             for (const [key, value] of (map as ReadonlyMap<string, TypeExpression>).entries()) {
                 const existing = matches.get(key)
                 if (existing) {
-                    if (!subsumes(reportError, existing, value)) {
+                    if (!subsumes(existing, value)) {
                         return undefined
                     }
                 } else {
@@ -1153,14 +1167,14 @@ function fitTemplate(
     }
 
     if (parameterized.kind === "array-type" && reified.kind === "array-type") {
-        return fitTemplate(reportError, parameterized.element, reified.element);
+        return fitTemplate(parameterized.element, reified.element);
     }
 
     if (parameterized.kind === "tuple-type" && reified.kind === "tuple-type" && parameterized.members.length === reified.members.length) {
         const all = new Map<string, TypeExpression>()
 
         for (let i = 0; i < parameterized.members.length; i++) {
-            const matches = fitTemplate(reportError, parameterized.members[i], reified.members[i]);
+            const matches = fitTemplate(parameterized.members[i], reified.members[i]);
 
             for (const key in matches) {
                 all.set(key, matches.get(key) as TypeExpression)
@@ -1177,7 +1191,7 @@ function fitTemplate(
             const other = reified.entries.find(e => entry.name.name === e.name.name)
 
             if (other) {
-                const matches = fitTemplate(reportError, entry.type, other.type);
+                const matches = fitTemplate(entry.type, other.type);
 
                 for (const key in matches) {
                     all.set(key, matches.get(key) as TypeExpression)
@@ -1190,7 +1204,7 @@ function fitTemplate(
 
     if ((parameterized.kind === "iterator-type" && reified.kind === "iterator-type") 
      || (parameterized.kind === "plan-type" && reified.kind === "plan-type")) {
-        return fitTemplate(reportError, parameterized.inner, reified.inner);
+        return fitTemplate(parameterized.inner, reified.inner);
     }
 
     if (parameterized.kind === "union-type") {
@@ -1215,7 +1229,7 @@ function fitTemplate(
             if (parameterizedMembersRemaining.length === 1 && isGenericParam(parameterizedMembersRemaining[0])) {
                 const matches = new Map<string, TypeExpression>();
 
-                matches.set(parameterizedMembersRemaining[0].name.name, simplifyUnions(reportError, {
+                matches.set(parameterizedMembersRemaining[0].name.name, simplifyUnions({
                     kind: "union-type",
                     members: reifiedMembersRemaining,
                     mutability: undefined,
@@ -1245,9 +1259,9 @@ function fitTemplate(
 export function invocationFromMethodCall(expr: Expression): Invocation|undefined {
     if (expr.kind === 'invocation' && expr.subject.kind === 'property-accessor') {
         const fnName = expr.subject.property.name
-        const subjectType = inferType(() => {}, expr.subject.subject)
+        const subjectType = inferType(expr.subject.subject)
 
-        if (!propertiesOf(() => {}, subjectType)?.some(p => p.name.name === fnName)) {
+        if (!propertiesOf(subjectType)?.some(p => p.name.name === fnName)) {
             const { module, code, startIndex, endIndex } = expr.subject.property
 
             const inv: Invocation = {

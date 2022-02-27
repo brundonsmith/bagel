@@ -243,7 +243,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "property-type": return `${f(ast.subject)}${ast.optional ? '?' : ''}.${ast.property.name}`;
         case "javascript-escape-type": return "<js escape>";
         default:
-            // @ts-expect-error
+            // @ts-expect-error: exhaustiveness
             throw Error(ast.kind)
     }
 }

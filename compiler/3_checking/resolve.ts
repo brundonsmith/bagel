@@ -1,19 +1,16 @@
-import { cannotFindExport, cannotFindModule } from "../errors.ts";
 import { computedFn } from "../mobx.ts";
-import Store, { getModuleByName } from "../store.ts";
 import { AST } from "../_model/ast.ts";
-import { Binding, ModuleName, ReportError } from "../_model/common.ts";
-import { ValueDeclaration,FuncDeclaration,ProcDeclaration,TypeDeclaration } from "../_model/declarations.ts";
+import { Binding } from "../_model/common.ts";
 
-export const resolve = computedFn((reportError: ReportError, name: string, from: AST): Binding|undefined => {
-    return resolveInner(reportError, name, from, from)
+export const resolve = computedFn((name: string, from: AST): Binding|undefined => {
+    return resolveInner(name, from, from)
 })
 
 /**
  * Given some identifier and some AST context, look upwards until a binding is
  * found for the identifier (or the root is reached)
  */
-const resolveInner = (reportError: ReportError, name: string, from: AST, originator: AST): Binding|undefined => {
+const resolveInner = (name: string, from: AST, originator: AST): Binding|undefined => {
     const parent = from.parent
 
     // if we've reached the root of the AST, there's no binding
@@ -21,29 +18,20 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
         return undefined;
     }
 
-    let resolved: Binding|undefined;
-
     switch (parent.kind) {
         case "module": {
             for (let declarationIndex = 0; declarationIndex < parent.declarations.length; declarationIndex++) {
                 const declaration = parent.declarations[declarationIndex]
 
                 switch (declaration.kind) {
-                    case "type-declaration": {
-                        if (declaration.name.name === name) {
-                            resolved = {
-                                identifier: declaration.name,
-                                owner: declaration,
-                            }
-                        }
-                    } break;
+                    case "type-declaration":
                     case "func-declaration":
                     case "proc-declaration":
                     case "value-declaration":
                     case "derive-declaration":
                     case "remote-declaration": {
                         if (declaration.name.name === name) {
-                            resolved = {
+                            return {
                                 owner: declaration,
                                 identifier: declaration.name
                             }
@@ -51,7 +39,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                     } break;
                     case "import-all-declaration": {
                         if (declaration.alias.name === name) {
-                            resolved = {
+                            return {
                                 owner: declaration,
                                 identifier: declaration.alias
                             }
@@ -63,35 +51,9 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
 
                             // found the matching import
                             if (nameAst.name === name) {
-                                const otherModule = getModuleByName(Store, declaration.module as ModuleName, declaration.path.value)
-
-                                if (otherModule == null) {
-                                    // other module doesn't exist
-                                    reportError(cannotFindModule(declaration.path))
-                                } else {
-                                    const imported = otherModule.declarations.find(decl =>
-                                        (decl.kind === 'value-declaration' || 
-                                         decl.kind === 'func-declaration' || 
-                                         decl.kind === 'proc-declaration' || 
-                                         decl.kind === 'type-declaration')
-                                        && decl.name.name === importItem.name.name
-                                        && decl.exported) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|undefined
-
-                                    if (imported == null) {
-                                        reportError(cannotFindExport(importItem, declaration));
-                                    } else {
-                                        if (imported.kind === 'type-declaration') {
-                                            resolved = {
-                                                identifier: nameAst,
-                                                owner: imported
-                                            }
-                                        } else {
-                                            resolved = {
-                                                identifier: nameAst,
-                                                owner: imported,
-                                            }
-                                        }
-                                    }
+                                return {
+                                    identifier: nameAst,
+                                    owner: importItem,
                                 }
                             }
                         }
@@ -102,7 +64,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
         case "generic-type": {
             for (const typeParam of parent.typeParams) {
                 if (typeParam.name.name === name) {
-                    resolved = {
+                    return {
                         identifier: typeParam.name,
                         owner: {
                             kind: "generic-param-type",
@@ -126,7 +88,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
             if (parent.type.kind === 'generic-type') {
                 for (const typeParam of parent.type.typeParams) {
                     if (typeParam.name.name === name) {
-                        resolved = {
+                        return {
                             identifier: typeParam.name,
                             owner: {
                                 kind: "generic-param-type",
@@ -150,7 +112,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                 const arg = funcOrProcType.args[i]
 
                 if (arg.name.name === name) {
-                    resolved = {
+                    return {
                         owner: parent,
                         identifier: arg.name
                     }
@@ -164,7 +126,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                 if (statement.kind === "value-declaration-statement" || statement.kind === 'destructuring-declaration-statement' || statement.kind === 'await-statement') {
                     if (statement.kind !== 'destructuring-declaration-statement') {
                         if (statement.name?.name === name) {
-                            resolved = {
+                            return {
                                 owner: statement,
                                 identifier: statement.name
                             }
@@ -172,7 +134,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                     } else {
                         for (const property of statement.properties) {
                             if (property.name === name) {
-                                resolved = {
+                                return {
                                     owner: statement,
                                     identifier: property
                                 }
@@ -184,7 +146,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
             break;
         case "for-loop": {
             if (parent.itemIdentifier.name === name) {
-                resolved = {
+                return {
                     owner: parent,
                     identifier: parent.itemIdentifier
                 }
@@ -196,7 +158,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
 
                 if (declaration.kind === 'inline-const-declaration') {
                     if (declaration.name.name === name) {
-                        resolved = {
+                        return {
                             owner: declaration,
                             identifier: declaration.name
                         }
@@ -204,7 +166,7 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
                 } else {
                     for (const property of declaration.properties) {
                         if (property.name === name) {
-                            resolved = {
+                            return {
                                 owner: declaration,
                                 identifier: property
                             }
@@ -216,5 +178,5 @@ const resolveInner = (reportError: ReportError, name: string, from: AST, origina
     }
 
     // if not resolved, recurse upward to the next AST node
-    return resolved ?? resolveInner(reportError, name, parent, originator)
+    return resolveInner(name, parent, originator)
 }

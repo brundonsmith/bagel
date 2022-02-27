@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-fallthrough
 import { AwaitStatement, DestructuringDeclarationStatement, ForLoop, ValueDeclarationStatement } from "./statements.ts";
-import { GenericParamType, TypeExpression, TypeParam } from "./type-expressions.ts";
-import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, TypeDeclaration } from "./declarations.ts";
+import { GenericParamType, TypeExpression } from "./type-expressions.ts";
+import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, TypeDeclaration, ImportItem } from "./declarations.ts";
 import { Expression, Func, InlineConstDeclaration, InlineDestructuringDeclaration, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
@@ -27,6 +27,7 @@ export type Binding = {
         | Func
         | Proc
         | ImportAllDeclaration
+        | ImportItem
         | InlineDestructuringDeclaration
         | DestructuringDeclarationStatement
         | TypeDeclaration
@@ -43,10 +44,12 @@ export function getBindingMutability(binding: Binding, from: AST): "immutable"|"
         case 'proc':
         case 'for-loop':
         case 'import-all-declaration':
+        case 'import-item':
             return 'mutable'
         case 'func-declaration':
         case 'proc-declaration':
         case 'inline-const-declaration':
+        case 'derive-declaration':
         case 'remote-declaration':
         case 'await-statement':
         case 'inline-destructuring-declaration':
@@ -58,8 +61,8 @@ export function getBindingMutability(binding: Binding, from: AST): "immutable"|"
         case 'generic-param-type':
             return 'immutable'
         default:
-            // @ts-expect-error
-            throw Error('Unreachable!' + binding.ast.kind)
+            // @ts-expect-error: exhaustiveness
+            throw Error('Unreachable!' + binding.owner.kind)
     }
 }
 

@@ -145,7 +145,7 @@ const RULES = {
     },
     'redundantConditional': {
         message: (ast: AST) => {
-            const condType = resolveType(() => {}, inferType(() => {}, ast as Expression))
+            const condType = resolveType(inferType(ast as Expression))
             const always = isAlways(ast as Expression)
             return `This condition is redundant, because it can only ever be ${String(always)} (type: '${format(condType)}')`
         },
@@ -162,13 +162,13 @@ const RULES = {
         autofix: undefined
     },
     'stringNumberConditional': {
-        message: (ast: AST) => `Condition has type '${format(inferType(() => {}, ast as Expression))}'. Beware using string or numbers in conditionals; in Bagel all strings and numbers are truthy!`,
+        message: (ast: AST) => `Condition has type '${format(inferType(ast as Expression))}'. Beware using string or numbers in conditionals; in Bagel all strings and numbers are truthy!`,
         match: (ast: AST) => {
             const condition = conditionFrom(ast)
 
             if (condition) {
-                const conditionType = inferType(() => {}, condition)
-                if (subsumes(() => {}, conditionType, STRING_TYPE) || subsumes(() => {}, conditionType, NUMBER_TYPE)) {
+                const conditionType = inferType(condition)
+                if (subsumes(conditionType, STRING_TYPE) || subsumes(conditionType, NUMBER_TYPE)) {
                     return condition
                 }
             }
@@ -176,13 +176,13 @@ const RULES = {
         autofix: undefined
     },
     'explicitBooleansOnly': {
-        message: (ast: AST) => `Should only use explicit boolean expressions in conditionals; this expression is of type '${format(inferType(() => {}, ast as Expression))}'`,
+        message: (ast: AST) => `Should only use explicit boolean expressions in conditionals; this expression is of type '${format(inferType(ast as Expression))}'`,
         match: (ast: AST) => {
             const condition = conditionFrom(ast)
 
             if (condition) {
-                const conditionType = inferType(() => {}, condition)
-                if (!subsumes(() => {}, BOOLEAN_TYPE, conditionType)) {
+                const conditionType = inferType(condition)
+                if (!subsumes(BOOLEAN_TYPE, conditionType)) {
                     return condition
                 }
             }
@@ -195,7 +195,7 @@ const RULES = {
             
             // local identifier, inside a func declaration
             if (ast.kind === 'local-identifier' && findAncestor(ast, a => a.kind === 'func-declaration') != null) {
-                const binding = resolve(() => {}, ast.name, ast)
+                const binding = resolve(ast.name, ast)
 
                 // bound to let-declaration
                 if (binding?.owner.kind === 'value-declaration' && !binding.owner.isConst) {
@@ -242,13 +242,13 @@ function conditionFrom(ast: AST): Expression|undefined {
 }
 
 function isAlways(condition: Expression): boolean|undefined {
-    const condType = resolveType(() => {}, inferType(() => {}, condition))
+    const condType = resolveType(inferType(condition))
 
-    if (subsumes(() => {}, FALSY, condType)) {
+    if (subsumes(FALSY, condType)) {
         return false
     }
 
-    if (!overlaps(() => {}, FALSY, condType)) {
+    if (!overlaps(FALSY, condType)) {
         return true
     }
 

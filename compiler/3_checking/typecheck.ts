@@ -1,18 +1,18 @@
 import { Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, STRING_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
-import { alreadyDeclared, assignmentError,BagelError,cannotFindName,miscError } from "../errors.ts";
+import { alreadyDeclared, assignmentError,BagelError,cannotFindExport,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, TYPE_AST_NOISE, AST_NOISE } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
 import { ancestors, findAncestor, iterateParseTree, typesEqual, within } from "../utils/ast.ts";
-import { _Store } from "../store.ts";
+import Store, { getModuleByName, _Store } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
 import { log, stripSourceInfo } from "../utils/debugging.ts";
 import { computedFn } from "../mobx.ts";
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "./resolve.ts";
-import { ValueDeclaration } from "../_model/declarations.ts";
+import { DeriveDeclaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, RemoteDeclaration, TypeDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 
 
 export const typeerrors = computedFn((store: _Store, moduleName: ModuleName): BagelError[] => {
@@ -34,12 +34,39 @@ export const typeerrors = computedFn((store: _Store, moduleName: ModuleName): Ba
  * Walk an entire AST and report all issues that we find
  */
 export function typecheck(reportError: ReportError, ast: Module): void {
-    const infer = (expr: Expression) => inferType(reportError, expr)
-    const resolveT = (type: TypeExpression) => resolveType(reportError, type)
-
     for (const { current, parent } of iterateParseTree(ast)) {
             
         switch(current.kind) {
+            case "import-all-declaration":
+            case "import-declaration": {
+                const otherModule = getModuleByName(Store, current.module as ModuleName, current.path.value)
+
+                if (otherModule == null) {
+                    // other module doesn't exist
+                    reportError(cannotFindModule(current.path))
+                }
+            } break;
+            case "import-item": {
+                const importDeclaration = (current.parent as ImportDeclaration)
+                const otherModule = getModuleByName(Store, current.module as ModuleName, importDeclaration.path.value)
+
+                if (otherModule != null) {
+                    const imported = otherModule.declarations.find(other =>
+                        (other.kind === 'value-declaration' ||
+                        other.kind === 'func-declaration' ||
+                        other.kind === 'proc-declaration' ||
+                        other.kind === 'type-declaration' ||
+                        other.kind === 'derive-declaration' ||
+                        other.kind === 'remote-declaration')
+                        && other.name.name === current.name.name) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined
+    
+                    if (imported?.kind === 'type-declaration') {
+                        reportError(miscError(current, `'${current.name.name}' refers to a type, but it's used as an expression`))
+                    } else if(!imported?.exported) {
+                        reportError(miscError(current, `'${current.name.name}' exists but is not exported`))
+                    }
+                }
+            } break;
             case "module": {
                 const seen = new Map<string, PlainIdentifier>()
                 const duplicates = new Set<PlainIdentifier>()
@@ -65,7 +92,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             case "javascript-escape":
                                 return []
                             default:
-                                // @ts-expect-error
+                                // @ts-expect-error: exhaustiveness
                                 throw Error(decl.kind)
                         }
                     })()
@@ -106,7 +133,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             case "javascript-escape":
                                 return []
                             default:
-                                // @ts-expect-error
+                                // @ts-expect-error: exhaustiveness
                                 throw Error(stmt.kind)
                         }
                     })()
@@ -138,7 +165,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             case "inline-destructuring-declaration":
                                 return decl.properties
                             default:
-                                // @ts-expect-error
+                                // @ts-expect-error: exhaustiveness
                                 throw Error(decl.kind)
                         }
                     })()
@@ -163,14 +190,14 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "inline-const-declaration": {
 
                 if (current.kind === 'inline-const-declaration' && current.awaited) {
-                    const valueType = resolveT(infer(current.value))
+                    const valueType = resolveType(inferType(current.value))
 
                     if (valueType.kind !== 'plan-type') {
                         // make sure value is a plan
                         reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${format(valueType)}'`))
                     } else if (current.type != null) {
                         // make sure value fits declared type, if there is one
-                        if (!subsumes(reportError, current.type, valueType.inner)) {
+                        if (!subsumes(current.type, valueType.inner)) {
                             reportError(assignmentError(current.value, current.type, valueType.inner))
                         }
                     }
@@ -182,21 +209,21 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "await-statement": {
-                const valueType = resolveT(infer(current.plan))
+                const valueType = resolveType(inferType(current.plan))
 
                 if (valueType.kind !== 'plan-type') {
                     // make sure value is a plan
                     reportError(miscError(current.plan, `Can only await expressions of type Plan; found type '${format(valueType)}'`))
                 } else if (current.type != null) {
                     // make sure value fits declared type, if there is one
-                    if (!subsumes(reportError, current.type, valueType.inner)) {
+                    if (!subsumes(current.type, valueType.inner)) {
                         reportError(assignmentError(current.plan, current.type, valueType.inner))
                     }
                 }
             } break;
             case "inline-destructuring-declaration":
             case "destructuring-declaration-statement": {
-                const valueType = resolveT(infer(current.value))
+                const valueType = resolveType(inferType(current.value))
                 
                 if (current.kind === 'inline-destructuring-declaration' && current.awaited) {
                     if (valueType.kind !== 'plan-type') {
@@ -221,7 +248,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     if (valueType.kind !== 'object-type') {
                         reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${format(valueType)}'`))
                     } else {
-                        const objectProperties = propertiesOf(reportError, valueType)
+                        const objectProperties = propertiesOf(valueType)
                         for (const property of current.properties) {
                             if (!objectProperties?.find(prop => prop.name.name === property.name)) {
                                 reportError(miscError(property, `Property '${property.name}' does not exist on type '${format(valueType)}'`))
@@ -241,7 +268,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "derive-declaration": {
-                const fnType = resolveT(infer(current.fn))
+                const fnType = resolveType(inferType(current.fn))
 
                 if (fnType.kind === 'func-type') {
                     if (fnType.args.length > 0) {
@@ -250,7 +277,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                     if (current.type != null) {
                         // make sure value fits declared type, if there is one
-                        if (!subsumes(reportError, current.type, fnType.returnType ?? UNKNOWN_TYPE)) {
+                        if (!subsumes(current.type, fnType.returnType ?? UNKNOWN_TYPE)) {
                             reportError(assignmentError(current.fn, current.type, fnType.returnType ?? UNKNOWN_TYPE))
                         }
                     }
@@ -260,12 +287,12 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "remote-declaration": {
-                const fnType = resolveT(infer(current.fn))
+                const fnType = resolveType(inferType(current.fn))
 
                 if (fnType.kind === 'plan-type') {
                     if (current.type != null) {
                         // make sure value fits declared type, if there is one
-                        if (!subsumes(reportError, current.type, fnType.inner)) {
+                        if (!subsumes(current.type, fnType.inner)) {
                             reportError(assignmentError(current.fn, current.type, fnType.inner))
                         }
                     }
@@ -276,7 +303,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                     if (current.type != null) {
                         // make sure value fits declared type, if there is one
-                        if (!subsumes(reportError, current.type, fnType.returnType.inner)) {
+                        if (!subsumes(current.type, fnType.returnType.inner)) {
                             reportError(assignmentError(current.fn, current.type, fnType.returnType.inner))
                         }
                     }
@@ -290,7 +317,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 expect(reportError, BOOLEAN_TYPE, current.expr)
             } break;
             case "autorun-declaration": {
-                const effectType = resolveT(infer(current.effect))
+                const effectType = resolveType(inferType(current.effect))
 
                 if (effectType.kind !== "proc-type") {
                     reportError(miscError(current.effect, `Expected procedure`));
@@ -300,7 +327,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "func":
             case "proc": {
-                const inferred = infer(current) as FuncType|ProcType|GenericFuncType|GenericProcType
+                const inferred = inferType(current) as FuncType|ProcType|GenericFuncType|GenericProcType
                 const funcOrProcType = inferred.kind === 'generic-type' ? inferred.inner : inferred
 
                 {
@@ -342,18 +369,18 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "binary-operator": {
-                const leftType = infer(current.left)
-                const rightType = infer(current.right)
+                const leftType = inferType(current.left)
+                const rightType = inferType(current.right)
 
                 if (current.op.op === '==' || current.op.op === '!=') {
-                    if (!subsumes(reportError, leftType, rightType) 
-                     && !subsumes(reportError, rightType, leftType)) {
+                    if (!subsumes(leftType, rightType) 
+                     && !subsumes(rightType, leftType)) {
                         reportError(miscError(current, `Can't compare types ${format(leftType)} and ${format(rightType)} because they have no overlap`))
                     }
                 } else if (current.op.op !== '??' && current.op.op !== '&&' && current.op.op !== '||') {
                     const types = BINARY_OPERATOR_TYPES[current.op.op]?.find(({ left, right }) =>
-                        subsumes(reportError, left, leftType) && 
-                        subsumes(reportError, right, rightType))
+                        subsumes(left, leftType) && 
+                        subsumes(right, rightType))
 
                     if (types == null) {
                         reportError(miscError(current.op, `Operator '${current.op.op}' cannot be applied to types '${format(leftType)}' and '${format(rightType)}'`));
@@ -365,9 +392,9 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 // Creation of nominal values looks like/parses as function 
                 // invocation, but needs to be treated differently
                 if (current.subject.kind === "local-identifier") {
-                    const binding = resolve(() => {}, current.subject.name, current.subject)
+                    const binding = resolve(current.subject.name, current.subject)
                     if (binding?.owner.kind === 'type-declaration') {
-                        const resolvedType = resolveT(binding.owner.type)
+                        const resolvedType = resolveType(binding.owner.type)
     
                         if (resolvedType.kind === "nominal-type") {
                             expect(reportError, resolvedType.inner, current.args[0])
@@ -378,10 +405,10 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                 // method call
                 const invocation = invocationFromMethodCall(current) ?? current;
-                const resolvedSubject = resolveT(infer(invocation.subject))
+                const resolvedSubject = resolveType(inferType(invocation.subject))
 
                 // bound generic
-                const subjectType = bindInvocationGenericArgs(reportError, invocation)
+                const subjectType = bindInvocationGenericArgs(invocation)
 
                 if (subjectType == null) {
                     const subject = resolvedSubject as GenericType
@@ -390,8 +417,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         reportError(miscError(invocation, `Failed to infer generic type parameters; ${subject.typeParams.length} type arguments will need to be provided explicitly`))
                     } else if (subject.typeParams.length !== invocation.typeArgs.length) {
                         reportError(miscError(invocation, `Expected ${subject.typeParams.length} type arguments, but got ${invocation.typeArgs.length}`))
-                    } else {
-                        reportError(miscError(invocation, `Couldn't find a valid way to bind the provided generic args to this generic type`))
                     }
                 } else if ( // check that subject is callable
                     subjectType.kind !== "func-type" && subjectType.kind !== "proc-type" 
@@ -420,19 +445,31 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         }
                     }
                 }
+                
+                // check that provided type args fit `extends` clauses
+                if (subjectType?.kind === 'generic-type' && subjectType.typeParams.length > 0 && invocation.typeArgs.length > 0) {
+                    for (let i = 0; i < subjectType.typeParams.length; i++) {
+                        const typeParam = subjectType.typeParams[i]
+                        const typeArg = invocation.typeArgs[i]
+                        
+                        if (typeParam && typeArg && typeParam.extends && !subsumes(typeParam.extends, typeArg)) {
+                            reportError(assignmentError(typeArg, typeParam.extends, typeArg))
+                        }
+                    }
+                }
             } break;
             case "switch-expression": {
                 for (const { condition } of current.cases) {
-                    expect(reportError, infer(current.value), condition)
+                    expect(reportError, inferType(current.value), condition)
                 }
             } break;
             case "indexer": {
-                const subjectType = resolveT(infer(current.subject))
-                const indexType = resolveT(infer(current.indexer))
+                const subjectType = resolveType(inferType(current.subject))
+                const indexType = resolveType(inferType(current.indexer))
                 
                 if (subjectType.kind === "object-type" && indexType.kind === "literal-type") {
                     const key = indexType.value.value;
-                    const valueType = propertiesOf(reportError, subjectType)?.find(entry => entry.name.name === key)?.type;
+                    const valueType = propertiesOf(subjectType)?.find(entry => entry.name.name === key)?.type;
                     if (valueType == null) {
                         reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${format(subjectType)}'`));
                     }
@@ -458,10 +495,10 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 const isMethodCall = current.parent?.kind === 'invocation' && invocationFromMethodCall(current.parent) != null
 
                 if (!isMethodCall) {
-                    const subjectType = resolveT(infer(current.subject))
+                    const subjectType = resolveType(inferType(current.subject))
                     const subjectProperties = current.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-                        ? propertiesOf(reportError, subtract(reportError, subjectType, NIL_TYPE))
-                        : propertiesOf(reportError, subjectType)
+                        ? propertiesOf(subtract(subjectType, NIL_TYPE))
+                        : propertiesOf(subjectType)
 
                     if (subjectProperties == null) {
                         reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${format(subjectType)}")`));
@@ -482,21 +519,23 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 expect(reportError, current.type, current.inner,
                     (dest, val) => `Expression of type ${format(val)} cannot be expanded to type ${format(dest)}`)
 
-                if (typesEqual(resolveT(current.type), resolveT(infer(current.inner)))) {
+                if (typesEqual(resolveType(current.type), resolveType(inferType(current.inner)))) {
                     reportError(miscError(current, `Casting here is redundant, because ${format(current.inner)} is already of type ${format(current.type)}`))
                 }
             } break;
             case "named-type": {
                 // make sure we err if identifier can't be resolved, even if it isn't used
-                const binding = resolve(reportError, current.name.name, current)
+                const binding = resolve(current.name.name, current)
 
                 if (!binding) {
                     reportError(cannotFindName(current, current.name.name))
+                } else if (binding.owner.kind !== 'type-declaration' && binding.owner.kind !== 'generic-param-type') {
+                    reportError(miscError(current, `'${current.name.name}' is not a type`))
                 }
             } break;
             case "local-identifier": {
                 // make sure we err if identifier can't be resolved, even if it isn't used
-                const binding = resolve(reportError, current.name, current)
+                const binding = resolve(current.name, current)
 
                 if (binding) {
                     if (binding.owner.kind === 'value-declaration' || 
@@ -541,20 +580,20 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "assignment": {
 
                 // if assigning directly to variable, make sure it isn't a constant
-                const resolved = current.target.kind === "local-identifier" ? resolve(reportError, current.target.name, current.target) : undefined
+                const resolved = current.target.kind === "local-identifier" ? resolve(current.target.name, current.target) : undefined
                 if (current.target.kind === "local-identifier" && resolved != null && getBindingMutability(resolved, current.target) !== "assignable") {
                     reportError(miscError(current.target, `Cannot assign to '${current.target.name}' because it's constant`));
                 }
 
                 // if assigning into object or array, make sure the subject isn't immutable
                 if (current.target.kind === "property-accessor" || current.target.kind === "indexer") {
-                    const subjectType = resolveT(infer(current.target.subject))
+                    const subjectType = resolveType(inferType(current.target.subject))
                     if (subjectType.mutability !== "mutable") {
                         reportError(miscError(current.target, `Cannot assign to '${format(current.target)}' because '${format(current.target.subject)}' is constant`));
                     }
                 }
 
-                const targetType = infer(current.target);
+                const targetType = inferType(current.target);
                 expect(reportError, targetType, current.value)
             } break;
             case "range": {
@@ -597,19 +636,19 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "object-type": {
                 for (const spread of current.spreads) {
-                    const resolved = resolveT(spread)
+                    const resolved = resolveType(spread)
 
-                    if (!subsumes(reportError, RECORD_OF_ANY, resolved)) {
+                    if (!subsumes(RECORD_OF_ANY, resolved)) {
                         reportError(miscError(spread, `${format(resolved)} is not an object type; can only spread object types into object types`))
                     }
                 }
             } break;
             case "instance-of": {
-                const exprType = resolveT(infer(current.expr))
+                const exprType = resolveType(inferType(current.expr))
 
-                if (!subsumes(reportError, exprType, current.type)) {
+                if (!subsumes(exprType, current.type)) {
                     reportError(miscError(current, `This check will always be false, because ${format(current.expr)} can never be a ${format(current.type)}`))
-                } else if (typesEqual(resolveT(exprType), resolveT(current.type))) {
+                } else if (typesEqual(resolveType(exprType), resolveType(current.type))) {
                     reportError(miscError(current, `This check will always be true, because ${format(current.expr)} will always be a ${format(current.type)}`))
                 }
             } break;
@@ -633,21 +672,27 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "keyof-type":
             case "valueof-type":
-                if (!subsumes(reportError, RECORD_OF_ANY, current.inner)) {
+                if (!subsumes(RECORD_OF_ANY, current.inner)) {
                     const keyword = current.kind === 'keyof-type' ? 'keyof' : 'valueof'
                     reportError(miscError(current, `${keyword} can only be used on object types; found ${format(current.inner)}`))
                 }
                 break;
             case "elementof-type":
-                if (!subsumes(reportError, ARRAY_OF_ANY, current.inner)) {
+                if (!subsumes(ARRAY_OF_ANY, current.inner)) {
                     reportError(miscError(current, `elementof can only be used on array types; found ${format(current.inner)}`))
                 }
                 break;
+            case "bound-generic-type": {
+                const resolvedGeneric = resolveType(current.generic)
+
+                if (resolvedGeneric.kind !== 'generic-type') {
+                    reportError(miscError(current, 'Can only bind type arguments to a generic type'))
+                }
+            } break;
             case "if-else-expression":
             case "if-else-statement":
             case "while-loop":
             case "negation-operator":
-            case "import-item":
             case "js-proc":
             case "js-func":
             case "test-block-declaration":
@@ -670,7 +715,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "union-type":
             case "maybe-type":
             case "generic-param-type":
-            case "bound-generic-type":
             case "element-type":
             case "record-type":
             case "array-type":
@@ -692,23 +736,21 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "javascript-escape-type":
             case "error-type":
             case "error-expression":
-            case "import-declaration":
-            case "import-all-declaration":
             case "type-declaration":
             case "proc-declaration":
             case "func-declaration":
             case "typeof-type":
                 break;
             default:
-                // @ts-expect-error
+                // @ts-expect-error: exhaustiveness
                 throw Error(current.kind)
         }        
     }
 }
 
 function expect(reportError: ReportError, destinationType: TypeExpression, value: Expression, generateMessage?: (dest: TypeExpression, val: TypeExpression) => string) {
-    const inferredType = inferType(reportError, value);
-    if (!subsumes(reportError, destinationType, inferredType)) {
+    const inferredType = inferType(value);
+    if (!subsumes(destinationType, inferredType)) {
         reportError(
             generateMessage
                 ? miscError(value, generateMessage(destinationType, inferredType))
@@ -720,15 +762,14 @@ function expect(reportError: ReportError, destinationType: TypeExpression, value
  * Determine whether `value` can "fit into" `destination`. Used for verifying 
  * values passed to consts, arguments, etc, but for other things too.
  */
-export function subsumes(reportError: ReportError, destination: TypeExpression, value: TypeExpression): boolean {
-    const resolve = (type: TypeExpression) => resolveType(reportError, type)
+export function subsumes(destination: TypeExpression, value: TypeExpression): boolean {
 
     if (destination === value) {
         return true;
     }
 
-    const resolvedDestination = resolve(destination)
-    const resolvedValue = resolve(value)
+    const resolvedDestination = resolveType(destination)
+    const resolvedValue = resolveType(value)
 
     // constants can't be assigned to mutable slots
     if (resolvedDestination.mutability === "mutable" && (resolvedValue.mutability !== "mutable" && resolvedValue.mutability !== "literal")) {
@@ -756,33 +797,33 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
         if (resolvedValue.kind === "union-type") {
             return resolvedValue.members.every(valueMember => 
                 resolvedDestination.members.some(destinationMember => 
-                    subsumes(reportError, destinationMember, valueMember)));
+                    subsumes(destinationMember, valueMember)));
         } else {
             return resolvedDestination.members.some(member => 
-                subsumes(reportError, member, resolvedValue));
+                subsumes(member, resolvedValue));
         }
     } else if (resolvedValue.kind === "union-type") {
         return resolvedValue.members.every(member =>
-            subsumes(reportError, resolvedDestination, member));
+            subsumes(resolvedDestination, member));
     } else if(typesEqual(resolvedDestination, resolvedValue)) {
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
             && resolvedValue.args.length <= resolvedDestination.args.length
             && resolvedDestination.args.every((_, i) => 
                 // NOTE: Value and destination are flipped on purpose for args!
-                subsumes(reportError, resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE))
-            && subsumes(reportError, resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)) {
+                subsumes(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE))
+            && subsumes(resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)) {
         return true;
     } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" 
             && resolvedValue.args.length <= resolvedDestination.args.length
             && resolvedDestination.args.every((_, i) => 
                 // NOTE: Value and destination are flipped on purpose for args!
-                subsumes(reportError, resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE))) {
+                subsumes(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE))) {
         return true;
     } else if (resolvedDestination.kind === "array-type") {
         if (resolvedValue.kind === "array-type") {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
-                return subsumes(reportError, resolvedDestination.element, resolvedValue.element)
+                return subsumes(resolvedDestination.element, resolvedValue.element)
             } else {
                 return typesEqual(resolvedDestination.element, resolvedValue.element)
             }
@@ -790,7 +831,7 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
         if (resolvedValue.kind === 'tuple-type') {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
                 return resolvedValue.members.every(member =>
-                    subsumes(reportError, resolvedDestination.element, member))
+                    subsumes(resolvedDestination.element, member))
             }
         }
     } else if (resolvedDestination.kind === "tuple-type") {
@@ -798,7 +839,7 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
                 return resolvedValue.members.length === resolvedDestination.members.length
                     && resolvedValue.members.every((member, index) =>
-                        subsumes(reportError, resolvedDestination.members[index], member))
+                        subsumes(resolvedDestination.members[index], member))
             } else {
                 return resolvedValue.members.length === resolvedDestination.members.length
                     && resolvedValue.members.every((member, index) =>
@@ -808,8 +849,8 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
     } else if (resolvedDestination.kind === "record-type") {
         if (resolvedValue.kind === "record-type") {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
-                return subsumes(reportError, resolvedDestination.keyType, resolvedValue.keyType)
-                    && subsumes(reportError, resolvedDestination.valueType, resolvedValue.valueType)
+                return subsumes(resolvedDestination.keyType, resolvedValue.keyType)
+                    && subsumes(resolvedDestination.valueType, resolvedValue.valueType)
             } else {
                 return typesEqual(resolvedDestination.keyType, resolvedValue.keyType)
                     && typesEqual(resolvedDestination.valueType, resolvedValue.valueType)
@@ -819,14 +860,14 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
                 // TODO: Spreads
                 return resolvedValue.entries.every(({ name, type }) =>
-                    subsumes(reportError, resolvedDestination.keyType, { kind: 'literal-type', value: { kind: 'exact-string-literal', value: name.name, ...AST_NOISE }, ...TYPE_AST_NOISE }) &&
-                    subsumes(reportError, resolvedDestination.valueType, type))
+                    subsumes(resolvedDestination.keyType, { kind: 'literal-type', value: { kind: 'exact-string-literal', value: name.name, ...AST_NOISE }, ...TYPE_AST_NOISE }) &&
+                    subsumes(resolvedDestination.valueType, type))
             }
         }
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
         // TODO: Spreads
-        const destinationEntries = propertiesOf(reportError, resolvedDestination)
-        const valueEntries =       propertiesOf(reportError, resolvedValue)
+        const destinationEntries = propertiesOf(resolvedDestination)
+        const valueEntries =       propertiesOf(resolvedValue)
 
         return (
             destinationEntries?.every(({ name: key, type: destinationValue, optional }) => {
@@ -835,7 +876,7 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
                 if (valueEntry == null) {
                     return optional
                 } else {
-                    return subsumes(reportError,  destinationValue, valueEntry.type)
+                    return subsumes( destinationValue, valueEntry.type)
                 }
             }) === true
         );
@@ -843,7 +884,7 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
                 (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") ||
                 (resolvedDestination.kind === "error-type" && resolvedValue.kind === "error-type") ||
                 (resolvedDestination.kind === "remote-type" && resolvedValue.kind === "remote-type")) {
-        return subsumes(reportError, resolvedDestination.inner, resolvedValue.inner);
+        return subsumes(resolvedDestination.inner, resolvedValue.inner);
     } else if (resolvedDestination.kind === 'nominal-type' && resolvedValue.kind === 'nominal-type') {
         return resolvedDestination.name === resolvedValue.name;
     }
@@ -854,18 +895,18 @@ export function subsumes(reportError: ReportError, destination: TypeExpression, 
 /**
  * Determine whether or not two types have any overlap at all
  */
-export function overlaps(reportError: ReportError, a: TypeExpression, b: TypeExpression): boolean {
-    const resolvedA = resolveType(reportError, a)
-    const resolvedB = resolveType(reportError, b)
+export function overlaps(a: TypeExpression, b: TypeExpression): boolean {
+    const resolvedA = resolveType(a)
+    const resolvedB = resolveType(b)
 
-    if (subsumes(reportError, resolvedA, resolvedB) || subsumes(reportError, resolvedB, resolvedA)) {
+    if (subsumes(resolvedA, resolvedB) || subsumes(resolvedB, resolvedA)) {
         return true
     } else if (resolvedA.kind === 'union-type' && resolvedB.kind === 'union-type') {
-        return resolvedA.members.some(memberA => resolvedB.members.some(memberB => overlaps(reportError, memberA, memberB)))
+        return resolvedA.members.some(memberA => resolvedB.members.some(memberB => overlaps(memberA, memberB)))
     } else if (resolvedA.kind === 'union-type') {
-        return resolvedA.members.some(memberA => overlaps(reportError, memberA, resolvedB))
+        return resolvedA.members.some(memberA => overlaps(memberA, resolvedB))
     } else if (resolvedB.kind === 'union-type') {
-        return resolvedB.members.some(memberB => overlaps(reportError, memberB, resolvedA))
+        return resolvedB.members.some(memberB => overlaps(memberB, resolvedA))
     }
 
     return false
@@ -876,35 +917,31 @@ export function overlaps(reportError: ReportError, a: TypeExpression, b: TypeExp
  * simplify unions; generally collapse a type into its "real" form, whatever 
  * that means.
  */
-export function resolveType(reportError: ReportError, type: TypeExpression): TypeExpression {
-    const resolveT = (type: TypeExpression) => resolveType(reportError, type)
-
+export function resolveType(type: TypeExpression): TypeExpression {
     switch (type.kind) {
         case "named-type": {
-            const binding = resolve(reportError, type.name.name, type.name)
+            const binding = resolve(type.name.name, type.name)
 
             if (binding) {
                 if (binding.owner.kind === 'type-declaration') {
-                    return resolveT(binding.owner.type)
+                    return resolveType(binding.owner.type)
                 }
     
                 if (binding.owner.kind === 'generic-param-type') {
-                    return resolveT(binding.owner)
+                    return resolveType(binding.owner)
                 }
-
-                reportError(miscError(type, `${type.name.name} is not a type`))
             }
 
             return UNKNOWN_TYPE
         }
         case "generic-param-type":
-            return resolveT(type.extends ?? UNKNOWN_TYPE)
+            return resolveType(type.extends ?? UNKNOWN_TYPE)
         case "parenthesized-type":
-            return resolveT(type.inner)
+            return resolveType(type.inner)
         case "typeof-type":
-            return inferType(reportError, type.expr)
+            return inferType(type.expr)
         case "keyof-type": {
-            const inner = resolveT(type.inner)
+            const inner = resolveType(type.inner)
 
             if (inner.kind === 'record-type') {
                 return inner.keyType
@@ -935,7 +972,7 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
             }
         }
         case "valueof-type": {
-            const inner = resolveT(type.inner)
+            const inner = resolveType(type.inner)
             
             if (inner.kind === 'record-type') {
                 return inner.valueType
@@ -953,7 +990,7 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
             }
         }
         case "elementof-type": {
-            const inner = resolveT(type.inner)
+            const inner = resolveType(type.inner)
             
             if (inner.kind === 'array-type') {
                 return inner.element
@@ -975,7 +1012,7 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
         case "iterator-type": {
             return {
                 ...type,
-                inner: resolveT(type.inner)
+                inner: resolveType(type.inner)
             }
         }
         case "plan-type": {
@@ -986,13 +1023,13 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
 
             return {
                 ...type,
-                inner: resolveT(inner)
+                inner: resolveType(inner)
             }
         }
         case "maybe-type": {
             const { parent, module, code, startIndex, endIndex } = type
 
-            return resolveT({
+            return resolveType({
                 kind: "union-type",
                 members: [
                     type.inner,
@@ -1003,46 +1040,45 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
             })
         }
         case "bound-generic-type": {
-            const resolvedGeneric = resolveT(type.generic)
+            const resolvedGeneric = resolveType(type.generic)
 
             if (resolvedGeneric.kind !== 'generic-type') {
-                reportError(miscError(type, 'Can only bind type arguments to a generic type'))
                 return UNKNOWN_TYPE
             } else {
-                return resolveT(parameterizedGenericType(reportError, resolvedGeneric, type.typeArgs))
+                return resolveType(parameterizedGenericType(resolvedGeneric, type.typeArgs))
             }
         }
         case "union-type": {
             const resolved = {
                 ...type,
-                members: type.members.map(resolveT)
+                members: type.members.map(resolveType)
             }
 
-            const simplified = simplifyUnions(reportError, resolved)
+            const simplified = simplifyUnions(resolved)
 
             if (simplified.kind === 'union-type') {
                 return simplified
             } else {
-                return resolveT(simplified)
+                return resolveType(simplified)
             }
         }
         case "array-type": {
             return {
                 ...type,
-                element: resolveT(type.element)
+                element: resolveType(type.element)
             }
         }
         case "tuple-type": {
             return {
                 ...type,
-                members: type.members.map(resolveT)
+                members: type.members.map(resolveType)
             }
         }
         case "record-type": {
             return {
                 ...type,
-                keyType: resolveT(type.keyType),
-                valueType: resolveT(type.valueType)
+                keyType: resolveType(type.keyType),
+                valueType: resolveType(type.valueType)
             }
         }
         case "object-type": {
@@ -1050,20 +1086,20 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
                 ...type,
                 entries: type.entries.map(entry => ({
                     ...entry,
-                    type: resolveT(entry.type)
+                    type: resolveType(entry.type)
                 }))
             }
         }
         case "property-type": {
-            const subjectType = resolveT(type.subject)
+            const subjectType = resolveType(type.subject)
             const nilTolerantSubjectType = type.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-                ? subtract(reportError, subjectType, NIL_TYPE)
+                ? subtract(subjectType, NIL_TYPE)
                 : subjectType;
-            const property = propertiesOf(reportError, nilTolerantSubjectType)?.find(entry => entry.name.name === type.property.name)
+            const property = propertiesOf(nilTolerantSubjectType)?.find(entry => entry.name.name === type.property.name)
             
             const { parent, module, code, startIndex, endIndex } = type
             if (type.optional && property) {
-                return resolveT({
+                return resolveType({
                     kind: "maybe-type",
                     inner: property.type,
                     mutability: undefined,
@@ -1078,7 +1114,7 @@ export function resolveType(reportError: ReportError, type: TypeExpression): Typ
                 )
     
                 return (
-                    given(property, property => resolveT((
+                    given(property, property => resolveType((
                             property.optional
                                 ?  {
                                     kind: "maybe-type",

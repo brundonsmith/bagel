@@ -65,17 +65,15 @@ export function compile(module: Module, modulePath: ModuleName, includeTests?: b
         return runtimeCode + `\n export const tests = {
             testExprs: [${
                 module.declarations
-                    .filter(decl => decl.kind === "test-expr-declaration")
-                    // @ts-ignore
-                    .map((decl: TestExprDeclaration) => 
+                    .filter((decl): decl is TestExprDeclaration => decl.kind === "test-expr-declaration")
+                    .map(decl => 
                         `{ name: '${decl.name.value}', expr: ${compileOne(excludeTypes, modulePath, decl.expr)} }`)
                     .join(',\n')
             }],
             testBlocks: [${
                 module.declarations
-                    .filter(decl => decl.kind === "test-block-declaration")
-                    // @ts-ignore
-                    .map((decl: TestBlockDeclaration) => 
+                    .filter((decl): decl is TestBlockDeclaration => decl.kind === "test-block-declaration")
+                    .map(decl => 
                         `{ name: '${decl.name.value}', block: () => ${compileOne(excludeTypes, modulePath, decl.block)} }`)
                     .join(',\n')
             }]
@@ -131,7 +129,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "derive-declaration": 
             return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `() => ${c(ast.type)}` : ``} = ${INT}computedFn(${c(ast.fn)})`
         case "remote-declaration": {
-            const fnType = resolveType(() => {}, inferType(() => {}, ast.fn))
+            const fnType = resolveType(inferType(ast.fn))
             const compiledPlanGenerator = c(ast.fn)
 
             return exported(ast.exported) + `const ${ast.name.name} = new ${INT}Remote${ast.type ? `<${c(ast.type)}>` : ``}(
@@ -156,7 +154,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             const value = c(ast.value)
 
             if (ast.target.kind === 'local-identifier') {
-                const binding = resolve(() => {}, ast.target.name, ast.target)
+                const binding = resolve(ast.target.name, ast.target)
 
                 if (binding?.owner.kind === 'value-declaration' && !binding.owner.isConst) {
                     return `${ast.target.name}.value = ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
@@ -206,7 +204,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             // method call
             const invocation = invocationFromMethodCall(ast) ?? ast;
 
-            const subjectType = resolveType(() => {}, inferType(() => {}, invocation.subject))
+            const subjectType = resolveType(inferType(invocation.subject))
             const procType = (
                 subjectType.kind === 'proc-type' ? subjectType :
                 subjectType.kind === 'generic-type' && subjectType.inner.kind === 'proc-type' ? subjectType.inner :
@@ -254,7 +252,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "debug": return c(ast.inner);
         case "plain-identifier": return ast.name;
         case "local-identifier": {
-            const binding = resolve(() => {}, ast.name, ast)
+            const binding = resolve(ast.name, ast)
 
             if (binding?.owner.kind === 'value-declaration' && !binding.owner.isConst) {
                 return `${INT}observe(${ast.name}, 'value')`
@@ -269,7 +267,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             // HACK: let-declarations accessed from whole-module imports need special treatment!
             // will this break if the module import gets aliased so something else?
             if (ast.subject.kind === 'local-identifier') {
-                const binding = resolve(() => {}, ast.subject.name, ast)
+                const binding = resolve(ast.subject.name, ast)
 
                 if (binding?.owner.kind === 'import-all-declaration') {
                     const module = getModuleByName(Store, binding.owner.module as ModuleName, binding.owner.path.value)
@@ -329,7 +327,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "nil-type": return `(null | undefined)`;
         case "unknown-type": return `unknown`;
         case "parenthesized-type": return `(${c(ast.inner)})`
-        case "instance-of": return `${INT}instanceOf(${c(ast.expr)}, ${compileRuntimeType(resolveType(() => {}, ast.type))})`
+        case "instance-of": return `${INT}instanceOf(${c(ast.expr)}, ${compileRuntimeType(resolveType(ast.type))})`
         case "as-cast": return `${c(ast.inner)} as ${c(ast.type)}`
         case "error-expression": return `{ kind: ${INT}ERROR_SYM, value: ${c(ast.inner)} }`
 
@@ -449,8 +447,8 @@ const fixTruthinessIfNeeded = (excludeTypes: boolean, module: string, expr: Expr
         : compileOne(excludeTypes, module, expr)
 
 const needsTruthinessFix = (expr: Expression) => {
-    const type = inferType(() => {}, expr)
-    return !subsumes(() => {}, TRUTHINESS_SAFE_TYPES, type)
+    const type = inferType(expr)
+    return !subsumes(TRUTHINESS_SAFE_TYPES, type)
 }
 
 const truthinessOf = (compiledExpr: string) => 
