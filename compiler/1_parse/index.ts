@@ -41,7 +41,6 @@ const LIB_LOCATION = 'https://raw.githubusercontent.com/brundonsmith/bagel/maste
 
 const BGL_PRELUDE_DATA = [
     { module: LIB_LOCATION + '/core.bgl' as ModuleName, imports: [ 'log', 'logf', 'iter', 'UnknownObject', 'BagelConfig' ] },
-    { module: LIB_LOCATION + '/bagel.bgl' as ModuleName, imports: [ 'BagelConfig' ] },
     { module: LIB_LOCATION + '/arrays.bgl' as ModuleName, imports: [ 'push', 'unshift', 'pop', 'shift', 'splice' ] },
     { module: LIB_LOCATION + '/strings.bgl' as ModuleName, imports: [ 'includes', 'indexOf', 'replace', 'split', 'startsWith', 'substring', 'toLowerCase', 'toUpperCase', 'trim' ] },
     { module: LIB_LOCATION + '/objects.bgl' as ModuleName, imports: [ 'keys', 'values', 'entries' ] },
