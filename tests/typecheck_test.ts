@@ -973,6 +973,59 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Optional arguments pass",
+  fn() {
+    testTypecheck(
+      `
+      func foo(a: number, b?: string) => a + (b ?? 'foo')
+      
+      const b = foo(12)
+      const c = foo(12, 'stuff')`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Optional arguments fail 1",
+  fn() {
+    testTypecheck(
+      `
+      func foo(a: number, b?: string) => a + b`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Optional arguments fail 2",
+  fn() {
+    testTypecheck(
+      `
+      func foo(a: number, b?: string) => a + (b ?? 'foo')
+      
+      const b = foo(12)
+      const c = foo(12, 13)`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Optional arguments fail 3",
+  fn() {
+    testTypecheck(
+      `
+      func foo(a: number, b?: string) => a + (b ?? 'foo')
+      
+      const b = foo(12)
+      const c = foo(12, 13, 14)`,
+      true,
+    );
+  },
+});
+
+Deno.test({
   name: "Inferred type across modules",
   fn() {
     testMultiModuleTypecheck({
@@ -1401,6 +1454,48 @@ Deno.test({
     proc doStuff(stuff: { foo: boolean }) {
       const { foo } = stuff;
       foo = true;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Destructuring array statement pass",
+  fn() {
+    testTypecheck(`
+    proc doStuff(tuple: [number, number], array: number[]) {
+      const [a] = tuple;
+      const [b, c] = tuple;
+      const ap: number = a;
+      const bp: number = b;
+      const cp: number = c;
+
+      const [a2, b2] = array;
+      const a2p: number|nil = a2;
+      const b2p: number|nil = b2;
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Destructuring array statement fail 1",
+  fn() {
+    testTypecheck(`
+    proc doStuff(tuple: [number, number]) {
+      const [a, b, c] = tuple;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Destructuring array statement fail 2",
+  fn() {
+    testTypecheck(`
+    proc doStuff(array: number[]) {
+      const [a, b] = array;
+      const ap: number = a;
     }`,
     true)
   }
