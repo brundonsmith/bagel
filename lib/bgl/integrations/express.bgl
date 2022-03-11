@@ -55,7 +55,7 @@ export type CookieOptions = const {
 export type Response = const {
     status: (code: number) { },
     sendStatus: (code: number) { },
-    links: (links: {[string]: string}): { },
+    links: (links: {[string]: string}) { },
     send: (body: JSON) { },
     json: (body: JSON) { },
     jsonp: (body: JSON) { },
