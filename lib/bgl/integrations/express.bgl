@@ -54,8 +54,8 @@ export type CookieOptions = const {
 
 export type Response = const {
     status: (code: number) { },
-    sendStatus: (code: number) { };
-    links: (links: {[string]: string}): { };
+    sendStatus: (code: number) { },
+    links: (links: {[string]: string}): { },
     send: (body: JSON) { },
     json: (body: JSON) { },
     jsonp: (body: JSON) { },
@@ -90,7 +90,7 @@ export type Application = {
 }
 
 export js func express(requestBodyType?: 'text'|'json'|'urlencoded'): Application => {#
-    const app = ___express();
+    const app = ___express()
 
     // automatically apply body and cookie parsers
     app.use(___express[requestBodyType ?? 'text']())
