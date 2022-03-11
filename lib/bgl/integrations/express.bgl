@@ -1,0 +1,100 @@
+js#
+import ___express from 'https://ga.jspm.io/npm:express@4.17.3/index.js'
+import ___cookieParser from 'https://ga.jspm.io/npm:cookie-parser@1.4.6/index.js'
+#js
+
+export type MediaType = const {
+    value: string,
+    quality: number,
+    type: string,
+    subtype: string,
+}
+
+export type Request = const {
+    baseUrl: string,
+    url: string,
+    originalUrl: string,
+    path: string,
+    hostname: string,
+    subdomains: string[],
+    protocol: string,
+    secure: boolean,
+    ip: string,
+    ips: string[],
+    fresh: boolean,
+    stale: boolean,
+    xhr: boolean,
+    method: string,
+    accepted: MediaType[],
+
+    is: (contentType: string) => boolean,
+    header: (name: string) => string[] | string | nil,
+    accepts: () => string[],
+    acceptsCharsets: () => string[],
+    acceptsEncodings: () => string[],
+    acceptsLanguages: () => string[],
+
+    cookies: {[string]: string},
+    query: {[string]: string},
+    body: {[string]: string} | string | nil,
+    params: {[string]: string},
+}
+
+export type CookieOptions = const {
+    maxAge?: number,
+    signed?: boolean,
+    // expires?: Date,
+    httpOnly?: boolean,
+    path?: string,
+    domain?: string,
+    secure?: boolean,
+    encode?: (val: string) => string,
+    sameSite?: boolean | 'lax' | 'strict' | 'none',
+}
+
+export type Response = const {
+    status: (code: number) { },
+    sendStatus: (code: number) { };
+    links: (links: {[string]: string}): { };
+    send: (body: JSON) { },
+    json: (body: JSON) { },
+    jsonp: (body: JSON) { },
+    sendFile: (path: string) { },
+    download: (path: string, filename?: string) { },
+    type: (type: string) { },
+    attachment: (filename?: string) { },
+    set: (header: string, value: string) { },
+    headersSent: boolean,
+    get: (field: string) => string,
+    clearCookie: (name: string) { },
+    cookie: (name: string, val: string, options?: CookieOptions) { },
+    location: (url: string) { },
+    redirect: (url: string, status?: number) { },
+    charset: string,
+    vary: (field: string) { },
+    append: (field: string, value?: string[] | string) { },
+}
+
+export type RequestHandler = (req: Request, res: Response) { }
+export type MiddlewareHandler = (req: Request, res: Response, next: () {}) { }
+
+export type Application = {
+    get: (path: string, handler: RequestHandler) { },
+    post: (path: string, handler: RequestHandler) { },
+    put: (path: string, handler: RequestHandler) { },
+    delete: (path: string, handler: RequestHandler) { },
+
+    use: (paths: const string[], handler: RequestHandler) { },
+
+    listen: (port?: number) { },
+}
+
+export js func express(requestBodyType?: 'text'|'json'|'urlencoded'): Application => {#
+    const app = ___express();
+
+    // automatically apply body and cookie parsers
+    app.use(___express[requestBodyType ?? 'text']())
+    app.use(___cookieParser())
+
+    return app
+#}
