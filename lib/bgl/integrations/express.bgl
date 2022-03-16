@@ -1,6 +1,6 @@
 js#
-import ___express from 'https://ga.jspm.io/npm:express@4.17.3/index.js'
-import ___cookieParser from 'https://ga.jspm.io/npm:cookie-parser@1.4.6/index.js'
+import ___express from 'https://jspm.dev/npm:express@4.17.3'
+import ___cookieParser from 'https://jspm.dev/npm:cookie-parser@1.4.6'
 #js
 
 export type MediaType = const {
