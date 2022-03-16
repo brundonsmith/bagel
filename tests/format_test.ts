@@ -1,7 +1,8 @@
 import { parsed } from "../compiler/1_parse/index.ts";
+import { prettyProblem } from "../compiler/errors.ts";
 import { DEFAULT_OPTIONS, format } from "../compiler/other/format.ts";
 import Store from "../compiler/store.ts";
-import { stripSourceInfo } from "../compiler/utils/debugging.ts";
+import { log, stripSourceInfo } from "../compiler/utils/debugging.ts";
 import { deepEquals } from "../compiler/utils/misc.ts";
 import { Module } from "../compiler/_model/ast.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
@@ -360,18 +361,18 @@ const BAGEL_SNIPPETS = [
 
 Store.start({
     mode: "mock",
-    modules: Object.fromEntries(BAGEL_SNIPPETS.map((bgl, index) => ['snippet ' + index, bgl])),
+    modules: Object.fromEntries(BAGEL_SNIPPETS.map((bgl, index) => ['snippet' + index + '.bgl', bgl])),
     watch: undefined
 })
 
-for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
+for (const module of [...Store.modulesSource.keys()]) {
     Deno.test({
-        name: 'snippet ' + i,
+        name: module,
         fn() {
-            const { ast, errors } = parsed(Store, ('snippet ' + i) as ModuleName) ?? {}
+            const { ast, errors } = parsed(Store, module) ?? {}
 
             if (ast && errors && errors.length === 0) {
-                const formattedModuleName = ('formatted snippet ' + i) as ModuleName
+                const formattedModuleName = ('formatted-' + module) as ModuleName
                 const formatted = format(ast, DEFAULT_OPTIONS)
 
                 Store.setSource(formattedModuleName, formatted)
@@ -382,10 +383,10 @@ for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
                 stripSourceInfo(reParsed)
 
                 if (!deepEquals(ast, reParsed)) {
-                    throw `Reformatted AST did not match original:\noriginal:\n${BAGEL_SNIPPETS[i]}\nformatted:\n${formatted}`
+                    throw `Reformatted AST did not match original:\noriginal:\n${Store.modulesSource.get(module)}\nformatted:\n${Store.modulesSource.get(formattedModuleName)}`
                 }
             } else {
-                throw `Failed to parse:\n${BAGEL_SNIPPETS[i]}`
+                throw `Failed to parse:\n${Store.modulesSource.get(module)}`
             }
         }
     })

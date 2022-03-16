@@ -27,6 +27,7 @@ export type AST = (
 
 export type Module = SourceInfo & {
     readonly kind: "module",
+    readonly moduleType: "bgl"|"json"|"text",
     readonly hasMain: boolean,
     readonly declarations: readonly Declaration[],
 }

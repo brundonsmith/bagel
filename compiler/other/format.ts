@@ -18,16 +18,16 @@ export const DEFAULT_OPTIONS: FormatOptions = {
 export const formatted = computedFn((store: _Store, moduleName: ModuleName): string => {
     const ast = parsed(store, moduleName)?.ast
 
-    if (!ast) {
-        return ''
-    }
-    
-    return (
-        format(
-            ast,
-            DEFAULT_OPTIONS
+    if (ast?.moduleType === 'bgl') {
+        return (
+            format(
+                ast,
+                DEFAULT_OPTIONS
+            )
         )
-    )
+    } else {
+        return store.modulesSource.get(moduleName) ?? ''
+    }
 })
 
 export function format(ast: AST, options: FormatOptions = DEFAULT_OPTIONS): string {

@@ -75,7 +75,7 @@ Deno.test({
 
 // deno-lint-ignore require-await
 async function testSideEffects(bgl: string, expected: any[]) {
-    const moduleName = "<test>" as ModuleName;
+    const moduleName = "<test>.bgl" as ModuleName;
 
     Store.start({
         mode: "mock",

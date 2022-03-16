@@ -12,20 +12,141 @@ import { iterateParseTree, setParents } from "../utils/ast.ts";
 import { computedFn } from "../mobx.ts";
 import { _Store } from "../store.ts";
 import { format } from "../other/format.ts";
+import { path } from '../deps.ts';
+import { AST_NOISE } from "../3_checking/typeinfer.ts";
 
 export const parsed = computedFn((store: _Store, moduleName: ModuleName): { ast: Module, errors: readonly BagelError[] } | undefined => {
     const source = store.modulesSource.get(moduleName)
-    if (source) {
-        const errors: BagelError[] = []
-        const ast = parse(
-            moduleName,  
-            source + (store.mode?.mode !== 'mock' ? preludeFor(moduleName) : ''), 
-            err => errors.push(err)
-        )
 
-        return { ast, errors }
+    if (source) {
+        const fileType = path.extname(moduleName)
+
+        if (fileType === '.bgl') {
+            const errors: BagelError[] = []
+            const ast = parse(
+                moduleName,  
+                source + (store.mode?.mode !== 'mock' ? preludeFor(moduleName) : ''), 
+                err => errors.push(err)
+            )
+
+            return { ast, errors }
+        } else if (fileType === '.json') {
+            try {
+                const contents = JSON.parse(source)
+
+                return {
+                    ast: moduleWithDeclarations([
+                        {
+                            kind: "value-declaration",
+                            name: {
+                                kind: "plain-identifier",
+                                name: JSON_AND_PLAINTEXT_EXPORT_NAME,
+                                ...AST_NOISE
+                            },
+                            type: undefined,
+                            isConst: true,
+                            exported: "export",
+                            value: jsonToAST(contents),
+                            ...AST_NOISE
+                        }
+                    ]),
+                    errors: []
+                }
+            } catch (e) {
+                return {
+                    ast: moduleWithDeclarations([]),
+                    errors: [
+                        { kind: "bagel-syntax-error", message: `Failed to parse JSON file '${moduleName}': ` + e.message, ast: undefined, code: undefined, index: undefined, stack: undefined }
+                    ]
+                }
+            }
+        } else {
+            return {
+                ast: moduleWithDeclarations([
+                    {
+                        kind: "value-declaration",
+                        name: {
+                            kind: "plain-identifier",
+                            name: JSON_AND_PLAINTEXT_EXPORT_NAME,
+                            ...AST_NOISE
+                        },
+                        type: undefined,
+                        isConst: true,
+                        exported: "export",
+                        value: {
+                            kind: "exact-string-literal",
+                            value: source,
+                            ...AST_NOISE
+                        },
+                        ...AST_NOISE
+                    }
+                ]),
+                errors: []
+            }
+        }
     }
 })
+
+export const JSON_AND_PLAINTEXT_EXPORT_NAME = "CONTENTS"
+
+function moduleWithDeclarations(declarations: Declaration[]): Module {
+    return {
+        kind: "module",
+        moduleType: "text",
+        hasMain: false,
+        declarations,
+        ...AST_NOISE
+    }
+}
+
+function jsonToAST(json: unknown): Expression {
+    if (json == null) {
+        return {
+            kind: "nil-literal",
+            ...AST_NOISE
+        }
+    } else if (typeof json === 'boolean') {
+        return {
+            kind: "boolean-literal",
+            value: json,
+            ...AST_NOISE
+        }
+    } else if (typeof json === 'number') {
+        return {
+            kind: "number-literal",
+            value: json,
+            ...AST_NOISE
+        }
+    } else if (typeof json === 'string') {
+        return {
+            kind: "exact-string-literal",
+            value: json,
+            ...AST_NOISE
+        }
+    } else if (Array.isArray(json)) {
+        return {
+            kind: "array-literal",
+            entries: json.map(jsonToAST),
+            ...AST_NOISE
+        }
+    } else if (typeof json === 'object') {
+        return {
+            kind: "object-literal",
+            entries: Object.entries(json).map(([key, value]) => [
+                {
+                    kind: "plain-identifier",
+                    name: key,
+                    ...AST_NOISE
+                },
+                jsonToAST(value)
+            ]),
+            ...AST_NOISE
+        }
+    }
+
+    // Should be unreachable
+    throw Error(`Failed to convert value ${json} to Bagel JSON value`)
+}
 
 function preludeFor(module: ModuleName) {
     const normalizedModule = canonicalLibName(module)
@@ -84,6 +205,7 @@ export function parse(module: ModuleName, code: string, reportError: ReportError
 
     const moduleAst: Module = {
         kind: "module",
+        moduleType: "bgl",
         hasMain: declarations.some(decl => decl.kind === "proc-declaration" && decl.name.name === "main"),
         declarations,
         module,

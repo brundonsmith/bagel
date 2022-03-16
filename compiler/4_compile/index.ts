@@ -87,7 +87,13 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
     const c = (ast: AST) => compileOne(excludeTypes, module, ast)
 
     switch(ast.kind) {
-        case "import-all-declaration": return `import * as ${ast.alias.name} from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}"`;
+        case "import-all-declaration": {
+            const importedModuleType = ast.module && getModuleByName(Store, ast.module, ast.path.value)?.moduleType
+            const imported = importedModuleType === 'json' || importedModuleType === 'text'
+                ? `{ CONTENTS as ${ast.alias.name} }`
+                : `* as ${ast.alias.name}` 
+            return `import ${imported} from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}"`
+        }
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             c(name) + (alias ? ` as ${c(alias)}` : ``)
         ).join(", ")} } from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}"`;

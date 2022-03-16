@@ -594,7 +594,7 @@ Deno.test({
 })
 
 function testCompile(code: string, exp: string) {
-  const moduleName = '<test>' as ModuleName
+  const moduleName = '<test>.bgl' as ModuleName
 
   Store.start({
     mode: 'mock',

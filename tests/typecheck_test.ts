@@ -690,9 +690,9 @@ Deno.test({
   name: "Duplicate declaration name 2",
   fn() {
     testMultiModuleTypecheck({
-        a: `export const a = 12`,
-        b: `
-        from 'a' import { a }
+        'a.bgl': `export const a = 12`,
+        'b.bgl': `
+        from 'a.bgl' import { a }
         
         func a() => nil`
       },
@@ -1078,10 +1078,10 @@ Deno.test({
   name: "Fail to import module",
   fn() {
     testMultiModuleTypecheck({
-      "module-1": `
+      "module-1.bgl": `
       export func foo(b: number) => b * 2`,
-      "module-2": `
-      from 'module-3' import { foo }`
+      "module-2.bgl": `
+      from 'module-3.bgl' import { foo }`
     }, true)
   }
 })
@@ -1090,13 +1090,13 @@ Deno.test({
   name: "Import type across modules pass",
   fn() {
     testMultiModuleTypecheck({
-      "module-1": `
+      "module-1.bgl": `
       export type Foo = {
         method: () {}
       }`,
 
-      "module-2": `
-      from 'module-1' import { Foo }
+      "module-2.bgl": `
+      from 'module-1.bgl' import { Foo }
       proc bar(foo: Foo) {
         foo.method();
       }`
@@ -1108,13 +1108,13 @@ Deno.test({
   name: "Import type across modules fail",
   fn() {
     testMultiModuleTypecheck({
-      "module-1": `
+      "module-1.bgl": `
       export type Foo = {
         method: () {}
       }`,
 
-      "module-2": `
-      from 'module-1' import { Foo }
+      "module-2.bgl": `
+      from 'module-1.bgl' import { Foo }
       proc bar(foo: Foo) {
         foo.other();
       }`
@@ -1126,11 +1126,11 @@ Deno.test({
   name: "Inferred type across modules",
   fn() {
     testMultiModuleTypecheck({
-      "module-1": `
+      "module-1.bgl": `
       export func foo(b: number) => b * 2`,
 
-      "module-2": `
-      from 'module-1' import { foo }
+      "module-2.bgl": `
+      from 'module-1.bgl' import { foo }
       const stuff: number = foo(12)`
     }, false)
   }
@@ -1140,12 +1140,12 @@ Deno.test({
   name: "Inferred type across module with name resolution",
   fn() {
     testMultiModuleTypecheck({
-      "module-1": `
+      "module-1.bgl": `
       func foo(a: number) => a * 2
       export func bar(b: number) => foo(b) * 2`,
 
-      "module-2": `
-      from 'module-1' import { bar }
+      "module-2.bgl": `
+      from 'module-1.bgl' import { bar }
       const stuff: number = bar(12)`
     }, false)
   }
@@ -1155,11 +1155,11 @@ Deno.test({
   name: "Expose access in module",
   fn() {
     testMultiModuleTypecheck({
-      "module-1": `
+      "module-1.bgl": `
       expose let foo: number = 12`,
 
-      "module-2": `
-      from 'module-1' import { foo }
+      "module-2.bgl": `
+      from 'module-1.bgl' import { foo }
       proc bar() {
         let a: number = 0;
 
@@ -1174,11 +1174,11 @@ Deno.test({
   name: "Expose assignment",
   fn() {
     testMultiModuleTypecheck({
-      "module-1": `
+      "module-1.bgl": `
       expose let foo: number = 12`,
 
-      "module-2": `
-      from 'module-1' import { foo }
+      "module-2.bgl": `
+      from 'module-1.bgl' import { foo }
       proc bar() {
         foo = 13;
       }`
@@ -1642,9 +1642,9 @@ Deno.test({
   name: "Import all pass",
   fn() {
     testMultiModuleTypecheck({
-      'a': `export func foo(a: number) => a + 'stuff'`,
-      'b': `
-      import 'a' as moduleA
+      'a.bgl': `export func foo(a: number) => a + 'stuff'`,
+      'b.bgl': `
+      import 'a.bgl' as moduleA
       const x = moduleA.foo(12)`
     },
     false)
@@ -1655,9 +1655,9 @@ Deno.test({
   name: "Import all fail 1",
   fn() {
     testMultiModuleTypecheck({
-      'a': `export func foo2(a: number) => a + 'stuff'`,
-      'b': `
-      import 'a' as moduleA
+      'a.bgl': `export func foo2(a: number) => a + 'stuff'`,
+      'b.bgl': `
+      import 'a.bgl' as moduleA
       const x = moduleA.foo(12)`
     },
     true)
@@ -1668,9 +1668,9 @@ Deno.test({
   name: "Import all fail 2",
   fn() {
     testMultiModuleTypecheck({
-      'a': `export func foo(a: number) => a + 'stuff'`,
-      'b': `
-      import 'a' as moduleA
+      'a.bgl': `export func foo(a: number) => a + 'stuff'`,
+      'b.bgl': `
+      import 'a.bgl' as moduleA
       const x = foo(12)`
     },
     true)
@@ -1681,9 +1681,9 @@ Deno.test({
   name: "Import all fail 3",
   fn() {
     testMultiModuleTypecheck({
-      'a': `export func foo(a: number) => a + 'stuff'`,
-      'b': `
-      import 'a' as moduleA
+      'a.bgl': `export func foo(a: number) => a + 'stuff'`,
+      'b.bgl': `
+      import 'a.bgl' as moduleA
       const x = moduleA.foo('stuff')`
     },
     true)
@@ -1694,9 +1694,9 @@ Deno.test({
   name: "Import all fail 4",
   fn() {
     testMultiModuleTypecheck({
-      'a': `export func foo(a: number) => a + 'stuff'`,
-      'b': `
-      import 'c' as moduleA`
+      'a.bgl': `export func foo(a: number) => a + 'stuff'`,
+      'b.bgl': `
+      import 'c.bgl' as moduleA`
     },
     true)
   }
@@ -2353,7 +2353,7 @@ Deno.test({
 
 
 function testTypecheck(code: string, shouldFail: boolean): void {
-  const moduleName = "<test>" as ModuleName
+  const moduleName = "<test>.bgl" as ModuleName
 
   Store.start({
     mode: 'mock',

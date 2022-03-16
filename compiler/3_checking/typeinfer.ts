@@ -11,6 +11,7 @@ import Store, { getModuleByName } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration, ImportItem, Declaration } from "../_model/declarations.ts";
 import { resolve } from "./resolve.ts";
+import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
 
 export function inferType(
     ast: Expression,
@@ -575,7 +576,7 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
                     parent,
                     ...AST_NOISE
                 }
-            } else {
+            } else if (otherModule.moduleType === "bgl") {
                 const exportedDeclarations = otherModule.declarations.filter(decl =>
                     (decl.kind === 'value-declaration' || decl.kind === 'func-declaration' || decl.kind === 'proc-declaration')
                     && decl.exported) as (ValueDeclaration|FuncDeclaration|ProcDeclaration)[]
@@ -595,6 +596,16 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
                     mutability: 'mutable',
                     parent,
                     ...AST_NOISE
+                }
+            } else {
+                // json or plaintext
+                const contents = otherModule.declarations.find((decl): decl is ValueDeclaration =>
+                    decl.kind === 'value-declaration' && decl.name.name === JSON_AND_PLAINTEXT_EXPORT_NAME)
+
+                if (contents) {
+                    return inferType(contents.value)
+                } else {
+                    return UNKNOWN_TYPE
                 }
             }
         }
