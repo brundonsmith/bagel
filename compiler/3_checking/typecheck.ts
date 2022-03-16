@@ -2,7 +2,7 @@ import { Block, Module, PlainIdentifier } from "../_model/ast.ts";
 import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, TYPE_AST_NOISE, AST_NOISE } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, TYPE_AST_NOISE, AST_NOISE, resolveImport } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
 import { ancestors, findAncestor, iterateParseTree, literalType, maybeOf, typesEqual, within } from "../utils/ast.ts";
 import Store, { getModuleByName, _Store } from "../store.ts";
@@ -47,23 +47,13 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "import-item": {
-                const importDeclaration = (current.parent as ImportDeclaration)
-                const otherModule = getModuleByName(Store, current.module as ModuleName, importDeclaration.path.value)
+                const imported = resolveImport(current)
 
-                if (otherModule != null) {
-                    const imported = otherModule.declarations.find(other =>
-                        (other.kind === 'value-declaration' ||
-                        other.kind === 'func-declaration' ||
-                        other.kind === 'proc-declaration' ||
-                        other.kind === 'type-declaration' ||
-                        other.kind === 'derive-declaration' ||
-                        other.kind === 'remote-declaration')
-                        && other.name.name === current.name.name) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined
-    
-                    if (imported?.kind === 'type-declaration') {
-                        reportError(miscError(current, `'${current.name.name}' refers to a type, but it's used as an expression`))
-                    } else if(!imported?.exported) {
-                        reportError(miscError(current, `'${current.name.name}' exists but is not exported`))
+                if (imported) {
+                    if (imported == null) {
+                        reportError(miscError(current, `Can't find declaration '${current.name.name}' in module '${(current.parent as ImportDeclaration).path.value}'`))
+                    } else if(!imported.exported) {
+                        reportError(miscError(current, `Declaration '${current.name.name}' exists in module '${(current.parent as ImportDeclaration).path.value}' but is not exported`))
                     }
                 }
             } break;
@@ -421,7 +411,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 } else if ( // check that subject is callable
                     subjectType.kind !== "func-type" && subjectType.kind !== "proc-type" 
                 && (subjectType.kind !== 'generic-type' || (subjectType.inner.kind !== 'func-type' && subjectType.inner.kind !== 'proc-type'))) {
-                    reportError(miscError(invocation.subject, "Expression must be a function or procedure to be called"));
+                    reportError(miscError(invocation.subject, `Expression must be a function or procedure to be called; '${format(invocation.subject)}' is of type '${format(subjectType)}'`));
                 } else {
                     const invoked = subjectType.kind === 'generic-type' ? subjectType.inner as FuncType|ProcType : subjectType
         
@@ -529,8 +519,14 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                 if (!binding) {
                     reportError(cannotFindName(current, current.name.name))
-                } else if (binding.owner.kind !== 'type-declaration' && binding.owner.kind !== 'generic-param-type') {
-                    reportError(miscError(current, `'${current.name.name}' is not a type`))
+                } else {
+                    const decl = binding.owner.kind === 'import-item' 
+                        ? resolveImport(binding.owner)
+                        : binding.owner
+
+                    if (decl?.kind !== 'type-declaration' && decl?.kind !== 'generic-param-type') {
+                        reportError(miscError(current, `'${current.name.name}' is not a type`))
+                    }
                 }
             } break;
             case "local-identifier": {
@@ -572,6 +568,8 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                                 }
                             }
                         }
+                    } else if (binding.owner.kind === 'type-declaration') {
+                        reportError(miscError(current, `'${current.name}' is a type but it's used like a value`))
                     }
                 } else {
                     reportError(cannotFindName(current, current.name))
@@ -929,6 +927,14 @@ export function resolveType(type: TypeExpression): TypeExpression {
     
                 if (binding.owner.kind === 'generic-param-type') {
                     return resolveType(binding.owner)
+                }
+
+                if (binding.owner.kind === 'import-item') {
+                    const imported = resolveImport(binding.owner)
+
+                    if (imported && imported.exported && imported.kind === 'type-declaration') {
+                        return resolveType(imported.type)
+                    }
                 }
             }
 

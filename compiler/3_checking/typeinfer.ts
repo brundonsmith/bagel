@@ -9,7 +9,7 @@ import { computedFn } from "../mobx.ts";
 import { areSame, expressionsEqual, literalType, mapParseTree, maybeOf, typesEqual } from "../utils/ast.ts";
 import Store, { getModuleByName } from "../store.ts";
 import { format } from "../other/format.ts";
-import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration } from "../_model/declarations.ts";
+import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration, ImportItem, Declaration } from "../_model/declarations.ts";
 import { resolve } from "./resolve.ts";
 
 export function inferType(
@@ -599,23 +599,10 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
             }
         }
         case 'import-item': {
-            const importDeclaration = (decl.parent as ImportDeclaration)
-            const otherModule = getModuleByName(Store, decl.module as ModuleName, importDeclaration.path.value)
+            const imported = resolveImport(decl)
 
-            if (otherModule != null) {
-                const imported = otherModule.declarations.find(other =>
-                    (other.kind === 'value-declaration' ||
-                    other.kind === 'func-declaration' ||
-                    other.kind === 'proc-declaration' ||
-                    other.kind === 'type-declaration' ||
-                    other.kind === 'derive-declaration' ||
-                    other.kind === 'remote-declaration')
-                    && other.name.name === decl.name.name
-                    && other.exported) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined
-
-                if (imported) {
-                    return getBindingType(importedFrom, { owner: imported, identifier: imported.name }, visited)
-                }
+            if (imported) {
+                return getBindingType(importedFrom, { owner: imported, identifier: imported.name }, visited)
             }
         } break;
         case 'type-declaration':
@@ -1258,6 +1245,21 @@ export function invocationFromMethodCall(expr: Expression): Invocation|undefined
             return inv
         }
     }
+}
+
+export function resolveImport(importItem: ImportItem): ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined {
+    const importDeclaration = (importItem.parent as ImportDeclaration)
+    const otherModule = getModuleByName(Store, importItem.module as ModuleName, importDeclaration.path.value)
+
+    return otherModule?.declarations.find(other =>
+        (other.kind === 'value-declaration' ||
+        other.kind === 'func-declaration' ||
+        other.kind === 'proc-declaration' ||
+        other.kind === 'type-declaration' ||
+        other.kind === 'derive-declaration' ||
+        other.kind === 'remote-declaration')
+        && other.name.name === importItem.name.name
+    ) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined
 }
 
 export const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] }> = {

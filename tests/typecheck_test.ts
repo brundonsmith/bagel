@@ -1087,6 +1087,42 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Import type across modules pass",
+  fn() {
+    testMultiModuleTypecheck({
+      "module-1": `
+      export type Foo = {
+        method: () {}
+      }`,
+
+      "module-2": `
+      from 'module-1' import { Foo }
+      proc bar(foo: Foo) {
+        foo.method();
+      }`
+    }, false)
+  }
+})
+
+Deno.test({
+  name: "Import type across modules fail",
+  fn() {
+    testMultiModuleTypecheck({
+      "module-1": `
+      export type Foo = {
+        method: () {}
+      }`,
+
+      "module-2": `
+      from 'module-1' import { Foo }
+      proc bar(foo: Foo) {
+        foo.other();
+      }`
+    }, true)
+  }
+})
+
+Deno.test({
   name: "Inferred type across modules",
   fn() {
     testMultiModuleTypecheck({
