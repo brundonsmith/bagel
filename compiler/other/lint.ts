@@ -23,6 +23,7 @@ export function lint(config: BagelConfig|undefined, ast: AST): LintProblem[] {
             if (problemNode) {
                 problems.push({
                     kind: 'lint-problem',
+                    name,
                     rule,
                     ast: problemNode,
                     severity: (config?.lintRules?.[name] as LintRuleSeverity|undefined ?? DEFAULT_SEVERITY[name])
@@ -75,6 +76,7 @@ export type LintRuleSeverity = 'error'|'warning'|'info'|'off'
 
 export type LintProblem = {
     readonly kind: 'lint-problem',
+    readonly name: LintRuleName,
     readonly rule: LintRule,
     readonly ast: AST,
     readonly severity: LintRuleSeverity,
