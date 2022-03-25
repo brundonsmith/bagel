@@ -5,7 +5,7 @@ import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf, ErrorExpression } from "../_model/expressions.ts";
-import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement } from "../_model/statements.ts";
+import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
@@ -641,8 +641,8 @@ const procType: ParseFunction<ProcType|GenericProcType> = (module, code, startIn
         const procType: ProcType = {
             kind: "proc-type",
             args,
-            invalidatesParent: false,
-            isAsync: undefined,
+            isAsync: false, // TODO: Parse "async" keyword
+            throws: undefined, // TODO: Parse optional explicit "throws" type
             mutability: undefined,
             module,
             code,
@@ -1086,8 +1086,8 @@ const _procHeader: ParseFunction<ProcType|GenericProcType> = (module, code, star
         const procType: ProcType = {
             kind: "proc-type",
             args,
-            invalidatesParent: false,
-            isAsync: undefined,
+            isAsync: false, // TODO: Parse "async" keyword
+            throws: undefined, // TODO: Parse optional explicit "throws" type
             mutability: undefined,
             module,
             code,
@@ -1116,6 +1116,8 @@ const _procHeader: ParseFunction<ProcType|GenericProcType> = (module, code, star
 
 const statement: ParseFunction<Statement> = (module, code, startIndex) =>
     javascriptEscape(module, code, startIndex)
+    ?? tryCatch(module, code, startIndex)
+    ?? throwStatement(module, code, startIndex)
     ?? valueDeclarationStatement(module, code, startIndex)
     ?? ifElseStatement(module, code, startIndex)
     ?? forLoop(module, code, startIndex)
@@ -1212,11 +1214,17 @@ const awaitStatement: ParseFunction<AwaitStatement> = (module, code, startIndex)
 
 const procCall: ParseFunction<Invocation> = (module, code, startIndex) =>
     given(invocationAccessorChain(module, code, startIndex), ({ parsed, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(parseOptional(module, code, index, parseExact("?")), ({ parsed: bubbles, index: indexAfterQuestionMark }) =>
+    given(consumeWhitespace(code, indexAfterQuestionMark ?? index), index =>
     expec(consume(code, index, ';'), err(code, index, '";"'), index => 
         parsed.kind === "invocation" ? {
-            parsed,
+            parsed: {
+                ...parsed,
+                bubbles: bubbles != null
+            },
             index
-        } : undefined))
+        } : undefined)))))
     
 
 const ifElseStatement: ParseFunction<IfElseStatement> = (module, code, startIndex) =>
@@ -1336,6 +1344,46 @@ const parseBlockWithoutBraces: ParseFunction<Block> = (module, code, startIndex)
         },
         index,
     }))
+
+const tryCatch: ParseFunction<TryCatch> = (module, code, startIndex) =>
+    given(consume(code, startIndex, "try"), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(parseBlock(module, code, index), err(code, index, 'Try-block'), ({ parsed: tryBlock, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, "catch"), err(code, index, '"catch"'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(plainIdentifier(module, code, index), err(code, index, 'Identifier'), ({ parsed: errIdentifier, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(parseBlock(module, code, index), err(code, index, 'Catch-block'), ({ parsed: catchBlock, index }) => ({
+        parsed: {
+            kind: 'try-catch',
+            tryBlock,
+            errIdentifier,
+            catchBlock,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    }))))))))))
+
+const throwStatement: ParseFunction<ThrowStatement> = (module, code, startIndex) =>
+    given(consume(code, startIndex, "throw"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(expression(module, code, index), err(code, index, 'Error expression'), ({ parsed: errorExpression, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, ';'), err(code, index, '";"'), index => ({
+        parsed: {
+            kind: 'throw-statement',
+            errorExpression,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    }))))))
 
 const expression: ParseFunction<Expression> = memoize3((module, code, startIndex) =>
     EXPRESSION_PARSER.parseStartingFromTier(0)(module, code, startIndex))
@@ -1893,6 +1941,7 @@ const _oneGetToInvocationOrAccess = (subject: Expression, get: InvocationArgs|Pr
             subject,
             typeArgs: get.typeArgs,
             args: get.exprs,
+            bubbles: false,
             module: get.module,
             code: get.code,
             startIndex: subject.startIndex,

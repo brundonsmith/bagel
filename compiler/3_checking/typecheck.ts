@@ -1,8 +1,8 @@
 import { Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, TYPE_AST_NOISE, AST_NOISE, resolveImport } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, TYPE_AST_NOISE, AST_NOISE, resolveImport, throws } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
 import { ancestors, findAncestor, iterateParseTree, literalType, maybeOf, typesEqual, within } from "../utils/ast.ts";
 import Store, { getModuleByName, _Store } from "../store.ts";
@@ -103,6 +103,8 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "block": {
+
+                // check against re-declarations of symbols
                 const seen = new Map<string, PlainIdentifier>()
                 const duplicates = new Set<PlainIdentifier>()
 
@@ -121,6 +123,8 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             case "while-loop":
                             case "assignment":
                             case "javascript-escape":
+                            case "try-catch":
+                            case "throw-statement":
                                 return []
                             default:
                                 // @ts-expect-error: exhaustiveness
@@ -141,6 +145,33 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                 for (const duplicate of duplicates) {
                     reportError(alreadyDeclared(duplicate))
+                }
+
+
+                if (current.parent?.kind === 'try-catch' && current === current.parent.tryBlock) {
+                    // shouldn't use ? inside try-blocks
+                    for (const stmt of current.statements) {
+                        if (stmt.kind === 'invocation' && stmt.bubbles) {
+                            reportError(miscError(stmt, `Don't use '?' operator inside try-blocks; errors here are caught, and don't bubble up to the outer proc`))
+                        }
+                    }
+                } else {
+                    for (const stmt of current.statements) {
+                        if (stmt.kind === 'invocation' && !stmt.bubbles) {
+                            const procType = inferType(stmt.subject)
+
+                            if (procType.kind === 'proc-type') {
+                                // check against "throwing" invocations without a ?
+                                if (procType.throws && !stmt.bubbles) {
+                                    reportError(miscError(stmt, `Proc calls that might throw an error must either be handled in a try-catch, or bubble their error up using '?'`))
+                                }
+                                // check against non-throwing invocations that do have a ?
+                                if (!procType.throws && stmt.bubbles) {
+                                    reportError(miscError(stmt, `This proc can't throw an error, so there's no reason to use '?' here`))
+                                }
+                            }
+                        }
+                    }
                 }
             } break;
             case "inline-const-group": {
@@ -594,16 +625,27 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 const targetType = inferType(current.target);
                 expect(reportError, targetType, current.value)
             } break;
-            case "range": {
+            case "range":
                 expect(reportError, NUMBER_TYPE, current.start, 
                     (_, val) => `Expected number for start of range; got '${format(val)}'`)
                 expect(reportError, NUMBER_TYPE, current.end, 
                     (_, val) => `Expected number for end of range; got '${format(val)}'`)
-            } break;
-            case "for-loop": {
+                break;
+            case "for-loop":
                 expect(reportError, ITERATOR_OF_ANY, current.iterator, 
                     (_, val) => `Expected iterator after "of" in for loop; found '${format(val)}'`)
+                break;
+            case "try-catch": {
+                const thrown = throws(current.tryBlock)
+
+                if (thrown.length === 0) {
+                    reportError(miscError(current.tryBlock, `try/catch is redundant; no errors can be thrown in this block`))
+                }
             } break;
+            case "throw-statement":
+                expect(reportError, ERROR_OF_ANY, current.errorExpression,
+                    (_, val) => `Can only thow Errors; this is a '${format(val)}'`)
+                break;
             case "element-tag": {
                 for (const child of current.children) {
                     expect(reportError, ELEMENT_TAG_CHILD_TYPE, child)

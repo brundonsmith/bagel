@@ -1,25 +1,17 @@
-// from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/http.bgl' import { get }
 
-js func get(url: string): Plan<unknown> => {#
-    return () => fetch(url).then(res => res.text())
-#}
-
-func getCard(num: number) => get('https://api.pokemontcg.io/v1/cards/base1-' + num)
-
-let num = 1
-
-remote cardInfo = () => getCard(num)
-
-autorun () {
-    log('response:');
-    log(cardInfo.value);
-    log('');
+proc foo(n: number) {
+    if n < 10 {
+        log('all good!');
+    } else {
+        throw Error('it errored!');
+    }
 }
 
 proc main() {
-    await timeout(2000);
-    num = num + 1;
-    
-    await timeout(2000);
-    num = num + 1;
+    try {
+        foo(15);
+        log('passed');
+    } catch e {
+        log(e);
+    }
 }

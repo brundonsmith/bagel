@@ -64,8 +64,8 @@ export type GenericParamType = SourceInfo & {
 export type ProcType = SourceInfo & {
     readonly kind: "proc-type",
     readonly args: readonly Arg[],
-    readonly invalidatesParent: boolean,
-    readonly isAsync: boolean|undefined,
+    readonly isAsync: boolean,
+    readonly throws: TypeExpression|undefined,
     readonly mutability: undefined,
 }
 
@@ -503,8 +503,8 @@ export const PROC: ProcType = {
         startIndex: undefined,
         endIndex: undefined,
     }),
-    invalidatesParent: false,
     isAsync: false,
+    throws: undefined,
     mutability: undefined,
     parent: undefined,
     module: undefined,
@@ -602,43 +602,3 @@ export const FALSY: UnionType = {
 }
 
 // TODO: Only allow known object properties when instantiating an object literal, like TypeScript does
-
-const ALL_TYPE_EXPRESSION_TYPES: { [key in TypeExpression["kind"]]: undefined } = {
-    "union-type": undefined,
-    "maybe-type": undefined,
-    "named-type": undefined,
-    "generic-param-type": undefined,
-    "proc-type": undefined,
-    "func-type": undefined,
-    "generic-type": undefined,
-    "bound-generic-type": undefined,
-    "element-type": undefined,
-    "object-type": undefined,
-    "record-type": undefined,
-    "array-type": undefined,
-    "string-type": undefined,
-    "number-type": undefined,
-    "boolean-type": undefined,
-    "nil-type": undefined,
-    "unknown-type": undefined,
-    "any-type": undefined,
-    "never-type": undefined,
-    "property-type": undefined,
-    "iterator-type": undefined,
-    "plan-type": undefined,
-    "error-type": undefined,
-    "remote-type": undefined,
-    "parenthesized-type": undefined,
-    "typeof-type": undefined,
-    "keyof-type": undefined,
-    "valueof-type": undefined,
-    "elementof-type": undefined,
-    "literal-type": undefined,
-    "tuple-type": undefined,
-    "nominal-type": undefined,
-    "javascript-escape-type": undefined,
-}
-
-export function isTypeExpression(ast: AST): ast is TypeExpression {
-    return Object.prototype.hasOwnProperty.call(ALL_TYPE_EXPRESSION_TYPES, ast.kind);
-}

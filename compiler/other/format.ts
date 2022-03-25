@@ -242,6 +242,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         // case "element-type": return `<${ast.tagName}>`;
         case "property-type": return `${f(ast.subject)}${ast.optional ? '?' : ''}.${ast.property.name}`;
         case "javascript-escape-type": return "<js escape>";
+        case "try-catch": return `try ${f(ast.tryBlock)} catch (${f(ast.errIdentifier)}) ${f(ast.catchBlock)};`
+        case "throw-statement": return `throw ${f(ast.errorExpression)};`
         default:
             // @ts-expect-error: exhaustiveness
             throw Error(ast.kind)

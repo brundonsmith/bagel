@@ -1,5 +1,4 @@
-// deno-lint-ignore-file no-fallthrough
-import { AwaitStatement, DestructuringDeclarationStatement, ForLoop, ValueDeclarationStatement } from "./statements.ts";
+import { AwaitStatement, DestructuringDeclarationStatement, ForLoop, TryCatch, ValueDeclarationStatement } from "./statements.ts";
 import { GenericParamType, TypeExpression } from "./type-expressions.ts";
 import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, TypeDeclaration, ImportItem } from "./declarations.ts";
 import { Expression, Func, InlineConstDeclaration, InlineDestructuringDeclaration, Proc } from "./expressions.ts";
@@ -32,6 +31,7 @@ export type Binding = {
         | DestructuringDeclarationStatement
         | TypeDeclaration
         | GenericParamType
+        | TryCatch
 }
 
 export function getBindingMutability(binding: Binding, from: AST): "immutable"|"readonly"|"mutable"|"assignable" {
@@ -54,12 +54,12 @@ export function getBindingMutability(binding: Binding, from: AST): "immutable"|"
         case 'await-statement':
         case 'inline-destructuring-declaration':
         case 'destructuring-declaration-statement':
+        case 'type-declaration':
+        case 'generic-param-type':
+        case 'try-catch':
             return 'immutable'
         case 'value-declaration-statement':
             return !binding.owner.isConst ? 'assignable' : 'immutable'
-        case 'type-declaration':
-        case 'generic-param-type':
-            return 'immutable'
         default:
             // @ts-expect-error: exhaustiveness
             throw Error('Unreachable!' + binding.owner.kind)

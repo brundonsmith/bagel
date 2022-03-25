@@ -12,6 +12,8 @@ export type Statement =
     | Assignment
     | Invocation
     | AwaitStatement
+    | TryCatch
+    | ThrowStatement
 
 export type ValueDeclarationStatement = SourceInfo & {
     readonly kind: "value-declaration-statement",
@@ -66,4 +68,17 @@ export type AwaitStatement = SourceInfo & {
     readonly noAwait: boolean,
     readonly name: PlainIdentifier|undefined,
     readonly type: TypeExpression|undefined,
+}
+
+export type TryCatch = SourceInfo & {
+    readonly kind: "try-catch",
+    readonly tryBlock: Block,
+    readonly errIdentifier: PlainIdentifier,
+    readonly catchBlock: Block
+    // TODO: finally-block
+}
+
+export type ThrowStatement = SourceInfo & {
+    readonly kind: "throw-statement",
+    readonly errorExpression: Expression,
 }

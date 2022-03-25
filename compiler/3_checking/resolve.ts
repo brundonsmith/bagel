@@ -119,7 +119,7 @@ const resolveInner = (name: string, from: AST, originator: AST): Binding|undefin
                 }
             }
         } break;
-        case "block":
+        case "block": {
             for (let statementIndex = 0; statementIndex < parent.statements.length; statementIndex++) {
                 const statement = parent.statements[statementIndex]
 
@@ -143,7 +143,15 @@ const resolveInner = (name: string, from: AST, originator: AST): Binding|undefin
                     }
                 }
             }
-            break;
+
+            const grandparent = parent.parent
+            if (grandparent?.kind === 'try-catch' && grandparent.catchBlock === parent && grandparent.errIdentifier.name === name) {
+                return {
+                    owner: grandparent,
+                    identifier: grandparent.errIdentifier
+                }
+            }
+        } break;
         case "for-loop": {
             if (parent.itemIdentifier.name === name) {
                 return {

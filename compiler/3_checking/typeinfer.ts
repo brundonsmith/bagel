@@ -4,7 +4,7 @@ import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, Generi
 import { given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
-import { AST, PlainIdentifier } from "../_model/ast.ts";
+import { AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
 import { areSame, expressionsEqual, literalType, mapParseTree, maybeOf, typesEqual } from "../utils/ast.ts";
 import Store, { getModuleByName } from "../store.ts";
@@ -12,6 +12,7 @@ import { format } from "../other/format.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration, ImportItem, Declaration } from "../_model/declarations.ts";
 import { resolve } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
+import { Statement } from "../_model/statements.ts";
 
 export function inferType(
     ast: Expression,
@@ -53,10 +54,25 @@ const inferTypeInner = computedFn((
     const visited = [...previouslyVisited, ast]
 
     switch(ast.kind) {
-        case "proc":
         case "js-proc":
         case "js-func":
             return ast.type
+        case "proc": {
+            // TODO: infer arg types just like we do under func
+            const thrown = throws(ast.body)
+            const procType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
+
+            return {
+                ...procType,
+                throws: thrown.length > 0
+                    ? {
+                        kind: 'union-type',
+                        members: thrown,
+                        ...TYPE_AST_NOISE
+                    }
+                    : undefined
+            }
+        }
         case "func": {
             
             // infer callback type based on context
@@ -563,6 +579,19 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
             return iteratorType.kind === 'iterator-type'
                 ? iteratorType.inner
                 : UNKNOWN_TYPE
+        }
+        case 'try-catch': {
+            const thrown = throws(decl.tryBlock)
+
+            if (thrown.length === 0) {
+                return UNKNOWN_TYPE
+            } else {
+                return {
+                    kind: 'union-type',
+                    members: thrown,
+                    ...TYPE_AST_NOISE
+                }
+            }
         }
         case 'import-all-declaration': {
             const otherModule = getModuleByName(Store, decl.module as ModuleName, decl.path.value)
@@ -1307,4 +1336,75 @@ export const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExp
     "!=": [
         { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
     ],
+}
+
+export function throws(block: Block): TypeExpression[] {
+    const errorTypes: TypeExpression[] = []
+
+    for (const statement of block.statements) {
+        switch (statement.kind) {
+            case 'invocation': {
+                const procType = inferType(statement.subject)
+
+                if (procType.kind === 'proc-type' && procType.throws) {
+                    errorTypes.push(procType.throws)
+                }
+            } break;
+            // case 'await-statement'
+            // case 'destructuring-declaration-statement'
+            case 'for-loop':
+            case 'while-loop':
+                errorTypes.push(...throws(statement.body))
+                break;
+            case 'try-catch':
+                errorTypes.push(...throws(statement.catchBlock))
+                break;
+            case 'if-else-statement':
+                for (const { outcome } of statement.cases) {
+                    errorTypes.push(...throws(outcome))
+                }
+                if (statement.defaultCase) {
+                    errorTypes.push(...throws(statement.defaultCase))
+                }
+                break;
+            case 'throw-statement':
+                errorTypes.push(inferType(statement.errorExpression))
+                break;
+        }
+    }
+
+    return errorTypes
+}
+
+function isAsync(block: Block): boolean {
+    for (const statement of block.statements) {
+        switch (statement.kind) {
+            case 'invocation': {
+                const procType = inferType(statement.subject)
+
+                if (procType.kind === 'proc-type' && procType.isAsync) {
+                    return true
+                }
+            } break;
+            case 'for-loop':
+            case 'while-loop':
+                if (isAsync(statement.body)) return true
+                break;
+            case 'try-catch':
+                if (isAsync(statement.tryBlock) || isAsync(statement.catchBlock)) return true
+                break;
+            case 'if-else-statement':
+                for (const { outcome } of statement.cases) {
+                    if (isAsync(outcome)) return true
+                }
+                if (statement.defaultCase && isAsync(statement.defaultCase)) {
+                    return true
+                }
+                break;
+            case 'await-statement':
+                return true;
+        }
+    }
+
+    return false;
 }

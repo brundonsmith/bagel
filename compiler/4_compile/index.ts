@@ -210,22 +210,29 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             // method call
             const invocation = invocationFromMethodCall(ast) ?? ast;
 
-            const subjectType = resolveType(inferType(invocation.subject))
-            const procType = (
-                subjectType.kind === 'proc-type' ? subjectType :
-                subjectType.kind === 'generic-type' && subjectType.inner.kind === 'proc-type' ? subjectType.inner :
-                undefined
-            )
+            const subjectType = inferType(invocation.subject)
 
-            let invalidation = ''
-            if (procType?.invalidatesParent) {
-                // TODO: This won't work if the method has been aliased. Gotta figure that out...
-                if (invocation.subject.kind === 'property-accessor') {
-                    invalidation = `; ${INT}invalidate(${c(invocation.subject.subject)})`
-                }
+            const typeArgs = invocation.kind === "invocation" && invocation.typeArgs.length > 0 ? `<${invocation.typeArgs.map(c).join(',')}>` : ''
+            const args = invocation.args.map(c).join(', ')
+
+            const compiledInvocation = `${c(invocation.subject)}${typeArgs}(${args})`
+
+            if (subjectType.kind === 'proc-type' && subjectType.throws) {
+                return `{
+                    const e = ${compiledInvocation};
+                    if (e) return e;
+                }`
+            } else {
+                return compiledInvocation
             }
-
-            return `${c(invocation.subject)}${invocation.kind === "invocation" && invocation.typeArgs.length > 0 ? `<${invocation.typeArgs.map(c).join(',')}>` : ''}(${invocation.args.map(c).join(', ')})` + invalidation;
+        }
+        case "try-catch": {
+            return `
+            {
+                const ${ast.errIdentifier.name} = (() => ${c(ast.tryBlock)})()
+        
+                if (${ast.errIdentifier.name} != null) ${c(ast.catchBlock)}
+            }`
         }
         case "binary-operator": {
             if ((ast.op.op === '&&' || ast.op.op === '||') && needsTruthinessFix(ast.left)) {
@@ -336,6 +343,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "instance-of": return `${INT}instanceOf(${c(ast.expr)}, ${compileRuntimeType(resolveType(ast.type))})`
         case "as-cast": return `${c(ast.inner)} as ${c(ast.type)}`
         case "error-expression": return `{ kind: ${INT}ERROR_SYM, value: ${c(ast.inner)} }`
+        case "throw-statement": return `return ${c(ast.errorExpression)};`
 
         default:
             throw Error("Couldn't compile '" + ast.kind + "'");
