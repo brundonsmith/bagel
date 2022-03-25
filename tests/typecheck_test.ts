@@ -550,8 +550,12 @@ Deno.test({
 //   fn() {
 //     testTypecheck(
 //       `
-//       func given<T,R>(val: T|nil, fn: (val: T) => R): R|nil => if val != nil { fn(val) }
-//       func double(n: number|nil): number|nil => given(n, x => x * 2)`,
+//       func given<T,R>(val: T|nil, fn: (val: T) => R): R|nil =>
+//         if val != nil {
+//           fn(val)
+//         }
+//
+//       func double(n: number|nil): number|nil => given<number, number>(n, x => x * 2)`,
 //       false
 //     )
 //   }
@@ -2350,6 +2354,135 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Throw statement pass",
+  fn() {
+    testTypecheck(`
+    proc foo() {
+      throw Error('message');
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Throw statement fail",
+  fn() {
+    testTypecheck(`
+    proc foo() {
+      throw 12;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Error bubble pass",
+  fn() {
+    testTypecheck(`
+    proc foo() {
+      throw Error('message');
+    }
+    
+    proc main() {
+      foo()?;
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Error bubble fail",
+  fn() {
+    testTypecheck(`
+    proc foo() {
+      throw Error('message');
+    }
+    
+    proc main() {
+      foo();
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Try/catch pass",
+  fn() {
+    testTypecheck(`
+    proc log(s: string) { }
+
+    proc foo() {
+      throw Error({ prop1: 'stuff' });
+    }
+    
+    proc main() {
+      try {
+        foo();
+      } catch e {
+        log(e.value.prop1);
+      }
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Try/catch fail 1",
+  fn() {
+    testTypecheck(`
+    proc log(s: string) { }
+
+    proc foo() {
+      throw Error({ prop1: 'stuff' });
+    }
+    
+    proc main() {
+      try {
+        foo();
+      } catch e {
+        log(e.value.prop2);
+      }
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Try/catch fail 2",
+  fn() {
+    testTypecheck(`
+    proc log(s: string) { }
+
+    proc foo() {
+      throw Error({ prop1: 'stuff' });
+    }
+    
+    proc main() {
+      try {
+        foo()?;
+      } catch e {
+        log(e.value.prop1);
+      }
+    }`,
+    true)
+  }
+})
+
+// Deno.test({
+//   name: "Complex function type inference pass",
+//   fn() {
+//     testTypecheck(`
+//     type Adder = {
+//       inc: (n: number) => number
+//     }
+    
+//     const a: Adder = {
+//       inc: n => n + 1
+//     }`,
+//     false)
+//   }
+// })
 
 
 function testTypecheck(code: string, shouldFail: boolean): void {

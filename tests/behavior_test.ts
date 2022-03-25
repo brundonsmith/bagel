@@ -73,6 +73,58 @@ Deno.test({
     },
 });
 
+Deno.test({
+    name: "Try/catch 1",
+    fn() {
+        testSideEffects(
+            `
+            proc foo(n: number) {
+                if n < 10 {
+                    output('all good!');
+                } else {
+                    throw Error('it errored!');
+                }
+            }
+
+            proc runTest() {
+                try {
+                    foo(5);
+                    output('passed');
+                } catch e {
+                    output(e);
+                }
+            }`,
+            ['all good!', 'passed']
+        )
+    }
+})
+
+Deno.test({
+    name: "Try/catch 2",
+    fn() {
+        testSideEffects(
+            `
+            proc foo(n: number) {
+                if n < 10 {
+                    output('all good!');
+                } else {
+                    throw Error('it errored!');
+                }
+            }
+
+            proc runTest() {
+                try {
+                    foo(15);
+                    output('passed');
+                } catch e {
+                    output(e.value);
+                }
+            }`,
+            ['it errored!']
+        )
+    }
+})
+
 // deno-lint-ignore require-await
 async function testSideEffects(bgl: string, expected: any[]) {
     const moduleName = "<test>.bgl" as ModuleName;
