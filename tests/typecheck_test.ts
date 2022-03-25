@@ -2469,6 +2469,23 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Circular type",
+  fn() {
+    testTypecheck(`
+    type JSON =
+      | {[string]: JSON}
+      | JSON[]
+      | string
+      | number
+      | boolean
+      | nil
+    
+    const foo: JSON = { bar: 'stuff' }`,
+    false)
+  }
+})
+
 // Deno.test({
 //   name: "Complex function type inference pass",
 //   fn() {
