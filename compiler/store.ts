@@ -142,6 +142,8 @@ export function getConfig(store: _Store): BagelConfig|undefined {
     if (store.mode?.mode === 'mock') {
         return undefined
     } else if (store.mode?.mode === 'build' || store.mode?.mode === 'run') {
+        // TODO: Have this work for 'check' and 'transpile' modes too; requires 
+        // more complex logic for finding the file that should have the config
         const { entryFile } = store.mode
         const res = parsed(store, entryFile)
         const configDecl = res?.ast.declarations.find(decl =>
