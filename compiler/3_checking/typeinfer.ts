@@ -12,7 +12,6 @@ import { format } from "../other/format.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration, ImportItem, Declaration } from "../_model/declarations.ts";
 import { resolve } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
-import { Statement } from "../_model/statements.ts";
 
 export function inferType(
     ast: Expression,
@@ -117,8 +116,8 @@ const inferTypeInner = computedFn((
             }
         }
         case "binary-operator": {
-            const leftType = resolveType(inferType(ast.left, visited))
-            const rightType = resolveType(inferType(ast.right, visited))
+            const leftType = inferType(ast.left, visited)
+            const rightType = inferType(ast.right, visited)
             
             if (ast.op.op === '??') {
                 return {
@@ -328,7 +327,7 @@ const inferTypeInner = computedFn((
                 if (Array.isArray(entry)) {
                     const [name, value] = entry as [PlainIdentifier, Expression]
 
-                    const type = resolveType(inferType(value, visited));
+                    const type = inferType(value, visited);
                     return {
                         kind: "attribute",
                         name,

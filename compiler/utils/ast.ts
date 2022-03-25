@@ -134,6 +134,17 @@ export function maybeOf(inner: TypeExpression): MaybeType {
     }
 }
 
+export function planOf(inner: TypeExpression): PlanType {
+    const { parent, module, code, startIndex, endIndex } = inner
+
+    return {
+        kind: 'plan-type',
+        inner,
+        mutability: undefined,
+        parent, module, code, startIndex, endIndex
+    }
+}
+
 export function literalType(value: ExactStringLiteral|NumberLiteral|BooleanLiteral|PlainIdentifier|string|number): LiteralType {
     
     if (typeof value === 'string' || typeof value === 'number') {

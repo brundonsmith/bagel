@@ -1,10 +1,10 @@
 import { Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, TYPE_AST_NOISE, AST_NOISE, resolveImport, throws } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
-import { ancestors, findAncestor, iterateParseTree, literalType, maybeOf, typesEqual, within } from "../utils/ast.ts";
+import { ancestors, findAncestor, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
 import Store, { getModuleByName, _Store } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
@@ -211,15 +211,17 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "inline-const-declaration": {
 
                 if (current.kind === 'inline-const-declaration' && current.awaited) {
-                    const valueType = resolveType(inferType(current.value))
+                    const planType = inferType(current.value)
 
-                    if (valueType.kind !== 'plan-type') {
+                    if (!subsumes(PLAN_OF_ANY, planType)) {
                         // make sure value is a plan
-                        reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${format(valueType)}'`))
+                        reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${format(planType)}'`))
                     } else if (current.type != null) {
+
                         // make sure value fits declared type, if there is one
-                        if (!subsumes(current.type, valueType.inner)) {
-                            reportError(assignmentError(current.value, current.type, valueType.inner))
+                        const expectedPlanType = planOf(current.type)
+                        if (!subsumes(expectedPlanType, planType)) {
+                            reportError(assignmentError(current.value, expectedPlanType, planType))
                         }
                     }
                 } else {
@@ -230,35 +232,39 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "await-statement": {
-                const valueType = resolveType(inferType(current.plan))
+                const planType = inferType(current.plan)
 
-                if (valueType.kind !== 'plan-type') {
+                if (!subsumes(PLAN_OF_ANY, planType)) {
                     // make sure value is a plan
-                    reportError(miscError(current.plan, `Can only await expressions of type Plan; found type '${format(valueType)}'`))
+                    reportError(miscError(current.plan, `Can only await expressions of type Plan; found type '${format(planType)}'`))
                 } else if (current.type != null) {
+
                     // make sure value fits declared type, if there is one
-                    if (!subsumes(current.type, valueType.inner)) {
-                        reportError(assignmentError(current.plan, current.type, valueType.inner))
+                    const expectedPlanType = planOf(current.type)
+                    if (!subsumes(expectedPlanType, planType)) {
+                        reportError(assignmentError(current.plan, expectedPlanType, planType))
                     }
                 }
             } break;
             case "inline-destructuring-declaration":
             case "destructuring-declaration-statement": {
-                const valueType = resolveType(inferType(current.value))
+                const valueType = inferType(current.value)
                 
                 if (current.kind === 'inline-destructuring-declaration' && current.awaited) {
-                    if (valueType.kind !== 'plan-type') {
+                    if (!subsumes(PLAN_OF_ANY, valueType)) {
                         // make sure value is a plan
                         reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${format(valueType)}'`))
                     } else {
                         // make sure destructuring matches value type
                         if (current.destructureKind === 'object') {
-                            if (valueType.inner.kind !== 'object-type') {
-                                reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${format(valueType.inner)}'`))
+                            const expectedPlanType = planOf(RECORD_OF_ANY)
+                            if (!subsumes(expectedPlanType, valueType)) {
+                                reportError(miscError(current.value, `Can only destructure object types using '{ }'; found plan of type '${format(valueType)}'`))
                             }
                         } else {
-                            if (valueType.inner.kind !== 'array-type' && valueType.inner.kind !== 'tuple-type') {
-                                reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type '${format(valueType.inner)}'`))
+                            const expectedPlanType = planOf(ARRAY_OF_ANY)
+                            if (!subsumes(expectedPlanType, valueType)) {
+                                reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found plan of type '${format(valueType)}'`))
                             }
                         }
                     }
@@ -266,7 +272,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                 // make sure destructuring matches value type
                 if (current.destructureKind === 'object') {
-                    if (valueType.kind !== 'object-type') {
+                    if (!subsumes(RECORD_OF_ANY, valueType)) {
                         reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${format(valueType)}'`))
                     } else {
                         const objectProperties = propertiesOf(valueType)
@@ -277,12 +283,13 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         }
                     }
                 } else {
-                    if (valueType.kind !== 'array-type' && valueType.kind !== 'tuple-type') {
+                    if (!subsumes(ARRAY_OF_ANY, valueType)) {
                         reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type '${format(valueType)}'`))
                     } else {
-                        if (valueType.kind === 'tuple-type') {
-                            for (let i = valueType.members.length; i < current.properties.length; i++) {
-                                reportError(miscError(current.properties[i], `Can't destructure element in index ${i}, because the provided tuple only has ${valueType.members.length} elements`))
+                        const resolvedValueType = resolveType(valueType)
+                        if (resolvedValueType.kind === 'tuple-type') {
+                            for (let i = resolvedValueType.members.length; i < current.properties.length; i++) {
+                                reportError(miscError(current.properties[i], `Can't destructure element in index ${i}, because the provided tuple only has ${resolvedValueType.members.length} elements`))
                             }
                         }
                     }
@@ -676,15 +683,13 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "object-type": {
                 for (const spread of current.spreads) {
-                    const resolved = resolveType(spread)
-
-                    if (!subsumes(RECORD_OF_ANY, resolved)) {
-                        reportError(miscError(spread, `${format(resolved)} is not an object type; can only spread object types into object types`))
+                    if (!subsumes(RECORD_OF_ANY, spread)) {
+                        reportError(miscError(spread, `${format(spread)} is not an object type; can only spread object types into object types`))
                     }
                 }
             } break;
             case "instance-of": {
-                const exprType = resolveType(inferType(current.expr))
+                const exprType = inferType(current.expr)
 
                 if (!subsumes(exprType, current.type)) {
                     reportError(miscError(current, `This check will always be false, because ${format(current.expr)} can never be a ${format(current.type)}`))
@@ -808,8 +813,8 @@ export function subsumes(destination: TypeExpression, value: TypeExpression): bo
         return true;
     }
 
-    const resolvedDestination = resolveType(destination)
-    const resolvedValue = resolveType(value)
+    const resolvedDestination = resolveType(destination.kind === 'named-type' ? resolveNamedType(destination) : destination, true)
+    const resolvedValue = resolveType(value.kind === 'named-type' ? resolveNamedType(value) : value, true)
 
     // constants can't be assigned to mutable slots
     if (resolvedDestination.mutability === "mutable" && (resolvedValue.mutability !== "mutable" && resolvedValue.mutability !== "literal")) {
@@ -957,39 +962,43 @@ export function overlaps(a: TypeExpression, b: TypeExpression): boolean {
  * simplify unions; generally collapse a type into its "real" form, whatever 
  * that means.
  */
-export function resolveType(type: TypeExpression): TypeExpression {
+export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpression {
     switch (type.kind) {
         case "named-type": {
-            const binding = resolve(type.name.name, type.name)
+            if (skipNamed) {
+                return type
+            } else {
+                const binding = resolve(type.name.name, type.name)
 
-            if (binding) {
-                if (binding.owner.kind === 'type-declaration') {
-                    return resolveType(binding.owner.type)
-                }
-    
-                if (binding.owner.kind === 'generic-param-type') {
-                    return resolveType(binding.owner)
-                }
+                if (binding) {
+                    if (binding.owner.kind === 'type-declaration') {
+                        return resolveType(binding.owner.type, skipNamed)
+                    }
+        
+                    if (binding.owner.kind === 'generic-param-type') {
+                        return resolveType(binding.owner, skipNamed)
+                    }
 
-                if (binding.owner.kind === 'import-item') {
-                    const imported = resolveImport(binding.owner)
+                    if (binding.owner.kind === 'import-item') {
+                        const imported = resolveImport(binding.owner)
 
-                    if (imported && imported.exported && imported.kind === 'type-declaration') {
-                        return resolveType(imported.type)
+                        if (imported && imported.exported && imported.kind === 'type-declaration') {
+                            return resolveType(imported.type, skipNamed)
+                        }
                     }
                 }
-            }
 
-            return UNKNOWN_TYPE
+                return UNKNOWN_TYPE
+            }
         }
         case "generic-param-type":
-            return resolveType(type.extends ?? UNKNOWN_TYPE)
+            return resolveType(type.extends ?? UNKNOWN_TYPE, skipNamed)
         case "parenthesized-type":
-            return resolveType(type.inner)
+            return resolveType(type.inner, skipNamed)
         case "typeof-type":
             return inferType(type.expr)
         case "keyof-type": {
-            const inner = resolveType(type.inner)
+            const inner = resolveType(type.inner, skipNamed)
 
             if (inner.kind === 'record-type') {
                 return inner.keyType
@@ -1008,7 +1017,7 @@ export function resolveType(type: TypeExpression): TypeExpression {
             }
         }
         case "valueof-type": {
-            const inner = resolveType(type.inner)
+            const inner = resolveType(type.inner, skipNamed)
             
             if (inner.kind === 'record-type') {
                 return inner.valueType
@@ -1026,7 +1035,7 @@ export function resolveType(type: TypeExpression): TypeExpression {
             }
         }
         case "elementof-type": {
-            const inner = resolveType(type.inner)
+            const inner = resolveType(type.inner, skipNamed)
             
             if (inner.kind === 'array-type') {
                 return inner.element
@@ -1048,7 +1057,7 @@ export function resolveType(type: TypeExpression): TypeExpression {
         case "iterator-type": {
             return {
                 ...type,
-                inner: resolveType(type.inner)
+                inner: resolveType(type.inner, skipNamed)
             }
         }
         case "plan-type": {
@@ -1059,7 +1068,7 @@ export function resolveType(type: TypeExpression): TypeExpression {
 
             return {
                 ...type,
-                inner: resolveType(inner)
+                inner: resolveType(inner, skipNamed)
             }
         }
         case "maybe-type": {
@@ -1073,21 +1082,21 @@ export function resolveType(type: TypeExpression): TypeExpression {
                 ],
                 mutability: undefined,
                 parent, module, code, startIndex, endIndex
-            })
+            }, skipNamed)
         }
         case "bound-generic-type": {
-            const resolvedGeneric = resolveType(type.generic)
+            const resolvedGeneric = resolveType(type.generic, skipNamed)
 
             if (resolvedGeneric.kind !== 'generic-type') {
                 return UNKNOWN_TYPE
             } else {
-                return resolveType(parameterizedGenericType(resolvedGeneric, type.typeArgs))
+                return resolveType(parameterizedGenericType(resolvedGeneric, type.typeArgs), skipNamed)
             }
         }
         case "union-type": {
             const resolved = {
                 ...type,
-                members: type.members.map(resolveType)
+                members: type.members.map(m => resolveType(m, skipNamed))
             }
 
             const simplified = simplifyUnions(resolved)
@@ -1095,26 +1104,26 @@ export function resolveType(type: TypeExpression): TypeExpression {
             if (simplified.kind === 'union-type') {
                 return simplified
             } else {
-                return resolveType(simplified)
+                return resolveType(simplified, skipNamed)
             }
         }
         case "array-type": {
             return {
                 ...type,
-                element: resolveType(type.element)
+                element: resolveType(type.element, skipNamed)
             }
         }
         case "tuple-type": {
             return {
                 ...type,
-                members: type.members.map(resolveType)
+                members: type.members.map(m => resolveType(m, skipNamed))
             }
         }
         case "record-type": {
             return {
                 ...type,
-                keyType: resolveType(type.keyType),
-                valueType: resolveType(type.valueType)
+                keyType: resolveType(type.keyType, skipNamed),
+                valueType: resolveType(type.valueType, skipNamed)
             }
         }
         case "object-type": {
@@ -1122,19 +1131,19 @@ export function resolveType(type: TypeExpression): TypeExpression {
                 ...type,
                 entries: type.entries.map(entry => ({
                     ...entry,
-                    type: resolveType(entry.type)
+                    type: resolveType(entry.type, skipNamed)
                 }))
             }
         }
         case "property-type": {
-            const subjectType = resolveType(type.subject)
+            const subjectType = resolveType(type.subject, skipNamed)
             const nilTolerantSubjectType = type.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
                 ? subtract(subjectType, NIL_TYPE)
                 : subjectType;
             const property = propertiesOf(nilTolerantSubjectType)?.find(entry => entry.name.name === type.property.name)
             
             if (type.optional && property) {
-                return resolveType(maybeOf(property.type))
+                return resolveType(maybeOf(property.type), skipNamed)
             } else {
                 const mutability = (
                     property?.type?.mutability == null ? undefined :
@@ -1148,7 +1157,7 @@ export function resolveType(type: TypeExpression): TypeExpression {
                             property.optional
                                 ?  maybeOf({ ...property.type, mutability } as TypeExpression)
                                 : { ...property.type, mutability } as TypeExpression
-                            ))) 
+                            ), skipNamed)) 
                         ?? UNKNOWN_TYPE
                 )
             }
@@ -1156,4 +1165,28 @@ export function resolveType(type: TypeExpression): TypeExpression {
     }
 
     return type
+}
+
+function resolveNamedType(type: NamedType): TypeExpression {
+    const binding = resolve(type.name.name, type.name)
+
+    if (binding) {
+        if (binding.owner.kind === 'type-declaration') {
+            return binding.owner.type
+        }
+
+        if (binding.owner.kind === 'generic-param-type') {
+            return binding.owner
+        }
+
+        if (binding.owner.kind === 'import-item') {
+            const imported = resolveImport(binding.owner)
+
+            if (imported && imported.exported && imported.kind === 'type-declaration') {
+                return imported.type
+            }
+        }
+    }
+
+    return UNKNOWN_TYPE
 }
