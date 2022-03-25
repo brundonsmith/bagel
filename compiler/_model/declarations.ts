@@ -48,6 +48,7 @@ export type ProcDeclaration = SourceInfo & Exported & {
     readonly action: boolean,
     readonly name: PlainIdentifier,
     readonly value: Proc|JsProc,
+    readonly platforms: readonly Platform[],
 }
 
 export type FuncDeclaration = SourceInfo & Exported & {
@@ -55,6 +56,7 @@ export type FuncDeclaration = SourceInfo & Exported & {
     readonly memo: boolean,
     readonly name: PlainIdentifier,
     readonly value: Func|JsFunc,
+    readonly platforms: readonly Platform[],
 }
 
 export type ValueDeclaration = SourceInfo & {
@@ -65,6 +67,10 @@ export type ValueDeclaration = SourceInfo & {
     readonly isConst: boolean,
     readonly exported: undefined|'export'|'expose',
 }
+
+export const ALL_PLATFORMS = ["node", "deno", "web"] as const
+
+export type Platform = "node" | "deno" | "web"
 
 export type DeriveDeclaration = SourceInfo & Exported & {
     readonly kind: "derive-declaration",

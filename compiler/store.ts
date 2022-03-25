@@ -6,7 +6,7 @@ import { computedFn, makeAutoObservable } from "./mobx.ts";
 import { pathIsRemote } from "./utils/misc.ts";
 import { ModuleName } from "./_model/common.ts";
 import { lint, LintProblem } from "./other/lint.ts";
-import { ValueDeclaration } from "./_model/declarations.ts";
+import { Platform, ValueDeclaration } from "./_model/declarations.ts";
 import { PlainIdentifier } from "./_model/ast.ts";
 import { ExactStringLiteral, Expression } from "./_model/expressions.ts";
 
@@ -133,12 +133,12 @@ export function canonicalModuleName(importerModule: string, importPath: string):
 }
 
 export type BagelConfig = {
-    platforms: string[]|undefined,
+    platforms: Platform[]|undefined,
     markupFunction: Expression|undefined
     lintRules: {[key: string]: string}|undefined
 }
 
-export function getConfig(store: _Store): BagelConfig|undefined {
+export const getConfig = computedFn((store: _Store): BagelConfig|undefined => {
     if (store.mode?.mode === 'mock') {
         return undefined
     } else if (store.mode?.mode === 'build' || store.mode?.mode === 'run') {
@@ -152,7 +152,7 @@ export function getConfig(store: _Store): BagelConfig|undefined {
         // TODO: Eventually we want to actually evaluate the const, not
         // just walk its AST
         if (configDecl?.value.kind === 'object-literal') {
-            let platforms: string[]|undefined
+            let platforms: Platform[]|undefined
             let markupFunction: Expression|undefined
             let lintRules: {[key: string]: string}|undefined
             
@@ -161,7 +161,7 @@ export function getConfig(store: _Store): BagelConfig|undefined {
                     Array.isArray(e) && (e[0] as PlainIdentifier).name === 'platforms') as any)?.[1] as Expression|undefined
                 
                 platforms = platformsExpr?.kind === 'array-literal' ?
-                    platformsExpr.entries.filter(e => e.kind === 'exact-string-literal').map(e => (e as ExactStringLiteral).value)
+                    platformsExpr.entries.filter(e => e.kind === 'exact-string-literal').map(e => (e as ExactStringLiteral).value as Platform)
                 : undefined
             }
             
@@ -194,4 +194,4 @@ export function getConfig(store: _Store): BagelConfig|undefined {
     } else {
         // TODO: Look for index.bgl if directory was specified
     }
-}
+})

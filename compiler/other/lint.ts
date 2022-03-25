@@ -7,7 +7,7 @@ import { BagelConfig, _Store } from "../store.ts";
 import { findAncestor, iterateParseTree, mapParseTree } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
-import { FuncDeclaration, ProcDeclaration, ValueDeclaration } from "../_model/declarations.ts";
+import { ALL_PLATFORMS, FuncDeclaration, ProcDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 import { Expression, Func, Proc } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, FALSY, NUMBER_TYPE, STRING_TYPE } from "../_model/type-expressions.ts";
 import { format,DEFAULT_OPTIONS } from "./format.ts";
@@ -121,6 +121,7 @@ const RULES = {
                     const f: FuncDeclaration = {
                         kind: 'func-declaration',
                         memo: false,
+                        platforms: ALL_PLATFORMS,
                         exported: exported != null,
                         name,
                         value,
@@ -132,6 +133,7 @@ const RULES = {
                     const p: ProcDeclaration = {
                         kind: 'proc-declaration',
                         action: false,
+                        platforms: ALL_PLATFORMS,
                         exported: exported != null,
                         name,
                         value,

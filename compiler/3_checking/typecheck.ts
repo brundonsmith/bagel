@@ -2,17 +2,16 @@ import { Block, Module, PlainIdentifier } from "../_model/ast.ts";
 import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY } from "../_model/type-expressions.ts";
 import { given } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, TYPE_AST_NOISE, AST_NOISE, resolveImport, throws } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, resolveImport, throws } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
 import { ancestors, findAncestor, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
-import Store, { getModuleByName, _Store } from "../store.ts";
+import Store, { getConfig, getModuleByName, _Store } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
-import { log, stripSourceInfo } from "../utils/debugging.ts";
 import { computedFn } from "../mobx.ts";
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "./resolve.ts";
-import { DeriveDeclaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, RemoteDeclaration, TypeDeclaration, ValueDeclaration } from "../_model/declarations.ts";
+import { ImportDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 
 
 export const typeerrors = computedFn((store: _Store, moduleName: ModuleName): BagelError[] => {
@@ -34,6 +33,8 @@ export const typeerrors = computedFn((store: _Store, moduleName: ModuleName): Ba
  * Walk an entire AST and report all issues that we find
  */
 export function typecheck(reportError: ReportError, ast: Module): void {
+    const config = getConfig(Store)
+    
     for (const { current, parent } of iterateParseTree(ast)) {
             
         switch(current.kind) {
@@ -569,45 +570,52 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "local-identifier": {
                 // make sure we err if identifier can't be resolved, even if it isn't used
-                const binding = resolve(current.name, current)
+                const rawBinding = resolve(current.name, current)
+                const binding = rawBinding?.owner.kind === 'import-item' ? resolveImport(rawBinding.owner) : rawBinding?.owner
 
                 if (binding) {
-                    if (binding.owner.kind === 'value-declaration' || 
-                        binding.owner.kind === 'value-declaration-statement' ||
-                        binding.owner.kind === 'inline-const-declaration' ||
-                        binding.owner.kind === 'inline-destructuring-declaration') {
+                    if (binding.kind === 'value-declaration' || 
+                        binding.kind === 'value-declaration-statement' ||
+                        binding.kind === 'inline-const-declaration' ||
+                        binding.kind === 'inline-destructuring-declaration') {
 
                         // using a let-declaration to initialize a const
-                        if (binding.owner.kind === 'value-declaration' && 
-                            !binding.owner.isConst && 
+                        if (binding.kind === 'value-declaration' && 
+                            !binding.isConst &&
                             (findAncestor(current, a => a.kind === 'value-declaration') as ValueDeclaration|undefined)?.isConst) {
                             
                             reportError(miscError(current, `Const declarations cannot be initialized from mutable state (referencing '${format(current)}')`))
                         }
 
                         const declarations = (
-                            binding.owner.kind === 'value-declaration' ? (binding.owner.parent as Module).declarations :
-                            binding.owner.kind === 'value-declaration-statement' ? (binding.owner.parent as Block).statements :
-                            binding.owner.kind === 'inline-const-declaration' ? (binding.owner.parent as InlineConstGroup).declarations :
-                            binding.owner.kind === 'inline-destructuring-declaration' ? (binding.owner.parent as InlineConstGroup).declarations :
+                            binding.kind === 'value-declaration' ? (binding.parent as Module).declarations :
+                            binding.kind === 'value-declaration-statement' ? (binding.parent as Block).statements :
+                            binding.kind === 'inline-const-declaration' ? (binding.parent as InlineConstGroup).declarations :
+                            binding.kind === 'inline-destructuring-declaration' ? (binding.parent as InlineConstGroup).declarations :
                             undefined
                         )
 
                         if (declarations) {
-                            if (within(current, binding.owner.value)) {
+                            if (within(current, binding.value)) {
                                 reportError(miscError(current, `Can't reference "${current.name}" in its own initialization`))
                             } else {
-                                const decl = [...ancestors(current)].find(a => a.kind === binding.owner.kind)
+                                const decl = [...ancestors(current)].find(a => a.kind === binding.kind)
 
                                 if (decl) {
-                                    if ((declarations as unknown[]).indexOf(binding.owner) > (declarations as unknown[]).indexOf(decl)) {
+                                    if ((declarations as unknown[]).indexOf(binding) > (declarations as unknown[]).indexOf(decl)) {
                                         reportError(miscError(current, `Can't reference "${current.name}" before initialization`))
                                     }
                                 }
                             }
                         }
-                    } else if (binding.owner.kind === 'type-declaration') {
+                    } else if (binding.kind === 'type-declaration') {
                         reportError(miscError(current, `'${current.name}' is a type but it's used like a value`))
+                    } else if (config?.platforms && (binding.kind === 'proc-declaration' || binding.kind === 'func-declaration')) {
+                        const unmetPlatforms = config.platforms.filter(platform => !binding.platforms.includes(platform))
+
+                        if (unmetPlatforms.length > 0) {
+                            reportError(miscError(current, `Project is configured to target platforms ${config.platforms.join(', ')}, but '${current.name}' is only supported in ${binding.platforms.join(', ')}`))
+                        }
                     }
                 } else {
                     reportError(cannotFindName(current, current.name))

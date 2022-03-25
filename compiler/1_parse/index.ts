@@ -3,7 +3,7 @@ import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration } from "../_model/declarations.ts";
+import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf, ErrorExpression } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType } from "../_model/type-expressions.ts";
@@ -803,7 +803,7 @@ const unknownType: ParseFunction<UnknownType> = (module, code, startIndex) =>
 
 const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
-    given(parseKeyword(code, index, 'js'), ({ parsed: js, index }) =>
+    given(parseOptional(module, code, index, parsePlatform), ({ parsed: platform, index }) =>
     given(consume(code, index, "proc"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(parseKeyword(code, index, 'action'), ({ parsed: action, index }) =>
@@ -811,7 +811,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
     given(consumeWhitespace(code, index), index =>
     given(_procHeader(module, code, index), ({ parsed: type, index }) => 
     given(consumeWhitespace(code, index), index =>
-    js 
+    platform 
         ? expec(consume(code, index, "{#"), err(code, index, '"{#"'), jsStartIndex => {
             let jsEndIndex = index;
 
@@ -835,6 +835,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
                         startIndex,
                         endIndex
                     },
+                    platforms: platform === 'js' ? ALL_PLATFORMS : [platform],
                     exported,
                     module,
                     code,
@@ -861,6 +862,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
                     startIndex,
                     endIndex: index
                 },
+                platforms: ALL_PLATFORMS,
                 exported,
                 module,
                 code,
@@ -872,7 +874,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startIndex) => 
     given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
-    given(parseKeyword(code, index, 'js'), ({ parsed: js, index }) =>
+    given(parseOptional(module, code, index, parsePlatform), ({ parsed: platform, index }) =>
     given(consume(code, index, "func"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(parseKeyword(code, index, 'memo'), ({ parsed: memo, index }) =>
@@ -880,7 +882,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
     given(consumeWhitespace(code, index), index =>
     given(_funcHeader(module, code, index), ({ parsed: type, index }) => 
     given(consumeWhitespace(code, index), index =>
-    js 
+    platform 
         ? expec(consume(code, index, "{#"), err(code, index, '"{#"'), jsStartIndex => {
             let jsEndIndex = index;
 
@@ -904,6 +906,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
                         startIndex,
                         endIndex,
                     },
+                    platforms: platform === 'js' ? ALL_PLATFORMS : [platform],
                     exported,
                     module,
                     code,
@@ -927,6 +930,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
                     startIndex,
                     endIndex: index,
                 },
+                platforms: ALL_PLATFORMS,
                 exported,
                 module,
                 code,
@@ -936,11 +940,19 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
             index,
         })))))))))))
 
+const parsePlatform: ParseFunction<'js' | Platform> = (module, code, index) =>
+    given(
+        parseExact('js')(module, code, index) ??
+        parseExact('node')(module, code, index) ??
+        parseExact('deno')(module, code, index) ??
+        parseExact('web')(module, code, index), ({ parsed: platform, index }) =>
+    given(consumeWhitespaceRequired(code, index), index => ({ parsed: platform, index })))
+    
 const valueDeclaration: ParseFunction<ValueDeclaration> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(parseExact("export")(module, code, index) ?? parseExact("expose")(module, code, index), ({ parsed: exported, index }) =>
-        given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, index })))), ({ parsed: exported, index: indexAfterExport }) =>
-    given(parseExact("const")(module, code, indexAfterExport ?? startIndex) ?? parseExact("let")(module, code, indexAfterExport ?? startIndex), ({ parsed: kind, index }) =>
+        given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, index })))), ({ parsed: exported, index }) =>
+    given(parseExact("const")(module, code, index) ?? parseExact("let")(module, code, index), ({ parsed: kind, index }) =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(plainIdentifier(module, code, index), ({ parsed: name, index}) =>
     given(consumeWhitespace(code, index), index =>
@@ -1081,8 +1093,8 @@ const proc: ParseFunction<Proc> = (module, code, startIndex) =>
     }))))
 
 const _procHeader: ParseFunction<ProcType|GenericProcType> = (module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index: indexAfterTypeParams }) =>
-    given(_seriesOfArguments(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, index }) => {
+    given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index }) =>
+    given(_seriesOfArguments(module, code, index), ({ parsed: args, index }) => {
         const procType: ProcType = {
             kind: "proc-type",
             args,
@@ -1194,7 +1206,7 @@ const awaitStatement: ParseFunction<AwaitStatement> = (module, code, startIndex)
         given(consumeWhitespace(code, index), index =>
         given(consume(code, index, "="), index =>
         given(consumeWhitespace(code, index), index => ({ parsed: { name, type }, index }))))))))), ({ parsed: assignToInfo, index }) =>
-    given(consume(code, index ?? startIndex, "await"), index =>
+    given(consume(code, index, "await"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(expression(module, code, index), ({ parsed: plan, index }) =>
     expec(consume(code, index, ';'), err(code, index, '";"'), index => ({

@@ -177,7 +177,7 @@ const DEFAULT_SERIES_OPTIONS: SeriesOptions = {
     whitespace: "optional",
 }
 
-export function parseOptional<T>(module: ModuleName, code: string, index: number, parseFn: ParseFunction<T>): Partial<ParseResult<T>> | BagelError {
+export function parseOptional<T>(module: ModuleName, code: string, index: number, parseFn: ParseFunction<T>): { parsed: T|undefined, index: number } | BagelError {
     const result = parseFn(module, code, index);
 
     if (isError(result)) {
@@ -185,7 +185,7 @@ export function parseOptional<T>(module: ModuleName, code: string, index: number
     } else {
         return {
             parsed: result?.parsed,
-            index: result?.index,
+            index: result?.index ?? index,
         };
     }
 }
