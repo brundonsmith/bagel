@@ -1,0 +1,11 @@
+{
+    "foo": 12,
+    "bar": [
+        "other",
+        false,
+        null
+    ],
+    "obj": {
+        "stuff": "sdkfghskdfgjh"
+    }
+}
