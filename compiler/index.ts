@@ -69,10 +69,10 @@ const DEFAULT_INDEX_BGL = `
 export const config: BagelConfig = {
 
     // Remove entries from this list to enable different platform-specific APIs
-    platforms: ["node", "deno", "browser"],
+    platforms: ['node', 'deno', 'browser'],
 
     // You can override individual rules here, or leave empty for the default linter behavior
-    lintRules: { }
+    lintRules: { },
 }
 
 proc main() {
@@ -99,14 +99,14 @@ async function main() {
         } else {
             await fs.ensureDir(providedEntry)
             await Deno.writeTextFile(path.resolve(providedEntry, 'index.bgl'), DEFAULT_INDEX_BGL)
-            console.log(`Created new Bagel project ${providedEntry}`)
+            console.log(Colors.green(pad('Created')) + `new Bagel project ${providedEntry}`)
         }
     } else if (mode === 'init') {
         if (await fs.exists('./index.bgl')) {
             fail(`Can't initialize Bagel project here because one already exists`)
         } else {
             await Deno.writeTextFile('./index.bgl', DEFAULT_INDEX_BGL)
-            console.log(`Initialized Bagel project in current directory`)
+            console.log(Colors.green(pad('Initialized')) + `Bagel project in current directory`)
         }
     } else {
         const mode = await modeFromArgs(Deno.args)
@@ -185,7 +185,8 @@ const printErrors = debounce((errors: Map<ModuleName, (BagelError|LintProblem)[]
 
     if (modulesWithErrors === 0) {
         if (Store.mode?.mode === 'check' || Store.mode?.mode === 'build' || Store.mode?.mode === 'transpile') {
-            console.log('No problems detected')
+            const localModules = [...Store.modules].filter(p => !p.includes('http') && !path.relative(Deno.cwd(), p).includes('../')).length
+            console.log(Colors.green(pad('Checked')) + `${localModules} module${sOrNone(localModules)} and found no problems`)
         }
     } else {
         console.log()
@@ -210,7 +211,7 @@ autorun(() => {
 })
 
 // write compiled code to disk
-autorun(() => {
+autorun(async () => {
     const mode = Store.mode;
     if (done(Store) && (mode?.mode === 'transpile' || mode?.mode === 'build' || mode?.mode === 'run')) {
         const compiledModules = [...Store.modulesSource.keys()].map(module => ({
@@ -218,9 +219,15 @@ autorun(() => {
             js: compiled(Store, module)
         }))
 
-        Promise.all(compiledModules.map(({ jsPath, js }) =>
-                Deno.writeTextFile(jsPath, js)))
-            .then(() => bundle(mode))
+        await Promise.all(compiledModules.map(({ jsPath, js }) =>
+            Deno.writeTextFile(jsPath, js)))
+
+        if (mode.mode === 'transpile') {
+            const localModules = [...Store.modules].filter(p => !p.includes('http') && !path.relative(Deno.cwd(), p).includes('../')).length
+            console.log(Colors.green(pad('Transpiled')) + `${localModules} Bagel file${sOrNone(localModules)}`)
+        } else {
+            bundle(mode)
+        }
     }
 })
 
@@ -360,7 +367,7 @@ const bundleOutput = async (entryFile: string, outfile: string) => {
         })
 
         const bundleSize = (await Deno.stat(outfile)).size
-        console.log(Colors.green('Bundled ') + outfile + ` (${prettysize(bundleSize)})`)
+        console.log(Colors.green(pad('Bundled')) + `${outfile} (${prettysize(bundleSize)})`)
     } catch (e) {
         console.error(e)
     } finally {
@@ -395,7 +402,7 @@ function canonicalModuleName(importerModule: ModuleName, importPath: string): Mo
 }
 
 function fail(msg: string): any {
-    console.error(Colors.red(pad('[Failed]')) + msg)
+    console.error(Colors.red(pad('Failed')) + msg)
     Deno.exit(1)
 }
 
