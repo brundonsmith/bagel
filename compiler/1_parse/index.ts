@@ -18,7 +18,7 @@ import { AST_NOISE } from "../3_checking/typeinfer.ts";
 export const parsed = computedFn((store: _Store, moduleName: ModuleName): { ast: Module, errors: readonly BagelError[] } | undefined => {
     const source = store.modulesSource.get(moduleName)
 
-    if (source) {
+    if (source != null) {
         const fileType = path.extname(moduleName)
 
         if (fileType === '.bgl') {
