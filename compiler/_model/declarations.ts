@@ -68,9 +68,9 @@ export type ValueDeclaration = SourceInfo & {
     readonly exported: undefined|'export'|'expose',
 }
 
-export const ALL_PLATFORMS = ["node", "deno", "web"] as const
+export const ALL_PLATFORMS = ["node", "deno", "browser"] as const
 
-export type Platform = "node" | "deno" | "web"
+export type Platform = "node" | "deno" | "browser"
 
 export type DeriveDeclaration = SourceInfo & Exported & {
     readonly kind: "derive-declaration",

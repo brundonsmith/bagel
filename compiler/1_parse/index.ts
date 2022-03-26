@@ -945,7 +945,7 @@ const parsePlatform: ParseFunction<'js' | Platform> = (module, code, index) =>
         parseExact('js')(module, code, index) ??
         parseExact('node')(module, code, index) ??
         parseExact('deno')(module, code, index) ??
-        parseExact('web')(module, code, index), ({ parsed: platform, index }) =>
+        parseExact('browser')(module, code, index), ({ parsed: platform, index }) =>
     given(consumeWhitespaceRequired(code, index), index => ({ parsed: platform, index })))
     
 const valueDeclaration: ParseFunction<ValueDeclaration> = (module, code, startIndex) =>

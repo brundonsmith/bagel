@@ -27,7 +27,7 @@ async function modeFromArgs(args: string[]): Promise<Mode> {
         args.includes('--deno') ? 'deno' :
         undefined
     )
-
+    
     if (!(await fs.exists(providedEntry))) {
         fail(`${providedEntry} not found`)
     }
@@ -61,25 +61,60 @@ async function modeFromArgs(args: string[]): Promise<Mode> {
         case "autofix":
             return { mode, fileOrDir: providedEntry, watch: undefined }
         default:
-            return fail(`Must provide a command: build, check, test, run, transpile, clean`)
+            return fail(`Must provide a command: new, init, build, check, test, run, transpile, clean, format, autofix`)
     }
-} 
+}
+
+const DEFAULT_INDEX_BGL = `
+export const config: BagelConfig = {
+
+    // Remove entries from this list to enable different platform-specific APIs
+    platforms: ["node", "deno", "browser"],
+
+    // You can override individual rules here, or leave empty for the default linter behavior
+    lintRules: { }
+}
+
+proc main() {
+
+}
+`
 
 async function main() {
-    if (Deno.args[0] === 'clean' || Deno.args.includes('--clean')) {
-        const numFiles = await cleanCache()
-        console.log(Colors.yellow('Cleaned    ') + 'Bagel cache (' + numFiles + ' files)')
+    const mode = Deno.args[0]
+    const providedEntry =  path.resolve(Deno.cwd(), Deno.args[1] ?? './')
 
-        if (Deno.args[0] === 'clean') {
+    if (mode === 'clean' || Deno.args.includes('--clean')) {
+        const numFiles = await cleanCache()
+        console.log(Colors.yellow(pad('Cleaned')) + 'Bagel cache (' + numFiles + ' files)')
+
+        if (mode === 'clean') {
             return
         }
     }
 
-    const mode = await modeFromArgs(Deno.args)
-
-    await fs.ensureDir(cacheDir())
-
-    Store.start(mode)
+    if (mode === 'new') {
+        if (await fs.exists(providedEntry)) {
+            fail(`Cannot create project directory ${providedEntry} because it already exists`)
+        } else {
+            await fs.ensureDir(providedEntry)
+            await Deno.writeTextFile(path.resolve(providedEntry, 'index.bgl'), DEFAULT_INDEX_BGL)
+            console.log(`Created new Bagel project ${providedEntry}`)
+        }
+    } else if (mode === 'init') {
+        if (await fs.exists('./index.bgl')) {
+            fail(`Can't initialize Bagel project here because one already exists`)
+        } else {
+            await Deno.writeTextFile('./index.bgl', DEFAULT_INDEX_BGL)
+            console.log(`Initialized Bagel project in current directory`)
+        }
+    } else {
+        const mode = await modeFromArgs(Deno.args)
+    
+        await fs.ensureDir(cacheDir())
+    
+        Store.start(mode)
+    }
 }
 
 // Load modules from disk or web
@@ -105,7 +140,7 @@ autorun(async () => {
                         if (await fs.exists(path)) {
                             await Deno.remove(path)
                         }
-                        console.error(Colors.red('Failed     ') + module)
+                        console.error(Colors.red(pad('Failed')) + module)
                         Deno.exit(1)
                     }
                 }
@@ -360,10 +395,18 @@ function canonicalModuleName(importerModule: ModuleName, importPath: string): Mo
 }
 
 function fail(msg: string): any {
-    console.error(msg)
+    console.error(Colors.red(pad('[Failed]')) + msg)
     Deno.exit(1)
 }
 
+function pad(str: string): string {
+    const targetLength = 11;
+    let res = str
+    while (res.length < targetLength) {
+        res += ' '
+    }
+    return res
+}
 
 async function test() {
     const thisModulePath = windowsPathToModulePath(path.dirname(import.meta.url))
