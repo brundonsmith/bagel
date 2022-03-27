@@ -12,7 +12,7 @@ export js func logf<T>(x: T): T => {#
    return x;
 #}
 
-export js func iter<T>(x: T[]): Iterator<T> => {#
+export js func iter<T>(x: const T[]): Iterator<T> => {#
     return ___iter(x)
 #}
 
