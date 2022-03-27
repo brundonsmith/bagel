@@ -848,7 +848,8 @@ function distillUnion(type: TypeExpression): TypeExpression {
             }
         }
 
-        const members = type.members.filter((_, index) => !indicesToDrop.has(index))
+        const members = type.members.filter((type, index) =>
+            !indicesToDrop.has(index) && type.kind !== 'never-type')
 
         return {
             kind: "union-type",
@@ -913,23 +914,17 @@ function narrow(type: TypeExpression, fit: TypeExpression): TypeExpression {
     type = resolveType(type)
     fit = resolveType(fit)
 
-    if (fit.kind === 'union-type') {
-        let t = type
-
-        for (const member of fit.members) {
-            t = narrow(t, member)
-        }
-
-        return t
-    } else if (type.kind === "union-type") {
+    if (type.kind === "union-type") {
         return {
             ...type,
             members: type.members.map(member => narrow(member, fit))
         }
     } else if (type.kind === 'unknown-type') {
         return fit
-    } else { // TODO: There's probably more we can do here
+    } else if (subsumes(fit, type)) {
         return type
+    } else {
+        return NEVER_TYPE
     }
 }
 
