@@ -262,19 +262,12 @@ const importDeclaration: ParseFunction<ImportDeclaration> = (module, code, start
     expec(consume(code, index, "import"), err(code, index, '"import"'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
-    given(parseSeries(module, code, index, plainIdentifier, ","), ({ parsed: imports, index }) =>
+    given(parseSeries(module, code, index, importItem, ","), ({ parsed: imports, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
         parsed: {
             kind: "import-declaration",
-            imports: imports.map(i => ({
-                kind: "import-item",
-                name: i,
-                module,
-                code: i.code,
-                startIndex: i.startIndex,
-                endIndex: i.endIndex,
-            })),
+            imports,
             path,
             module,
             code,
@@ -283,6 +276,25 @@ const importDeclaration: ParseFunction<ImportDeclaration> = (module, code, start
         },
         index
     })))))))))))
+
+const importItem: ParseFunction<ImportItem> = (module, code, startIndex) =>
+    given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
+    given(parseOptional(module, code, index, (module, code, index) =>
+        given(consumeWhitespace(code, index), index =>
+        given(consume(code, index, 'as'), index =>
+        given(consumeWhitespace(code, index), index =>
+          plainIdentifier(module, code, index))))), ({ parsed: alias, index }) => ({
+            parsed: {
+                kind: "import-item",
+                name,
+                alias,
+                module,
+                code,
+                startIndex,
+                endIndex: index,
+            },
+            index
+          })))
 
 const typeDeclaration: ParseFunction<TypeDeclaration> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
