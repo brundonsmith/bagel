@@ -291,7 +291,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "Object type fail",
+  name: "Object type fail 1",
   fn() {
     testTypecheck(
       `type MyObj = {
@@ -306,6 +306,23 @@ Deno.test({
             bar: {
                 other: 'foo'
             }
+        }`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Object type fail 2",
+  fn() {
+    testTypecheck(
+      `type MyObj = {
+            foo: string,
+        }
+        
+        const obj: MyObj = {
+            foo: 'stuff',
+            bar: 12
         }`,
       true,
     );

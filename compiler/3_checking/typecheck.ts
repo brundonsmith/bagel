@@ -906,17 +906,29 @@ export function subsumes(destination: TypeExpression, value: TypeExpression): bo
         const destinationEntries = propertiesOf(resolvedDestination)
         const valueEntries =       propertiesOf(resolvedValue)
 
-        return (
-            destinationEntries?.every(({ name: key, type: destinationValue, optional }) => {
-                const valueEntry = valueEntries?.find(e => e.name.name === key.name)
+        if (destinationEntries == null || valueEntries == null) {
+            return false
+        }
+
+        const fits = (
+            destinationEntries.every(({ name: key, type: destinationValue, optional }) => {
+                const valueEntry = valueEntries.find(e => e.name.name === key.name)
 
                 if (valueEntry == null) {
                     return optional
                 } else {
                     return subsumes( destinationValue, valueEntry.type)
                 }
-            }) === true
-        );
+            })
+        )
+
+        if (resolvedValue.mutability === 'literal') {
+            // disallow passing object literals with unrecognized properties
+            return fits && valueEntries.every(({ name: key }) =>
+                destinationEntries.some(e => e.name.name === key.name))
+        } else {
+            return fits
+        }
     } else if ((resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") ||
                 (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") ||
                 (resolvedDestination.kind === "error-type" && resolvedValue.kind === "error-type") ||
