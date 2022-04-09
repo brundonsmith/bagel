@@ -331,7 +331,7 @@ const _nominalTypeDeclaration: ParseFunction<TypeDeclaration> = (module, code, s
         given(consumeWhitespace(code, index), index =>
         given(typeExpression(module, code, index), ({ parsed: inner, index }) =>
         given(consumeWhitespace(code, index), index =>
-        given(consume(code, index, ")"), () => ({ parsed: inner, index })))))))), ({ parsed: inner, index }) => ({
+        given(consume(code, index, ")"), index => ({ parsed: inner, index })))))))), ({ parsed: inner, index }) => ({
         parsed: {
             kind: "type-declaration",
             name,
