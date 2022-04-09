@@ -12,7 +12,7 @@ Deno.test({
             `
             let counter = 0
 
-            autorun () {
+            autorun {
                 output(counter);
             }
 
@@ -33,12 +33,12 @@ Deno.test({
             `
             let counterHolder: { prop: number, other: string } = { prop: 0, other: 'stuff' }
     
-            autorun () {
+            autorun {
                 // should be ignored in reactions!
                 output(counterHolder.other);
             }
     
-            autorun () {
+            autorun {
                 output(counterHolder.prop);
             }
     
@@ -59,7 +59,7 @@ Deno.test({
             `
             let counter = 0
 
-            autorun () {
+            autorun {
                 output(counter);
             }
 

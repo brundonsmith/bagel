@@ -2246,7 +2246,7 @@ Deno.test({
     js func get(n: number): Plan<string> => {# #}
 
     let incr = 0
-    remote foo: string () => get(incr)
+    remote foo: string => get(incr)
     
     proc thing() {
       if (!foo.loading) {
