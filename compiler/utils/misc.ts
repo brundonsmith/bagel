@@ -23,8 +23,6 @@ type BasicData =
 export function deepEquals(a: BasicData, b: BasicData, ignorePropNames: readonly string[] = []): boolean {
     if (a === b) {
         return true;
-    } else if (typeof a === 'symbol' && typeof b === 'symbol') {
-        return true;
     } else if(a == null && b == null) {
         return true;
     } else if (a != null && b != null && typeof a === "object" && typeof b === "object") {
