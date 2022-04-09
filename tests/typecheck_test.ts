@@ -2561,7 +2561,7 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
 
   if (!shouldFail && errors.length > 0) {
     throw `Type check should have succeeded but failed with errors\n\n` +
-    errors.map(err => prettyProblem(err.ast?.module ?? '<test>', err)).join("\n")
+    errors.map(err => prettyProblem(err.ast?.module ?? '<test>' as ModuleName, err)).join("\n")
   } else if (shouldFail && errors.length === 0) {
     throw `Type check should have failed but succeeded`
   }
