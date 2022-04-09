@@ -34,7 +34,7 @@ export type ImportDeclaration = SourceInfo & {
 export type ImportItem = SourceInfo & {
     readonly kind: "import-item",
     readonly name: PlainIdentifier,
-    readonly alias?: PlainIdentifier,
+    readonly alias: PlainIdentifier | undefined,
 }
 
 export type TypeDeclaration = SourceInfo & Exported & {

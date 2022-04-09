@@ -191,8 +191,8 @@ export type LiteralType = SourceInfo & {
 
 export type NominalType = SourceInfo & {
     readonly kind: "nominal-type",
-    readonly name: symbol,
-    readonly inner: TypeExpression,
+    readonly name: string,
+    readonly inner: TypeExpression | undefined,
     readonly mutability: undefined,
 }
 

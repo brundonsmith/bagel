@@ -2462,6 +2462,45 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Nominal pass",
+  fn() {
+    testMultiModuleTypecheck({
+      'a.bgl': `
+      export nominal type A
+      export nominal type B
+      export type Thing = A | B`,
+      'b.bgl': `
+      from 'a.bgl' import { A, B, Thing }
+      
+      func foo(thing: Thing) =>
+        if thing instanceof A {
+          12
+        } else {
+          13
+        }
+        
+      const x: Thing = A`
+    }, false)
+  }
+})
+
+Deno.test({
+  name: "Nominal fail 1",
+  fn() {
+    testMultiModuleTypecheck({
+      'a.bgl': `
+      export nominal type A`,
+      'b.bgl': `
+      from 'a.bgl' import { A as OtherA }
+
+      nominal type A
+
+      const x: OtherA = A`
+    }, true)
+  }
+})
+
 // Deno.test({
 //   name: "Complex function type inference pass",
 //   fn() {
@@ -2522,7 +2561,7 @@ function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: 
 
   if (!shouldFail && errors.length > 0) {
     throw `Type check should have succeeded but failed with errors\n\n` +
-    errors.map(err => prettyProblem("<test>" as ModuleName, err)).join("\n")
+    errors.map(err => prettyProblem(err.ast?.module ?? '<test>', err)).join("\n")
   } else if (shouldFail && errors.length === 0) {
     throw `Type check should have failed but succeeded`
   }

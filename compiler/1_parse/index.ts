@@ -3,7 +3,7 @@ import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform } from "../_model/declarations.ts";
+import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf, ErrorExpression } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType } from "../_model/type-expressions.ts";
@@ -323,25 +323,26 @@ const _nominalTypeDeclaration: ParseFunction<TypeDeclaration> = (module, code, s
     given(consume(code, index, "nominal"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     expec(consume(code, index, "type"), err(code, index, '"type"'), index => 
-    given(consumeWhitespaceRequired(code, index), startOfNameIndex =>
-    expec(plainIdentifier(module, code, startOfNameIndex), err(code, startOfNameIndex, 'Type name'), ({ parsed: name, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "("), err(code, index, '"("'), index =>
-    given(consumeWhitespace(code, index), index =>
-    expec(typeExpression(module, code, index), err(code, index, 'Type expression'), ({ parsed: inner, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(plainIdentifier(module, code, index), err(code, index, 'Type name'), ({ parsed: name, index }) =>
+    given(parseOptional(module, code, index, (module, code, index) =>
+        given(consumeWhitespace(code, index), index =>
+        given(consume(code, index, "("), index =>
+        given(consumeWhitespace(code, index), index =>
+        given(typeExpression(module, code, index), ({ parsed: inner, index }) =>
+        given(consumeWhitespace(code, index), index =>
+        given(consume(code, index, ")"), () => ({ parsed: inner, index })))))))), ({ parsed: inner, index }) => ({
         parsed: {
             kind: "type-declaration",
             name,
             type: {
                 kind:"nominal-type",
-                name: Symbol(name.name),
+                name: name.name,
                 inner,
                 mutability: undefined,
-                module: inner.module,
-                code: inner.code,
-                startIndex: startOfNameIndex,
+                module,
+                code,
+                startIndex: name.startIndex,
                 endIndex: index
             },
             exported,
@@ -351,7 +352,7 @@ const _nominalTypeDeclaration: ParseFunction<TypeDeclaration> = (module, code, s
             endIndex: index,
         },
         index,
-    })))))))))))))
+    }))))))))
 
 
 const typeExpression: ParseFunction<TypeExpression> =  memoize3((module, code, startIndex) =>

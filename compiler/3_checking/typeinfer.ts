@@ -625,7 +625,13 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
                 return getBindingType(importedFrom, { owner: imported, identifier: imported.name }, visited)
             }
         } break;
-        case 'type-declaration':
+        case 'type-declaration': {
+            if (decl.type.kind === 'nominal-type' && decl.type.inner == null) {
+                return decl.type
+            } else {
+                return UNKNOWN_TYPE
+            }
+        }
         case 'generic-param-type':
             return UNKNOWN_TYPE
         default:
@@ -1013,9 +1019,13 @@ export const propertiesOf = computedFn((
 
     switch (resolvedType.kind) {
         case "nominal-type": {
-            return [
-                attribute("value", resolvedType.inner, false)
-            ]
+            if (resolvedType.inner) {
+                return [
+                    attribute("value", resolvedType.inner, false)
+                ]
+            } else {
+                return []
+            }
         }
         case "object-type": {
             const attrs = [...resolvedType.entries]

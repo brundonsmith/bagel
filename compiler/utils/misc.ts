@@ -22,10 +22,13 @@ type BasicData =
 
 export function deepEquals(a: BasicData, b: BasicData, ignorePropNames: readonly string[] = []): boolean {
     if (a === b) {
+        // Trivially equal
         return true;
     } else if(a == null && b == null) {
+        // Don't distinguish null and undefined
         return true;
     } else if (a != null && b != null && typeof a === "object" && typeof b === "object") {
+        // Recurse
         if (Array.isArray(a) && Array.isArray(b)) {
             if (a.length !== b.length) {
                 return false;

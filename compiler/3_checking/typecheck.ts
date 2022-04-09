@@ -397,7 +397,11 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         const resolvedType = resolveType(binding.owner.type)
     
                         if (resolvedType.kind === "nominal-type") {
-                            expect(reportError, resolvedType.inner, current.args[0])
+                            if (resolvedType.inner) {
+                                expect(reportError, resolvedType.inner, current.args[0])
+                            } else {
+                                reportError(miscError(current.args[0] ?? current, `Nominal type ${current.subject.name} doesn't have an inner value`))
+                            }
                             break;
                         }
                     }
@@ -580,7 +584,9 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             }
                         }
                     } else if (binding.kind === 'type-declaration') {
-                        reportError(miscError(current, `'${current.name}' is a type but it's used like a value`))
+                        if (binding.type.kind !== 'nominal-type' || binding.type.inner) { // nominals with no inner value are allowed here
+                            reportError(miscError(current, `'${current.name}' is a type, but it's used like a value`))
+                        }
                     } else if (config?.platforms && (binding.kind === 'proc-declaration' || binding.kind === 'func-declaration')) {
                         const unmetPlatforms = config.platforms.filter(platform => !binding.platforms.includes(platform))
 
@@ -830,6 +836,12 @@ export function subsumes(destination: TypeExpression, value: TypeExpression): bo
     } else if (resolvedValue.kind === "union-type") {
         return resolvedValue.members.every(member =>
             subsumes(resolvedDestination, member));
+    } else if (resolvedDestination.kind === 'nominal-type' && resolvedValue.kind === 'nominal-type') {
+        return (
+            resolvedDestination.module != null && resolvedValue.module != null &&
+            resolvedDestination.module === resolvedValue.module &&
+            resolvedDestination.name === resolvedValue.name
+        )
     } else if(typesEqual(resolvedDestination, resolvedValue)) {
         return true;
     } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
@@ -910,8 +922,6 @@ export function subsumes(destination: TypeExpression, value: TypeExpression): bo
                 (resolvedDestination.kind === "error-type" && resolvedValue.kind === "error-type") ||
                 (resolvedDestination.kind === "remote-type" && resolvedValue.kind === "remote-type")) {
         return subsumes(resolvedDestination.inner, resolvedValue.inner);
-    } else if (resolvedDestination.kind === 'nominal-type' && resolvedValue.kind === 'nominal-type') {
-        return resolvedDestination.name === resolvedValue.name;
     }
 
     return false;

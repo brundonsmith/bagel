@@ -91,7 +91,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ` : '') + `await ${f(ast.plan)};`
         case "type-declaration":
             if (ast.type.kind === 'nominal-type') {
-                return exported(ast.exported) + `nominal type ${ast.name.name}(${f(ast.type.inner)})`
+                const inner = ast.type.inner ? `(${f(ast.type.inner)})` : ''
+                return exported(ast.exported) + `nominal type ${ast.name.name}${inner}`
             } else {
                 return exported(ast.exported) + `type ${ast.name.name} = ${f(ast.type)}`
             }
@@ -225,7 +226,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "boolean-type": return `boolean`;
         case "nil-type": return `nil`;
         case "literal-type": return JSON.stringify(ast.value.value).replaceAll('"', "'");
-        case "nominal-type": return ast.name.description ?? '<unnamed nominal>';
+        case "nominal-type": return ast.name ?? '<unnamed nominal>';
         case "iterator-type": return ast.inner.kind === 'any-type' ? `Iterator` : `Iterator<${f(ast.inner)}>`;
         case "plan-type":     return ast.inner.kind === 'any-type' ? `Plan` : `Plan<${f(ast.inner)}>`;
         case "error-type":    return ast.inner.kind === 'any-type' ? `Error` : `Error<${f(ast.inner)}>`;
