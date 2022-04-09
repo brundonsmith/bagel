@@ -111,7 +111,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                             `(${ast.name.name} as any).sym = ${INT}${ast.name.name};\n`
                         : '') +
                         `${exported(ast.exported)}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
-                            ? `{ kind: typeof ${INT}${ast.name.name}${valueTypeDecl ? `, ${valueTypeDecl}` : '' }}`
+                            ? `{ kind: typeof ${INT}${ast.name.name}${valueTypeDecl ? `, ${valueTypeDecl}` : '' } }`
                             : c(ast.type)}`
                     )
             );
