@@ -356,7 +356,8 @@ const BAGEL_SNIPPETS = [
       const foo: (string|number)[] = ['foo', 12, true, 'bar']`, `
       func foo(a: number?, b: string?, c: boolean): number|string|boolean => a ?? b ?? c`, `
       func foo(a: string?, b: string?): string => a ?? b ?? 12`,
-      `export nominal type Foo({ prop1: string, prop2: number })`
+      `export nominal type Foo({ prop1: string, prop2: number })`,
+      `const el = <foo a='b' />`
 ]
 
 Store.start({

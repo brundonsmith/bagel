@@ -203,7 +203,15 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                 return `const [ ${propsAndSpread} ] = ${value}` + semicolon
             }
         }
-        case "element-tag":
+        case "element-tag": {
+            const close = ast.children.length === 0
+                ? ' />'
+                : `>${
+                    ast.children.map(c =>
+                        '\n' + nextIndentation + (c.kind === 'element-tag' ? fIndent(c) : `{${fIndent(c)}}`)
+                    ).join('')
+                }\n${currentIndentation}</${ast.tagName.name}>`
+
             return `<${ast.tagName.name} ${
                 ast.attributes.entries.map(entry =>
                     entry.kind === 'local-identifier' ? entry.name :
@@ -213,11 +221,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                             ? f(entry.value)
                             : `{${f(entry.value)}}`}`
                 ).join(' ')
-            }>${
-                ast.children.map(c =>
-                    '\n' + nextIndentation + (c.kind === 'element-tag' ? fIndent(c) : `{${fIndent(c)}}`)
-                ).join('')
-            }${ast.children.length > 0 ? '\n' + currentIndentation : ''}</${ast.tagName.name}>`
+            }${close}`
+        }
         case "javascript-escape":
             return `js#${ast.js}#js`
         case "union-type": return ast.members.map(f).join(" | ");

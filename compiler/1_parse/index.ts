@@ -2031,51 +2031,88 @@ const localIdentifier: ParseFunction<LocalIdentifier> = (module, code, startInde
     }))
 
 // TODO: Support /> closing
-export const elementTag: ParseFunction<ElementTag> = (module, code, startIndex) =>
+export const elementTag: ParseFunction<ElementTag> = (module, code, startIndex) => 
     given(consume(code, startIndex, "<"), index =>
     given(plainIdentifier(module, code, index), ({ parsed: tagName, index }) =>
     given(consumeWhitespace(code, index), index =>
-    given(parseSeries(module, code, index, _tagAttribute), ({ parsed: attributes, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ">"), err(code, index, '">"'), index => 
-    given(parseSeries(module, code, index, (module, code, index) => elementTag(module, code, index) ?? _elementEmbeddedExpression(module, code, index)), ({ parsed: children, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, "</"), err(code, index, 'Closing tag'), index => 
-    expec(plainIdentifier(module, code, index), err(code, index, "Closing tag name"), ({ parsed: closingTagName, index }) =>
-    // TODO: Check that closing tag matches opening tag
-    expec(consume(code, index, ">"), err(code, index, '">"'), index => ({
-        parsed: {
-            kind: "element-tag",
-            tagName,
-            attributes: {
-                kind: 'object-literal',
-                entries: attributes.map(([key, value]) => ({
-                    kind: 'object-entry',
-                    key,
-                    value,
-                    module: key.module,
-                    code: key.code,
-                    startIndex: key.startIndex,
-                    endIndex: value.endIndex
-                })),
-                module,
-                code,
-                startIndex: attributes[0]?.[0]?.startIndex ?? startIndex,
-                endIndex: attributes[attributes.length - 1]?.[1]?.endIndex ?? index,
-            },
-            children,
+    given(parseSeries(module, code, index, _tagAttribute), ({ parsed: attributes, index }) => 
+    given(consumeWhitespace(code, index), index => {
+        const attributesObj: ObjectLiteral = {
+            kind: 'object-literal',
+            entries: attributes.map(([key, value]) => ({
+                kind: 'object-entry',
+                key,
+                value,
+                module: key.module,
+                code: key.code,
+                startIndex: key.startIndex,
+                endIndex: value.endIndex
+            })),
             module,
             code,
-            startIndex,
-            endIndex: index,
-        },
-        index,
-    }))))))))))))
+            startIndex: attributes[0]?.[0]?.startIndex ?? startIndex,
+            endIndex: attributes[attributes.length - 1]?.[1]?.endIndex ?? index,
+        }
+
+        const singletonClose = consume(code, index, '/>')
+
+        if (singletonClose != null) {
+            return {
+                parsed: {
+                    kind: "element-tag",
+                    tagName,
+                    attributes: attributesObj,
+                    children: [],
+                    module,
+                    code,
+                    startIndex,
+                    endIndex: singletonClose,
+                },
+                index: singletonClose,
+            }
+        } else {
+            return (
+                expec(consume(code, index, ">"), err(code, index, '">"'), index => 
+                given(parseSeries(module, code, index, (module, code, index) => elementTag(module, code, index) ?? _elementEmbeddedExpression(module, code, index)), ({ parsed: children, index }) =>
+                expec(consume(code, index, "</"), err(code, index, 'Closing tag'), index => 
+                expec(plainIdentifier(module, code, index), err(code, index, "Closing tag name"), ({ parsed: closingTagName, index }) =>
+                // TODO: Check that closing tag matches opening tag
+                expec(consume(code, index, ">"), err(code, index, '">"'), index => ({
+                    parsed: {
+                        kind: "element-tag",
+                        tagName,
+                        attributes: {
+                            kind: 'object-literal',
+                            entries: attributes.map(([key, value]) => ({
+                                kind: 'object-entry',
+                                key,
+                                value,
+                                module: key.module,
+                                code: key.code,
+                                startIndex: key.startIndex,
+                                endIndex: value.endIndex
+                            })),
+                            module,
+                            code,
+                            startIndex: attributes[0]?.[0]?.startIndex ?? startIndex,
+                            endIndex: attributes[attributes.length - 1]?.[1]?.endIndex ?? index,
+                        },
+                        children,
+                        module,
+                        code,
+                        startIndex,
+                        endIndex: index,
+                    },
+                    index,
+                }))))))
+            )
+        }
+    })))))
 
 const _tagAttribute: ParseFunction<[PlainIdentifier, Expression]> = (module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
     given(consume(code, index, "="), index =>
-    expec(_elementEmbeddedExpression(module, code, index), err(code, index, "Expression"), ({ parsed: expression, index }) => ({
+    expec(exactStringLiteral(module, code, index) ?? _elementEmbeddedExpression(module, code, index), err(code, index, "Expression"), ({ parsed: expression, index }) => ({
         parsed: [ name, expression ],
         index,
     }))))
