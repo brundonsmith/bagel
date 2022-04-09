@@ -468,29 +468,10 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
                 mutability
             } as TypeExpression
         }
-        case 'derive-declaration': {
-            if (decl.type) {
-                return decl.type
-            }
-
-            const fnType = resolveType(inferType(decl.fn, visited))
-            if (fnType.kind === 'func-type' && fnType.returnType) {
-                return fnType.returnType
-            }
-
-            return UNKNOWN_TYPE
-        }
+        case 'derive-declaration':
+            return decl.type ?? resolveType(inferType(decl.expr, visited))
         case 'remote-declaration': {
-            const fnType = resolveType(inferType(decl.fn, visited))
-
-            let inner;
-            if (fnType.kind === 'plan-type') {
-                inner = fnType.inner
-            } else if (fnType.kind === 'func-type' && fnType.returnType?.kind === 'plan-type') {
-                inner = fnType.returnType.inner
-            } else {
-                inner = UNKNOWN_TYPE
-            }
+            const inner = decl.type ?? resolveType(inferType(decl.expr, visited))
 
             const { module, code, startIndex, endIndex } = decl
 

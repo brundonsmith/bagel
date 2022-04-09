@@ -133,18 +133,15 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             }
         }
         case "derive-declaration": 
-            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `() => ${c(ast.type)}` : ``} = ${INT}computedFn(${c(ast.fn)})`
+            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `() => ${c(ast.type)}` : ``} = ${INT}computedFn(
+                () => ${c(ast.expr)}
+            )`
         case "remote-declaration": {
-            const fnType = resolveType(inferType(ast.fn))
-            const compiledPlanGenerator = c(ast.fn)
-
-            return exported(ast.exported) + `const ${ast.name.name} = new ${INT}Remote${ast.type ? `<${c(ast.type)}>` : ``}(
-                ${fnType.kind === 'plan-type'
-                    ? `() => ${compiledPlanGenerator}`
-                    : compiledPlanGenerator}
+            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `${INT}Remote<${c(ast.type)}>` : ``} = new ${INT}Remote(
+                () => ${c(ast.expr)}
             )`
         }
-        case "autorun-declaration": return `${INT}autorun(${c(ast.effect)})`;
+        case "autorun-declaration": return `${INT}autorun(() => ${c(ast.effect)})`;
         case "destructuring-declaration-statement":
         case "inline-destructuring-declaration": {
             const propsAndSpread = ast.properties.map(p => p.name).join(', ') + (ast.spread ? `, ...${ast.spread.name}` : '')

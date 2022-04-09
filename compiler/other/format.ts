@@ -85,7 +85,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "derive-declaration":
         case "remote-declaration": {
             const keyword = ast.kind === 'derive-declaration' ? 'derive' : 'remote'
-            return exported(ast.exported) + `${keyword} ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} ${format(ast.fn)}`
+            return exported(ast.exported) + `${keyword} ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} => ${format(ast.expr)}`
         }
         case "await-statement":
             return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ` : '') + `await ${f(ast.plan)};`

@@ -297,62 +297,33 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "derive-declaration": {
-                const fnType = resolveType(inferType(current.fn))
+                const exprType = resolveType(inferType(current.expr))
 
-                if (fnType.kind === 'func-type') {
-                    if (fnType.args.length > 0) {
-                        reportError(miscError(current.fn, `Derive declarations shouldn't take any arguments`))
+                if (current.type != null) {
+                    // make sure value fits declared type, if there is one
+                    if (!subsumes(current.type, exprType)) {
+                        reportError(assignmentError(current.expr, current.type, exprType))
                     }
-
-                    if (current.type != null) {
-                        // make sure value fits declared type, if there is one
-                        if (!subsumes(current.type, fnType.returnType ?? UNKNOWN_TYPE)) {
-                            reportError(assignmentError(current.fn, current.type, fnType.returnType ?? UNKNOWN_TYPE))
-                        }
-                    }
-                } else {
-                    // make sure value is a plan
-                    reportError(miscError(current.fn, `Remote declarations must be defined with either a Plan or a function that returns a Plan; found type '${format(fnType)}'`))
                 }
             } break;
             case "remote-declaration": {
-                const fnType = resolveType(inferType(current.fn))
+                const exprType = resolveType(inferType(current.expr))
 
-                if (fnType.kind === 'plan-type') {
+                if (exprType.kind === 'plan-type') {
                     if (current.type != null) {
                         // make sure value fits declared type, if there is one
-                        if (!subsumes(current.type, fnType.inner)) {
-                            reportError(assignmentError(current.fn, current.type, fnType.inner))
-                        }
-                    }
-                } else if (fnType.kind === 'func-type' && fnType.returnType?.kind === 'plan-type') {
-                    if (fnType.args.length > 0) {
-                        reportError(miscError(current.fn, `Remotes declarations shouldn't take any arguments`))
-                    }
-
-                    if (current.type != null) {
-                        // make sure value fits declared type, if there is one
-                        if (!subsumes(current.type, fnType.returnType.inner)) {
-                            reportError(assignmentError(current.fn, current.type, fnType.returnType.inner))
+                        if (!subsumes(current.type, exprType.inner)) {
+                            reportError(assignmentError(current.expr, current.type, exprType.inner))
                         }
                     }
                 } else {
                     // make sure value is a plan
-                    reportError(miscError(current.fn, `Remote declarations must be defined with either a Plan or a function that returns a Plan; found type '${format(fnType)}'`))
+                    reportError(miscError(current.expr, `Remote declarations must be defined with a Plan expression; found type '${format(exprType)}'`))
                 }
             } break;
             case "test-expr-declaration": {
                 // make sure test value is a boolean
                 expect(reportError, BOOLEAN_TYPE, current.expr)
-            } break;
-            case "autorun-declaration": {
-                const effectType = resolveType(inferType(current.effect))
-
-                if (effectType.kind !== "proc-type") {
-                    reportError(miscError(current.effect, `Expected procedure`));
-                } else if (effectType.args.length > 0) {
-                    reportError(miscError(current.effect, `Effect procedure should not take any arguments; provided procedure expects ${effectType.args.length}`));
-                }
             } break;
             case "func":
             case "proc": {
@@ -742,6 +713,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     reportError(miscError(current, 'Can only bind type arguments to a generic type'))
                 }
             } break;
+            case "autorun-declaration":
             case "if-else-expression":
             case "if-else-statement":
             case "while-loop":

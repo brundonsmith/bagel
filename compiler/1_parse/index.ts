@@ -984,12 +984,14 @@ const deriveOrRemoteDelcaration: ParseFunction<DeriveDeclaration|RemoteDeclarati
     given(consumeWhitespace(code, index), index =>
     given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) =>
     given(consumeWhitespace(code, index), index =>
-    given(func(module, code, index), ({ parsed: fn, index }) => ({
+    expec(consume(code, index, '=>'), err(code, index, "'=>'"), index =>
+    given(consumeWhitespace(code, index), index =>
+    given(expression(module, code, index), ({ parsed: expr, index }) => ({
         parsed: {
             kind: kind === 'derive' ? 'derive-declaration' : 'remote-declaration',
             name,
             type,
-            fn,
+            expr,
             exported,
             module,
             code,
@@ -997,7 +999,7 @@ const deriveOrRemoteDelcaration: ParseFunction<DeriveDeclaration|RemoteDeclarati
             endIndex: index,
         },
         index
-    })))))))))
+    })))))))))))
 
 const _maybeTypeAnnotation: ParseFunction<TypeExpression|undefined> = (module, code, startIndex) =>{
     const result = (
@@ -1019,7 +1021,7 @@ const _maybeTypeAnnotation: ParseFunction<TypeExpression|undefined> = (module, c
 const autorunDeclaration: ParseFunction<AutorunDeclaration> = (module, code, startIndex) =>
     given(consume(code, startIndex, "autorun"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
-    expec(expression(module, code, index), err(code, index, "Effect"), ({ parsed: effect, index }) => ({
+    expec(parseBlock(module, code, index), err(code, index, "Effect block"), ({ parsed: effect, index }) => ({
         parsed: {
             kind: "autorun-declaration",
             effect,

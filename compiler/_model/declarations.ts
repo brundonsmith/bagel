@@ -76,14 +76,19 @@ export type DeriveDeclaration = SourceInfo & Exported & {
     readonly kind: "derive-declaration",
     readonly name: PlainIdentifier,
     readonly type: TypeExpression|undefined,
-    readonly fn: Func,
+    readonly expr: Expression,
 }
 
 export type RemoteDeclaration = SourceInfo & Exported & {
     readonly kind: "remote-declaration",
     readonly name: PlainIdentifier,
     readonly type: TypeExpression|undefined,
-    readonly fn: Func,
+    readonly expr: Expression,
+}
+
+export type AutorunDeclaration = SourceInfo & {
+    readonly kind: "autorun-declaration",
+    readonly effect: Block
 }
 
 export type TestExprDeclaration = SourceInfo & {
@@ -96,11 +101,6 @@ export type TestBlockDeclaration = SourceInfo & {
     readonly kind: "test-block-declaration",
     readonly name: ExactStringLiteral,
     readonly block: Block,
-}
-
-export type AutorunDeclaration = SourceInfo & {
-    readonly kind: "autorun-declaration",
-    readonly effect: Expression
 }
 
 // TODO: ClassReaction
