@@ -175,7 +175,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "switch-expression":
             return `switch ${f(ast.value)} {\n${ast.cases.map(c => nextIndentation + fIndent(c)).join('\n')}\n${currentIndentation}}`
         case "test-expr-declaration":
-            return `test expr ${f(ast.name)} = ${f(ast.expr)}`
+            return `test expr ${f(ast.name)} => ${f(ast.expr)}`
         case "test-block-declaration":
             return `test block ${f(ast.name)} ${f(ast.block)}`
         case "debug":

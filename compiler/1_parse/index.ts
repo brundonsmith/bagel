@@ -1040,7 +1040,7 @@ const testExprDeclaration: ParseFunction<TestExprDeclaration> = (module, code, s
     given(consumeWhitespace(code, index), index => 
     expec(exactStringLiteral(module, code, index), err(code, index, 'Test name'), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, '='), err(code, index, '"="'), index =>
+    expec(consume(code, index, '=>'), err(code, index, '"=>"'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Test expression'), ({ parsed: expr, index }) => ({
         parsed: {
