@@ -4,7 +4,7 @@ import { given } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, resolveImport, throws } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
-import { ancestors, findAncestor, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
+import { ancestors, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
 import Store, { getConfig, getModuleByName, _Store } from "../store.ts";
 import { format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
@@ -278,7 +278,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     } else {
                         const objectProperties = propertiesOf(valueType)
                         for (const property of current.properties) {
-                            if (!objectProperties?.find(prop => prop.name.name === property.name)) {
+                            if (!objectProperties?.find(prop => getName(prop.name) === property.name)) {
                                 reportError(miscError(property, `Property '${property.name}' does not exist on type '${format(valueType)}'`))
                             }
                         }
@@ -473,7 +473,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 
                 if (subjectType.kind === "object-type" && indexType.kind === "literal-type") {
                     const key = indexType.value.value;
-                    const valueType = propertiesOf(subjectType)?.find(entry => entry.name.name === key)?.type;
+                    const valueType = propertiesOf(subjectType)?.find(entry => getName(entry.name) === key)?.type;
                     if (valueType == null) {
                         reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${format(subjectType)}'`));
                     }
@@ -506,7 +506,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                     if (subjectProperties == null) {
                         reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${format(subjectType)}")`));
-                    } else if (!subjectProperties.some(property => property.name.name === current.property.name)) {
+                    } else if (!subjectProperties.some(property => getName(property.name) === current.property.name)) {
                         reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${format(subjectType)}'`));
                     }
                 }
@@ -719,6 +719,11 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     reportError(miscError(current, 'Can only bind type arguments to a generic type'))
                 }
             } break;
+            case "object-entry":
+                if (current.key.kind !== 'plain-identifier') {
+                    expect(reportError, VALID_RECORD_KEY, current.key)
+                }
+                break;
             case "autorun-declaration":
             case "if-else-expression":
             case "if-else-statement":
@@ -912,7 +917,7 @@ export function subsumes(destination: TypeExpression, value: TypeExpression): bo
 
         const fits = (
             destinationEntries.every(({ name: key, type: destinationValue, optional }) => {
-                const valueEntry = valueEntries.find(e => e.name.name === key.name)
+                const valueEntry = valueEntries.find(e => getName(e.name) === getName(key))
 
                 if (valueEntry == null) {
                     return optional
@@ -925,7 +930,7 @@ export function subsumes(destination: TypeExpression, value: TypeExpression): bo
         if (resolvedValue.mutability === 'literal') {
             // disallow passing object literals with unrecognized properties
             return fits && valueEntries.every(({ name: key }) =>
-                destinationEntries.some(e => e.name.name === key.name))
+                destinationEntries.some(e => getName(e.name) === getName(key)))
         } else {
             return fits
         }
@@ -1142,7 +1147,7 @@ export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpr
             const nilTolerantSubjectType = type.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
                 ? subtract(subjectType, NIL_TYPE)
                 : subjectType;
-            const property = propertiesOf(nilTolerantSubjectType)?.find(entry => entry.name.name === type.property.name)
+            const property = propertiesOf(nilTolerantSubjectType)?.find(entry => getName(entry.name) === type.property.name)
             
             if (type.optional && property) {
                 return resolveType(maybeOf(property.type), skipNamed)

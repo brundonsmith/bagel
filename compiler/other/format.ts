@@ -2,9 +2,10 @@
 import { parsed } from "../1_parse/index.ts";
 import { computedFn } from "../mobx.ts";
 import { _Store } from "../store.ts";
-import { AST } from '../_model/ast.ts'
+import { getName } from "../utils/ast.ts";
+import { AST, PlainIdentifier } from '../_model/ast.ts'
 import { ModuleName } from "../_model/common.ts";
-import { Spread } from "../_model/expressions.ts";
+import { ExactStringLiteral } from "../_model/expressions.ts";
 import { TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 export type FormatOptions = {
@@ -105,14 +106,19 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "operator":
             return ast.op
         // TODO: Put obj and array literals all on one line vs indented based on size of contents
-        case "object-literal":  return `{${
+        case "object-literal": return `{${
                 ast.entries.map(entry =>
-                    nextIndentation +
-                    (Array.isArray(entry) 
-                        ? `${entry[0].name}: ${fIndent(entry[1])}`
-                        : f(entry as Spread))
+                    nextIndentation + f(entry)
                 ).join(',\n')
             }\n${currentIndentation}}`;
+        case "object-entry":{
+            const key = (
+                ast.key.kind === 'plain-identifier' || ast.key.kind === 'exact-string-literal' ? f(ast.key) :
+                `[${f(ast.key)}]`
+            )
+            
+            return `${key}: ${fIndent(ast.value)}`
+        }
         case "array-literal":
             return `[${
                 ast.entries.map(f).join(', ')
@@ -198,7 +204,16 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             }
         }
         case "element-tag":
-            return `<${ast.tagName.name}${ast.attributes.length > 0 ? ' ' + ast.attributes.map(([name, value]) => `${name.name}={${f(value)}}`).join(' ') : ''}>${
+            return `<${ast.tagName.name} ${
+                ast.attributes.entries.map(entry =>
+                    entry.kind === 'local-identifier' ? entry.name :
+                    entry.kind === 'spread' ? `{...${f(entry.expr)}}` :
+                    `${getName(entry.key as PlainIdentifier | ExactStringLiteral)}=${
+                        entry.value.kind === 'exact-string-literal'
+                            ? f(entry.value)
+                            : `{${f(entry.value)}}`}`
+                ).join(' ')
+            }>${
                 ast.children.map(c =>
                     '\n' + nextIndentation + (c.kind === 'element-tag' ? fIndent(c) : `{${fIndent(c)}}`)
                 ).join('')
@@ -217,7 +232,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             ast.spreads.map(s => '\n' + nextIndentation + '...' + fIndent(s)).concat(
             ast.entries.map(e => '\n' + nextIndentation + fIndent(e)))
                 .join(',')}\n${currentIndentation}}`;
-        case "attribute": return  `${ast.name.name}: ${f(ast.type)}`
+        case "attribute": return  `${f(ast.name)}: ${f(ast.type)}`
         case "record-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
         case "array-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `${f(ast.element)}[]`;
         case "tuple-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `[${ast.members.map(f).join(", ")}]`;

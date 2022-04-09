@@ -5,11 +5,12 @@ import { inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts"
 import { computedFn } from "../mobx.ts";
 import { format } from "../other/format.ts";
 import Store, { canonicalModuleName, getModuleByName, Mode, _Store } from "../store.ts";
+import { getName } from "../utils/ast.ts";
 import { jsFileLocation } from "../utils/misc.ts";
-import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
+import { Module, AST, Block } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
-import { Expression, Proc, Func, Spread, JsFunc, JsProc } from "../_model/expressions.ts";
+import { Expression, Proc, Func, JsFunc, JsProc } from "../_model/expressions.ts";
 import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, TRUTHINESS_SAFE_TYPES, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 
@@ -295,7 +296,14 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
 
             return `${INT}observe(${c(ast.subject)}, '${ast.property.name}')`;
         }
-        case "object-literal":  return `{${objectEntries(excludeTypes, module, ast.entries)}}`;
+        case "object-literal":  return `{${ast.entries.map(c).join(', ')}}`;
+        case "object-entry": {
+            const key = ast.key.kind === 'plain-identifier' || ast.key.kind === 'exact-string-literal'
+                ? c(ast.key)
+                : `[${c(ast.key)}]`
+            
+            return `${key}: ${c(ast.value)}`
+        }
         case "array-literal":   return `[${ast.entries.map(c).join(", ")}]`;
         case "string-literal":  return `\`${ast.segments.map(segment =>
                                             typeof segment === "string"
@@ -309,8 +317,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "javascript-escape": return ast.js;
         case "indexer": return `${c(ast.subject)}[${c(ast.indexer)}]`;
         case "block": return `{ ${blockContents(excludeTypes, module, ast)} }`;
-        case "element-tag": return `${INT}defaultMarkupFunction('${ast.tagName.name}',{${
-            objectEntries(excludeTypes, module, (ast.attributes as ([PlainIdentifier, Expression|Expression[]] | Spread)[]))}}, [ ${ast.children.map(c).join(', ')} ])`;
+        case "element-tag": return `${INT}defaultMarkupFunction('${ast.tagName.name}', ${c(ast.attributes)}, [ ${ast.children.map(c).join(', ')} ])`;
         case "union-type": return ast.members.map(c).join(" | ");
         case "maybe-type": return c(ast.inner) + '|null|undefined'
         case "named-type": return ast.name.name;
@@ -322,11 +329,13 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "object-type": return (
             ast.spreads.map(s => c(s) + ' & ').join('') +
             `{${
-                ast.entries.map(({ name, type }) =>
-                    `${name.name}: ${c(type)}`)
-                .join(', ')
+                ast.entries
+                    .map(c)
+                    .join(', ')
             }}`
         );
+        case "attribute":
+            return `${c(ast.name)}: ${c(ast.type)}`
         case "record-type": return `{[key: ${c(ast.keyType)}]: ${c(ast.valueType)}}`;
         case "array-type": return `${c(ast.element)}[]`;
         case "tuple-type": return `[${ast.members.map(c).join(", ")}]`;
@@ -362,7 +371,7 @@ function compileRuntimeType(type: TypeExpression): string {
         case 'array-type': return `{ kind: ${INT}RT_ARRAY, inner: ${compileRuntimeType(type.element)} }`;
         case 'record-type': return `{ kind: ${INT}RT_RECORD, key: ${compileRuntimeType(type.keyType)}, value: ${compileRuntimeType(type.valueType)} }`;
         case 'object-type': return `{ kind: ${INT}RT_OBJECT, entries: [${type.entries.map(({ name, type, optional }) =>
-            `{ key: '${name.name}', value: ${compileRuntimeType(type)}, optional: ${optional} }`
+            `{ key: '${getName(name)}', value: ${compileRuntimeType(type)}, optional: ${optional} }`
         )}] }`;
         case 'nominal-type': return `{ kind: ${INT}RT_NOMINAL, nominal: ${type.name}.sym }`
         case 'error-type': return `{ kind: ${INT}RT_ERROR, inner: ${compileRuntimeType(type.inner)} }`
@@ -377,18 +386,6 @@ function compileRuntimeType(type: TypeExpression): string {
 
 function blockContents(excludeTypes: boolean, module: string, block: Block) {
     return block.statements.map(s => '\n' + compileOne(excludeTypes, module, s) + ';').join('') + '\n'
-}
-
-function objectEntries(excludeTypes: boolean, module: string, entries: readonly (readonly [PlainIdentifier, Expression | readonly Expression[]]|Spread)[]): string {
-    return entries
-        .map(entry => 
-            Array.isArray(entry)
-                ? `${compileOne(excludeTypes, module, entry[0])}: ${
-                    Array.isArray(entry[1]) 
-                        ? entry[1].map(c => compileOne(excludeTypes, module, c)) 
-                        : compileOne(excludeTypes, module, entry[1] as Expression)}`
-                : compileOne(excludeTypes, module, entry as Spread))
-        .join(", ")
 }
 
 export const INT = `___`;

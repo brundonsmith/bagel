@@ -1,6 +1,6 @@
 import { ModuleName } from "./common.ts";
 import { Declaration, ImportItem } from "./declarations.ts";
-import { Case, Expression, InlineConstDeclaration, InlineDestructuringDeclaration, Operator, Spread, SwitchCase } from "./expressions.ts";
+import { Case, Expression, InlineConstDeclaration, InlineDestructuringDeclaration, ObjectEntry, Operator, Spread, SwitchCase } from "./expressions.ts";
 import { CaseBlock, Statement } from "./statements.ts";
 import { Arg, Attribute, TypeExpression } from "./type-expressions.ts";
 
@@ -23,6 +23,7 @@ export type AST = (
     | Spread
     | InlineConstDeclaration
     | InlineDestructuringDeclaration
+    | ObjectEntry
 )
 
 export type Module = SourceInfo & {

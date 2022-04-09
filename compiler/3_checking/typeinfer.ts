@@ -1,15 +1,15 @@
 import { Refinement, ModuleName, Binding } from "../_model/common.ts";
-import { BinaryOp, Expression, Invocation, isExpression, LocalIdentifier, Spread } from "../_model/expressions.ts";
+import { BinaryOp, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry } from "../_model/expressions.ts";
 import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NEVER_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
-import { given } from "../utils/misc.ts";
+import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumes } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
-import { areSame, expressionsEqual, literalType, mapParseTree, maybeOf, typesEqual } from "../utils/ast.ts";
+import { areSame, expressionsEqual, getName, literalType, mapParseTree, maybeOf, typesEqual, unionOf } from "../utils/ast.ts";
 import Store, { getModuleByName } from "../store.ts";
 import { format } from "../other/format.ts";
-import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration, ImportItem, Declaration } from "../_model/declarations.ts";
+import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration, ImportItem } from "../_model/declarations.ts";
 import { resolve } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
 
@@ -196,7 +196,7 @@ const inferTypeInner = computedFn((
             
             if (baseType.kind === "object-type" && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
                 const key = indexType.value.value;
-                const valueType = propertiesOf(baseType)?.find(entry => entry.name.name === key)?.type;
+                const valueType = propertiesOf(baseType)?.find(entry => getName(entry.name) === key)?.type;
 
                 return valueType ?? UNKNOWN_TYPE;
             } else if (baseType.kind === "record-type") {
@@ -323,20 +323,11 @@ const inferTypeInner = computedFn((
             };
         }
         case "object-literal": {
-            const entries = ast.entries.map(entry => {
-                if (Array.isArray(entry)) {
-                    const [name, value] = entry as [PlainIdentifier, Expression]
-
-                    const type = inferType(value, visited);
-                    return {
-                        kind: "attribute",
-                        name,
-                        type, 
-                        mutability: undefined,
-                        parent, module, code, startIndex, endIndex
-                    }
-                } else {
-                    const spreadObj = (entry as Spread).expr
+            const entries = ast.entries.map((entry): Attribute | readonly Attribute[] | ObjectEntry | undefined => {
+                if (entry.kind === 'local-identifier') {
+                    return attribute(entry.name, resolveType(inferType(entry)), false)
+                } else if (entry.kind === 'spread') {
+                    const spreadObj = entry.expr
                     const spreadObjType = resolveType(inferType(spreadObj, visited));
 
                     if (spreadObjType.kind !== 'object-type') {
@@ -344,16 +335,77 @@ const inferTypeInner = computedFn((
                     } else {
                         return spreadObjType.entries
                     }
-                }
-            }).filter(el => el != null).flat() as Attribute[]
+                } else {
+                    const { key, value } = entry
 
-            return {
-                kind: "object-type",
-                spreads: [],
-                entries,
-                mutability: "literal",
-                parent, module, code, startIndex, endIndex
-            };
+                    if (key.kind === 'plain-identifier' || key.kind === 'exact-string-literal') {
+                        const valueType = inferType(value, visited);
+    
+                        return {
+                            kind: "attribute",
+                            name: key,
+                            type: valueType,
+                            optional: false,
+                            forceReadonly: false,
+                            mutability: undefined,
+                            parent, module, code, startIndex, endIndex
+                        }
+                    } else {
+                        // arbitrary expression; bail out to record type
+                        return entry
+                    }
+                }
+            }).filter(exists).flat()
+
+            if (entries.some((entry): entry is ObjectEntry => entry.kind === 'object-entry')) {
+                // bail out to record type
+
+                const keyType = unionOf(entries.map(entry =>
+                    entry.kind === 'object-entry' ? inferType(
+                        entry.key.kind === 'plain-identifier'
+                            ? identifierToExactString(entry.key)
+                            : entry.key) :
+                    entry.name.kind === 'exact-string-literal' ? {
+                        kind: 'literal-type',
+                        value: entry.name,
+                        module: entry.module,
+                        code: entry.code,
+                        startIndex: entry.startIndex,
+                        endIndex: entry.endIndex,
+                        mutability: undefined
+                    } :
+                    {
+                        kind: 'literal-type',
+                        value: identifierToExactString(entry.name),
+                        module: entry.module,
+                        code: entry.code,
+                        startIndex: entry.startIndex,
+                        endIndex: entry.endIndex,
+                        mutability: undefined
+                    }
+                ))
+
+                const valueType = unionOf(entries.map(entry =>
+                    entry.kind === 'object-entry' ? inferType(entry.value) :
+                    entry.type
+                ))
+
+                return {
+                    kind: "record-type",
+                    keyType,
+                    valueType,
+                    mutability: "literal",
+                    parent, module, code, startIndex, endIndex
+                };
+            } else {
+                return {
+                    kind: "object-type",
+                    spreads: [],
+                    entries: entries as Attribute[],
+                    mutability: "literal",
+                    parent, module, code, startIndex, endIndex
+                };
+            }
         }
         case "array-literal": {
             const memberTypes: TypeExpression[] = []
@@ -512,7 +564,7 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
             if (decl.destructureKind === 'object' && objectOrArrayType.kind === 'object-type') {
                 const props = propertiesOf(objectOrArrayType)
 
-                return props?.find(prop => prop.name.name === binding.identifier.name)?.type ?? UNKNOWN_TYPE
+                return props?.find(prop => getName(prop.name) === binding.identifier.name)?.type ?? UNKNOWN_TYPE
             } else if (decl.destructureKind === 'array') {
                 if (objectOrArrayType.kind === 'array-type') {
                     return maybeOf(objectOrArrayType.element)
@@ -1170,7 +1222,7 @@ function fitTemplate(
         const all = new Map<string, TypeExpression>()
 
         for (const entry of parameterized.entries) {
-            const other = reified.entries.find(e => entry.name.name === e.name.name)
+            const other = reified.entries.find(e => getName(entry.name) === getName(e.name))
 
             if (other) {
                 const matches = fitTemplate(entry.type, other.type);
@@ -1243,7 +1295,7 @@ export function invocationFromMethodCall(expr: Expression): Invocation|undefined
         const fnName = expr.subject.property.name
         const subjectType = inferType(expr.subject.subject)
 
-        if (!propertiesOf(subjectType)?.some(p => p.name.name === fnName)) {
+        if (!propertiesOf(subjectType)?.some(p => getName(p.name) === fnName)) {
             const { module, code, startIndex, endIndex } = expr.subject.property
 
             const inv: Invocation = {
@@ -1393,3 +1445,12 @@ function isAsync(block: Block): boolean {
 
     return false;
 }
+
+const identifierToExactString = (ident: PlainIdentifier): ExactStringLiteral => ({
+    kind: 'exact-string-literal',
+    value: ident.name,
+    module: ident.module,
+    code: ident.code,
+    startIndex: ident.startIndex,
+    endIndex: ident.endIndex,
+})

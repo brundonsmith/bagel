@@ -1,7 +1,7 @@
 import { AST_NOISE } from "../3_checking/typeinfer.ts";
 import { AST,PlainIdentifier,SourceInfo } from "../_model/ast.ts";
-import { BooleanLiteral, ExactStringLiteral, Expression, NumberLiteral } from "../_model/expressions.ts";
-import { LiteralType, MaybeType, PlanType, TypeExpression } from "../_model/type-expressions.ts";
+import { BooleanLiteral, ExactStringLiteral, Expression, LocalIdentifier, NumberLiteral } from "../_model/expressions.ts";
+import { LiteralType, MaybeType, PlanType, TypeExpression, UnionType } from "../_model/type-expressions.ts";
 import { deepEquals } from "./misc.ts";
 
 export function areSame(a: AST|undefined, b: AST|undefined) {
@@ -123,6 +123,17 @@ export function setParents(ast: AST) {
     }
 }
 
+export function unionOf(members: TypeExpression[]): UnionType {
+    const { parent, module, code, startIndex, endIndex } = members[0]
+
+    return {
+        kind: 'union-type',
+        members,
+        mutability: undefined,
+        parent, module, code, startIndex, endIndex
+    }
+}
+
 export function maybeOf(inner: TypeExpression): MaybeType {
     const { parent, module, code, startIndex, endIndex } = inner
 
@@ -182,3 +193,8 @@ export function literalType(value: ExactStringLiteral|NumberLiteral|BooleanLiter
         }
     }
 }
+
+export const getName = (ast: PlainIdentifier | LocalIdentifier | ExactStringLiteral): string =>
+    ast.kind === 'plain-identifier' || ast.kind === 'local-identifier'
+        ? ast.name
+        : ast.value

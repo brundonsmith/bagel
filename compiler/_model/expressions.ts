@@ -180,7 +180,13 @@ export type SwitchCase = SourceInfo & {
 
 export type ObjectLiteral = SourceInfo & {
     readonly kind: "object-literal",
-    readonly entries: readonly (readonly [PlainIdentifier, Expression]|Spread)[],
+    readonly entries: readonly (ObjectEntry | Spread | LocalIdentifier)[],
+}
+
+export type ObjectEntry = SourceInfo & {
+    readonly kind: "object-entry",
+    readonly key: PlainIdentifier|Expression,
+    readonly value: Expression
 }
 
 export type ArrayLiteral = SourceInfo & {
@@ -220,7 +226,7 @@ export type NilLiteral = SourceInfo & {
 export type ElementTag = SourceInfo & {
     readonly kind: "element-tag",
     readonly tagName: PlainIdentifier,
-    readonly attributes: readonly (readonly [PlainIdentifier, Expression])[],
+    readonly attributes: ObjectLiteral,
     readonly children: readonly Expression[],
 }
 

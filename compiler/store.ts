@@ -8,7 +8,8 @@ import { ModuleName } from "./_model/common.ts";
 import { lint, LintProblem } from "./other/lint.ts";
 import { Platform, ValueDeclaration } from "./_model/declarations.ts";
 import { PlainIdentifier } from "./_model/ast.ts";
-import { ExactStringLiteral, Expression } from "./_model/expressions.ts";
+import { ExactStringLiteral, Expression, ObjectEntry } from "./_model/expressions.ts";
+import { getName } from "./utils/ast.ts";
 
 export type Mode =
     | { mode: "build", entryFile: ModuleName, watch: boolean }
@@ -176,10 +177,10 @@ export const getConfig = computedFn((store: _Store): BagelConfig|undefined => {
                 
                 lintRules = lintRulesExpr?.kind === 'object-literal' ?
                     Object.fromEntries(lintRulesExpr.entries
-                        .filter(e => Array.isArray(e) && (e[1] as Expression).kind === 'exact-string-literal')
+                        .filter((e): e is ObjectEntry => e.kind === 'object-entry' && e.value.kind === 'exact-string-literal')
                         .map(e => [
-                            (e as [PlainIdentifier, ExactStringLiteral])[0].name,
-                            (e as [PlainIdentifier, ExactStringLiteral])[1].value,
+                            getName(e.key as PlainIdentifier | ExactStringLiteral),
+                            (e.value as ExactStringLiteral).value,
                         ]))
                 : undefined
             }

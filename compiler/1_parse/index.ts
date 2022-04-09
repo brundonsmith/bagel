@@ -4,7 +4,7 @@ import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf, ErrorExpression } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf, ErrorExpression, ObjectEntry } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
@@ -132,14 +132,16 @@ function jsonToAST(json: unknown): Expression {
     } else if (typeof json === 'object') {
         return {
             kind: "object-literal",
-            entries: Object.entries(json).map(([key, value]) => [
-                {
+            entries: Object.entries(json).map(([key, value]) => ({
+                kind: 'object-entry',
+                key: {
                     kind: "plain-identifier",
                     name: key,
                     ...AST_NOISE
                 },
-                jsonToAST(value)
-            ]),
+                value: jsonToAST(value),
+                ...AST_NOISE
+            })),
             ...AST_NOISE
         }
     }
@@ -467,7 +469,7 @@ const objectType: ParseFunction<ObjectType> = (module, code, startIndex) =>
     })))))))
 
 const _typeSpreadOrEntry: ParseFunction<NamedType|Attribute> = (module, code, startIndex) => 
-    _objectTypeEntry(module, code, startIndex) ?? _objectTypeSpread(module, code, startIndex)
+    attribute(module, code, startIndex) ?? _objectTypeSpread(module, code, startIndex)
 
 const _objectTypeSpread: ParseFunction<NamedType> = (module, code, startIndex) =>
     given(consume(code, startIndex, '...'), index =>
@@ -476,8 +478,8 @@ const _objectTypeSpread: ParseFunction<NamedType> = (module, code, startIndex) =
             ? syntaxError(code, index, `Can't spread type ${format(res.parsed)}`)
             : res as ParseResult<NamedType>))
 
-const _objectTypeEntry: ParseFunction<Attribute> = (module, code, startIndex) =>
-    given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
+const attribute: ParseFunction<Attribute> = (module, code, startIndex) =>
+    given(plainIdentifier(module, code, startIndex) ?? exactStringLiteral(module, code, startIndex), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseOptional(module, code, index, parseExact("?")), ({ parsed: optional, index: indexAfterQuestionMark }) =>
     given(consume(code, indexAfterQuestionMark ?? index, ":"), index => 
@@ -2045,7 +2047,22 @@ export const elementTag: ParseFunction<ElementTag> = (module, code, startIndex) 
         parsed: {
             kind: "element-tag",
             tagName,
-            attributes,
+            attributes: {
+                kind: 'object-literal',
+                entries: attributes.map(([key, value]) => ({
+                    kind: 'object-entry',
+                    key,
+                    value,
+                    module: key.module,
+                    code: key.code,
+                    startIndex: key.startIndex,
+                    endIndex: value.endIndex
+                })),
+                module,
+                code,
+                startIndex: attributes[0]?.[0]?.startIndex ?? startIndex,
+                endIndex: attributes[attributes.length - 1]?.[1]?.endIndex ?? index,
+            },
             children,
             module,
             code,
@@ -2105,17 +2122,32 @@ export const objectLiteral: ParseFunction<ObjectLiteral> = (module, code, startI
         index,
     }))))
 
-const _spreadOrEntry: ParseFunction<[PlainIdentifier, Expression]|Spread> = (module, code, startIndex) =>
+const _spreadOrEntry: ParseFunction<ObjectLiteral['entries'][number]> = (module, code, startIndex) =>
     spread(module, code, startIndex)
-    ?? _objectEntry(module, code, startIndex)
+    ?? objectEntry(module, code, startIndex)
+    ?? localIdentifier(module, code, startIndex)
 
-const _objectEntry = (module: ModuleName, code: string, index: number): ParseResult<[PlainIdentifier, Expression]> | BagelError | undefined =>
-    given(plainIdentifier(module, code, index), ({ parsed: key, index }) =>
+const objectEntry = (module: ModuleName, code: string, startIndex: number): ParseResult<ObjectEntry> | BagelError | undefined =>
+    given(plainIdentifier(module, code, startIndex) ??
+          exactStringLiteral(module, code, startIndex) ??
+          given(consume(code, startIndex, '['), index =>
+            given(consumeWhitespace(code, index), index =>
+            expec(expression(module, code, index), err(code, index, 'Expression'), ({ parsed: key, index }) =>
+            given(consumeWhitespace(code, index), index =>
+            expec(consume(code, index, ']'), err(code, index, '"]"'), index => ({ parsed: key, index })))))), ({ parsed: key, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ":"), index => 
     given(consumeWhitespace(code, index), index =>
     given(expression(module, code, index), ({ parsed: value, index }) => ({
-        parsed: [key, value],
+        parsed: {
+            kind: 'object-entry',
+            key,
+            value,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
         index,
     }))))))
 

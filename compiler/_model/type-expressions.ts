@@ -133,7 +133,7 @@ export type ObjectType = SourceInfo & Mutability & {
 
 export type Attribute = SourceInfo & {
     readonly kind: "attribute",
-    readonly name: PlainIdentifier,
+    readonly name: PlainIdentifier | ExactStringLiteral,
     readonly type: TypeExpression,
     readonly optional: boolean,
     readonly forceReadonly: boolean,
@@ -389,6 +389,7 @@ export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
     startIndex: undefined,
     endIndex: undefined,
 }
+export const VALID_RECORD_KEY: TypeExpression = STRING_TYPE
 export const RECORD_OF_ANY: RecordType = {
     kind: "record-type",
     keyType: ANY_TYPE,

@@ -1,6 +1,5 @@
-import { os, path } from "../deps.ts";
+import { path } from "../deps.ts";
 import { Mode } from "../store.ts";
-import { AST } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
@@ -9,6 +8,10 @@ export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
     } else {
         return undefined;
     }
+}
+
+export function exists<T> (val: T|null|undefined): val is T {
+    return val != null
 }
 
 type BasicData =
