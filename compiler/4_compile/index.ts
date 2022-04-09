@@ -97,21 +97,25 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
             c(name) + (alias ? ` as ${c(alias)}` : ``)
         ).join(", ")} } from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}"`;
-        case "type-declaration":  return (
-            excludeTypes
-                ? ''
-                : (
-                    (ast.type.kind === 'nominal-type' ?
-                        `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n` +
-                        `${exported(ast.exported)}const ${ast.name.name} = ((value: ${c(ast.type.inner)}): ${ast.name.name} => ({ kind: ${INT}${ast.name.name}, value })) as (((value: ${c(ast.type.inner)}) => ${ast.name.name}) & { sym: typeof ${INT}${ast.name.name} });\n` +
-                        `${ast.name.name}.sym = ${INT}${ast.name.name};\n` +
-                        `(${ast.name.name} as any).sym = ${INT}${ast.name.name};\n`
-                    : '') +
-                    `${exported(ast.exported)}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
-                        ? `{ kind: typeof ${INT}${ast.name.name}, value: ${c(ast.type.inner)} }`
-                        : c(ast.type)}`
-                )
-        );
+        case "type-declaration": {
+            const valueTypeDecl = ast.type.kind === 'nominal-type' && ast.type.inner ? `value: ${c(ast.type.inner)}` : ''
+
+            return (
+                excludeTypes
+                    ? ''
+                    : (
+                        (ast.type.kind === 'nominal-type' ?
+                            `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n` +
+                            `${exported(ast.exported)}const ${ast.name.name} = ((${valueTypeDecl}): ${ast.name.name} => ({ kind: ${INT}${ast.name.name}, value })) as (((${valueTypeDecl}) => ${ast.name.name}) & { sym: typeof ${INT}${ast.name.name} });\n` +
+                            `${ast.name.name}.sym = ${INT}${ast.name.name};\n` +
+                            `(${ast.name.name} as any).sym = ${INT}${ast.name.name};\n`
+                        : '') +
+                        `${exported(ast.exported)}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
+                            ? `{ kind: typeof ${INT}${ast.name.name} ${valueTypeDecl ? `, ${valueTypeDecl}` : '' }}`
+                            : c(ast.type)}`
+                    )
+            );
+        }
         case "proc-declaration":
             return compileProcDeclaration(excludeTypes, module, ast)
         case "func-declaration":
@@ -360,7 +364,7 @@ function compileRuntimeType(type: TypeExpression): string {
         case 'object-type': return `{ kind: ${INT}RT_OBJECT, entries: [${type.entries.map(({ name, type, optional }) =>
             `{ key: '${name.name}', value: ${compileRuntimeType(type)}, optional: ${optional} }`
         )}] }`;
-        case 'nominal-type': return `{ kind: ${INT}RT_NOMINAL, nominal: ${type.name.description}.sym }`
+        case 'nominal-type': return `{ kind: ${INT}RT_NOMINAL, nominal: ${type.name}.sym }`
         case 'error-type': return `{ kind: ${INT}RT_ERROR, inner: ${compileRuntimeType(type.inner)} }`
         case 'iterator-type': return `{ kind: ${INT}RT_ITERATOR, inner: ${compileRuntimeType(type.inner)} }`
         case 'plan-type': return `{ kind: ${INT}RT_PLAN, inner: ${compileRuntimeType(type.inner)} }`
