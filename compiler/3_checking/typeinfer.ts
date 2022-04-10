@@ -1158,6 +1158,7 @@ function fitTemplate(
         return false
     }
 
+    // exact match
     if (isGenericParam(parameterized)) {
         const matches = new Map<string, TypeExpression>();
         matches.set(parameterized.name.name, reified);
@@ -1171,12 +1172,12 @@ function fitTemplate(
                 fitTemplate(arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE)),
         ]
 
-        // if (parameterized.kind === 'func-type' && reified.kind === 'func-type' &&
-        //     parameterized.returnType && reified.returnType) {
-        //     matchGroups.push(
-        //         fitTemplate(parameterized.returnType, reified.returnType)
-        //     )
-        // }
+        if (parameterized.kind === 'func-type' && reified.kind === 'func-type' &&
+            parameterized.returnType && reified.returnType) {
+            matchGroups.push(
+                fitTemplate(parameterized.returnType, reified.returnType)
+            )
+        }
 
         if (matchGroups.some(g => g == null)) {
             return undefined
@@ -1184,15 +1185,17 @@ function fitTemplate(
 
         const matches = new Map<string, TypeExpression>();
 
-        for (const map of matchGroups) {
-            for (const [key, value] of (map as ReadonlyMap<string, TypeExpression>).entries()) {
-                const existing = matches.get(key)
-                if (existing) {
-                    if (!subsumes(existing, value)) {
-                        return undefined
+        for (const map of matchGroups as ReadonlyMap<string, TypeExpression>[]) {
+            for (const [key, value] of map.entries()) {
+                if (!isGenericParam(value)) {
+                    const existing = matches.get(key)
+                    if (existing) {
+                        if (!subsumes(existing, value)) {
+                            return undefined
+                        }
+                    } else {
+                        matches.set(key, value);
                     }
-                } else {
-                    matches.set(key, value);
                 }
             }
         }
@@ -1237,7 +1240,8 @@ function fitTemplate(
     }
 
     if ((parameterized.kind === "iterator-type" && reified.kind === "iterator-type") 
-     || (parameterized.kind === "plan-type" && reified.kind === "plan-type")) {
+     || (parameterized.kind === "plan-type" && reified.kind === "plan-type") 
+     || (parameterized.kind === "remote-type" && reified.kind === "remote-type")) {
         return fitTemplate(parameterized.inner, reified.inner);
     }
 

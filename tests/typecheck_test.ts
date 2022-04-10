@@ -515,7 +515,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Union generic param inference",
+  name: "Union generic param inference pass",
   fn() {
     testTypecheck(
       `
@@ -535,6 +535,32 @@ Deno.test({
       const c: number = other(12)`,
       true
     )
+  }
+})
+
+Deno.test({
+  name: "Method chain generic param inference pass",
+  fn() {
+    testTypecheck(
+      `
+      js func iter<T>(x: const T[]): Iterator<T> => {# #}
+      js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> => {# #}
+
+      func foo(arr: const number[]): Iterator<string> => arr.iter().map((n: number) => 'foo' + n)`
+    , false)
+  }
+})
+
+Deno.test({
+  name: "Method chain generic param inference fail",
+  fn() {
+    testTypecheck(
+      `
+      js func iter<T>(x: const T[]): Iterator<T> => {# #}
+      js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> => {# #}
+
+      func foo(arr: const number[]): Iterator<number> => arr.iter().map((n: number) => 'foo' + n)`
+    , true)
   }
 })
 
@@ -562,21 +588,22 @@ Deno.test({
   }
 })
 
-// Deno.test({
-//   name: "Complex generic param inference",
-//   fn() {
-//     testTypecheck(
-//       `
-//       func given<T,R>(val: T|nil, fn: (val: T) => R): R|nil =>
-//         if val != nil {
-//           fn(val)
-//         }
-//
-//       func double(n: number|nil): number|nil => given<number, number>(n, x => x * 2)`,
-//       false
-//     )
-//   }
-// })
+Deno.test({
+  name: "Complex generic param inference",
+  fn() {
+    testTypecheck(
+      `
+      func given<T,R>(val: T|nil, fn: (val: T) => R): R|nil =>
+        if val != nil {
+          fn(val)
+        }
+
+      func double(n: number|nil): number|nil =>
+        given(n, (x: number) => x * 2)`,
+      false
+    )
+  }
+})
 
 Deno.test({
   name: "Union generic param inference fail",
