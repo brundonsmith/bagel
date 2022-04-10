@@ -134,6 +134,7 @@ export type Indexer = SourceInfo & {
     readonly kind: "indexer",
     readonly subject: Expression,
     readonly indexer: Expression,
+    readonly optional: boolean,
 }
 
 export type PropertyAccessor = SourceInfo & {
