@@ -1,6 +1,6 @@
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "../3_checking/resolve.ts";
-import { resolveType, subsumes } from "../3_checking/typecheck.ts";
+import { resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
 import { inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
 import { computedFn } from "../mobx.ts";
 import { format } from "../other/format.ts";
@@ -460,7 +460,7 @@ const fixTruthinessIfNeeded = (excludeTypes: boolean, module: string, expr: Expr
 
 const needsTruthinessFix = (expr: Expression) => {
     const type = inferType(expr)
-    return !subsumes(TRUTHINESS_SAFE_TYPES, type)
+    return subsumationIssues(TRUTHINESS_SAFE_TYPES, type) != null
 }
 
 const truthinessOf = (compiledExpr: string) => 

@@ -32,6 +32,7 @@ export type BagelAssignableToError = {
     ast: AST,
     destination: TypeExpression,
     value: TypeExpression,
+    issues: Array<string | string[]>,
     stack?: string|undefined,
 }
 
@@ -87,7 +88,15 @@ export function errorMessage(error: BagelError): string {
         case "bagel-syntax-error":
             return error.message
         case "bagel-assignable-to-error":
-            return `Type "${format(error.value)}" is not assignable to type "${format(error.destination)}"`;
+            return error.issues.map((issue, index) => {
+                const indentation = new Array(index).fill(' ').join('')
+
+                return (
+                    typeof issue === 'string'
+                        ? indentation + issue
+                        : issue.map(issue => indentation + issue).join('\n')
+                )
+            }).join('\n');
         case "bagel-cannot-find-name-error":
             return `Cannot find name "${error.name}"`;
         case "bagel-already-declared-error":
@@ -105,8 +114,8 @@ export function syntaxError(code: string, index: number, message: string): Bagel
     return { kind: "bagel-syntax-error", ast: undefined, code, index, message, stack: undefined }
 }
 
-export function assignmentError(ast: AST, destination: TypeExpression, value: TypeExpression): BagelAssignableToError {
-    return { kind: "bagel-assignable-to-error", ast, destination, value, stack: undefined };
+export function assignmentError(ast: AST, destination: TypeExpression, value: TypeExpression, issues: Array<string | string[]>): BagelAssignableToError {
+    return { kind: "bagel-assignable-to-error", ast, destination, value, issues, stack: undefined };
 }
 
 export function cannotFindName(ast: LocalIdentifier|PlainIdentifier): BagelCannotFindNameError;

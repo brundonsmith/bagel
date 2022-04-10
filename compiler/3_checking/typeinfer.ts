@@ -2,7 +2,7 @@ import { Refinement, ModuleName, Binding } from "../_model/common.ts";
 import { BinaryOp, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry } from "../_model/expressions.ts";
 import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NEVER_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { exists, given } from "../utils/misc.ts";
-import { resolveType, subsumes } from "./typecheck.ts";
+import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
@@ -148,8 +148,8 @@ const inferTypeInner = computedFn((
                 }
             } else {
                 const types = BINARY_OPERATOR_TYPES[ast.op.op]?.find(({ left, right }) =>
-                    subsumes(left, leftType) && 
-                    subsumes(right, rightType))
+                    !subsumationIssues(left, leftType) && 
+                    !subsumationIssues(right, rightType))
 
                 if (types == null) {
                     return BINARY_OPERATOR_TYPES[ast.op.op]?.[0].output ?? UNKNOWN_TYPE
@@ -192,7 +192,7 @@ const inferTypeInner = computedFn((
             const baseType = resolveType(inferType(ast.subject, visited));
             const indexType = resolveType(inferType(ast.indexer, visited));
 
-            const indexIsNumber = subsumes(NUMBER_TYPE, indexType)
+            const indexIsNumber = !subsumationIssues(NUMBER_TYPE, indexType)
             
             if (baseType.kind === "object-type" && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
                 const key = indexType.value.value;
@@ -200,7 +200,7 @@ const inferTypeInner = computedFn((
 
                 return valueType ?? UNKNOWN_TYPE;
             } else if (baseType.kind === "record-type") {
-                if (!subsumes(baseType.keyType, indexType)) {
+                if (subsumationIssues(baseType.keyType, indexType)) {
                     return UNKNOWN_TYPE;
                 } else {
                     return maybeOf(baseType.valueType)
@@ -746,7 +746,7 @@ export function bindInvocationGenericArgs(invocation: Invocation): TypeExpressio
                 const typeParam = subjectType.typeParams[i]
                 const typeArg = invocation.typeArgs[i]
                 
-                if (typeParam.extends && !subsumes(typeParam.extends, typeArg)) {
+                if (typeParam.extends && subsumationIssues(typeParam.extends, typeArg)) {
                     return undefined
                 }
             }
@@ -779,7 +779,7 @@ export function bindInvocationGenericArgs(invocation: Invocation): TypeExpressio
                 for (const param of subjectType.typeParams) {
                     const inferred = inferredBindings.get(param.name.name)
                     
-                    if (param.extends && inferred && !subsumes(param.extends, inferred)) {
+                    if (param.extends && inferred && subsumationIssues(param.extends, inferred)) {
                         return undefined
                     }
                 }
@@ -880,7 +880,7 @@ function distillUnion(type: TypeExpression): TypeExpression {
                     const a = type.members[i];
                     const b = type.members[j];
 
-                    if (subsumes(b, a) && !indicesToDrop.has(j) && resolveType(b).kind !== 'unknown-type') {
+                    if (!subsumationIssues(b, a) && !indicesToDrop.has(j) && resolveType(b).kind !== 'unknown-type') {
                         indicesToDrop.add(i);
                     }
                 }
@@ -960,7 +960,7 @@ function narrow(type: TypeExpression, fit: TypeExpression): TypeExpression {
         }
     } else if (type.kind === 'unknown-type') {
         return fit
-    } else if (subsumes(fit, type)) {
+    } else if (!subsumationIssues(fit, type)) {
         return type
     } else {
         return NEVER_TYPE
@@ -1190,7 +1190,7 @@ function fitTemplate(
                 if (!isGenericParam(value)) {
                     const existing = matches.get(key)
                     if (existing) {
-                        if (!subsumes(existing, value)) {
+                        if (subsumationIssues(existing, value)) {
                             return undefined
                         }
                     } else {

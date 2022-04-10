@@ -9,11 +9,13 @@ import { ExactStringLiteral } from "../_model/expressions.ts";
 import { TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 export type FormatOptions = {
-    spaces: number
+    spaces: number,
+    lineBreaks: boolean
 }
 
 export const DEFAULT_OPTIONS: FormatOptions = {
-    spaces: 4
+    spaces: 4,
+    lineBreaks: true
 }
 
 export const formatted = computedFn((store: _Store, moduleName: ModuleName): string => {
@@ -41,9 +43,11 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
     const currentIndentation = indentation(options, indent)
     const nextIndentation = indentation(options, indent + 1)
 
+    const br = options.lineBreaks ? '\n' : ' '
+
     switch (ast.kind) {
         case "module":
-            return ast.declarations.map(f).join('\n\n')
+            return ast.declarations.map(f).join(br + br)
         case "import-all-declaration":
             return `import ${f(ast.path)} as ${ast.alias.name}`
         case "import-declaration":
@@ -77,7 +81,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "arg":
             return ast.name.name + maybeTypeAnnotation(options, indent, parent, ast.type)
         case "block":
-            return `{\n${ast.statements.map(s => nextIndentation + fIndent(s)).join('\n')}\n${currentIndentation}}`
+            return `{${br}${ast.statements.map(s => nextIndentation + fIndent(s)).join(br)}${br}${currentIndentation}}`
         case "value-declaration":
         case "value-declaration-statement":
             return (ast.kind === 'value-declaration' ? exported(ast.exported) : '') + 
@@ -109,8 +113,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "object-literal": return `{${
                 ast.entries.map(entry =>
                     nextIndentation + f(entry)
-                ).join(',\n')
-            }\n${currentIndentation}}`;
+                ).join(',' + br)
+            }${br}${currentIndentation}}`;
         case "object-entry":{
             const key = (
                 ast.key.kind === 'plain-identifier' || ast.key.kind === 'exact-string-literal' ? f(ast.key) :
@@ -134,7 +138,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return 'nil'
         case "if-else-expression":
             return `if ${ast.cases.map(f).join(' else if ')}`
-                + (ast.defaultCase ? ` else {\n${nextIndentation}` + fIndent(ast.defaultCase) + `\n${currentIndentation}}` : '')
+                + (ast.defaultCase ? ` else {${br}${nextIndentation}` + fIndent(ast.defaultCase) + `${br}${currentIndentation}}` : '')
         case "if-else-statement":
             return `if ${ast.cases.map(f).join(' else if ')}`
                 + (ast.defaultCase ? ' else ' + fIndent(ast.defaultCase) : '')
@@ -153,7 +157,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return `${f(ast.subject)}${ast.optional ? '?' : ''}.${ast.property.name}`
         case "func": {
             const funcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
-            return `${ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''}(${funcType.args.map(f).join(', ')})${maybeTypeAnnotation(options, indent, parent, funcType.returnType)} =>\n${nextIndentation}${fIndent(ast.body)}`
+            return `${ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''}(${funcType.args.map(f).join(', ')})${maybeTypeAnnotation(options, indent, parent, funcType.returnType)} =>${br}${nextIndentation}${fIndent(ast.body)}`
         }
         case "proc": {
             const procType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
@@ -174,13 +178,13 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "autorun-declaration":
             return `autorun ${f(ast.effect)}`
         case "case":
-            return `${f(ast.condition)} {\n${nextIndentation}${fIndent(ast.outcome)}\n${currentIndentation}}`
+            return `${f(ast.condition)} {${br}${nextIndentation}${fIndent(ast.outcome)}${br}${currentIndentation}}`
         case "case-block":
             return `${f(ast.condition)} ${f(ast.outcome)}`
         case "switch-case":
             return `case ${f(ast.condition)}: ${f(ast.outcome)}`
         case "switch-expression":
-            return `switch ${f(ast.value)} {\n${ast.cases.map(c => nextIndentation + fIndent(c)).join('\n')}\n${currentIndentation}}`
+            return `switch ${f(ast.value)} {${br}${ast.cases.map(c => nextIndentation + fIndent(c)).join(br)}${br}${currentIndentation}}`
         case "test-expr-declaration":
             return `test expr ${f(ast.name)} => ${f(ast.expr)}`
         case "test-block-declaration":
@@ -188,7 +192,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "debug":
             return `!debug[${f(ast.inner)}]`
         case "inline-const-group":
-            return ast.declarations.map(d => nextIndentation + fIndent(d) + ',\n').join('') + fIndent(ast.inner)
+            return ast.declarations.map(d => nextIndentation + fIndent(d) + ',' + br).join('') + fIndent(ast.inner)
         case "inline-const-declaration":
             return `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${ast.awaited ? 'await ' : ''}${f(ast.value)}`
         case "inline-destructuring-declaration":
@@ -208,9 +212,9 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                 ? ' />'
                 : `>${
                     ast.children.map(c =>
-                        '\n' + nextIndentation + (c.kind === 'element-tag' ? fIndent(c) : `{${fIndent(c)}}`)
+                        br + nextIndentation + (c.kind === 'element-tag' ? fIndent(c) : `{${fIndent(c)}}`)
                     ).join('')
-                }\n${currentIndentation}</${ast.tagName.name}>`
+                }${br}${currentIndentation}</${ast.tagName.name}>`
 
             return `<${ast.tagName.name} ${
                 ast.attributes.entries.map(entry =>
@@ -234,9 +238,9 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "proc-type": return `(${ast.args.map(arg => arg.name.name + (arg.type ? `: ${f(arg.type)}` : '')).join(', ')}) {}`;
         case "func-type": return `(${ast.args.map(arg => arg.name.name + (arg.type ? `: ${f(arg.type)}` : '')).join(', ')}) => ${f(ast.returnType ?? UNKNOWN_TYPE)}`;
         case "object-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `{${
-            ast.spreads.map(s => '\n' + nextIndentation + '...' + fIndent(s)).concat(
-            ast.entries.map(e => '\n' + nextIndentation + fIndent(e)))
-                .join(',')}\n${currentIndentation}}`;
+            ast.spreads.map(s => br + nextIndentation + '...' + fIndent(s)).concat(
+            ast.entries.map(e => br + nextIndentation + fIndent(e)))
+                .join(',')}${br}${currentIndentation}}`;
         case "attribute": return  `${f(ast.name)}: ${f(ast.type)}`
         case "record-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
         case "array-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `${f(ast.element)}[]`;
@@ -302,6 +306,10 @@ function maybeTypeAnnotation(options: FormatOptions, indent: number, parent: AST
 }
 
 function indentation(options: FormatOptions, indent: number) {
+    if (!options.lineBreaks) {
+        return ''
+    }
+
     let str = ''
 
     for (let i = 0; i < indent; i++) {

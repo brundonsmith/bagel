@@ -67,6 +67,9 @@ export function sOrNone(num: number): string {
 export function esOrNone(num: number): string {
     return num > 1 ? 'es' : '';
 }
+export function iesOrY(num: number): string {
+    return num > 1 ? 'ies' : 'y';
+}
 export function wasOrWere(num: number): string {
     return num > 1 ? 'were' : 'was';
 }

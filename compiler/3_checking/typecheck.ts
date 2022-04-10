@@ -1,17 +1,19 @@
-import { Block, Module, PlainIdentifier } from "../_model/ast.ts";
+import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
 import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY } from "../_model/type-expressions.ts";
-import { given } from "../utils/misc.ts";
+import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, resolveImport, throws } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
 import { ancestors, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
 import Store, { getConfig, getModuleByName, _Store } from "../store.ts";
-import { format } from "../other/format.ts";
+import { DEFAULT_OPTIONS, format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
 import { computedFn } from "../mobx.ts";
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "./resolve.ts";
 import { ImportDeclaration, ValueDeclaration } from "../_model/declarations.ts";
+
+const msgFormat = (ast: AST) => format(ast, { ...DEFAULT_OPTIONS, lineBreaks: false })
 
 
 export const typeerrors = computedFn((store: _Store, moduleName: ModuleName): BagelError[] => {
@@ -214,16 +216,16 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 if (current.kind === 'inline-const-declaration' && current.awaited) {
                     const planType = inferType(current.value)
 
-                    if (!subsumes(PLAN_OF_ANY, planType)) {
+                    if (subsumationIssues(PLAN_OF_ANY, planType)) {
                         // make sure value is a plan
-                        reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${format(planType)}'`))
+                        reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${msgFormat(planType)}'`))
                     } else if (current.type != null) {
 
                         // make sure value fits declared type, if there is one
                         const expectedPlanType = planOf(current.type)
-                        if (!subsumes(expectedPlanType, planType)) {
-                            reportError(assignmentError(current.value, expectedPlanType, planType))
-                        }
+                        given(subsumationIssues(expectedPlanType, planType), issues => {
+                            reportError(assignmentError(current.value, expectedPlanType, planType, issues))
+                        })
                     }
                 } else {
                     // make sure value fits declared type, if there is one
@@ -235,16 +237,16 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "await-statement": {
                 const planType = inferType(current.plan)
 
-                if (!subsumes(PLAN_OF_ANY, planType)) {
+                if (subsumationIssues(PLAN_OF_ANY, planType)) {
                     // make sure value is a plan
-                    reportError(miscError(current.plan, `Can only await expressions of type Plan; found type '${format(planType)}'`))
+                    reportError(miscError(current.plan, `Can only await expressions of type Plan; found type '${msgFormat(planType)}'`))
                 } else if (current.type != null) {
 
                     // make sure value fits declared type, if there is one
                     const expectedPlanType = planOf(current.type)
-                    if (!subsumes(expectedPlanType, planType)) {
-                        reportError(assignmentError(current.plan, expectedPlanType, planType))
-                    }
+                    given(subsumationIssues(expectedPlanType, planType), issues => {
+                        reportError(assignmentError(current.plan, expectedPlanType, planType, issues))
+                    })
                 }
             } break;
             case "inline-destructuring-declaration":
@@ -252,20 +254,20 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 const valueType = inferType(current.value)
                 
                 if (current.kind === 'inline-destructuring-declaration' && current.awaited) {
-                    if (!subsumes(PLAN_OF_ANY, valueType)) {
+                    if (subsumationIssues(PLAN_OF_ANY, valueType)) {
                         // make sure value is a plan
-                        reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${format(valueType)}'`))
+                        reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${msgFormat(valueType)}'`))
                     } else {
                         // make sure destructuring matches value type
                         if (current.destructureKind === 'object') {
                             const expectedPlanType = planOf(RECORD_OF_ANY)
-                            if (!subsumes(expectedPlanType, valueType)) {
-                                reportError(miscError(current.value, `Can only destructure object types using '{ }'; found plan of type '${format(valueType)}'`))
+                            if (subsumationIssues(expectedPlanType, valueType)) {
+                                reportError(miscError(current.value, `Can only destructure object types using '{ }'; found plan of type '${msgFormat(valueType)}'`))
                             }
                         } else {
                             const expectedPlanType = planOf(ARRAY_OF_ANY)
-                            if (!subsumes(expectedPlanType, valueType)) {
-                                reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found plan of type '${format(valueType)}'`))
+                            if (subsumationIssues(expectedPlanType, valueType)) {
+                                reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found plan of type '${msgFormat(valueType)}'`))
                             }
                         }
                     }
@@ -273,19 +275,19 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                 // make sure destructuring matches value type
                 if (current.destructureKind === 'object') {
-                    if (!subsumes(RECORD_OF_ANY, valueType)) {
-                        reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${format(valueType)}'`))
+                    if (subsumationIssues(RECORD_OF_ANY, valueType)) {
+                        reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${msgFormat(valueType)}'`))
                     } else {
                         const objectProperties = propertiesOf(valueType)
                         for (const property of current.properties) {
                             if (!objectProperties?.find(prop => getName(prop.name) === property.name)) {
-                                reportError(miscError(property, `Property '${property.name}' does not exist on type '${format(valueType)}'`))
+                                reportError(miscError(property, `Property '${property.name}' does not exist on type '${msgFormat(valueType)}'`))
                             }
                         }
                     }
                 } else {
-                    if (!subsumes(ARRAY_OF_ANY, valueType)) {
-                        reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type '${format(valueType)}'`))
+                    if (subsumationIssues(ARRAY_OF_ANY, valueType)) {
+                        reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type '${msgFormat(valueType)}'`))
                     } else {
                         const resolvedValueType = resolveType(valueType)
                         if (resolvedValueType.kind === 'tuple-type') {
@@ -298,27 +300,29 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "derive-declaration": {
                 const exprType = resolveType(inferType(current.expr))
+                const declaredType = current.type
 
-                if (current.type != null) {
+                if (declaredType) {
                     // make sure value fits declared type, if there is one
-                    if (!subsumes(current.type, exprType)) {
-                        reportError(assignmentError(current.expr, current.type, exprType))
-                    }
+                    given(subsumationIssues(declaredType, exprType), issues => {
+                        reportError(assignmentError(current.expr, declaredType, exprType, issues))
+                    })
                 }
             } break;
             case "remote-declaration": {
                 const exprType = resolveType(inferType(current.expr))
+                const declaredType = current.type
 
                 if (exprType.kind === 'plan-type') {
-                    if (current.type != null) {
+                    if (declaredType != null) {
                         // make sure value fits declared type, if there is one
-                        if (!subsumes(current.type, exprType.inner)) {
-                            reportError(assignmentError(current.expr, current.type, exprType.inner))
-                        }
+                        given(subsumationIssues(declaredType, exprType.inner), issues => {
+                            reportError(assignmentError(current.expr, declaredType, exprType.inner, issues))
+                        })
                     }
                 } else {
                     // make sure value is a plan
-                    reportError(miscError(current.expr, `Remote declarations must be defined with a Plan expression; found type '${format(exprType)}'`))
+                    reportError(miscError(current.expr, `Remote declarations must be defined with a Plan expression; found type '${msgFormat(exprType)}'`))
                 }
             } break;
             case "test-expr-declaration": {
@@ -373,17 +377,17 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 const rightType = inferType(current.right)
 
                 if (current.op.op === '==' || current.op.op === '!=') {
-                    if (!subsumes(leftType, rightType) 
-                     && !subsumes(rightType, leftType)) {
-                        reportError(miscError(current, `Can't compare types '${format(leftType)}' and '${format(rightType)}' because they have no overlap`))
+                    if (subsumationIssues(leftType, rightType) 
+                     && subsumationIssues(rightType, leftType)) {
+                        reportError(miscError(current, `Can't compare types '${msgFormat(leftType)}' and '${msgFormat(rightType)}' because they have no overlap`))
                     }
                 } else if (current.op.op !== '??' && current.op.op !== '&&' && current.op.op !== '||') {
                     const types = BINARY_OPERATOR_TYPES[current.op.op]?.find(({ left, right }) =>
-                        subsumes(left, leftType) && 
-                        subsumes(right, rightType))
+                        !subsumationIssues(left, leftType) && 
+                        !subsumationIssues(right, rightType))
 
                     if (types == null) {
-                        reportError(miscError(current.op, `Operator '${current.op.op}' cannot be applied to types '${format(leftType)}' and '${format(rightType)}'`));
+                        reportError(miscError(current.op, `Operator '${current.op.op}' cannot be applied to types '${msgFormat(leftType)}' and '${msgFormat(rightType)}'`));
                     }
                 }
             } break;
@@ -425,7 +429,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 } else if ( // check that subject is callable
                     subjectType.kind !== "func-type" && subjectType.kind !== "proc-type" 
                 && (subjectType.kind !== 'generic-type' || (subjectType.inner.kind !== 'func-type' && subjectType.inner.kind !== 'proc-type'))) {
-                    reportError(miscError(invocation.subject, `Expression must be a function or procedure to be called; '${format(invocation.subject)}' is of type '${format(subjectType)}'`));
+                    reportError(miscError(invocation.subject, `Expression must be a function or procedure to be called; '${msgFormat(invocation.subject)}' is of type '${msgFormat(subjectType)}'`));
                 } else {
                     const invoked = subjectType.kind === 'generic-type' ? subjectType.inner as FuncType|ProcType : subjectType
         
@@ -455,9 +459,13 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     for (let i = 0; i < subjectType.typeParams.length; i++) {
                         const typeParam = subjectType.typeParams[i]
                         const typeArg = invocation.typeArgs[i]
+
+                        const extendsType = typeParam?.extends
                         
-                        if (typeParam && typeArg && typeParam.extends && !subsumes(typeParam.extends, typeArg)) {
-                            reportError(assignmentError(typeArg, typeParam.extends, typeArg))
+                        if (typeParam && typeArg && extendsType) {
+                            given(subsumationIssues(extendsType, typeArg), issues => {
+                                reportError(assignmentError(typeArg, extendsType, typeArg, issues))
+                            })
                         }
                     }
                 }
@@ -475,24 +483,24 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     const key = indexType.value.value;
                     const valueType = propertiesOf(subjectType)?.find(entry => getName(entry.name) === key)?.type;
                     if (valueType == null) {
-                        reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${format(subjectType)}'`));
+                        reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${msgFormat(subjectType)}'`));
                     }
                 } else if (subjectType.kind === "record-type") {
                     expect(reportError, subjectType.keyType, current.indexer,
-                        (_, val) => `Expression of type '${format(val)}' can't be used to index type '${format(subjectType)}'`)
+                        (_, val) => `Expression of type '${msgFormat(val)}' can't be used to index type '${msgFormat(subjectType)}'`)
                 } else if (subjectType.kind === "array-type" || subjectType.kind === "string-type" || subjectType.kind === "tuple-type" || (subjectType.kind === 'literal-type' && subjectType.value.kind === 'exact-string-literal')) {
                     expect(reportError, NUMBER_TYPE, current.indexer,
-                        (_, val) => `Expression of type '${format(val)}' can't be used to index type '${format(subjectType)}'`)
+                        (_, val) => `Expression of type '${msgFormat(val)}' can't be used to index type '${msgFormat(subjectType)}'`)
 
                     if (subjectType.kind === "tuple-type" || (subjectType.kind === 'literal-type' && subjectType.value.kind === 'exact-string-literal')) {
                         const max = subjectType.kind === 'tuple-type' ? subjectType.members.length : (subjectType.value as ExactStringLiteral).value.length
 
                         if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal' && (indexType.value.value < 0 || indexType.value.value >= max)) {
-                            reportError(miscError(current.indexer, `Index ${indexType.value.value} is out of range on type '${format(subjectType)}'`));
+                            reportError(miscError(current.indexer, `Index ${indexType.value.value} is out of range on type '${msgFormat(subjectType)}'`));
                         }
                     }
                 } else {
-                    reportError(miscError(current.indexer, `Expression of type '${format(indexType)}' can't be used to index type '${format(subjectType)}'`));
+                    reportError(miscError(current.indexer, `Expression of type '${msgFormat(indexType)}' can't be used to index type '${msgFormat(subjectType)}'`));
                 }
             } break;
             case "property-accessor": {
@@ -505,9 +513,9 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         : propertiesOf(subjectType)
 
                     if (subjectProperties == null) {
-                        reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${format(subjectType)}")`));
+                        reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${msgFormat(subjectType)}")`));
                     } else if (!subjectProperties.some(property => getName(property.name) === current.property.name)) {
-                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${format(subjectType)}'`));
+                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${msgFormat(subjectType)}'`));
                     }
                 }
             } break;
@@ -521,10 +529,10 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "as-cast": {
                 expect(reportError, current.type, current.inner,
-                    (dest, val) => `Expression of type ${format(val)} cannot be expanded to type ${format(dest)}`)
+                    (dest, val) => `Expression of type ${msgFormat(val)} cannot be expanded to type ${msgFormat(dest)}`)
 
                 if (typesEqual(resolveType(current.type), resolveType(inferType(current.inner)))) {
-                    reportError(miscError(current, `Casting here is redundant, because ${format(current.inner)} is already of type ${format(current.type)}`))
+                    reportError(miscError(current, `Casting here is redundant, because ${msgFormat(current.inner)} is already of type ${msgFormat(current.type)}`))
                 }
             } break;
             case "named-type": {
@@ -559,7 +567,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             !binding.isConst &&
                             (findAncestor(current, a => a.kind === 'value-declaration') as ValueDeclaration|undefined)?.isConst) {
                             
-                            reportError(miscError(current, `Const declarations cannot be initialized from mutable state (referencing '${format(current)}')`))
+                            reportError(miscError(current, `Const declarations cannot be initialized from mutable state (referencing '${msgFormat(current)}')`))
                         }
 
                         const declarations = (
@@ -610,7 +618,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 if (current.target.kind === "property-accessor" || current.target.kind === "indexer") {
                     const subjectType = resolveType(inferType(current.target.subject))
                     if (subjectType.mutability !== "mutable") {
-                        reportError(miscError(current.target, `Cannot assign to '${format(current.target)}' because '${format(current.target.subject)}' is immutable`));
+                        reportError(miscError(current.target, `Cannot assign to '${msgFormat(current.target)}' because '${msgFormat(current.target.subject)}' is immutable`));
                     }
                 }
 
@@ -619,13 +627,13 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "range":
                 expect(reportError, NUMBER_TYPE, current.start, 
-                    (_, val) => `Expected number for start of range; got '${format(val)}'`)
+                    (_, val) => `Expected number for start of range; got '${msgFormat(val)}'`)
                 expect(reportError, NUMBER_TYPE, current.end, 
-                    (_, val) => `Expected number for end of range; got '${format(val)}'`)
+                    (_, val) => `Expected number for end of range; got '${msgFormat(val)}'`)
                 break;
             case "for-loop":
                 expect(reportError, ITERATOR_OF_ANY, current.iterator, 
-                    (_, val) => `Expected iterator after "of" in for loop; found '${format(val)}'`)
+                    (_, val) => `Expected iterator after "of" in for loop; found '${msgFormat(val)}'`)
                 break;
             case "try-catch": {
                 const thrown = throws(current.tryBlock)
@@ -636,7 +644,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "throw-statement":
                 expect(reportError, ERROR_OF_ANY, current.errorExpression,
-                    (_, val) => `Can only thow Errors; this is a '${format(val)}'`)
+                    (_, val) => `Can only thow Errors; this is a '${msgFormat(val)}'`)
                 break;
             case "element-tag": {
                 for (const child of current.children) {
@@ -646,10 +654,10 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "spread": {
                 if (parent?.kind === 'object-literal') {
                     expect(reportError, RECORD_OF_ANY, current.expr, 
-                        (_, val) => `Only objects can be spread into an object; found ${format(val)}`)
+                        (_, val) => `Only objects can be spread into an object; found ${msgFormat(val)}`)
                 } else if (parent?.kind === 'array-literal') {
                     expect(reportError, ARRAY_OF_ANY, current.expr, 
-                        (_, val) => `Only arrays or tuples can be spread into an array; found ${format(val)}`)
+                        (_, val) => `Only arrays or tuples can be spread into an array; found ${msgFormat(val)}`)
                 }
             } break;
             case "proc-type":
@@ -668,18 +676,18 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "object-type": {
                 for (const spread of current.spreads) {
-                    if (!subsumes(RECORD_OF_ANY, spread)) {
-                        reportError(miscError(spread, `${format(spread)} is not an object type; can only spread object types into object types`))
+                    if (subsumationIssues(RECORD_OF_ANY, spread)) {
+                        reportError(miscError(spread, `${msgFormat(spread)} is not an object type; can only spread object types into object types`))
                     }
                 }
             } break;
             case "instance-of": {
                 const exprType = inferType(current.expr)
 
-                if (!subsumes(exprType, current.type)) {
-                    reportError(miscError(current, `This check will always be false, because ${format(current.expr)} can never be a ${format(current.type)}`))
+                if (subsumationIssues(exprType, current.type)) {
+                    reportError(miscError(current, `This check will always be false, because ${msgFormat(current.expr)} can never be a ${msgFormat(current.type)}`))
                 } else if (typesEqual(resolveType(exprType), resolveType(current.type))) {
-                    reportError(miscError(current, `This check will always be true, because ${format(current.expr)} will always be a ${format(current.type)}`))
+                    reportError(miscError(current, `This check will always be true, because ${msgFormat(current.expr)} will always be a ${msgFormat(current.type)}`))
                 }
             } break;
             case "generic-type": {
@@ -702,14 +710,14 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "keyof-type":
             case "valueof-type":
-                if (!subsumes(RECORD_OF_ANY, current.inner)) {
+                if (subsumationIssues(RECORD_OF_ANY, current.inner)) {
                     const keyword = current.kind === 'keyof-type' ? 'keyof' : 'valueof'
-                    reportError(miscError(current, `${keyword} can only be used on object types; found ${format(current.inner)}`))
+                    reportError(miscError(current, `${keyword} can only be used on object types; found ${msgFormat(current.inner)}`))
                 }
                 break;
             case "elementof-type":
-                if (!subsumes(ARRAY_OF_ANY, current.inner)) {
-                    reportError(miscError(current, `elementof can only be used on array types; found ${format(current.inner)}`))
+                if (subsumationIssues(ARRAY_OF_ANY, current.inner)) {
+                    reportError(miscError(current, `elementof can only be used on array types; found ${msgFormat(current.inner)}`))
                 }
                 break;
             case "bound-generic-type": {
@@ -786,30 +794,38 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
 function expect(reportError: ReportError, destinationType: TypeExpression, value: Expression, generateMessage?: (dest: TypeExpression, val: TypeExpression) => string) {
     const inferredType = inferType(value);
-    if (!subsumes(destinationType, inferredType)) {
+    given(subsumationIssues(destinationType, inferredType), issues => {
         reportError(
             generateMessage
                 ? miscError(value, generateMessage(destinationType, inferredType))
-                : assignmentError(value, destinationType, inferredType));
-    }
+                : assignmentError(value, destinationType, inferredType, issues));
+    })
 }
 
 /**
  * Determine whether `value` can "fit into" `destination`. Used for verifying 
  * values passed to consts, arguments, etc, but for other things too.
  */
-export function subsumes(destination: TypeExpression, value: TypeExpression): boolean {
+export function subsumationIssues(destination: TypeExpression, value: TypeExpression): Array<string | string[]> | undefined {
 
     if (destination === value) {
-        return true;
+        return undefined;
     }
 
     const resolvedDestination = resolveType(destination.kind === 'named-type' ? resolveNamedType(destination) : destination, true)
     const resolvedValue = resolveType(value.kind === 'named-type' ? resolveNamedType(value) : value, true)
 
+    const baseErrorMessage = `Type '${msgFormat(resolvedValue)}' is not assignable to type '${msgFormat(resolvedDestination)}'`
+    const withBase = (inner: Array<string | string[]>) => [baseErrorMessage, ...inner]
+    const all = (...inner: Array<ReturnType<typeof subsumationIssues>>): ReturnType<typeof subsumationIssues> =>
+        given(emptyToUndefined(inner.filter(exists).flat()), withBase)
+
     // constants can't be assigned to mutable slots
     if (resolvedDestination.mutability === "mutable" && (resolvedValue.mutability !== "mutable" && resolvedValue.mutability !== "literal")) {
-        return false;
+        return [
+            baseErrorMessage,
+            `Value with constant type '${msgFormat(value)}' can't be assigned to slot with mutable type '${msgFormat(destination)}'`
+        ];
     }
 
     if (
@@ -818,92 +834,148 @@ export function subsumes(destination: TypeExpression, value: TypeExpression): bo
         resolvedDestination.kind === "any-type" || 
         resolvedDestination.kind === "unknown-type"
     ) {
-        return true;
+        return undefined;
     } else if (resolvedValue.kind === "unknown-type") {
-        return false;
+        return [baseErrorMessage];
     } else if (resolvedValue.kind === 'never-type' || resolvedDestination.kind === 'never-type') {
-        return false;
+        return [baseErrorMessage];
     } else if (
         (resolvedDestination.kind === "number-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "number-literal") ||
         (resolvedDestination.kind === "string-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "exact-string-literal") ||
         (resolvedDestination.kind === "boolean-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "boolean-literal")
     ) {
-        return true;
+        return undefined;
     } else if(resolvedDestination.kind === "union-type") {
         if (resolvedValue.kind === "union-type") {
-            return resolvedValue.members.every(valueMember => 
+            const subsumed = resolvedValue.members.every(valueMember => 
                 resolvedDestination.members.some(destinationMember => 
-                    subsumes(destinationMember, valueMember)));
+                    !subsumationIssues(destinationMember, valueMember)));
+
+            if (subsumed) {
+                return undefined
+            } else {
+                return [baseErrorMessage]
+            }
         } else {
-            return resolvedDestination.members.some(member => 
-                subsumes(member, resolvedValue));
+            const subsumed = resolvedDestination.members.some(member => 
+                !subsumationIssues(member, resolvedValue))
+                
+            if (subsumed) {
+                return undefined
+            } else {
+                return [baseErrorMessage]
+            }
         }
     } else if (resolvedValue.kind === "union-type") {
-        return resolvedValue.members.every(member =>
-            subsumes(resolvedDestination, member));
+        return all(
+            resolvedValue.members.map(member =>
+                subsumationIssues(resolvedDestination, member))
+            .filter(exists)
+            .flat())
     } else if (resolvedDestination.kind === 'nominal-type' && resolvedValue.kind === 'nominal-type') {
-        return (
+        if (
             resolvedDestination.module != null && resolvedValue.module != null &&
             resolvedDestination.module === resolvedValue.module &&
             resolvedDestination.name === resolvedValue.name
-        )
+        ) {
+            return undefined
+        } else {
+            return [
+                baseErrorMessage,
+                `'${msgFormat(resolvedValue)}' and '${msgFormat(resolvedDestination)}' are different nominal types`
+            ]
+        }
     } else if(typesEqual(resolvedDestination, resolvedValue)) {
-        return true;
-    } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type" 
-            && resolvedValue.args.length <= resolvedDestination.args.length
-            && resolvedDestination.args.every((_, i) => 
-                // NOTE: Value and destination are flipped on purpose for args!
-                subsumes(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE))
-            && subsumes(resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)) {
-        return true;
-    } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" 
-            && resolvedValue.args.length <= resolvedDestination.args.length
-            && resolvedDestination.args.every((_, i) => 
-                // NOTE: Value and destination are flipped on purpose for args!
-                subsumes(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE))) {
-        return true;
+        return undefined;
+    } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type") {
+        if (resolvedValue.args.length > resolvedDestination.args.length) {
+            return [
+                baseErrorMessage,
+                `'${msgFormat(resolvedValue)}' requires ${resolvedValue.args.length} arguments, but '${msgFormat(resolvedDestination)}' is only provided with ${resolvedDestination.args.length}`
+            ]
+        } else {
+            return all(
+                ...resolvedDestination.args.map((_, i) => 
+                    // NOTE: Value and destination are flipped on purpose for args!
+                    subsumationIssues(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE)),
+                subsumationIssues(resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)
+            )
+        }
+    } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type") {
+        if (resolvedValue.args.length > resolvedDestination.args.length) {
+            return [
+                baseErrorMessage,
+                `'${msgFormat(resolvedValue)}' requires ${resolvedValue.args.length} arguments, but '${msgFormat(resolvedDestination)}' is only provided with ${resolvedDestination.args.length}`
+            ]
+        } else {
+            return all(
+                ...resolvedDestination.args.map((_, i) => 
+                    // NOTE: Value and destination are flipped on purpose for args!
+                    subsumationIssues(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE)))
+        }
     } else if (resolvedDestination.kind === "array-type") {
         if (resolvedValue.kind === "array-type") {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
-                return subsumes(resolvedDestination.element, resolvedValue.element)
+                return all(subsumationIssues(resolvedDestination.element, resolvedValue.element))
             } else {
-                return typesEqual(resolvedDestination.element, resolvedValue.element)
+                if (typesEqual(resolvedDestination.element, resolvedValue.element)) {
+                    return undefined
+                } else {
+                    return [baseErrorMessage]
+                }
             }
         }
         if (resolvedValue.kind === 'tuple-type') {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
-                return resolvedValue.members.every(member =>
-                    subsumes(resolvedDestination.element, member))
+                return all(...resolvedValue.members.map(member =>
+                    subsumationIssues(resolvedDestination.element, member)))
             }
         }
     } else if (resolvedDestination.kind === "tuple-type") {
         if (resolvedValue.kind === 'tuple-type') {
+            if (resolvedValue.members.length !== resolvedDestination.members.length) {
+                return [
+                    baseErrorMessage,
+                    `'${resolvedDestination}' has exactly ${resolvedDestination.members.length} members, but '${resolvedValue.members.length}' has ${resolvedValue.members.length}`
+                ]
+            }
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
-                return resolvedValue.members.length === resolvedDestination.members.length
-                    && resolvedValue.members.every((member, index) =>
-                        subsumes(resolvedDestination.members[index], member))
+                return all(
+                    ...resolvedValue.members.map((member, index) =>
+                        subsumationIssues(resolvedDestination.members[index], member))
+                )
             } else {
-                return resolvedValue.members.length === resolvedDestination.members.length
-                    && resolvedValue.members.every((member, index) =>
-                        typesEqual(resolvedDestination.members[index], member))
+                if (resolvedValue.members.every((member, index) =>
+                    typesEqual(resolvedDestination.members[index], member))) {
+                    return undefined
+                } else {
+                    return [baseErrorMessage]
+                }
             }
         }
     } else if (resolvedDestination.kind === "record-type") {
         if (resolvedValue.kind === "record-type") {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
-                return subsumes(resolvedDestination.keyType, resolvedValue.keyType)
-                    && subsumes(resolvedDestination.valueType, resolvedValue.valueType)
+                return all(
+                    subsumationIssues(resolvedDestination.keyType, resolvedValue.keyType),
+                    subsumationIssues(resolvedDestination.valueType, resolvedValue.valueType)
+                )
             } else {
-                return typesEqual(resolvedDestination.keyType, resolvedValue.keyType)
-                    && typesEqual(resolvedDestination.valueType, resolvedValue.valueType)
+                if (typesEqual(resolvedDestination.keyType, resolvedValue.keyType) &&
+                    typesEqual(resolvedDestination.valueType, resolvedValue.valueType)) {
+                    return undefined
+                } else {
+                    return [baseErrorMessage]
+                }
             }
         }
         if (resolvedValue.kind === "object-type") {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
                 // TODO: Spreads
-                return resolvedValue.entries.every(({ name, type }) =>
-                    subsumes(resolvedDestination.keyType, literalType(name)) &&
-                    subsumes(resolvedDestination.valueType, type))
+                return all(...resolvedValue.entries.map(({ name, type }) => all(
+                    subsumationIssues(resolvedDestination.keyType, literalType(name)),
+                    subsumationIssues(resolvedDestination.valueType, type)
+                )))
             }
         }
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
@@ -912,37 +984,58 @@ export function subsumes(destination: TypeExpression, value: TypeExpression): bo
         const valueEntries =       propertiesOf(resolvedValue)
 
         if (destinationEntries == null || valueEntries == null) {
-            return false
+            return [baseErrorMessage]
         }
 
-        const fits = (
-            destinationEntries.every(({ name: key, type: destinationValue, optional }) => {
-                const valueEntry = valueEntries.find(e => getName(e.name) === getName(key))
+        const missingProperties: string[] = []
+        const propertyTypeIssues: Array<string | string[]> = []
+        for (const { name: key, type: destinationValue, optional } of destinationEntries) {
+            const valueEntry = valueEntries.find(e => getName(e.name) === getName(key))
 
-                if (valueEntry == null) {
-                    return optional
-                } else {
-                    return subsumes( destinationValue, valueEntry.type)
+            if (valueEntry == null) {
+                if (!optional) {
+                    missingProperties.push(getName(key))
                 }
-            })
-        )
+            } else {
+                propertyTypeIssues.push(...all(subsumationIssues(destinationValue, valueEntry.type)) ?? [])
+            }
+        }
+        const missingPropertiesMessage = missingProperties.length > 0
+            ? [`Missing propert${iesOrY(missingProperties.length)} ${missingProperties.map(p => `'${p}'`).join(', ')} required by type '${msgFormat(resolvedDestination)}'`]
+            : []
 
+        const extraProperties: string[] = []
+        // disallow passing object literals with unrecognized properties
         if (resolvedValue.mutability === 'literal') {
-            // disallow passing object literals with unrecognized properties
-            return fits && valueEntries.every(({ name: key }) =>
-                destinationEntries.some(e => getName(e.name) === getName(key)))
-        } else {
-            return fits
+            for (const { name: key } of valueEntries) {
+                if (!destinationEntries.some(e => getName(e.name) === getName(key))) {
+                    extraProperties.push(getName(key))
+                }
+            }
+        }
+        const extraPropertiesMessage = extraProperties.length > 0
+            ? [`Has propert${iesOrY(extraProperties.length)} ${extraProperties.map(p => `'${p}'`).join(', ')} not found on type '${msgFormat(resolvedDestination)}'`]
+            : []
+
+        if (missingPropertiesMessage || extraPropertiesMessage) {
+            return all(
+                missingPropertiesMessage,
+                extraPropertiesMessage,
+                propertyTypeIssues
+            )
         }
     } else if ((resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") ||
                 (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") ||
                 (resolvedDestination.kind === "error-type" && resolvedValue.kind === "error-type") ||
                 (resolvedDestination.kind === "remote-type" && resolvedValue.kind === "remote-type")) {
-        return subsumes(resolvedDestination.inner, resolvedValue.inner);
+        return all(subsumationIssues(resolvedDestination.inner, resolvedValue.inner));
     }
 
-    return false;
+    return [baseErrorMessage];
 }
+
+const emptyToUndefined = (arr: ReturnType<typeof subsumationIssues>): ReturnType<typeof subsumationIssues> =>
+    arr?.length === 0 ? undefined : arr?.filter(el => el.length > 0)
 
 /**
  * Determine whether or not two types have any overlap at all
@@ -951,7 +1044,7 @@ export function overlaps(a: TypeExpression, b: TypeExpression): boolean {
     const resolvedA = resolveType(a)
     const resolvedB = resolveType(b)
 
-    if (subsumes(resolvedA, resolvedB) || subsumes(resolvedB, resolvedA)) {
+    if (!subsumationIssues(resolvedA, resolvedB) || !subsumationIssues(resolvedB, resolvedA)) {
         return true
     } else if (resolvedA.kind === 'union-type' && resolvedB.kind === 'union-type') {
         return resolvedA.members.some(memberA => resolvedB.members.some(memberB => overlaps(memberA, memberB)))

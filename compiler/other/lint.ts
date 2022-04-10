@@ -1,6 +1,6 @@
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "../3_checking/resolve.ts";
-import { overlaps, resolveType, subsumes } from "../3_checking/typecheck.ts";
+import { overlaps, resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
 import { inferType } from "../3_checking/typeinfer.ts";
 import { computedFn } from "../mobx.ts";
 import { BagelConfig, _Store } from "../store.ts";
@@ -172,7 +172,7 @@ const RULES = {
 
             if (condition) {
                 const conditionType = inferType(condition)
-                if (subsumes(conditionType, STRING_TYPE) || subsumes(conditionType, NUMBER_TYPE)) {
+                if (!subsumationIssues(conditionType, STRING_TYPE) || !subsumationIssues(conditionType, NUMBER_TYPE)) {
                     return condition
                 }
             }
@@ -186,7 +186,7 @@ const RULES = {
 
             if (condition) {
                 const conditionType = inferType(condition)
-                if (!subsumes(BOOLEAN_TYPE, conditionType)) {
+                if (subsumationIssues(BOOLEAN_TYPE, conditionType)) {
                     return condition
                 }
             }
@@ -248,7 +248,7 @@ function conditionFrom(ast: AST): Expression|undefined {
 function isAlways(condition: Expression): boolean|undefined {
     const condType = resolveType(inferType(condition))
 
-    if (subsumes(FALSY, condType)) {
+    if (!subsumationIssues(FALSY, condType)) {
         return false
     }
 
