@@ -29,19 +29,12 @@ const resolveInner = (name: string, from: AST, originator: AST): Binding|undefin
                     case "proc-declaration":
                     case "value-declaration":
                     case "derive-declaration":
-                    case "remote-declaration": {
+                    case "remote-declaration":
+                        case "import-all-declaration": {
                         if (declaration.name.name === name) {
                             return {
                                 owner: declaration,
                                 identifier: declaration.name
-                            }
-                        }
-                    } break;
-                    case "import-all-declaration": {
-                        if (declaration.alias.name === name) {
-                            return {
-                                owner: declaration,
-                                identifier: declaration.alias
                             }
                         }
                     } break;

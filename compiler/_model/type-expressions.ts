@@ -1,4 +1,4 @@
-import { AST, PlainIdentifier, SourceInfo } from "./ast.ts";
+import { PlainIdentifier, SourceInfo } from "./ast.ts";
 import { BooleanLiteral, ExactStringLiteral, Expression, NumberLiteral } from "./expressions.ts";
 
 export type TypeExpression =
@@ -36,51 +36,44 @@ export type TypeExpression =
     | PropertyType
     | JavascriptEscapeType
 
-export type UnionType = SourceInfo & {
+export type UnionType = SourceInfo & NoMutability & {
     readonly kind: "union-type",
     readonly members: readonly TypeExpression[],
-    readonly mutability: undefined,
 }
 
-export type MaybeType = SourceInfo & {
+export type MaybeType = SourceInfo & NoMutability & {
     readonly kind: "maybe-type",
     readonly inner: TypeExpression,
-    readonly mutability: undefined,
 }
 
-export type NamedType = SourceInfo & {
+export type NamedType = SourceInfo & NoMutability & {
     readonly kind: "named-type",
     readonly name: PlainIdentifier,
-    readonly mutability: undefined,
 }
 
-export type GenericParamType = SourceInfo & {
+export type GenericParamType = SourceInfo & NoMutability & {
     readonly kind: "generic-param-type",
     readonly name: PlainIdentifier,
     readonly extends: TypeExpression|undefined,
-    readonly mutability: undefined,
 }
 
-export type ProcType = SourceInfo & {
+export type ProcType = SourceInfo & NoMutability & {
     readonly kind: "proc-type",
     readonly args: readonly Arg[],
     readonly isAsync: boolean,
     readonly throws: TypeExpression|undefined,
-    readonly mutability: undefined,
 }
 
-export type FuncType = SourceInfo & {
+export type FuncType = SourceInfo & NoMutability & {
     readonly kind: "func-type",
     readonly args: readonly Arg[],
     readonly returnType?: TypeExpression,
-    readonly mutability: undefined,
 }
 
-export type GenericType = SourceInfo & {
+export type GenericType = SourceInfo & NoMutability & {
     readonly kind: "generic-type",
     readonly typeParams: readonly TypeParam[],
     readonly inner: TypeExpression,
-    readonly mutability: undefined,
 }
 
 export type TypeParam = {
@@ -91,24 +84,21 @@ export type TypeParam = {
 // These two types are special cases of GenericType that allow us to encode 
 // additional guarantees at certain spots in the AST, and thereby avoid some 
 // as-casting later on
-export type GenericFuncType = SourceInfo & {
+export type GenericFuncType = SourceInfo & NoMutability & {
     readonly kind: "generic-type",
     readonly typeParams: readonly TypeParam[],
     readonly inner: FuncType,
-    readonly mutability: undefined,
 }
-export type GenericProcType = SourceInfo & {
+export type GenericProcType = SourceInfo & NoMutability & {
     readonly kind: "generic-type",
     readonly typeParams: readonly TypeParam[],
     readonly inner: ProcType,
-    readonly mutability: undefined,
 }
 
-export type BoundGenericType = SourceInfo & {
+export type BoundGenericType = SourceInfo & NoMutability & {
     readonly kind: "bound-generic-type",
     readonly typeArgs: readonly TypeExpression[],
     readonly generic: TypeExpression,
-    readonly mutability: undefined,
 }
 
 export type Arg = SourceInfo & {
@@ -118,11 +108,10 @@ export type Arg = SourceInfo & {
     readonly optional: boolean,
 }
 
-export type ElementType = SourceInfo & {
+export type ElementType = SourceInfo & NoMutability & {
     readonly kind: "element-type",
     // tagName: PlainIdentifier,
     // attributes: [PlainIdentifier, Expression][],
-    readonly mutability: undefined,
 }
 
 export type ObjectType = SourceInfo & Mutability & {
@@ -131,13 +120,12 @@ export type ObjectType = SourceInfo & Mutability & {
     readonly entries: readonly Attribute[],
 }
 
-export type Attribute = SourceInfo & {
+export type Attribute = SourceInfo & NoMutability & {
     readonly kind: "attribute",
     readonly name: PlainIdentifier | ExactStringLiteral,
     readonly type: TypeExpression,
     readonly optional: boolean,
     readonly forceReadonly: boolean,
-    readonly mutability: undefined,
 }
 
 export type RecordType = SourceInfo & Mutability & {
@@ -163,123 +151,104 @@ export type PrimitiveType =
     | NilType
     | UnknownType
 
-export type StringType = SourceInfo & {
+export type StringType = SourceInfo & NoMutability & {
     readonly kind: "string-type",
-    readonly mutability: undefined,
 }
 
-export type NumberType = SourceInfo & {
+export type NumberType = SourceInfo & NoMutability & {
     readonly kind: "number-type",
-    readonly mutability: undefined,
 }
 
-export type BooleanType = SourceInfo & {
+export type BooleanType = SourceInfo & NoMutability & {
     readonly kind: "boolean-type",
-    readonly mutability: undefined,
 }
 
-export type NilType = SourceInfo & {
+export type NilType = SourceInfo & NoMutability & {
     readonly kind: "nil-type",
-    readonly mutability: undefined,
 }
 
-export type LiteralType = SourceInfo & {
+export type LiteralType = SourceInfo & NoMutability & {
     readonly kind: "literal-type",
     readonly value: ExactStringLiteral | NumberLiteral | BooleanLiteral,
-    readonly mutability: undefined,
 }
 
-export type NominalType = SourceInfo & {
+export type NominalType = SourceInfo & NoMutability & {
     readonly kind: "nominal-type",
     readonly name: string,
     readonly inner: TypeExpression | undefined,
-    readonly mutability: undefined,
 }
 
-export type IteratorType = SourceInfo & {
+export type IteratorType = SourceInfo & NoMutability & {
     readonly kind: "iterator-type",
     readonly inner: TypeExpression,
-    readonly mutability: undefined,
 }
 
-export type PlanType = SourceInfo & {
+export type PlanType = SourceInfo & NoMutability & {
     readonly kind: "plan-type",
     readonly inner: TypeExpression,
-    readonly mutability: undefined,
 }
 
-export type RemoteType = SourceInfo & {
+export type RemoteType = SourceInfo & NoMutability & {
     readonly kind: "remote-type",
     readonly inner: TypeExpression,
-    readonly mutability: undefined,
 }
 
-export type ErrorType = SourceInfo & {
+export type ErrorType = SourceInfo & NoMutability & {
     readonly kind: "error-type",
     readonly inner: TypeExpression,
-    readonly mutability: undefined,
 }
 
-export type ParenthesizedType = SourceInfo & {
+export type ParenthesizedType = SourceInfo & NoMutability & {
     readonly kind: "parenthesized-type",
     readonly inner: TypeExpression,
-    readonly mutability: undefined,
 }
 
-export type TypeofType = SourceInfo & {
+export type TypeofType = SourceInfo & NoMutability & {
     readonly kind: "typeof-type",
     readonly expr: Expression,
-    readonly mutability: undefined,
 }
 
-export type KeyofType = SourceInfo & {
+export type KeyofType = SourceInfo & NoMutability & {
     readonly kind: "keyof-type",
     readonly inner: TypeExpression,
-    readonly mutability: undefined,
 }
 
-export type ValueofType = SourceInfo & {
+export type ValueofType = SourceInfo & NoMutability & {
     readonly kind: "valueof-type",
     readonly inner: TypeExpression,
-    readonly mutability: undefined,
 }
 
-export type ElementofType = SourceInfo & {
+export type ElementofType = SourceInfo & NoMutability & {
     readonly kind: "elementof-type",
     readonly inner: TypeExpression,
-    readonly mutability: undefined,
 }
 
-export type UnknownType = SourceInfo & {
+export type UnknownType = SourceInfo & NoMutability & {
     readonly kind: "unknown-type",
-    readonly mutability: undefined,
 }
 
 // Internal use only!
-export type AnyType = SourceInfo & {
+export type AnyType = SourceInfo & NoMutability & {
     readonly kind: "any-type",
-    readonly mutability: undefined,
 }
 
-export type NeverType = SourceInfo & {
+export type NeverType = SourceInfo & NoMutability & {
     readonly kind: "never-type",
-    readonly mutability: undefined,
 }
 
-export type PropertyType = SourceInfo & {
+export type PropertyType = SourceInfo & NoMutability & {
     readonly kind: "property-type",
     readonly subject: TypeExpression,
     readonly property: PlainIdentifier,
     readonly optional: boolean,
-    readonly mutability: undefined,
 }
 
-export type JavascriptEscapeType = SourceInfo & {
+export type JavascriptEscapeType = SourceInfo & NoMutability & {
     readonly kind: "javascript-escape-type",
-    readonly mutability: undefined,
 }
 
 export type Mutability = { readonly mutability: "immutable"|"readonly"|"mutable"|"literal" }
+export type NoMutability = { readonly mutability: undefined }
 
 export const STRING_TYPE: StringType = {
     kind: "string-type",
@@ -533,6 +502,7 @@ export const ELEMENT_TAG_CHILD_TYPE: TypeExpression = {
         STRING_TYPE,
         NUMBER_TYPE,
         NIL_TYPE,
+        FALSE_TYPE,
         { kind: "element-type", mutability: undefined, parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
         { kind: "array-type", element: {
             kind: "union-type",

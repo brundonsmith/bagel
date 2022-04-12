@@ -188,53 +188,73 @@ const inferTypeInner = computedFn((
                 return UNKNOWN_TYPE;
             }
         }
-        case "indexer": {
-            const baseType = resolveType(inferType(ast.subject, visited));
-            const indexType = resolveType(inferType(ast.indexer, visited));
-
-            const indexIsNumber = !subsumationIssues(NUMBER_TYPE, indexType)
-            
-            if (baseType.kind === "object-type" && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
-                const key = indexType.value.value;
-                const valueType = propertiesOf(baseType)?.find(entry => getName(entry.name) === key)?.type;
-
-                return valueType ?? UNKNOWN_TYPE;
-            } else if (baseType.kind === "record-type") {
-                if (subsumationIssues(baseType.keyType, indexType)) {
-                    return UNKNOWN_TYPE;
-                } else {
-                    return maybeOf(baseType.valueType)
+        case "property-accessor": {
+            if (ast.property.kind === 'plain-identifier') {
+                return {
+                    kind: "property-type",
+                    subject: inferType(ast.subject, visited),
+                    property: ast.property,
+                    optional: ast.optional,
+                    parent: ast.parent,
+                    module: ast.module,
+                    code: ast.code,
+                    startIndex: ast.startIndex,
+                    endIndex: ast.endIndex,
+                    mutability: undefined
                 }
-            } else if (baseType.kind === "array-type" && indexIsNumber) {
-                return maybeOf(baseType.element)
-            } else if (baseType.kind === "tuple-type" && indexIsNumber) {
-                if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
-                    return baseType.members[indexType.value.value] ?? NIL_TYPE
-                } else {
-                    return {
-                        kind: "union-type",
-                        members: [ ...baseType.members, NIL_TYPE ],
-                        parent,
-                        ...TYPE_AST_NOISE
-                    }
-                }
-            } else if (baseType.kind === 'string-type' && indexIsNumber) {
-                return maybeOf(STRING_TYPE)
-            } else if (baseType.kind === 'literal-type' && baseType.value.kind === 'exact-string-literal' && indexIsNumber) {
-                if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
-                    const char = baseType.value.value[indexType.value.value]
+            } else {
+                const subjectType = resolveType(inferType(ast.subject, visited));
+                const indexType = resolveType(inferType(ast.property, visited));
 
-                    if (char) {
-                        return literalType(char)
+                const nillable = subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
+
+                const indexIsNumber = !subsumationIssues(NUMBER_TYPE, indexType)
+                const subjectProperties = ast.optional && nillable
+                    ? propertiesOf(subtract(subjectType, NIL_TYPE))
+                    : propertiesOf(subjectType)
+                
+                if (subjectProperties && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
+                    const key = indexType.value.value;
+                    const valueType = subjectProperties.find(entry => getName(entry.name) === key)?.type;
+
+                    return valueType ?? UNKNOWN_TYPE;
+                } else if (subjectType.kind === "record-type") {
+                    if (subsumationIssues(subjectType.keyType, indexType)) {
+                        return UNKNOWN_TYPE;
                     } else {
-                        return NIL_TYPE
+                        return maybeOf(subjectType.valueType)
                     }
-                } else {
+                } else if (subjectType.kind === "array-type" && indexIsNumber) {
+                    return maybeOf(subjectType.element)
+                } else if (subjectType.kind === "tuple-type" && indexIsNumber) {
+                    if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
+                        return subjectType.members[indexType.value.value] ?? NIL_TYPE
+                    } else {
+                        return {
+                            kind: "union-type",
+                            members: [ ...subjectType.members, NIL_TYPE ],
+                            parent,
+                            ...TYPE_AST_NOISE
+                        }
+                    }
+                } else if (subjectType.kind === 'string-type' && indexIsNumber) {
                     return maybeOf(STRING_TYPE)
-                }
-            }
+                } else if (subjectType.kind === 'literal-type' && subjectType.value.kind === 'exact-string-literal' && indexIsNumber) {
+                    if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
+                        const char = subjectType.value.value[indexType.value.value]
 
-            return UNKNOWN_TYPE;
+                        if (char) {
+                            return literalType(char)
+                        } else {
+                            return NIL_TYPE
+                        }
+                    } else {
+                        return maybeOf(STRING_TYPE)
+                    }
+                }
+
+                return UNKNOWN_TYPE;
+            }
         }
         case "if-else-expression":
         case "switch-expression": {
@@ -289,20 +309,6 @@ const inferTypeInner = computedFn((
             }
 
             return innerType
-        }
-        case "property-accessor": {
-            return {
-                kind: "property-type",
-                subject: inferType(ast.subject, visited),
-                property: ast.property,
-                optional: ast.optional,
-                parent: ast.parent,
-                module: ast.module,
-                code: ast.code,
-                startIndex: ast.startIndex,
-                endIndex: ast.endIndex,
-                mutability: undefined
-            }
         }
         case "local-identifier": {
             const binding = resolve(ast.name, ast)
@@ -1295,7 +1301,7 @@ function fitTemplate(
  * Convert a.foo() to foo(a)
  */
 export function invocationFromMethodCall(expr: Expression): Invocation|undefined {
-    if (expr.kind === 'invocation' && expr.subject.kind === 'property-accessor') {
+    if (expr.kind === 'invocation' && expr.subject.kind === 'property-accessor' && expr.subject.property.kind === 'plain-identifier') {
         const fnName = expr.subject.property.name
         const subjectType = inferType(expr.subject.subject)
 

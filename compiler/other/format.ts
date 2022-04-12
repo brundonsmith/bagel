@@ -49,9 +49,9 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "module":
             return ast.declarations.map(f).join(br + br)
         case "import-all-declaration":
-            return `import ${f(ast.path)} as ${ast.alias.name}`
+            return `import ${f(ast.path)} as ${ast.name.name}`
         case "import-declaration":
-            return `from '${ast.path.value}' import { ${ast.imports.map(f)} }`
+            return `from ${f(ast.path)} import { ${ast.imports.map(f)} }`
         case "import-item":
             return ast.name.name + (ast.alias ? ' as ' + ast.alias.name : '')
         case "func-declaration":
@@ -153,8 +153,21 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return `while ${f(ast.condition)} ${f(ast.body)}`
         case "invocation":
             return `${f(ast.subject)}${maybeTypeArgs(options, indent, parent, ast.typeArgs)}(${ast.args.map(f).join(', ')})` + (parent?.kind === 'block' ? ';' : '')
-        case "property-accessor":
-            return `${f(ast.subject)}${ast.optional ? '?' : ''}.${ast.property.name}`
+        case "property-accessor": {
+            const operator = (
+                ast.optional ? '?.' :
+                ast.property.kind === 'plain-identifier' ? '.' :
+                ''
+            )
+
+            const property = (
+                ast.property.kind === 'plain-identifier'
+                    ? ast.property.name
+                    : `[${f(ast.property)}]`
+            )
+
+            return `${f(ast.subject)}${operator}${property}`
+        }
         case "func": {
             const funcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
             return `${ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''}(${funcType.args.map(f).join(', ')})${maybeTypeAnnotation(options, indent, parent, funcType.returnType)} =>${br}${nextIndentation}${fIndent(ast.body)}`
@@ -173,8 +186,6 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return `${f(ast.start)}..${f(ast.end)}`
         case "spread":
             return `...${f(ast.expr)}`
-        case "indexer":
-            return `${f(ast.subject)}[${f(ast.indexer)}]`
         case "autorun-declaration":
             return `autorun ${f(ast.effect)}`
         case "case":

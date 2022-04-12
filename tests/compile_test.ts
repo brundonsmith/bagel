@@ -242,7 +242,7 @@ Deno.test({
   fn() {
     testCompile(
       `func uid(arr, i) => arr[i]`,
-      `const uid = (arr, i) => (arr[i]);`,
+      `const uid = (arr, i) => (___observe(arr, i));`,
     );
   },
 });
@@ -252,7 +252,7 @@ Deno.test({
   fn() {
     testCompile(
       `const x = [ arr1[0] ]`,
-      `const x = [arr1[0]];`,
+      `const x = [___observe(arr1, 0)];`,
     );
   },
 });

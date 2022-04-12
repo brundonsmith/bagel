@@ -7,7 +7,7 @@ import { format } from "../other/format.ts";
 import Store, { canonicalModuleName, getModuleByName, Mode, _Store } from "../store.ts";
 import { getName } from "../utils/ast.ts";
 import { jsFileLocation } from "../utils/misc.ts";
-import { Module, AST, Block } from "../_model/ast.ts";
+import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func, JsFunc, JsProc } from "../_model/expressions.ts";
@@ -88,16 +88,22 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
     const c = (ast: AST) => compileOne(excludeTypes, module, ast)
 
     switch(ast.kind) {
-        case "import-all-declaration": {
+        case "import-all-declaration":
+        case "import-declaration": {
             const importedModuleType = ast.module && getModuleByName(Store, ast.module, ast.path.value)?.moduleType
-            const imported = importedModuleType === 'json' || importedModuleType === 'text'
-                ? `{ CONTENTS as ${ast.alias.name} }`
-                : `* as ${ast.alias.name}` 
-            return `import ${imported} from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}"`
+            const imported = (
+                ast.kind === 'import-declaration' ?
+                    '{ ' + ast.imports.map(({ name, alias }) => c(name) + (alias ? ` as ${c(alias)}` : ``)).join(", ") + ' }'
+                : importedModuleType === 'json' || importedModuleType === 'text' ?
+                    `{ CONTENTS as ${ast.name.name} }`
+                :
+                    `* as ${ast.name.name}`
+            )
+
+            const jsImportPath = jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')
+                
+            return `import ${imported} from "${jsImportPath}"`
         }
-        case "import-declaration": return `import { ${ast.imports.map(({ name, alias }) => 
-            c(name) + (alias ? ` as ${c(alias)}` : ``)
-        ).join(", ")} } from "${jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')}"`;
         case "type-declaration": {
             const valueTypeDecl = ast.type.kind === 'nominal-type' && ast.type.inner ? `value: ${c(ast.type.inner)}` : ''
 
@@ -169,10 +175,16 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 } else {
                     return `${ast.target.name} = ${value}`
                 }
-            } else if (ast.target.kind === 'indexer') {
-                return `${c(ast.target.subject)}[${c(ast.target.indexer)}] = ${value}; ${INT}invalidate(${c(ast.target.subject)}, ${c(ast.target.indexer)})`
             } else {
-                return `${c(ast.target.subject)}.${ast.target.property.name} = ${value}; ${INT}invalidate(${c(ast.target.subject)}, '${c(ast.target.property)}')`
+                const property = (
+                    ast.target.property.kind === 'plain-identifier'
+                        ? `.${ast.target.property.name}`
+                        : `[${c(ast.target.property)}]`
+                )
+
+                const propertyExpr = propertyAsExpression(excludeTypes, module, ast.target.property)
+
+                return `${c(ast.target.subject)}${property} = ${value}; ${INT}invalidate(${c(ast.target.subject)}, ${propertyExpr})`
             }
         }
         case "await-statement": {
@@ -280,21 +292,25 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "property-accessor": {
 
             // HACK: let-declarations accessed from whole-module imports need special treatment!
-            // will this break if the module import gets aliased so something else?
-            if (ast.subject.kind === 'local-identifier') {
+            // will this break if the module import gets aliased to something else?
+            const property = ast.property
+            if (ast.subject.kind === 'local-identifier' && property.kind === 'plain-identifier') {
                 const binding = resolve(ast.subject.name, ast)
 
                 if (binding?.owner.kind === 'import-all-declaration') {
                     const module = getModuleByName(Store, binding.owner.module as ModuleName, binding.owner.path.value)
                     
-                    if (module?.declarations.find(decl =>
-                            decl.kind === 'value-declaration' && !decl.isConst && decl.name.name === ast.property.name)) {
-                        return `${INT}observe(${INT}observe(${c(ast.subject)}, '${ast.property.name}'), 'value')`;
+                    // TODO: forbid using indexer brackets on whole-module import (do we get this for free already?)
+                    if (module?.declarations.some(decl =>
+                            decl.kind === 'value-declaration' && !decl.isConst && decl.name.name === property.name)) {
+                        return `${INT}observe(${INT}observe(${c(ast.subject)}, '${property.name}'), 'value')`;
                     }
                 }
             }
 
-            return `${INT}observe(${c(ast.subject)}, '${ast.property.name}')`;
+            const propertyExpr = propertyAsExpression(excludeTypes, module, property)
+
+            return `${INT}observe(${c(ast.subject)}, ${propertyExpr})`;
         }
         case "object-literal":  return `{${ast.entries.map(c).join(', ')}}`;
         case "object-entry": {
@@ -315,7 +331,6 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
-        case "indexer": return `${c(ast.subject)}[${c(ast.indexer)}]`;
         case "block": return `{ ${blockContents(excludeTypes, module, ast)} }`;
         case "element-tag": return `${INT}defaultMarkupFunction('${ast.tagName.name}', ${c(ast.attributes)}, [ ${ast.children.map(c).join(', ')} ])`;
         case "union-type": return ast.members.map(c).join(" | ");
@@ -382,6 +397,14 @@ function compileRuntimeType(type: TypeExpression): string {
     }
 
     throw Error(`Couldn't runtime-compile type ${format(type)}`)
+}
+
+function propertyAsExpression (excludeTypes: boolean, module: string, property: PlainIdentifier | Expression) {
+    return (
+        property.kind === 'plain-identifier'
+            ? `'${property.name}'`
+            : compileOne(excludeTypes, module, property)
+    )
 }
 
 function blockContents(excludeTypes: boolean, module: string, block: Block) {

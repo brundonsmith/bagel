@@ -4,7 +4,7 @@ import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, Indexer, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf, ErrorExpression, ObjectEntry } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, InlineConstDeclaration, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InlineDestructuringDeclaration, InstanceOf, ErrorExpression, ObjectEntry } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatement, Statement, WhileLoop, AwaitStatement, DestructuringDeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
@@ -243,10 +243,10 @@ const importAllDeclaration: ParseFunction<ImportAllDeclaration> = (module, code,
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
     expec(consume(code, index, "as"), err(code, index, '"as"'), index =>
     expec(consumeWhitespaceRequired(code, index), err(code, index, "Whitespace"), index =>
-    expec(plainIdentifier(module, code, index), err(code, index, '"Name"'), ({ parsed: alias, index }) => ({
+    expec(plainIdentifier(module, code, index), err(code, index, '"Name"'), ({ parsed: name, index }) => ({
         parsed: {
             kind: "import-all-declaration",
-            alias,
+            name,
             path,
             module,
             code,
@@ -1200,7 +1200,7 @@ const assignment: ParseFunction<Assignment> = (module, code, startIndex) =>
     expec(expression(module, code, index), err(code, index, "Assignment value"), ({ parsed: value, index }) => 
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => 
-        target.kind === "local-identifier" || target.kind === "property-accessor" || target.kind === 'indexer' ? {
+        target.kind === "local-identifier" || target.kind === "property-accessor" ? {
             parsed: {
                 kind: "assignment",
                 target,
@@ -1746,33 +1746,41 @@ const negationOperator: ParseFunction<NegationOperator> = memoize3((module, code
         index
     }))))
     
-const indexer: ParseFunction<Indexer> = (module, code, startIndex) =>
+const indexer: ParseFunction<PropertyAccessor> = (module, code, startIndex) =>
     given(EXPRESSION_PARSER.parseBeneath(module, code, startIndex, indexer), ({ parsed: base, index }) =>
     given(parseSeries(module, code, index, _indexerExpression), ({ parsed: indexers, index }) => 
         indexers.length > 0 ? 
             {
-                parsed: indexers.reduce((subject, { indexer, optional }) => ({
-                    kind: "indexer",
+                parsed: indexers.reduce((subject, { property, optional }) => ({
+                    kind: "property-accessor",
                     subject,
-                    indexer,
+                    property,
                     optional,
                     module,
                     code,
                     startIndex,
                     endIndex: index,
-                }), base) as Indexer,
+                }), base) as PropertyAccessor,
                 index,
             }
         : undefined))
 
-const _indexerExpression: ParseFunction<{ indexer: Expression, optional: boolean }> = (module, code, startIndex) =>
+const _indexerExpression: ParseFunction<Omit<PropertyAccessor, 'subject'>> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, parseExact('?.')), ({ parsed: question, index }) =>
     given(consume(code, index, "["), index => 
     given(consumeWhitespace(code, index), index =>
-    expec(expression(module, code, index), err(code, index, 'Indexer expression'),({ parsed: indexer, index }) =>
+    expec(expression(module, code, index), err(code, index, 'Indexer expression'),({ parsed: property, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index => ({
-        parsed: { indexer, optional: question != null },
+        parsed: {
+            kind: "property-accessor",
+            property,
+            optional: question != null,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
         index
     })))))))
 
@@ -1928,37 +1936,22 @@ const parenthesized: ParseFunction<ParenthesizedExpression> = (module, code, sta
         index,
     }))))))
 
-const invocationAccessorChain: ParseFunction<Invocation|PropertyAccessor|Indexer> = (module, code, startIndex) =>
+const invocationAccessorChain: ParseFunction<Invocation|PropertyAccessor> = (module, code, startIndex) =>
     given(EXPRESSION_PARSER.parseBeneath(module, code, startIndex, invocationAccessorChain), ({ parsed: subject, index }) =>
-    given(parseSeries<InvocationArgs|PropertyAccess>(module, code, index, (module, code, index) => 
-        _invocationArgs(module, code, index) ?? _bracketsPropertyAccess(module, code, index) ?? _dotPropertyAccess(module, code, index)), ({ parsed: gets, index }) => 
+    given(parseSeries<InvocationArgs|Omit<PropertyAccessor, 'subject'>>(module, code, index, (module, code, index) => 
+        _invocationArgs(module, code, index) ?? _indexerExpression(module, code, index) ?? _dotPropertyAccess(module, code, index)),
+    ({ parsed: gets, index }) => 
         gets.length > 0 ? {
             parsed: _getsToInvocationsAndAccesses(subject, gets),
             index
         } : undefined))
 
-type PropertyAccess = SourceInfo & { kind: "property-access", property: PlainIdentifier | Expression, optional: boolean }
-
-const _bracketsPropertyAccess: ParseFunction<PropertyAccess> = (module, code, startIndex) =>
-    given(_indexerExpression(module, code, startIndex), ({ parsed: { indexer, optional }, index }) => ({
-        parsed: {
-            kind: "property-access",
-            property: indexer,
-            optional,
-            module,
-            code,
-            startIndex,
-            endIndex: index
-        },
-        index
-    }))
-
-const _dotPropertyAccess: ParseFunction<PropertyAccess> = (module, code, startIndex) =>
+const _dotPropertyAccess: ParseFunction<Omit<PropertyAccessor, 'subject'>> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, parseExact("?")), ({ parsed: question, index }) =>
     given(consume(code, index, "."), index =>
     expec(plainIdentifier(module, code, index), err(code, index, "Property name"), ({ parsed: property, index }) => ({
         parsed: {
-            kind: "property-access",
+            kind: "property-accessor",
             property,
             optional: question != null,
             module,
@@ -1969,7 +1962,7 @@ const _dotPropertyAccess: ParseFunction<PropertyAccess> = (module, code, startIn
         index
     }))))
 
-const _getsToInvocationsAndAccesses = (subject: Expression, gets: (InvocationArgs|PropertyAccess)[]): Invocation|PropertyAccessor|Indexer => {
+const _getsToInvocationsAndAccesses = (subject: Expression, gets: (InvocationArgs|Omit<PropertyAccessor, 'subject'>)[]): Invocation|PropertyAccessor => {
     let current = _oneGetToInvocationOrAccess(subject, gets[0])
 
     for (let i = 1; i < gets.length; i++) {
@@ -1979,7 +1972,7 @@ const _getsToInvocationsAndAccesses = (subject: Expression, gets: (InvocationArg
     return current
 }
 
-const _oneGetToInvocationOrAccess = (subject: Expression, get: InvocationArgs|PropertyAccess): Invocation|PropertyAccessor|Indexer => {
+const _oneGetToInvocationOrAccess = (subject: Expression, get: InvocationArgs|Omit<PropertyAccessor, 'subject'>): Invocation|PropertyAccessor => {
     if (get.kind === "invocation-args") {
         return {
             kind: "invocation",
@@ -1993,28 +1986,9 @@ const _oneGetToInvocationOrAccess = (subject: Expression, get: InvocationArgs|Pr
             endIndex: get.endIndex
         }
     } else {
-        if (get.property.kind === 'plain-identifier') {
-            return {
-                kind: "property-accessor",
-                subject,
-                property: get.property,
-                optional: get.optional,
-                module: get.module,
-                code: get.code,
-                startIndex: subject.startIndex,
-                endIndex: get.endIndex
-            }
-        } else {
-            return {
-                kind: "indexer",
-                subject,
-                indexer: get.property,
-                optional: get.optional,
-                module: get.module,
-                code: get.code,
-                startIndex: subject.startIndex,
-                endIndex: get.endIndex
-            }
+        return {
+            ...get,
+            subject
         }
     }
 }

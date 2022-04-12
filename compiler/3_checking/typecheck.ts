@@ -70,7 +70,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             case "import-declaration":
                                 return decl.imports.map(i => i.alias ?? i.name)
                             case "import-all-declaration":
-                                return [decl.alias]
                             case "type-declaration":
                             case "proc-declaration":
                             case "func-declaration":
@@ -475,47 +474,57 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     expect(reportError, inferType(current.value), condition)
                 }
             } break;
-            case "indexer": {
-                const subjectType = resolveType(inferType(current.subject))
-                const indexType = resolveType(inferType(current.indexer))
-                
-                if (subjectType.kind === "object-type" && indexType.kind === "literal-type") {
-                    const key = indexType.value.value;
-                    const valueType = propertiesOf(subjectType)?.find(entry => getName(entry.name) === key)?.type;
-                    if (valueType == null) {
-                        reportError(miscError(current.indexer, `Property '${key}' doesn't exist on type '${msgFormat(subjectType)}'`));
-                    }
-                } else if (subjectType.kind === "record-type") {
-                    expect(reportError, subjectType.keyType, current.indexer,
-                        (_, val) => `Expression of type '${msgFormat(val)}' can't be used to index type '${msgFormat(subjectType)}'`)
-                } else if (subjectType.kind === "array-type" || subjectType.kind === "string-type" || subjectType.kind === "tuple-type" || (subjectType.kind === 'literal-type' && subjectType.value.kind === 'exact-string-literal')) {
-                    expect(reportError, NUMBER_TYPE, current.indexer,
-                        (_, val) => `Expression of type '${msgFormat(val)}' can't be used to index type '${msgFormat(subjectType)}'`)
-
-                    if (subjectType.kind === "tuple-type" || (subjectType.kind === 'literal-type' && subjectType.value.kind === 'exact-string-literal')) {
-                        const max = subjectType.kind === 'tuple-type' ? subjectType.members.length : (subjectType.value as ExactStringLiteral).value.length
-
-                        if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal' && (indexType.value.value < 0 || indexType.value.value >= max)) {
-                            reportError(miscError(current.indexer, `Index ${indexType.value.value} is out of range on type '${msgFormat(subjectType)}'`));
-                        }
-                    }
-                } else {
-                    reportError(miscError(current.indexer, `Expression of type '${msgFormat(indexType)}' can't be used to index type '${msgFormat(subjectType)}'`));
-                }
-            } break;
             case "property-accessor": {
                 const isMethodCall = current.parent?.kind === 'invocation' && invocationFromMethodCall(current.parent) != null
 
                 if (!isMethodCall) {
                     const subjectType = resolveType(inferType(current.subject))
-                    const subjectProperties = current.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
+                    const property = current.property
+
+                    const nillable = subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
+
+                    if (nillable && !current.optional) {
+                        reportError(miscError(current.property, `Can't access properties on '${format(subjectType)}' without an optional-chaining operator (".?"), because it is potentially nil`))
+                    }
+
+                    const subjectProperties = current.optional && nillable
                         ? propertiesOf(subtract(subjectType, NIL_TYPE))
                         : propertiesOf(subjectType)
 
-                    if (subjectProperties == null) {
-                        reportError(miscError(current.subject, `Can only use dot operator (".") on objects with known properties (value is of type "${msgFormat(subjectType)}")`));
-                    } else if (!subjectProperties.some(property => getName(property.name) === current.property.name)) {
-                        reportError(miscError(current.property, `Property '${current.property.name}' does not exist on type '${msgFormat(subjectType)}'`));
+                    if (property.kind === 'plain-identifier') {
+                        if (subjectProperties == null) {
+                            // TODO: I don't think this allows accessing record properties with dot
+                            reportError(miscError(current.subject, `Can only use dot operator (".") on objects with properties (value is of type "${msgFormat(subjectType)}")`));
+                        } else if (!subjectProperties.some(property => getName(property.name) === getName(property.name))) {
+                            reportError(miscError(property, `Property '${property.name}' does not exist on type '${msgFormat(subjectType)}'`));
+                        }
+                    } else {
+                        const indexType = resolveType(inferType(property))
+
+                        if (subjectProperties && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
+                            const key = indexType.value.value;
+                            const valueType = subjectProperties?.find(entry => getName(entry.name) === key)?.type;
+                            
+                            if (valueType == null) {
+                                reportError(miscError(property, `Property '${key}' doesn't exist on type '${msgFormat(subjectType)}'`));
+                            }
+                        } else if (subjectType.kind === "record-type") {
+                            expect(reportError, subjectType.keyType, property,
+                                (_, val) => `Expression of type '${msgFormat(val)}' can't be used to index type '${msgFormat(subjectType)}'`)
+                        } else if (subjectType.kind === "array-type" || subjectType.kind === "string-type" || subjectType.kind === "tuple-type" || (subjectType.kind === 'literal-type' && subjectType.value.kind === 'exact-string-literal')) {
+                            expect(reportError, NUMBER_TYPE, property,
+                                (_, val) => `Expression of type '${msgFormat(val)}' can't be used to index type '${msgFormat(subjectType)}'`)
+    
+                            if (subjectType.kind === "tuple-type" || (subjectType.kind === 'literal-type' && subjectType.value.kind === 'exact-string-literal')) {
+                                const max = subjectType.kind === 'tuple-type' ? subjectType.members.length : (subjectType.value as ExactStringLiteral).value.length
+    
+                                if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal' && (indexType.value.value < 0 || indexType.value.value >= max)) {
+                                    reportError(miscError(property, `Index ${indexType.value.value} is out of range on type '${msgFormat(subjectType)}'`));
+                                }
+                            }
+                        } else {
+                            reportError(miscError(property, `Expression of type '${msgFormat(indexType)}' can't be used to index type '${msgFormat(subjectType)}'`));
+                        }
                     }
                 }
             } break;
@@ -615,7 +624,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
 
                 // if assigning into object or array, make sure the subject isn't immutable
-                if (current.target.kind === "property-accessor" || current.target.kind === "indexer") {
+                if (current.target.kind === "property-accessor") {
                     const subjectType = resolveType(inferType(current.target.subject))
                     if (subjectType.mutability !== "mutable") {
                         reportError(miscError(current.target, `Cannot assign to '${msgFormat(current.target)}' because '${msgFormat(current.target.subject)}' is immutable`));

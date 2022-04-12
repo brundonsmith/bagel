@@ -1,5 +1,5 @@
 import { SourceInfo,PlainIdentifier,Block } from "./ast.ts";
-import { Expression, Indexer, Invocation, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions.ts";
+import { Expression, Invocation, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions.ts";
 import { TypeExpression } from "./type-expressions.ts";
 
 export type Statement = 
@@ -58,7 +58,7 @@ export type WhileLoop = SourceInfo & {
 
 export type Assignment = SourceInfo & {
     readonly kind: "assignment",
-    readonly target: LocalIdentifier | PropertyAccessor | Indexer,
+    readonly target: LocalIdentifier | PropertyAccessor,
     readonly value: Expression,
 }
 

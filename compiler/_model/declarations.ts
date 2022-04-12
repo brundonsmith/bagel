@@ -21,7 +21,7 @@ type Exported = { readonly exported: boolean }
 
 export type ImportAllDeclaration = SourceInfo & {
     readonly kind: "import-all-declaration",
-    readonly alias: PlainIdentifier,
+    readonly name: PlainIdentifier,
     readonly path: ExactStringLiteral,
 }
 

@@ -12,7 +12,6 @@ export type Expression =
     | BinaryOperator
     | NegationOperator
     | Invocation
-    | Indexer
     | ParenthesizedExpression
     | PropertyAccessor
     | LocalIdentifier
@@ -130,17 +129,10 @@ export type Invocation = SourceInfo & {
     readonly bubbles: boolean,
 }
 
-export type Indexer = SourceInfo & {
-    readonly kind: "indexer",
-    readonly subject: Expression,
-    readonly indexer: Expression,
-    readonly optional: boolean,
-}
-
 export type PropertyAccessor = SourceInfo & {
     readonly kind: "property-accessor",
     readonly subject: Expression,
-    readonly property: PlainIdentifier,
+    readonly property: PlainIdentifier | Expression,
     readonly optional: boolean,
 }
 
@@ -256,7 +248,6 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "binary-operator": undefined,
     "negation-operator": undefined,
     "invocation": undefined,
-    "indexer": undefined,
     "if-else-expression": undefined,
     "switch-expression": undefined,
     "range": undefined,
