@@ -2545,6 +2545,88 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Import JSON pass",
+  fn() {
+    testMultiModuleTypecheck({
+      'a.json': `
+      {
+        "foo": 123,
+        "bar": {
+          "arr": [ "foo" ],
+          "thing": false,
+          "other": null
+        }
+      }`,
+      'b.bgl': `
+      import 'a.json' as a
+
+      const x: 123 = a.foo`
+    }, false)
+  }
+})
+
+Deno.test({
+  name: "Import JSON fail",
+  fn() {
+    testMultiModuleTypecheck({
+      'a.json': `
+      {
+        "foo": 123
+      }`,
+      'b.bgl': `
+      import 'a.json' as a
+
+      const x: string = a.foo`
+    }, true)
+  }
+})
+
+Deno.test({
+  name: "Import plaintext pass",
+  fn() {
+    testMultiModuleTypecheck({
+      'a.txt': `Lorem ipsum`,
+      'b.bgl': `
+      import 'a.txt' as a
+
+      const x: 'Lorem ipsum' = a`
+    }, false)
+  }
+})
+
+Deno.test({
+  name: "Import plaintext fail",
+  fn() {
+    testMultiModuleTypecheck({
+      'a.txt': `Lorem ipsum`,
+      'b.bgl': `
+      import 'a.txt' as a
+
+      const x: number = a`
+    }, true)
+  }
+})
+
+Deno.test({
+  name: "Element type pass",
+  fn() {
+    testTypecheck(`
+    const x: Element = <div />`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Element type fail",
+  fn() {
+    testTypecheck(`
+    const x: string = <div />`,
+    true)
+  }
+})
+
+
 // Deno.test({
 //   name: "Complex function type inference pass",
 //   fn() {
