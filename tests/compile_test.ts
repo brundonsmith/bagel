@@ -1,7 +1,6 @@
-import { parsed } from "../compiler/1_parse/index.ts";
+import { parse } from "../compiler/1_parse/index.ts";
 import { compile } from "../compiler/4_compile/index.ts";
 import { prettyProblem } from "../compiler/errors.ts";
-import Store from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
@@ -596,20 +595,12 @@ Deno.test({
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>.bgl' as ModuleName
 
-  Store.start({
-    mode: 'mock',
-    modules: {
-      [moduleName]: code
-    },
-    watch: undefined
-  })
-  
-  const parseResult = parsed(Store, moduleName)
+  const parseResult = parse(moduleName, code, true)
 
   if (parseResult) {
     const { ast, errors } = parseResult
 
-    const compiled = compile(ast, moduleName)
+    const compiled = compile(moduleName, ast, 'cache', true)
   
     if (errors.length > 0) {
       throw `\n${code}\nFailed to parse:\n` +

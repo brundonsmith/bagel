@@ -4,7 +4,7 @@ import { resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
 import { inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
 import { computedFn } from "../mobx.ts";
 import { format } from "../other/format.ts";
-import Store, { canonicalModuleName, getModuleByName, Mode, _Store } from "../store.ts";
+import { canonicalModuleName, getModuleByName } from "../store.ts";
 import { getName } from "../utils/ast.ts";
 import { jsFileLocation } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
@@ -13,20 +13,25 @@ import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclara
 import { Expression, Proc, Func, JsFunc, JsProc } from "../_model/expressions.ts";
 import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, TRUTHINESS_SAFE_TYPES, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
-
-export const compiled = computedFn((store: _Store, moduleName: ModuleName): string => {
-    const ast = parsed(store, moduleName)?.ast
+export const compiled = (moduleName: ModuleName, destination: 'cache'|'project', excludeJsPrelude?: boolean, includeTests?: boolean): string => {
+    const ast = parsed(moduleName)?.ast
 
     if (!ast) {
         return ''
     }
-    
+
+    return compile(moduleName, ast, destination, excludeJsPrelude, includeTests)
+}
+
+export const compile = computedFn((moduleName: ModuleName, ast: Module, destination: 'cache'|'project', excludeJsPrelude?: boolean, includeTests?: boolean, excludeTypes?: boolean): string => {
     return (
-        JS_PRELUDE + 
-        compile(
+        (excludeJsPrelude ? '' : JS_PRELUDE) + 
+        compileInner(
             ast, 
-            moduleName, 
-            store.mode?.mode === 'test'
+            moduleName,
+            destination,
+            includeTests,
+            excludeTypes
         )
     )
 })
@@ -56,10 +61,10 @@ import { ${
 `
 
 
-export function compile(module: Module, modulePath: ModuleName, includeTests?: boolean, excludeTypes = false): string {
+function compileInner(module: Module, modulePath: ModuleName, destination: 'cache'|'project', includeTests?: boolean, excludeTypes = false): string {
     const runtimeCode = module.declarations
         .filter(decl => decl.kind !== 'test-expr-declaration' && decl.kind !== 'test-block-declaration')
-        .map(decl => compileOne(excludeTypes, modulePath, decl) + ';')
+        .map(decl => compileOne(excludeTypes, modulePath, destination, decl) + ';')
         .join("\n\n") + (module.hasMain ? "\nsetTimeout(main, 0);\n" : "");
 
     if (includeTests) {
@@ -68,14 +73,14 @@ export function compile(module: Module, modulePath: ModuleName, includeTests?: b
                 module.declarations
                     .filter((decl): decl is TestExprDeclaration => decl.kind === "test-expr-declaration")
                     .map(decl => 
-                        `{ name: '${decl.name.value}', expr: ${compileOne(excludeTypes, modulePath, decl.expr)} }`)
+                        `{ name: '${decl.name.value}', expr: ${compileOne(excludeTypes, modulePath, destination, decl.expr)} }`)
                     .join(',\n')
             }],
             testBlocks: [${
                 module.declarations
                     .filter((decl): decl is TestBlockDeclaration => decl.kind === "test-block-declaration")
                     .map(decl => 
-                        `{ name: '${decl.name.value}', block: () => ${compileOne(excludeTypes, modulePath, decl.block)} }`)
+                        `{ name: '${decl.name.value}', block: () => ${compileOne(excludeTypes, modulePath, destination, decl.block)} }`)
                     .join(',\n')
             }]
         }`
@@ -84,13 +89,13 @@ export function compile(module: Module, modulePath: ModuleName, includeTests?: b
     }
 }
 
-function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
-    const c = (ast: AST) => compileOne(excludeTypes, module, ast)
+function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', ast: AST): string {
+    const c = (ast: AST) => compileOne(excludeTypes, module, destination, ast)
 
     switch(ast.kind) {
         case "import-all-declaration":
         case "import-declaration": {
-            const importedModuleType = ast.module && getModuleByName(Store, ast.module, ast.path.value)?.moduleType
+            const importedModuleType = ast.module && getModuleByName(ast.module, ast.path.value)?.moduleType
             const imported = (
                 ast.kind === 'import-declaration' ?
                     '{ ' + ast.imports.map(({ name, alias }) => c(name) + (alias ? ` as ${c(alias)}` : ``)).join(", ") + ' }'
@@ -100,7 +105,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                     `* as ${ast.name.name}`
             )
 
-            const jsImportPath = jsFileLocation(canonicalModuleName(module, ast.path.value), Store.mode as Mode).replaceAll(/\\/g, '/')
+            const jsImportPath = jsFileLocation(canonicalModuleName(module, ast.path.value), destination).replaceAll(/\\/g, '/')
                 
             return `import ${imported} from "${jsImportPath}"`
         }
@@ -124,9 +129,9 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             );
         }
         case "proc-declaration":
-            return compileProcDeclaration(excludeTypes, module, ast)
+            return compileProcDeclaration(excludeTypes, module, destination, ast)
         case "func-declaration":
-            return compileFuncDeclaration(excludeTypes, module, ast)
+            return compileFuncDeclaration(excludeTypes, module, destination, ast)
         case "value-declaration":
         case "value-declaration-statement": {
             const prefix = ast.kind === 'value-declaration' ? exported(ast.exported) : ''
@@ -182,27 +187,27 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                         : `[${c(ast.target.property)}]`
                 )
 
-                const propertyExpr = propertyAsExpression(excludeTypes, module, ast.target.property)
+                const propertyExpr = propertyAsExpression(excludeTypes, module, destination, ast.target.property)
 
                 return `${c(ast.target.subject)}${property} = ${value}; ${INT}invalidate(${c(ast.target.subject)}, ${propertyExpr})`
             }
         }
         case "await-statement": {
-            return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, ast.type)} = ` : '') + `await ${c(ast.plan)}()`
+            return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, destination, ast.type)} = ` : '') + `await ${c(ast.plan)}()`
         }
         case "if-else-statement": return 'if ' + ast.cases
             .map(({ condition, outcome }) => 
-                `(${fixTruthinessIfNeeded(excludeTypes, module, condition)}) ${c(outcome)}`)
+                `(${fixTruthinessIfNeeded(excludeTypes, module, destination, condition)}) ${c(outcome)}`)
             .join(' else if ')
             + (ast.defaultCase ? ` else ${c(ast.defaultCase)}` : '');
         case "for-loop": return `for (const ${c(ast.itemIdentifier)} of ${c(ast.iterator)}.inner) ${c(ast.body)}`;
-        case "while-loop": return `while (${fixTruthinessIfNeeded(excludeTypes, module, ast.condition)}) ${c(ast.body)}`;
+        case "while-loop": return `while (${fixTruthinessIfNeeded(excludeTypes, module, destination, ast.condition)}) ${c(ast.body)}`;
         case "proc":
         case "js-proc":
-            return compileProc(excludeTypes, module, ast);
+            return compileProc(excludeTypes, module, destination, ast);
         case "func":
         case "js-func":
-            return compileFunc(excludeTypes, module, ast);
+            return compileFunc(excludeTypes, module, destination, ast);
         case "inline-const-group": {
             const awaited = ast.declarations.some(d => d.awaited)
 
@@ -218,7 +223,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
             }
         }
         case "inline-const-declaration":
-            return `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, ast.type)} = ${ast.awaited ? `await (${c(ast.value)})()` : c(ast.value)};`
+            return `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, destination, ast.type)} = ${ast.awaited ? `await (${c(ast.value)})()` : c(ast.value)};`
         case "invocation": {
             
             // method call
@@ -250,7 +255,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         }
         case "binary-operator": {
             if ((ast.op.op === '&&' || ast.op.op === '||') && needsTruthinessFix(ast.left)) {
-                return truthify(excludeTypes, module, ast.left, ast.op.op, ast.right)
+                return truthify(excludeTypes, module, destination, ast.left, ast.op.op, ast.right)
             }
 
             if (ast.op.op === '==') {
@@ -263,13 +268,13 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
 
             return `(${c(ast.left)} ${ast.op.op} ${c(ast.right)})`;
         }
-        case "negation-operator": return `!(${fixTruthinessIfNeeded(excludeTypes, module, ast.base)})`;
+        case "negation-operator": return `!(${fixTruthinessIfNeeded(excludeTypes, module, destination, ast.base)})`;
         case "operator": return ast.op;
         case "if-else-expression":
         case "switch-expression": return '(' + ast.cases
             .map(({ condition, outcome }) => 
                 (ast.kind === "if-else-expression"
-                    ? fixTruthinessIfNeeded(excludeTypes, module, condition)
+                    ? fixTruthinessIfNeeded(excludeTypes, module, destination, condition)
                     : c(ast.value) + ' === ' + c(condition))
                 + ` ? ${c(outcome)} : `)
             .join('\n')
@@ -298,7 +303,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 const binding = resolve(ast.subject.name, ast)
 
                 if (binding?.owner.kind === 'import-all-declaration') {
-                    const module = getModuleByName(Store, binding.owner.module as ModuleName, binding.owner.path.value)
+                    const module = getModuleByName(binding.owner.module as ModuleName, binding.owner.path.value)
                     
                     // TODO: forbid using indexer brackets on whole-module import (do we get this for free already?)
                     if (module?.declarations.some(decl =>
@@ -308,7 +313,7 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
                 }
             }
 
-            const propertyExpr = propertyAsExpression(excludeTypes, module, property)
+            const propertyExpr = propertyAsExpression(excludeTypes, module, destination, property)
 
             return `${INT}observe(${c(ast.subject)}, ${propertyExpr})`;
         }
@@ -331,15 +336,15 @@ function compileOne(excludeTypes: boolean, module: string, ast: AST): string {
         case "boolean-literal": return JSON.stringify(ast.value);
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
-        case "block": return `{ ${blockContents(excludeTypes, module, ast)} }`;
+        case "block": return `{ ${blockContents(excludeTypes, module, destination, ast)} }`;
         case "element-tag": return `${INT}defaultMarkupFunction('${ast.tagName.name}', ${c(ast.attributes)}, [ ${ast.children.map(c).join(', ')} ])`;
         case "union-type": return ast.members.map(c).join(" | ");
         case "maybe-type": return c(ast.inner) + '|null|undefined'
         case "named-type": return ast.name.name;
         case "generic-type": return "unknown";
         case "bound-generic-type": return `unknown`;
-        case "proc-type": return `(${compileArgs(excludeTypes, module, ast.args)}) => void`;
-        case "func-type": return `(${compileArgs(excludeTypes, module, ast.args)}) => ${c(ast.returnType ?? UNKNOWN_TYPE)}`;
+        case "proc-type": return `(${compileArgs(excludeTypes, module, destination, ast.args)}) => void`;
+        case "func-type": return `(${compileArgs(excludeTypes, module, destination, ast.args)}) => ${c(ast.returnType ?? UNKNOWN_TYPE)}`;
         case "element-type": return `unknown`;
         case "object-type": return (
             ast.spreads.map(s => c(s) + ' & ').join('') +
@@ -399,16 +404,16 @@ function compileRuntimeType(type: TypeExpression): string {
     throw Error(`Couldn't runtime-compile type ${format(type)}`)
 }
 
-function propertyAsExpression (excludeTypes: boolean, module: string, property: PlainIdentifier | Expression) {
+function propertyAsExpression (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', property: PlainIdentifier | Expression) {
     return (
         property.kind === 'plain-identifier'
             ? `'${property.name}'`
-            : compileOne(excludeTypes, module, property)
+            : compileOne(excludeTypes, module, destination, property)
     )
 }
 
-function blockContents(excludeTypes: boolean, module: string, block: Block) {
-    return block.statements.map(s => '\n' + compileOne(excludeTypes, module, s) + ';').join('') + '\n'
+function blockContents(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', block: Block) {
+    return block.statements.map(s => '\n' + compileOne(excludeTypes, module, destination, s) + ';').join('') + '\n'
 }
 
 export const INT = `___`;
@@ -416,70 +421,70 @@ export const INT = `___`;
 const NIL = `undefined`;
 
 
-const compileProcDeclaration = (excludeTypes: boolean, module: string, decl: ProcDeclaration): string => {
-    const baseProc = compileOne(excludeTypes, module, decl.value)
+const compileProcDeclaration = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', decl: ProcDeclaration): string => {
+    const baseProc = compileOne(excludeTypes, module, destination, decl.value)
     const proc = decl.action ? `${INT}action(${baseProc})` : baseProc
     
     return exported(decl.exported) + `const ${decl.name.name} = ` + proc;
 }
-const compileFuncDeclaration = (excludeTypes: boolean, module: string, decl: FuncDeclaration): string => {
-    const baseFunc = compileOne(excludeTypes, module, decl.value)
+const compileFuncDeclaration = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', decl: FuncDeclaration): string => {
+    const baseFunc = compileOne(excludeTypes, module, destination, decl.value)
     const func = decl.memo ? `${INT}computedFn(${baseFunc})` : baseFunc
     
     return exported(decl.exported) + `const ${decl.name.name} = ` + func;
 }
 
-function compileProc(excludeTypes: boolean, module: string, proc: Proc|JsProc): string {
-    const signature = compileProcOrFunctionSignature(excludeTypes, module, proc.type)
-    return signature + ` => ${proc.kind === 'js-proc' ? `{${proc.body}}` : compileOne(excludeTypes, module, proc.body)}`;
+function compileProc(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', proc: Proc|JsProc): string {
+    const signature = compileProcOrFunctionSignature(excludeTypes, module, destination, proc.type)
+    return signature + ` => ${proc.kind === 'js-proc' ? `{${proc.body}}` : compileOne(excludeTypes, module, destination, proc.body)}`;
 }
-const compileFunc = (excludeTypes: boolean, module: string, func: Func|JsFunc): string => {
-    const signature = compileProcOrFunctionSignature(excludeTypes, module, func.type)
-    return signature + ' => ' + (func.kind === 'js-func' ? `{${func.body}}` : `(${compileOne(excludeTypes, module, func.body)})`)
+const compileFunc = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', func: Func|JsFunc): string => {
+    const signature = compileProcOrFunctionSignature(excludeTypes, module, destination, func.type)
+    return signature + ' => ' + (func.kind === 'js-func' ? `{${func.body}}` : `(${compileOne(excludeTypes, module, destination, func.body)})`)
 }
 
-const compileProcOrFunctionSignature = (excludeTypes: boolean, module: string, subject: ProcType|GenericProcType|FuncType|GenericFuncType): string => {
+const compileProcOrFunctionSignature = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', subject: ProcType|GenericProcType|FuncType|GenericFuncType): string => {
     const typeParams = !excludeTypes && subject.kind === 'generic-type'
-        ? maybeTypeParams(excludeTypes, module, subject.typeParams)
+        ? maybeTypeParams(excludeTypes, module, destination, subject.typeParams)
         : ''
     const functionType = subject.kind === 'generic-type' ? subject.inner : subject
 
     return (functionType.kind === 'proc-type' && functionType.isAsync ? 'async ' : '') +
         typeParams + 
-        `(${compileArgs(excludeTypes, module, functionType.args)})` +
+        `(${compileArgs(excludeTypes, module, destination, functionType.args)})` +
         (excludeTypes ? '' : 
         functionType.kind === 'proc-type' ? (functionType.isAsync ? ': Promise<void>' : ': void') : 
-        functionType.returnType != null ? `: ${compileOne(excludeTypes, module, functionType.returnType)}` :
+        functionType.returnType != null ? `: ${compileOne(excludeTypes, module, destination, functionType.returnType)}` :
         '')
 }
 
-function compileArgs(excludeTypes: boolean, module: string, args: readonly Arg[]): string {
+function compileArgs(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', args: readonly Arg[]): string {
     return args.map(arg =>
-        arg.name.name + maybeTypeAnnotation(excludeTypes, module, arg.type)).join(', ')
+        arg.name.name + maybeTypeAnnotation(excludeTypes, module, destination, arg.type)).join(', ')
 }
 
 function exported(e: boolean|"export"|"expose"|undefined): string {
     return e ? 'export ' : ''
 }
 
-function maybeTypeParams(excludeTypes: boolean, module: string, typeParams: readonly TypeParam[]): string {
+function maybeTypeParams(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', typeParams: readonly TypeParam[]): string {
     if (excludeTypes || typeParams.length === 0) {
         return ''
     } else {
         return `<${typeParams.map(p =>
-            p.name.name + (p.extends ? ` extends ${compileOne(excludeTypes, module, p.extends)}` : '')
+            p.name.name + (p.extends ? ` extends ${compileOne(excludeTypes, module, destination, p.extends)}` : '')
         ).join(', ')}>`
     }
 }
 
-function maybeTypeAnnotation(excludeTypes: boolean, module: string, type: TypeExpression|undefined): string {
-    return !excludeTypes && type ? `: ${compileOne(excludeTypes, module, type)}` : ''
+function maybeTypeAnnotation(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', type: TypeExpression|undefined): string {
+    return !excludeTypes && type ? `: ${compileOne(excludeTypes, module, destination, type)}` : ''
 }
 
-const fixTruthinessIfNeeded = (excludeTypes: boolean, module: string, expr: Expression) =>
+const fixTruthinessIfNeeded = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', expr: Expression) =>
     needsTruthinessFix(expr)
-        ? truthinessOf(compileOne(excludeTypes, module, expr))
-        : compileOne(excludeTypes, module, expr)
+        ? truthinessOf(compileOne(excludeTypes, module, destination, expr))
+        : compileOne(excludeTypes, module, destination, expr)
 
 const needsTruthinessFix = (expr: Expression) => {
     const type = inferType(expr)
@@ -489,10 +494,10 @@ const needsTruthinessFix = (expr: Expression) => {
 const truthinessOf = (compiledExpr: string) => 
     `(${compiledExpr} != null && (${compiledExpr} as unknown) !== false && (${compiledExpr} as any).kind !== ${INT}ERROR_SYM)`
 
-const truthify = (excludeTypes: boolean, module: string, leftExpr: Expression, op: "&&"|"||", rest: Expression) => {
-    const compiledExpr = compileOne(excludeTypes, module, leftExpr)
+const truthify = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', leftExpr: Expression, op: "&&"|"||", rest: Expression) => {
+    const compiledExpr = compileOne(excludeTypes, module, destination, leftExpr)
     const negation = op === "&&" ? "" : "!"
-    return `(${negation + truthinessOf(compiledExpr)} ? ${compileOne(excludeTypes, module, rest)} : ${compiledExpr})`
+    return `(${negation + truthinessOf(compiledExpr)} ? ${compileOne(excludeTypes, module, destination, rest)} : ${compiledExpr})`
 }
 
 // TODO: const nominal types (generalized const wrapper for any given type?)

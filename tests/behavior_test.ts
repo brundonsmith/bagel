@@ -1,7 +1,6 @@
-import { parsed } from "../compiler/1_parse/index.ts";
+import { parse } from "../compiler/1_parse/index.ts";
 import { compile, IMPORTED_ITEMS, INT } from "../compiler/4_compile/index.ts";
 import { BagelError, prettyProblem } from "../compiler/errors.ts";
-import Store from "../compiler/store.ts";
 import { Module } from "../compiler/_model/ast.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
@@ -125,21 +124,11 @@ Deno.test({
     }
 })
 
-// deno-lint-ignore require-await
 async function testSideEffects(bgl: string, expected: any[]) {
     const moduleName = "<test>.bgl" as ModuleName;
 
-    Store.start({
-        mode: "mock",
-        modules: {
-            [moduleName]: bgl
-        },
-        watch: undefined
-    });
-
-    const { ast, errors } = parsed(Store, moduleName) as { ast: Module, errors: BagelError[] };
-    const compiled = compile(ast, moduleName, false, true);
-
+    const { ast, errors } = parse(moduleName, bgl, true) as { ast: Module, errors: BagelError[] };
+    const compiled = compile(moduleName, ast, 'cache', true, false, true);
     if (errors.length > 0) {
         throw `\n${bgl}\nFailed to parse:\n` +
         errors.map((err) => prettyProblem(moduleName, err)).join("\n");

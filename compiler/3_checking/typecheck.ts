@@ -5,24 +5,17 @@ import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFind
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, resolveImport, throws } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
 import { ancestors, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
-import Store, { getConfig, getModuleByName, _Store } from "../store.ts";
+import { getConfig, getModuleByName } from "../store.ts";
 import { DEFAULT_OPTIONS, format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
 import { computedFn } from "../mobx.ts";
-import { parsed } from "../1_parse/index.ts";
 import { resolve } from "./resolve.ts";
 import { ImportDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 
 const msgFormat = (ast: AST) => format(ast, { ...DEFAULT_OPTIONS, lineBreaks: false })
 
 
-export const typeerrors = computedFn((store: _Store, moduleName: ModuleName): BagelError[] => {
-    const ast = parsed(store, moduleName)?.ast
-
-    if (!ast) {
-        return []
-    }
-
+export const typeerrors = computedFn((ast: Module): BagelError[] => {
     const errors: BagelError[] = []
     typecheck(
         err => errors.push(err), 
@@ -35,14 +28,14 @@ export const typeerrors = computedFn((store: _Store, moduleName: ModuleName): Ba
  * Walk an entire AST and report all issues that we find
  */
 export function typecheck(reportError: ReportError, ast: Module): void {
-    const config = getConfig(Store)
+    const config = getConfig()
     
     for (const { current, parent } of iterateParseTree(ast)) {
             
         switch(current.kind) {
             case "import-all-declaration":
             case "import-declaration": {
-                const otherModule = getModuleByName(Store, current.module as ModuleName, current.path.value)
+                const otherModule = getModuleByName(current.module as ModuleName, current.path.value)
 
                 if (otherModule == null) {
                     // other module doesn't exist

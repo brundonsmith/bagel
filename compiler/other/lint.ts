@@ -3,7 +3,7 @@ import { resolve } from "../3_checking/resolve.ts";
 import { overlaps, resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
 import { inferType } from "../3_checking/typeinfer.ts";
 import { computedFn } from "../mobx.ts";
-import { BagelConfig, _Store } from "../store.ts";
+import { BagelConfig } from "../store.ts";
 import { findAncestor, iterateParseTree, mapParseTree } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
@@ -35,8 +35,8 @@ export function lint(config: BagelConfig|undefined, ast: AST): LintProblem[] {
     return problems
 }
 
-export const autofixed = computedFn((store: _Store, moduleName: ModuleName): string => {
-    const ast = parsed(store, moduleName)?.ast
+export const autofixed = computedFn((moduleName: ModuleName): string => {
+    const ast = parsed(moduleName)?.ast
 
     if (!ast) {
         return ''

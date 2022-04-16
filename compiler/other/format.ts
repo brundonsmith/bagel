@@ -1,7 +1,7 @@
 
 import { parsed } from "../1_parse/index.ts";
 import { computedFn } from "../mobx.ts";
-import { _Store } from "../store.ts";
+import { modules } from "../store.ts";
 import { getName } from "../utils/ast.ts";
 import { AST, PlainIdentifier } from '../_model/ast.ts'
 import { ModuleName } from "../_model/common.ts";
@@ -18,8 +18,8 @@ export const DEFAULT_OPTIONS: FormatOptions = {
     lineBreaks: true
 }
 
-export const formatted = computedFn((store: _Store, moduleName: ModuleName): string => {
-    const ast = parsed(store, moduleName)?.ast
+export const formatted = computedFn((moduleName: ModuleName): string => {
+    const ast = parsed(moduleName)?.ast
 
     if (ast?.moduleType === 'bgl') {
         return (
@@ -29,7 +29,7 @@ export const formatted = computedFn((store: _Store, moduleName: ModuleName): str
             )
         )
     } else {
-        return store.modulesSource.get(moduleName) ?? ''
+        return modules.get(moduleName)?.source ?? ''
     }
 })
 

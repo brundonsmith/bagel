@@ -7,8 +7,7 @@ import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { computedFn } from "../mobx.ts";
 import { areSame, expressionsEqual, getName, literalType, mapParseTree, maybeOf, typesEqual, unionOf } from "../utils/ast.ts";
-import Store, { getModuleByName } from "../store.ts";
-import { format } from "../other/format.ts";
+import { getModuleByName } from "../store.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration, ImportItem } from "../_model/declarations.ts";
 import { resolve } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
@@ -632,7 +631,7 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
             }
         }
         case 'import-all-declaration': {
-            const otherModule = getModuleByName(Store, decl.module as ModuleName, decl.path.value)
+            const otherModule = getModuleByName(decl.module as ModuleName, decl.path.value)
 
             if (otherModule == null) {
                 return {
@@ -1336,7 +1335,7 @@ export function invocationFromMethodCall(expr: Expression): Invocation|undefined
 
 export function resolveImport(importItem: ImportItem): ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined {
     const importDeclaration = (importItem.parent as ImportDeclaration)
-    const otherModule = getModuleByName(Store, importItem.module as ModuleName, importDeclaration.path.value)
+    const otherModule = getModuleByName(importItem.module as ModuleName, importDeclaration.path.value)
 
     return otherModule?.declarations.find(other =>
         (other.kind === 'value-declaration' ||

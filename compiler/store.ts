@@ -2,7 +2,7 @@ import { parsed } from "./1_parse/index.ts";
 import { typeerrors } from "./3_checking/typecheck.ts";
 import { path } from "./deps.ts";
 import { BagelError, errorsEquivalent, isError } from "./errors.ts";
-import { computedFn, makeAutoObservable } from "./mobx.ts";
+import { computedFn } from "./mobx.ts";
 import { pathIsRemote } from "./utils/misc.ts";
 import { ModuleName } from "./_model/common.ts";
 import { lint, LintProblem } from "./other/lint.ts";
@@ -10,103 +10,55 @@ import { Platform, ValueDeclaration } from "./_model/declarations.ts";
 import { PlainIdentifier } from "./_model/ast.ts";
 import { ExactStringLiteral, Expression, ObjectEntry } from "./_model/expressions.ts";
 import { getName } from "./utils/ast.ts";
+import { observable } from './mobx.ts'
 
-export type Mode =
-    | { mode: "build", entryFile: ModuleName, watch: boolean }
-    | { mode: "run", entryFile: ModuleName, platform?: 'node'|'deno', watch: boolean }
-    | { mode: "check", fileOrDir: string, watch: boolean }
-    | { mode: "transpile", fileOrDir: string, watch: boolean }
-    | { mode: "test", fileOrDir: string, platform?: 'node'|'deno', watch: boolean }
-    | { mode: "format", fileOrDir: string, watch: undefined }
-    | { mode: "autofix", fileOrDir: string, watch: undefined }
-    | { mode: "mock", modules: Record<ModuleName, string>, watch: undefined } // for internal testing only!
+type ModuleData = {
+    source: string|undefined,
+    isEntry: boolean,
+    isProjectLocal: boolean
+}
+export const modules = observable(new Map<ModuleName, ModuleData>())
 
-export class _Store {
-
-    constructor() {
-        makeAutoObservable(this)
-    }
-
-    // State
-    mode: undefined | Mode = undefined
-
-    private _modules = new Set<ModuleName>([])
-    public get modules(): ReadonlySet<ModuleName> {
-        return this._modules
-    }
-
-    private _modulesSource = new Map<ModuleName, string>()
-    public get modulesSource(): ReadonlyMap<ModuleName, string> {
-        return this._modulesSource
-    }
-
-
-    // Actions
-    readonly start = async (mode: Mode) => {
-        this.mode = mode
-
-        if (mode.mode === 'mock') {
-            this._modulesSource = new Map()
-
-            for (const [k, v] of Object.entries(mode.modules)) {
-                const moduleName = k as ModuleName
-                this.setSource(moduleName, v)
-            }
-        } else if (mode.mode === 'build' || mode.mode === 'run') {
-            this._modules.add(mode.entryFile)
-        } else {
-            const singleEntry = !(await Deno.stat(mode.fileOrDir)).isDirectory
-            const allFiles = singleEntry 
-                ? [ mode.fileOrDir ]
-                : (await getAllFiles(mode.fileOrDir)).filter(f => f.match(/.*\.bgl$/));
-
-            this._modules = new Set([...allFiles as ModuleName[]])
+export const entry = computedFn(() => {
+    for (const [module, data] of modules) {
+        if (data.isEntry) {
+            return module
         }
     }
 
-    readonly registerModule = (moduleName: ModuleName) => {
-        this._modules.add(moduleName)
-    }
+    return undefined
+})
 
-    readonly setSource = (moduleName: ModuleName, source: string) => {
-        this._modulesSource.set(moduleName, source)
-    }
+export const done = computedFn(() => {
+    if (modules.size === 0) return false
 
-}
-const Store = new _Store()
-export default Store
-
-async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
-    for await (const file of Deno.readDir(dirPath)) {
-        const filePath = path.resolve(dirPath, file.name);
-
-        if ((await Deno.stat(filePath)).isDirectory) {
-            await getAllFiles(filePath, arrayOfFiles);
-        } else {
-            arrayOfFiles.push(filePath);
+    for (const module of modules.keys()) {
+        if (modules.get(module)?.source == null) {
+            return false
         }
     }
-  
-    return arrayOfFiles;
-}
 
-export const done = computedFn((store: _Store) =>
-    store.mode != null && store.modules.size > 0 && store.modulesSource.size >= store.modules.size)
+    return true
+})
 
-export const allProblems = computedFn((store: _Store) => {
+export const allProblems = computedFn((excludePrelude?: boolean) => {
     const allProblems = new Map<ModuleName, (BagelError|LintProblem)[]>()
     
-    for (const module of store.modulesSource.keys()) {
+    for (const module of modules.keys()) {
         allProblems.set(module, [])
     }
 
-    for (const module of store.modulesSource.keys()) {
-        const parseResult = parsed(store, module)
+    for (const [module, data] of modules) {
+        const parseResult = parsed(module, excludePrelude)
         if (parseResult) {
             // console.log(withoutSourceInfo(parsed.ast))
-            const { errors: parseErrors } = parseResult
-            const typecheckErrors = typeerrors(store, module)
-            const lintProblems = lint(getConfig(store), parseResult.ast)
+            const { ast, errors: parseErrors } = parseResult
+            const typecheckErrors = typeerrors(ast)
+            const lintProblems = (
+                data.isProjectLocal
+                    ? lint(getConfig(), parseResult.ast)
+                    : []
+            )
 
             for (const err of [...parseErrors, ...typecheckErrors, ...lintProblems].filter((err, index, arr) => !isError(err) || arr.findIndex(other => isError(other) && errorsEquivalent(err, other)) === index)) {
                 const errorModule = err.ast?.module ?? module;
@@ -118,20 +70,23 @@ export const allProblems = computedFn((store: _Store) => {
     return allProblems
 })
 
-export const getModuleByName = computedFn((store: _Store, importer: ModuleName, imported: string) => {
-    const importedModuleName = canonicalModuleName(importer, imported)
+export const hasProblems = computedFn(() => {
+    const problems = allProblems()
 
-    return parsed(store, importedModuleName)?.ast
+    for (const moduleProblems of problems.values()) {
+        if (moduleProblems.length > 0) {
+            return true
+        }
+    }
+
+    return false
 })
 
-export function canonicalModuleName(importerModule: string, importPath: string): ModuleName {
-    if (pathIsRemote(importPath)) {
-        return importPath as ModuleName
-    } else {
-        const moduleDir = path.dirname(importerModule);
-        return path.resolve(moduleDir, importPath) as ModuleName
-    }
-}
+export const getModuleByName = computedFn((importer: ModuleName, imported: string) => {
+    const importedModuleName = canonicalModuleName(importer, imported)
+
+    return parsed(importedModuleName)?.ast
+})
 
 export type BagelConfig = {
     platforms: Platform[]|undefined,
@@ -139,60 +94,63 @@ export type BagelConfig = {
     lintRules: {[key: string]: string}|undefined
 }
 
-export const getConfig = computedFn((store: _Store): BagelConfig|undefined => {
-    if (store.mode?.mode === 'mock') {
-        return undefined
-    } else if (store.mode?.mode === 'build' || store.mode?.mode === 'run') {
-        // TODO: Have this work for 'check' and 'transpile' modes too; requires 
-        // more complex logic for finding the file that should have the config
-        const { entryFile } = store.mode
-        const res = parsed(store, entryFile)
-        const configDecl = res?.ast.declarations.find(decl =>
-            decl.kind === 'value-declaration' && decl.isConst && decl.name.name === 'config') as ValueDeclaration|undefined
+export const getConfig = computedFn((): BagelConfig|undefined => {
+    const entryFile = entry()
 
-        // TODO: Eventually we want to actually evaluate the const, not
-        // just walk its AST
-        if (configDecl?.value.kind === 'object-literal') {
-            let platforms: Platform[]|undefined
-            let markupFunction: Expression|undefined
-            let lintRules: {[key: string]: string}|undefined
-            
-            {
-                const platformsExpr = (configDecl.value.entries.find(e =>
-                    Array.isArray(e) && (e[0] as PlainIdentifier).name === 'platforms') as any)?.[1] as Expression|undefined
-                
-                platforms = platformsExpr?.kind === 'array-literal' ?
-                    platformsExpr.entries.filter(e => e.kind === 'exact-string-literal').map(e => (e as ExactStringLiteral).value as Platform)
-                : undefined
-            }
-            
-            {
-                markupFunction = (configDecl.value.entries.find(e =>
-                    Array.isArray(e) && (e[0] as PlainIdentifier).name === 'markupFunction') as any)?.[1] as Expression|undefined
-            }
+    if (!entryFile) return undefined
 
-            {
-                const lintRulesExpr = (configDecl.value.entries.find(e =>
-                    Array.isArray(e) && (e[0] as PlainIdentifier).name === 'lintRules') as any)?.[1] as Expression|undefined
-                
-                lintRules = lintRulesExpr?.kind === 'object-literal' ?
-                    Object.fromEntries(lintRulesExpr.entries
-                        .filter((e): e is ObjectEntry => e.kind === 'object-entry' && e.value.kind === 'exact-string-literal')
-                        .map(e => [
-                            getName(e.key as PlainIdentifier | ExactStringLiteral),
-                            (e.value as ExactStringLiteral).value,
-                        ]))
-                : undefined
-            }
+    const res = parsed(entryFile)
+    const configDecl = res?.ast.declarations.find(decl =>
+        decl.kind === 'value-declaration' && decl.isConst && decl.name.name === 'config') as ValueDeclaration|undefined
+
+    // TODO: Eventually we want to actually evaluate the const, not
+    // just walk its AST
+    if (configDecl?.value.kind === 'object-literal') {
+        let platforms: Platform[]|undefined
+        let markupFunction: Expression|undefined
+        let lintRules: {[key: string]: string}|undefined
+        
+        {
+            const platformsExpr = (configDecl.value.entries.find(e =>
+                Array.isArray(e) && (e[0] as PlainIdentifier).name === 'platforms') as any)?.[1] as Expression|undefined
             
-            return {
-                platforms,
-                markupFunction,
-                lintRules
-            }
+            platforms = platformsExpr?.kind === 'array-literal' ?
+                platformsExpr.entries.filter(e => e.kind === 'exact-string-literal').map(e => (e as ExactStringLiteral).value as Platform)
+            : undefined
+        }
+        
+        {
+            markupFunction = (configDecl.value.entries.find(e =>
+                Array.isArray(e) && (e[0] as PlainIdentifier).name === 'markupFunction') as any)?.[1] as Expression|undefined
         }
 
-    } else {
-        // TODO: Look for index.bgl if directory was specified
+        {
+            const lintRulesExpr = (configDecl.value.entries.find(e =>
+                Array.isArray(e) && (e[0] as PlainIdentifier).name === 'lintRules') as any)?.[1] as Expression|undefined
+            
+            lintRules = lintRulesExpr?.kind === 'object-literal' ?
+                Object.fromEntries(lintRulesExpr.entries
+                    .filter((e): e is ObjectEntry => e.kind === 'object-entry' && e.value.kind === 'exact-string-literal')
+                    .map(e => [
+                        getName(e.key as PlainIdentifier | ExactStringLiteral),
+                        (e.value as ExactStringLiteral).value,
+                    ]))
+            : undefined
+        }
+        
+        return {
+            platforms,
+            markupFunction,
+            lintRules
+        }
     }
 })
+
+export function canonicalModuleName(importerModule: ModuleName, importPath: string): ModuleName {
+    if (pathIsRemote(importPath)) {
+        return importPath as ModuleName
+    } else {
+        const moduleDir = path.dirname(importerModule);
+        return path.resolve(moduleDir, importPath) as ModuleName
+    }
+}

@@ -1,8 +1,6 @@
-import { parsed } from "../compiler/1_parse/index.ts";
-import { prettyProblem } from "../compiler/errors.ts";
+import { parse } from "../compiler/1_parse/index.ts";
 import { DEFAULT_OPTIONS, format } from "../compiler/other/format.ts";
-import Store from "../compiler/store.ts";
-import { log, stripSourceInfo } from "../compiler/utils/debugging.ts";
+import { stripSourceInfo } from "../compiler/utils/debugging.ts";
 import { deepEquals } from "../compiler/utils/misc.ts";
 import { Module } from "../compiler/_model/ast.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
@@ -360,35 +358,29 @@ const BAGEL_SNIPPETS = [
       `const el = <foo a='b' />`
 ]
 
-Store.start({
-    mode: "mock",
-    modules: Object.fromEntries(BAGEL_SNIPPETS.map((bgl, index) => ['snippet' + index + '.bgl', bgl])),
-    watch: undefined
-})
+for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
+  const moduleName = ('snippet' + i + '.bgl') as ModuleName
+  const code = BAGEL_SNIPPETS[i]
 
-for (const module of [...Store.modulesSource.keys()]) {
-    Deno.test({
-        name: module,
-        fn() {
-            const { ast, errors } = parsed(Store, module) ?? {}
+  Deno.test({
+      name: moduleName,
+      fn() {
+          const { ast, errors } = parse(moduleName, code, true) ?? {}
 
-            if (ast && errors && errors.length === 0) {
-                const formattedModuleName = ('formatted-' + module) as ModuleName
-                const formatted = format(ast, DEFAULT_OPTIONS)
+          if (ast && errors && errors.length === 0) {
+              const formatted = format(ast, DEFAULT_OPTIONS)
 
-                Store.setSource(formattedModuleName, formatted)
+              const reParsed = parse(moduleName, formatted, true)?.ast as Module
 
-                const reParsed = parsed(Store, formattedModuleName)?.ast as Module
+              stripSourceInfo(ast)
+              stripSourceInfo(reParsed)
 
-                stripSourceInfo(ast)
-                stripSourceInfo(reParsed)
-
-                if (!deepEquals(ast, reParsed)) {
-                    throw `Reformatted AST did not match original:\noriginal:\n${Store.modulesSource.get(module)}\nformatted:\n${Store.modulesSource.get(formattedModuleName)}`
-                }
-            } else {
-                throw `Failed to parse:\n${Store.modulesSource.get(module)}`
-            }
-        }
-    })
+              if (!deepEquals(ast, reParsed)) {
+                  throw `Reformatted AST did not match original:\noriginal:\n${code}\nformatted:\n${formatted}`
+              }
+          } else {
+              throw `Failed to parse:\n${code}`
+          }
+      }
+  })
 }

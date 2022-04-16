@@ -1,10 +1,10 @@
-import { Colors, path, fs, debounce } from "./deps.ts";
+import { Colors, path, fs } from "./deps.ts";
 
 import { BagelError, prettyProblem } from "./errors.ts";
-import { all, cacheDir, cachedFilePath, esOrNone, on, pathIsRemote, sOrNone, bagelFileToTsFile, jsFileLocation } from "./utils/misc.ts";
+import { all, cacheDir, cachedFilePath, esOrNone, sOrNone, bagelFileToTsFile, jsFileLocation, given, pathIsRemote } from "./utils/misc.ts";
 
-import { autorun, configure } from "./mobx.ts";
-import Store, { allProblems, done, Mode } from "./store.ts";
+import { autorun, configure, runInAction, when } from "./mobx.ts";
+import { allProblems, canonicalModuleName, done, entry, hasProblems, modules } from "./store.ts";
 import { ModuleName } from "./_model/common.ts";
 import { autofixed, LintProblem } from "./other/lint.ts";
 import { compiled } from "./4_compile/index.ts";
@@ -18,51 +18,206 @@ configure({
     observableRequiresReaction: false,
 });
 
-async function modeFromArgs(args: string[]): Promise<Mode> {
-    const mode = args[0]
-    const providedEntry =  path.resolve(Deno.cwd(), args[1] ?? './')
-    const watch = args.includes("--watch");
-    const platform = (
-        args.includes('--node') ? 'node' :
-        args.includes('--deno') ? 'deno' :
-        undefined
-    )
-    
-    if (!(await fs.exists(providedEntry))) {
-        fail(`${providedEntry} not found`)
-    }
 
-    switch (mode) {
-        case "build":
-        case "run": {
-            // single file entry
-            const entryFile = await (async () => {
-                if ((await Deno.stat(providedEntry)).isDirectory) {
-                    const index = path.resolve(providedEntry, 'index.bgl')
-        
-                    if ((await Deno.stat(index)).isFile) {
-                        return index;
-                    } else {
-                        return fail(`Could not find index.bgl in directory ${providedEntry}`);
-                    }
-                } else {
-                    return providedEntry;
-                }
-            })()
+const POSSIBLE_COMMANDS = ['new', 'init', 'build', 'run', 'transpile', 'check', 
+    'test', 'format', 'autofix', 'clean'] as const
+type Command = typeof POSSIBLE_COMMANDS[number]
 
-            return { mode, entryFile, watch, platform }
+function parseArgs(args: readonly string[]) {
+    const flags = args.filter(arg => arg.startsWith('--'))
+    const nonFlags = args.filter(arg => !arg.startsWith('--'))
+
+    return {
+        command: (POSSIBLE_COMMANDS as readonly string[]).includes(nonFlags[0]) ? nonFlags[0] as Command : undefined,
+        target: path.resolve(Deno.cwd(), nonFlags[1] || '.'),
+        flags: {
+            watch: flags.includes('--watch'),
+            clean: flags.includes('--clean'),
+            node: flags.includes('--node'),
+            deno: flags.includes('--deno'),
+            bundle: flags.includes('--bundle'),
         }
-        case "check":
-        case "transpile":
-        case "test":
-            // operate on whole subdirectory
-            return { mode, fileOrDir: providedEntry, watch, platform }
-        case "format":
-        case "autofix":
-            return { mode, fileOrDir: providedEntry, watch: undefined }
-        default:
-            return fail(`Must provide a command: new, init, build, check, test, run, transpile, clean, format, autofix`)
     }
+}
+
+async function main() {
+    const { command, target, flags } = parseArgs(Deno.args)
+    
+    if (command == null) {
+        // error
+    } else if (command === 'build' || command === 'run') {
+        const entry = await entryPointFrom(target)
+        
+        if (!entry) {
+            // error
+        } else {
+            if (flags.clean) {
+                // TODO: Only clean modules relevant to entry
+                const numFiles = await cleanCache()
+                console.log(Colors.yellow(pad('Cleaned')) + 'Bagel cache (' + numFiles + ' files)')
+            }
+
+            modules.set(entry, { source: undefined, isEntry: true, isProjectLocal: true })
+
+            await when(() => done())
+
+            printProblems(allProblems(), false)
+
+            if (!hasProblems()) {
+                await writeCompiledModules('cache')
+    
+                if (command === 'build') {
+                    await bundleOutput(
+                        cachedFilePath(entry + '.ts'), 
+                        bagelFileToTsFile(entry, true)
+                    )
+                } else if (command === 'run') {
+                    const bundlePath = cachedFilePath(bagelFileToTsFile(entry, true))
+
+                    await bundleOutput(
+                        cachedFilePath(entry + '.ts'), 
+                        bundlePath
+                    )
+
+                    const nodePath = Deno.env.get('BAGEL_NODE_BIN')
+                    const denoPath = Deno.env.get('BAGEL_DENO_BIN')
+                    
+                    const nodeCommand = [nodePath || "node", bundlePath]
+                    const denoCommand = [denoPath || "deno", "run", bundlePath, "--allow-all", "--unstable"]
+
+                    if (flags.node) {
+                        console.log(Colors.green('Running (node) ') + bundlePath)
+                        await Deno.run({ cmd: nodeCommand }).status()
+                        return
+                    } else if (flags.deno) {
+                        console.log(Colors.green('Running (deno) ') + bundlePath)
+                        await Deno.run({ cmd: denoCommand }).status()
+                        return
+                    } else if (nodePath) {
+                        console.log(Colors.green('Running (' + nodePath + ')     ') + bundlePath)
+                        await Deno.run({ cmd: nodeCommand }).status()
+                        return
+                    } else if (denoPath) {
+                        console.log(Colors.green('Running (' + denoPath + ')     ') + bundlePath)
+                        await Deno.run({ cmd: denoCommand }).status()
+                        return
+                    } else {
+                        try {
+                            await Deno.run({ cmd: ["node", "-v"], stdout: 'piped' }).status()
+                            console.log(Colors.green('Running (node) ') + bundlePath)
+                            await Deno.run({ cmd: nodeCommand }).status()
+                            return
+                        } catch {
+                            try {
+                                await Deno.run({ cmd: ["deno", "--version"], stdout: 'piped' }).status()
+                                console.log(Colors.green('Running (deno) ') + bundlePath)
+                                await Deno.run({ cmd: denoCommand }).status()
+                                return
+                            } catch {
+                            }
+                        }
+                    }
+
+                    console.error(Colors.red('Failed to run: ') + 'Couldn\'t find a Node or Deno installation; please install one of the two or supply a path as BAGEL_NODE_BIN or BAGEL_DENO_BIN')
+                    Deno.exit(1)
+                }
+            }
+        }
+    } else if (command === 'transpile' || command === 'check' || command === 'test' || command === 'format' || command === 'autofix' || command === 'clean') {
+        if (!(await fs.exists(target))) {
+            // error
+        } else {
+            if (command === 'clean' || flags.clean) {
+                // TODO: Only clean modules relevant to target
+                const numFiles = await cleanCache()
+                console.log(Colors.yellow(pad('Cleaned')) + 'Bagel cache (' + numFiles + ' files)')
+            }
+
+            if (command !== 'clean') {
+                const info = await Deno.stat(target)
+                const allModules = (
+                    info.isDirectory
+                        ? (await getAllFiles(target)).filter(f => f.match(/.*\.bgl$/))
+                        : [ target ]
+                ) as ModuleName[]
+                
+                runInAction(() => {
+                    for (const module of allModules) {
+                        modules.set(module, { source: undefined, isEntry: false, isProjectLocal: false })
+                    }
+                })
+
+                if (command === 'transpile' || command === 'check') {
+                    await when(() => done())
+
+                    printProblems(allProblems(), false)
+
+                    if (command === 'transpile' && !hasProblems()) {
+                        await writeCompiledModules('project')
+
+                        const localModules = [...modules].filter(entry => entry[1].isProjectLocal).length
+                        console.log(Colors.green(pad('Transpiled')) + `${localModules} Bagel file${sOrNone(localModules)}`)
+                    }
+                } else if (command === 'format') {
+                    await Promise.all([...modules.entries()]
+                        .filter(entry => entry[1].isProjectLocal)
+                        .map(([module]) =>
+                            Deno.writeTextFile(module, formatted(module))))
+                } else if (command === 'autofix') {
+                    await Promise.all([...modules.entries()]
+                        .filter(entry => entry[1].isProjectLocal)
+                        .map(([module]) =>
+                            Deno.writeTextFile(module, autofixed(module))))
+                }
+            }
+
+        }
+    } else if (command === 'new' || command === 'init') {
+        if (await fs.exists(target)) {
+            // error
+            // fail(`Cannot create project directory ${providedEntry} because it already exists`)
+            // fail(`Can't initialize Bagel project here because one already exists`)
+        } else {
+            if (command === 'new') {
+                await fs.ensureDir(target)
+                await Deno.writeTextFile(path.resolve(target, 'index.bgl'), DEFAULT_INDEX_BGL)
+                console.log(Colors.green(pad('Created')) + `new Bagel project ${target}`)
+            } else if(command === 'init') {
+                await Deno.writeTextFile(path.resolve(Deno.cwd(), 'index.bgl'), DEFAULT_INDEX_BGL)
+                console.log(Colors.green(pad('Initialized')) + `Bagel project in current directory`)
+            }
+        }
+    }
+}
+
+const entryPointFrom = async (target: string): Promise<ModuleName | undefined> => {
+    const info = await Deno.stat(target)
+
+    const entryPath = (
+        info.isDirectory
+            ? path.resolve(target, 'index.bgl')
+            : target
+    )
+
+    if (await fs.exists(entryPath) && path.extname(entryPath) === '.bgl') {
+        return entryPath as ModuleName
+    } else {
+        return undefined
+    }
+}
+
+async function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
+    for await (const file of Deno.readDir(dirPath)) {
+        const filePath = path.resolve(dirPath, file.name);
+
+        if ((await Deno.stat(filePath)).isDirectory) {
+            await getAllFiles(filePath, arrayOfFiles);
+        } else {
+            arrayOfFiles.push(filePath);
+        }
+    }
+  
+    return arrayOfFiles;
 }
 
 const DEFAULT_INDEX_BGL = `
@@ -80,118 +235,22 @@ proc main() {
 }
 `
 
-async function main() {
-    const mode = Deno.args[0]
-    const providedEntry =  path.resolve(Deno.cwd(), Deno.args[1] ?? './')
-
-    if (mode === 'clean' || Deno.args.includes('--clean')) {
-        const numFiles = await cleanCache()
-        console.log(Colors.yellow(pad('Cleaned')) + 'Bagel cache (' + numFiles + ' files)')
-
-        if (mode === 'clean') {
-            return
-        }
-    }
-
-    if (mode === 'new') {
-        if (await fs.exists(providedEntry)) {
-            fail(`Cannot create project directory ${providedEntry} because it already exists`)
-        } else {
-            await fs.ensureDir(providedEntry)
-            await Deno.writeTextFile(path.resolve(providedEntry, 'index.bgl'), DEFAULT_INDEX_BGL)
-            console.log(Colors.green(pad('Created')) + `new Bagel project ${providedEntry}`)
-        }
-    } else if (mode === 'init') {
-        if (await fs.exists('./index.bgl')) {
-            fail(`Can't initialize Bagel project here because one already exists`)
-        } else {
-            await Deno.writeTextFile('./index.bgl', DEFAULT_INDEX_BGL)
-            console.log(Colors.green(pad('Initialized')) + `Bagel project in current directory`)
-        }
-    } else {
-        const mode = await modeFromArgs(Deno.args)
-    
-        await fs.ensureDir(cacheDir())
-    
-        Store.start(mode)
-    }
-}
-
-// Load modules from disk or web
-autorun(async () => {
-    for (const module of Store.modules) {
-        if (Store.modulesSource.get(module) == null) {
-            if (pathIsRemote(module)) {  // http import
-                const path = cachedFilePath(module)
-
-                if (fs.existsSync(path)) {  // module has already been cached locally
-                    const source = await Deno.readTextFile(path)
-                    Store.setSource(module, source)
-                } else {  // need to download module before compiling
-                    Deno.writeTextFileSync(path, '') // immediately write a file to mark it as in-progress
-                    const res = await fetch(module)
-
-                    if (res.status === 200) {
-                        console.log(Colors.green('Downloaded ') + module)
-                        const source = await res.text()
-                        await Deno.writeTextFile(path, source)
-                        Store.setSource(module, source)
-                    } else {
-                        if (await fs.exists(path)) {
-                            await Deno.remove(path)
-                        }
-                        console.error(Colors.red(pad('Failed')) + module)
-                        Deno.exit(1)
-                    }
-                }
-            } else {  // local disk import
-                const source = await Deno.readTextFile(module)
-                Store.setSource(module, source)
-            }
-        }
-    }
-})
-
-// add imported modules to set
-autorun(() => {
-    for (const module of Store.modules) {
-        const parseResult = parsed(Store, module)
-
-        if (parseResult) {
-            for (const decl of parseResult.ast.declarations) {
-                if (decl.kind === "import-declaration" || decl.kind === "import-all-declaration") {
-                    const importedModule = canonicalModuleName(module, decl.path.value)
-
-                    if (!Store.modules.has(importedModule)) {
-                        Store.registerModule(importedModule)
-                    }
-                }
-            }
-        }
-    }
-})
-
-/**
- * Print list of errors
- */
-const printErrors = debounce((errors: Map<ModuleName, (BagelError|LintProblem)[]>, watch?: boolean) => {
-    if (watch) {
+function printProblems (problems: Map<ModuleName, (BagelError|LintProblem)[]>, clearConsole: boolean) {
+    if (clearConsole) {
         console.clear()
     }
 
     let totalErrors = 0;
 
-    const modulesWithErrors = new Array(...errors.values()).filter(errs => errs.length > 0).length
+    const modulesWithErrors = new Array(...problems.values()).filter(errs => errs.length > 0).length
 
     if (modulesWithErrors === 0) {
-        if (Store.mode?.mode === 'check' || Store.mode?.mode === 'build' || Store.mode?.mode === 'transpile') {
-            const localModules = [...Store.modules].filter(p => !p.includes('http') && !path.relative(Deno.cwd(), p).includes('../')).length
-            console.log(Colors.green(pad('Checked')) + `${localModules} module${sOrNone(localModules)} and found no problems`)
-        }
+        const localModules = [...modules].filter(entry => entry[1].isProjectLocal).length
+        console.log(Colors.green(pad('Checked')) + `${localModules} module${sOrNone(localModules)} and found no problems`)
     } else {
         console.log()
 
-        for (const [module, errs] of errors.entries()) {
+        for (const [module, errs] of problems.entries()) {
             totalErrors += errs.length;
 
             for (const err of errs) {
@@ -201,132 +260,47 @@ const printErrors = debounce((errors: Map<ModuleName, (BagelError|LintProblem)[]
 
         console.log(`Found ${totalErrors} problem${sOrNone(totalErrors)} across ${modulesWithErrors} module${sOrNone(modulesWithErrors)}`)
     }
-}, 500)
-    
-// print errors as they occur
-autorun(() => {
-    if (done(Store) && Store.mode?.mode !== 'format' && Store.mode?.mode !== 'autofix') {
-        printErrors(allProblems(Store), Store.mode?.watch)
-    }
-})
+}
 
-// write compiled code to disk
-autorun(async () => {
-    const mode = Store.mode;
-    if (done(Store) && (mode?.mode === 'transpile' || mode?.mode === 'build' || mode?.mode === 'run')) {
-        const compiledModules = [...Store.modulesSource.keys()].map(module => ({
-            jsPath: jsFileLocation(module, mode),
-            js: compiled(Store, module)
-        }))
+async function writeCompiledModules(destination: 'cache'|'project') {
+    await Promise.all([...modules.keys()].map(module => {
+        const jsPath = jsFileLocation(module, destination)
+        const js = compiled(module, destination)
 
-        await Promise.all(compiledModules.map(({ jsPath, js }) =>
-            Deno.writeTextFile(jsPath, js)))
-
-        if (mode.mode === 'transpile') {
-            const localModules = [...Store.modules].filter(p => !p.includes('http') && !path.relative(Deno.cwd(), p).includes('../')).length
-            console.log(Colors.green(pad('Transpiled')) + `${localModules} Bagel file${sOrNone(localModules)}`)
-        } else {
-            bundle(mode)
-        }
-    }
-})
-
-const bundle = debounce(async (mode: Mode) => {
-    if (mode?.mode === 'build') {
-        await bundleOutput(
-            cachedFilePath(mode.entryFile + '.ts'), 
-            bagelFileToTsFile(mode.entryFile, true)
-        )
-    } else if (mode?.mode === 'run') {
-        const bundlePath = cachedFilePath(bagelFileToTsFile(mode.entryFile, true))
-
-        await bundleOutput(
-            cachedFilePath(mode.entryFile + '.ts'), 
-            bundlePath
-        )
-
-        const nodePath = Deno.env.get('BAGEL_NODE_BIN')
-        const denoPath = Deno.env.get('BAGEL_DENO_BIN')
-        
-        const nodeCommand = [nodePath || "node", bundlePath]
-        const denoCommand = [denoPath || "deno", "run", bundlePath, "--allow-all", "--unstable"]
-
-        if (mode?.platform === 'node') {
-            console.log(Colors.green('Running (node) ') + bundlePath)
-            await Deno.run({ cmd: nodeCommand }).status()
-            return
-        } else if (mode?.platform === 'deno') {
-            console.log(Colors.green('Running (deno) ') + bundlePath)
-            await Deno.run({ cmd: denoCommand }).status()
-            return
-        } else if (nodePath) {
-            console.log(Colors.green('Running (' + nodePath + ')     ') + bundlePath)
-            await Deno.run({ cmd: nodeCommand }).status()
-            return
-        } else if (denoPath) {
-            console.log(Colors.green('Running (' + denoPath + ')     ') + bundlePath)
-            await Deno.run({ cmd: denoCommand }).status()
-            return
-        } else {
-            try {
-                await Deno.run({ cmd: ["node", "-v"], stdout: 'piped' }).status()
-                console.log(Colors.green('Running (node) ') + bundlePath)
-                await Deno.run({ cmd: nodeCommand }).status()
-                return
-            } catch {
-                try {
-                    await Deno.run({ cmd: ["deno", "--version"], stdout: 'piped' }).status()
-                    console.log(Colors.green('Running (deno) ') + bundlePath)
-                    await Deno.run({ cmd: denoCommand }).status()
-                    return
-                } catch {
-                }
-            }
-        }
-
-        console.error(Colors.red('Failed to run: ') + 'Couldn\'t find a Node or Deno installation; please install one of the two or supply a path as BAGEL_NODE_BIN or BAGEL_DENO_BIN')
-        Deno.exit(1)
-    } else if (Store.mode?.mode === 'test') {
-        throw Error('TODO: Run tests')
-    }
-}, 500)
-
-// write formatted bgl code to disk
-autorun(() => {
-    if (done(Store) && (Store.mode?.mode === 'format' || Store.mode?.mode === 'autofix')) {
-        Promise.all([...Store.modules]
-            .filter(module => !pathIsRemote(module))
-            .map(module =>
-                Deno.writeTextFile(module, Store.mode?.mode === 'format' ? formatted(Store, module) : autofixed(Store, module))))
-    }
-})
+        Deno.writeTextFile(jsPath, js)
+    }))
+}
 
 // if watch mode is enabled, reload files from disk when changes detected
-const watchers = new Map<ModuleName, Deno.FsWatcher>()
+// const watchers = new Map<ModuleName, Deno.FsWatcher>()
 
-autorun(() => {
-    if (Store.mode?.watch) {
-        for (const module of Store.modules) {
-            if (!pathIsRemote(module) && watchers.get(module) == null) {
-                const watcher = Deno.watchFs(module);
-                watchers.set(module, watcher);
+// autorun(() => {
+//     if (Store.mode?.watch) {
+//         // TODO: watch for new files being created
+//         for (const module of Store.modules) {
+//             if (!pathIsRemote(module) && watchers.get(module) == null) {
+//                 try {
+//                     const watcher = Deno.watchFs(module);
+//                     watchers.set(module, watcher);
 
-                on(watcher, async () => {
-                    try {
-                        const fileContents = await Deno.readTextFile(module);
+//                     on(watcher, async () => {
+//                         try {
+//                             const fileContents = await Deno.readTextFile(module);
 
-                        if (fileContents && fileContents !== Store.modulesSource.get(module)) {
-                            Store.setSource(module, fileContents)
-                        }
-                    } catch (e) {
-                        console.error("Failed to read module " + module + "\n")
-                        console.error(e)
-                    }
-                })
-            }
-        }
-    }
-})
+//                             if (fileContents && fileContents !== modules.get(module)) {
+//                                 Store.setSource(module, fileContents)
+//                             }
+//                         } catch {
+//                             console.error(Colors.red(pad('Error')) + `couldn't find module ${module}`)
+//                         }
+//                     })
+//                 } catch {
+//                     console.error(Colors.red(pad('Error')) + `couldn't find module ${module}`)
+//                 }
+//             }
+//         }
+//     }
+// })
 
 async function cleanCache() {
     const dir = cacheDir()
@@ -392,21 +366,12 @@ function windowsPathToModulePath(str: string) {
     return str.replaceAll('\\', '/').replace(/^C:/, '/').replace(/^file:\/\/\//i, '')
 }
 
-function canonicalModuleName(importerModule: ModuleName, importPath: string): ModuleName {
-    if (pathIsRemote(importPath)) {
-        return importPath as ModuleName
-    } else {
-        const moduleDir = path.dirname(importerModule);
-        return path.resolve(moduleDir, importPath) as ModuleName
-    }
-}
-
-function fail(msg: string): any {
+export function fail(msg: string): any {
     console.error(Colors.red(pad('Failed')) + msg)
     Deno.exit(1)
 }
 
-function pad(str: string): string {
+export function pad(str: string): string {
     const targetLength = 11;
     let res = str
     while (res.length < targetLength) {
@@ -514,5 +479,73 @@ async function test() {
 //         }
 //     })
 // }
+
+// add imported modules to set
+autorun(() => {
+    const entryModule = entry()
+    const projectDir = given(entryModule, path.dirname)
+
+    for (const module of modules.keys()) {
+        const parseResult = parsed(module)
+
+        if (parseResult) {
+            for (const decl of parseResult.ast.declarations) {
+                if (decl.kind === "import-declaration" || decl.kind === "import-all-declaration") {
+                    const importedModule = canonicalModuleName(module, decl.path.value)
+
+                    if (!modules.has(importedModule)) {
+                        const isProjectLocal = projectDir != null && isWithin(projectDir, importedModule)
+
+                        modules.set(importedModule, { source: undefined, isEntry: false, isProjectLocal })
+                    }
+                }
+            }
+        }
+    }
+})
+
+// Load modules from disk or web
+autorun(async () => {
+    for (const [module, data] of modules) {
+        try {
+            if (data.source == null) {
+                if (pathIsRemote(module)) {  // http import
+                    const path = cachedFilePath(module)
+
+                    if (fs.existsSync(path)) {  // module has already been cached locally
+                        const source = await Deno.readTextFile(path)
+                        modules.set(module, { ...data, source })
+                    } else {  // need to download module before compiling
+                        Deno.writeTextFileSync(path, '') // immediately write a file to mark it as in-progress
+                        const res = await fetch(module)
+
+                        if (res.status === 200) {
+                            console.log(Colors.green(pad('Downloaded')) + module)
+                            const source = await res.text()
+                            await Deno.writeTextFile(path, source)
+                            modules.set(module, { ...data, source })
+                        } else {
+                            if (await fs.exists(path)) {
+                                await Deno.remove(path)
+                            }
+                            fail(module)
+                        }
+                    }
+                } else {  // local disk import
+                    const source = await Deno.readTextFile(module)
+                    modules.set(module, { ...data, source })
+                }
+            }
+        } catch {
+            console.error(Colors.red(pad('Error')) + `couldn't find module ${module}`)
+        }
+    }
+})
+
+function isWithin(dir: string, other: string) {
+    const relative = path.relative(dir, other)
+    return !relative.startsWith('../') && relative !== '..'
+}
+
 
 await main();

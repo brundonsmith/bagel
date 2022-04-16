@@ -1,6 +1,9 @@
 import { parsed } from "../compiler/1_parse/index.ts";
+import { typeerrors } from "../compiler/3_checking/typecheck.ts";
 import { prettyProblem } from "../compiler/errors.ts";
-import Store, { allProblems, canonicalModuleName } from "../compiler/store.ts";
+import { runInAction } from "../compiler/mobx.ts";
+import { lint } from "../compiler/other/lint.ts";
+import { allProblems, canonicalModuleName, modules } from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
@@ -2642,48 +2645,51 @@ Deno.test({
 //   }
 // })
 
+// this._modulesSource = new Map()
 
-function testTypecheck(code: string, shouldFail: boolean): void {
+// for (const [k, v] of Object.entries(mode.modules)) {
+//     const moduleName = k as ModuleName
+//     this.setSource(moduleName, v)
+// }
+
+function testTypecheck(source: string, shouldFail: boolean): void {
   const moduleName = "<test>.bgl" as ModuleName
 
-  Store.start({
-    mode: 'mock',
-    modules: {
-      [moduleName]: code
-    },
-    watch: undefined
+  runInAction(() => {
+    modules.clear()
+    modules.set(moduleName, { source, isEntry: true, isProjectLocal: true })
   })
-  
-  const parseResult = parsed(Store, moduleName)
+
+  const parseResult = parsed(moduleName, true)
 
   if (parseResult) {
-    const errors = allProblems(Store).get(moduleName)?.filter(e => e.kind !== 'lint-problem' || e.severity === 'error')
+    const errors = [
+      ...lint(undefined, parseResult.ast).filter(e => e.severity === 'error'),
+      ...typeerrors(parseResult.ast)
+    ]
 
     if (!errors) throw Error('Bwahhhh!')
   
     if (!shouldFail && errors.length > 0) {
-      throw `\n${code}\n\nType check should have succeeded but failed with errors\n` +
+      throw `\n${source}\n\nType check should have succeeded but failed with errors\n` +
         errors.map(err => prettyProblem(moduleName, err)).join("\n")
     } else if (shouldFail && errors.length === 0) {
-      throw `\n${code}\n\nType check should have failed but succeeded`
+      throw `\n${source}\n\nType check should have failed but succeeded`
     }
   }
 }
 
-function testMultiModuleTypecheck(modules: {[key: string]: string}, shouldFail: boolean): void {
-  modules = Object.fromEntries(Object.entries(modules).map(([key, value]) =>
-    [
-      canonicalModuleName(key as ModuleName, key),
-      value
-    ]))
+function testMultiModuleTypecheck(testModules: {[key: string]: string}, shouldFail: boolean): void {
 
-  Store.start({
-    mode: 'mock',
-    modules,
-    watch: undefined
+  runInAction(() => {
+    modules.clear()
+
+    for (const [module, source] of Object.entries(testModules)) {
+      modules.set(canonicalModuleName(module as ModuleName, module), { source, isEntry: false, isProjectLocal: true })
+    }
   })
-  
-  const errors = [...allProblems(Store).values()].flat()?.filter(e => e.kind !== 'lint-problem' || e.severity === 'error')
+
+  const errors = [...allProblems(true).values()].flat()?.filter(e => e.kind !== 'lint-problem' || e.severity === 'error')
 
   if (!shouldFail && errors.length > 0) {
     throw `Type check should have succeeded but failed with errors\n\n` +

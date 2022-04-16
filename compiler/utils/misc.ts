@@ -1,5 +1,4 @@
 import { path } from "../deps.ts";
-import { Mode } from "../store.ts";
 import { ModuleName } from "../_model/common.ts";
 
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
@@ -62,16 +61,16 @@ export function deepEquals(a: BasicData, b: BasicData, ignorePropNames: readonly
 }
 
 export function sOrNone(num: number): string {
-    return num > 1 ? 's' : '';
+    return num !== 1 ? 's' : '';
 }
 export function esOrNone(num: number): string {
-    return num > 1 ? 'es' : '';
+    return num !== 1 ? 'es' : '';
 }
 export function iesOrY(num: number): string {
-    return num > 1 ? 'ies' : 'y';
+    return num !== 1 ? 'ies' : 'y';
 }
 export function wasOrWere(num: number): string {
-    return num > 1 ? 'were' : 'was';
+    return num !== 1 ? 'were' : 'was';
 }
 
 export async function on<T>(iter: AsyncIterable<T>, cb: (val: T) => void) {
@@ -244,8 +243,8 @@ export function pathIsRemote(path: string): boolean {
     return path.match(/^https?:\/\//) != null
 }
 
-export function jsFileLocation(module: ModuleName, mode: Mode) {
-    return pathIsRemote(module) || mode?.mode !== 'transpile'
+export function jsFileLocation(module: ModuleName, destination: 'cache'|'project') {
+    return pathIsRemote(module) || destination === 'cache'
         ? cachedFilePath(module + '.ts')
         : bagelFileToTsFile(module)
 }
