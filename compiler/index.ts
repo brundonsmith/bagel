@@ -3,21 +3,13 @@ import { Colors, path, fs } from "./deps.ts";
 import { BagelError, prettyProblem } from "./errors.ts";
 import { all, cacheDir, cachedFilePath, esOrNone, sOrNone, bagelFileToTsFile, jsFileLocation, given, pathIsRemote } from "./utils/misc.ts";
 
-import { autorun, configure, runInAction, when } from "./mobx.ts";
 import { allProblems, canonicalModuleName, done, entry, hasProblems, modules } from "./store.ts";
 import { ModuleName } from "./_model/common.ts";
 import { autofixed, LintProblem } from "./other/lint.ts";
 import { compiled } from "./4_compile/index.ts";
 import { formatted } from "./other/format.ts";
 import { parsed } from "./1_parse/index.ts";
-
-configure({
-    enforceActions: "never",
-    computedRequiresReaction: false,
-    reactionRequiresObservable: false,
-    observableRequiresReaction: false,
-});
-
+import { autorun, invalidate, observe, runInAction, when, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
 
 const POSSIBLE_COMMANDS = ['new', 'init', 'build', 'run', 'transpile', 'check', 
     'test', 'format', 'autofix', 'clean'] as const
@@ -57,7 +49,7 @@ async function main() {
                 console.log(Colors.yellow(pad('Cleaned')) + 'Bagel cache (' + numFiles + ' files)')
             }
 
-            modules.set(entry, { source: undefined, isEntry: true, isProjectLocal: true })
+            modules[entry] = { source: undefined, isEntry: true, isProjectLocal: true }; invalidate(modules, entry)
 
             await when(() => done())
 
@@ -143,7 +135,7 @@ async function main() {
                 
                 runInAction(() => {
                     for (const module of allModules) {
-                        modules.set(module, { source: undefined, isEntry: false, isProjectLocal: false })
+                        modules[module] = { source: undefined, isEntry: false, isProjectLocal: false }; invalidate(modules, module)
                     }
                 })
 
@@ -155,19 +147,23 @@ async function main() {
                     if (command === 'transpile' && !hasProblems()) {
                         await writeCompiledModules('project')
 
-                        const localModules = [...modules].filter(entry => entry[1].isProjectLocal).length
+                        const localModules = [...Object.entries(modules)].filter(entry => entry[1].isProjectLocal).length
                         console.log(Colors.green(pad('Transpiled')) + `${localModules} Bagel file${sOrNone(localModules)}`)
                     }
                 } else if (command === 'format') {
-                    await Promise.all([...modules.entries()]
+                    observe(modules, WHOLE_OBJECT)
+
+                    await Promise.all([...Object.entries(modules)]
                         .filter(entry => entry[1].isProjectLocal)
                         .map(([module]) =>
-                            Deno.writeTextFile(module, formatted(module))))
+                            Deno.writeTextFile(module, formatted(module as ModuleName))))
                 } else if (command === 'autofix') {
-                    await Promise.all([...modules.entries()]
+                    observe(modules, WHOLE_OBJECT)
+
+                    await Promise.all([...Object.entries(modules)]
                         .filter(entry => entry[1].isProjectLocal)
                         .map(([module]) =>
-                            Deno.writeTextFile(module, autofixed(module))))
+                            Deno.writeTextFile(module, autofixed(module as ModuleName))))
                 }
             }
 
@@ -245,7 +241,7 @@ function printProblems (problems: Map<ModuleName, (BagelError|LintProblem)[]>, c
     const modulesWithErrors = new Array(...problems.values()).filter(errs => errs.length > 0).length
 
     if (modulesWithErrors === 0) {
-        const localModules = [...modules].filter(entry => entry[1].isProjectLocal).length
+        const localModules = [...Object.entries(modules)].filter(entry => entry[1].isProjectLocal).length
         console.log(Colors.green(pad('Checked')) + `${localModules} module${sOrNone(localModules)} and found no problems`)
     } else {
         console.log()
@@ -263,7 +259,8 @@ function printProblems (problems: Map<ModuleName, (BagelError|LintProblem)[]>, c
 }
 
 async function writeCompiledModules(destination: 'cache'|'project') {
-    await Promise.all([...modules.keys()].map(module => {
+    await Promise.all([...Object.keys(modules)].map(_module => {
+        const module = _module as ModuleName
         const jsPath = jsFileLocation(module, destination)
         const js = compiled(module, destination)
 
@@ -482,10 +479,14 @@ async function test() {
 
 // add imported modules to set
 autorun(() => {
+    observe(modules, WHOLE_OBJECT)
+
     const entryModule = entry()
     const projectDir = given(entryModule, path.dirname)
 
-    for (const module of modules.keys()) {
+    for (const _module of Object.keys(modules)) {
+        const module = _module as ModuleName
+
         const parseResult = parsed(module)
 
         if (parseResult) {
@@ -493,10 +494,10 @@ autorun(() => {
                 if (decl.kind === "import-declaration" || decl.kind === "import-all-declaration") {
                     const importedModule = canonicalModuleName(module, decl.path.value)
 
-                    if (!modules.has(importedModule)) {
+                    if (modules[importedModule] == null) {
                         const isProjectLocal = projectDir != null && isWithin(projectDir, importedModule)
 
-                        modules.set(importedModule, { source: undefined, isEntry: false, isProjectLocal })
+                        modules[importedModule] = { source: undefined, isEntry: false, isProjectLocal }; invalidate(modules, importedModule)
                     }
                 }
             }
@@ -506,7 +507,10 @@ autorun(() => {
 
 // Load modules from disk or web
 autorun(async () => {
-    for (const [module, data] of modules) {
+    observe(modules, WHOLE_OBJECT)
+
+    for (const [_module, data] of Object.entries(modules)) {
+        const module = _module as ModuleName
         try {
             if (data.source == null) {
                 if (pathIsRemote(module)) {  // http import
@@ -514,7 +518,7 @@ autorun(async () => {
 
                     if (fs.existsSync(path)) {  // module has already been cached locally
                         const source = await Deno.readTextFile(path)
-                        modules.set(module, { ...data, source })
+                        modules[module] = { ...data, source }; invalidate(modules, module)
                     } else {  // need to download module before compiling
                         Deno.writeTextFileSync(path, '') // immediately write a file to mark it as in-progress
                         const res = await fetch(module)
@@ -523,7 +527,7 @@ autorun(async () => {
                             console.log(Colors.green(pad('Downloaded')) + module)
                             const source = await res.text()
                             await Deno.writeTextFile(path, source)
-                            modules.set(module, { ...data, source })
+                            modules[module] = { ...data, source }; invalidate(modules, module)
                         } else {
                             if (await fs.exists(path)) {
                                 await Deno.remove(path)
@@ -533,11 +537,11 @@ autorun(async () => {
                     }
                 } else {  // local disk import
                     const source = await Deno.readTextFile(module)
-                    modules.set(module, { ...data, source })
+                    modules[module] = { ...data, source }; invalidate(modules, module)
                 }
             }
         } catch {
-            console.error(Colors.red(pad('Error')) + `couldn't find module ${module}`)
+            console.error(Colors.red(pad('Error')) + `couldn't find module '${module}'`)
         }
     }
 })

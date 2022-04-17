@@ -1,10 +1,10 @@
 import { parsed } from "../compiler/1_parse/index.ts";
 import { typeerrors } from "../compiler/3_checking/typecheck.ts";
 import { prettyProblem } from "../compiler/errors.ts";
-import { runInAction } from "../compiler/mobx.ts";
 import { lint } from "../compiler/other/lint.ts";
 import { allProblems, canonicalModuleName, modules } from "../compiler/store.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
+import { invalidate, runInAction, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
 
 Deno.test({
   name: "Basic constant",
@@ -2656,8 +2656,12 @@ function testTypecheck(source: string, shouldFail: boolean): void {
   const moduleName = "<test>.bgl" as ModuleName
 
   runInAction(() => {
-    modules.clear()
-    modules.set(moduleName, { source, isEntry: true, isProjectLocal: true })
+    invalidate(modules, WHOLE_OBJECT)
+    for (const module in modules) {
+      delete modules[module as ModuleName]
+    }
+
+    modules[moduleName] = { source, isEntry: true, isProjectLocal: true }
   })
 
   const parseResult = parsed(moduleName, true)
@@ -2682,10 +2686,13 @@ function testTypecheck(source: string, shouldFail: boolean): void {
 function testMultiModuleTypecheck(testModules: {[key: string]: string}, shouldFail: boolean): void {
 
   runInAction(() => {
-    modules.clear()
+    invalidate(modules, WHOLE_OBJECT)
+    for (const module in modules) {
+      delete modules[module as ModuleName]
+    }
 
     for (const [module, source] of Object.entries(testModules)) {
-      modules.set(canonicalModuleName(module as ModuleName, module), { source, isEntry: false, isProjectLocal: true })
+      modules[canonicalModuleName(module as ModuleName, module)] = { source, isEntry: false, isProjectLocal: true }
     }
   })
 

@@ -2,7 +2,6 @@ import { parsed } from "./1_parse/index.ts";
 import { typeerrors } from "./3_checking/typecheck.ts";
 import { path } from "./deps.ts";
 import { BagelError, errorsEquivalent, isError } from "./errors.ts";
-import { computedFn } from "./mobx.ts";
 import { pathIsRemote } from "./utils/misc.ts";
 import { ModuleName } from "./_model/common.ts";
 import { lint, LintProblem } from "./other/lint.ts";
@@ -10,17 +9,22 @@ import { Platform, ValueDeclaration } from "./_model/declarations.ts";
 import { PlainIdentifier } from "./_model/ast.ts";
 import { ExactStringLiteral, Expression, ObjectEntry } from "./_model/expressions.ts";
 import { getName } from "./utils/ast.ts";
-import { observable } from './mobx.ts'
+import { computedFn, observe, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
 
 type ModuleData = {
     source: string|undefined,
     isEntry: boolean,
     isProjectLocal: boolean
 }
-export const modules = observable(new Map<ModuleName, ModuleData>())
+export const modules: Record<ModuleName, ModuleData> = {}
 
-export const entry = computedFn(() => {
-    for (const [module, data] of modules) {
+export const entry = computedFn(function entry() {
+    observe(modules, WHOLE_OBJECT)
+
+    for (const _module in modules) {
+        const module = _module as ModuleName
+        const data = modules[module]
+
         if (data.isEntry) {
             return module
         }
@@ -29,11 +33,16 @@ export const entry = computedFn(() => {
     return undefined
 })
 
-export const done = computedFn(() => {
-    if (modules.size === 0) return false
+export const done = computedFn(function done () {
+    observe(modules, WHOLE_OBJECT)
 
-    for (const module of modules.keys()) {
-        if (modules.get(module)?.source == null) {
+    if (Object.keys(modules).length === 0) return false
+
+    for (const _module in modules) {
+        const module = _module as ModuleName
+        const data = modules[module]
+
+        if (data?.source == null) {
             return false
         }
     }
@@ -41,14 +50,19 @@ export const done = computedFn(() => {
     return true
 })
 
-export const allProblems = computedFn((excludePrelude?: boolean) => {
+export const allProblems = computedFn(function allProblems (excludePrelude?: boolean) {
+    observe(modules, WHOLE_OBJECT)
+
     const allProblems = new Map<ModuleName, (BagelError|LintProblem)[]>()
     
-    for (const module of modules.keys()) {
-        allProblems.set(module, [])
+    for (const module in modules) {
+        allProblems.set(module as ModuleName, [])
     }
 
-    for (const [module, data] of modules) {
+    for (const _module in modules) {
+        const module = _module as ModuleName
+        const data = modules[module]
+
         const parseResult = parsed(module, excludePrelude)
         if (parseResult) {
             // console.log(withoutSourceInfo(parsed.ast))
@@ -70,7 +84,7 @@ export const allProblems = computedFn((excludePrelude?: boolean) => {
     return allProblems
 })
 
-export const hasProblems = computedFn(() => {
+export const hasProblems = computedFn(function hasProblems () {
     const problems = allProblems()
 
     for (const moduleProblems of problems.values()) {
@@ -82,7 +96,7 @@ export const hasProblems = computedFn(() => {
     return false
 })
 
-export const getModuleByName = computedFn((importer: ModuleName, imported: string) => {
+export const getModuleByName = computedFn(function getModuleByName (importer: ModuleName, imported: string) {
     const importedModuleName = canonicalModuleName(importer, imported)
 
     return parsed(importedModuleName)?.ast
@@ -94,7 +108,7 @@ export type BagelConfig = {
     lintRules: {[key: string]: string}|undefined
 }
 
-export const getConfig = computedFn((): BagelConfig|undefined => {
+export const getConfig = computedFn(function getConfig (): BagelConfig|undefined {
     const entryFile = entry()
 
     if (!entryFile) return undefined

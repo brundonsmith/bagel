@@ -50,7 +50,7 @@
 export const WHOLE_OBJECT = Symbol('WHOLE_OBJECT')
 const COMPUTED_RESULT = Symbol('COMPUTED_RESULT')
 
-type Reaction = () => void
+type Reaction = () => void | Promise<void>
 type Observable = { obj: WeakRef<object>, prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT }
 
 let reportObservableAccessed: ((obs: Observable) => void) | undefined;
@@ -106,17 +106,20 @@ export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESU
     for (const entry of memoCache) {
         const entryIsInvalidated =
             entry.observables.some(o => 
-                o.obj.deref() === obj && (prop === WHOLE_OBJECT || prop === o.prop))
+                o.obj.deref() === obj && (prop === WHOLE_OBJECT || o.prop === WHOLE_OBJECT || prop === o.prop))
 
         if (entryIsInvalidated) {
+            const alreadyInvalidated = entry.cached === EMPTY_CACHE
             entry.cached = EMPTY_CACHE
-            invalidate(entry.fn, COMPUTED_RESULT)
+            if (!alreadyInvalidated) {
+                invalidate(entry.fn, COMPUTED_RESULT)
+            }
         }
     }
 
     // queue up reactions that observed this obj/prop
     for (const entry of observablesToReactions) {
-        if (obj === entry.obj.deref() && (prop === WHOLE_OBJECT || prop === entry.prop)) {
+        if (obj === entry.obj.deref() && (prop === WHOLE_OBJECT || entry.prop === WHOLE_OBJECT || prop === entry.prop)) {
             queue.add(entry.effect)
         }
     }
@@ -130,7 +133,7 @@ export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESU
     }
 }
 
-export function computedFn<F extends Function>(fn: F): F {
+export function computedFn<F extends Function>(fn: F, options: {  } = {}): F {
     return ((...args: any[]) => {
         observe(fn, COMPUTED_RESULT)
 
@@ -162,7 +165,7 @@ export function computedFn<F extends Function>(fn: F): F {
                 cacheEntry.observables = observables
                 cacheEntry.cached = result
             }
-
+            
             return result
         }
     }) as unknown as F
@@ -184,6 +187,32 @@ export function autorun(fn: Reaction) {
     run()
 }
 
+export function when(fn: () => boolean): Promise<void> {
+    // return new Promise(resolve => setTimeout(resolve, 1000))
+    return new Promise(resolve => {
+        function run() {
+
+            // remove this reaction's entries from the mapping
+            observablesToReactions = observablesToReactions.filter(r => r.effect !== run)
+    
+            // run the reaction and collect all new mappings
+            const previous = reportObservableAccessed
+            reportObservableAccessed = obs => observablesToReactions.push({ ...obs, effect: run })
+            const conditionMet = fn()
+            reportObservableAccessed = previous
+
+            if (conditionMet) {
+                // unsubscribe
+                observablesToReactions = observablesToReactions.filter(r => r.effect !== run)
+
+                resolve()
+            }
+        }
+    
+        run()
+    })
+}
+
 export function action<F extends (...args: any[]) => void>(fn: F): F {
     return ((...args: unknown[]) => {
         const topOfAction = queuedReactions == null
@@ -198,4 +227,18 @@ export function action<F extends (...args: any[]) => void>(fn: F): F {
             queuedReactions = undefined
         }
     }) as unknown as  F
+}
+
+export function runInAction(fn: () => void) {
+    const topOfAction = queuedReactions == null
+    const queue = queuedReactions = queuedReactions ?? new Set()
+
+    fn()
+    
+    if (topOfAction) {
+        for (const effect of queue) {
+            effect()
+        }
+        queuedReactions = undefined
+    }
 }

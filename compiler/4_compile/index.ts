@@ -1,8 +1,8 @@
+import { computedFn } from "../../lib/ts/reactivity.ts";
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "../3_checking/resolve.ts";
 import { resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
 import { inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
-import { computedFn } from "../mobx.ts";
 import { format } from "../other/format.ts";
 import { canonicalModuleName, getModuleByName } from "../store.ts";
 import { getName } from "../utils/ast.ts";
@@ -23,7 +23,7 @@ export const compiled = (moduleName: ModuleName, destination: 'cache'|'project',
     return compile(moduleName, ast, destination, excludeJsPrelude, includeTests)
 }
 
-export const compile = computedFn((moduleName: ModuleName, ast: Module, destination: 'cache'|'project', excludeJsPrelude?: boolean, includeTests?: boolean, excludeTypes?: boolean): string => {
+export const compile = computedFn(function compile (moduleName: ModuleName, ast: Module, destination: 'cache'|'project', excludeJsPrelude?: boolean, includeTests?: boolean, excludeTypes?: boolean): string {
     return (
         (excludeJsPrelude ? '' : JS_PRELUDE) + 
         compileInner(

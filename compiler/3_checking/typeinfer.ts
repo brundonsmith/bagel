@@ -5,12 +5,12 @@ import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, PlainIdentifier } from "../_model/ast.ts";
-import { computedFn } from "../mobx.ts";
 import { areSame, expressionsEqual, getName, literalType, mapParseTree, maybeOf, typesEqual, unionOf } from "../utils/ast.ts";
 import { getModuleByName } from "../store.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration, ImportItem } from "../_model/declarations.ts";
 import { resolve } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
+import { computedFn } from "../../lib/ts/reactivity.ts";
 
 export function inferType(
     ast: Expression,
@@ -39,10 +39,10 @@ export function inferType(
     return simplifyUnions(refinedType)
 }
 
-const inferTypeInner = computedFn((
+const inferTypeInner = computedFn(function inferTypeInner(
     ast: Expression,
     previouslyVisited: readonly AST[],
-): TypeExpression => {
+): TypeExpression {
     const { parent, module, code, startIndex, endIndex, ..._rest } = ast
 
     if (previouslyVisited.includes(ast)) {
@@ -1069,9 +1069,9 @@ function conditionToRefinement(condition: Expression, conditionIsTrue: boolean):
     return { kind: conditionIsTrue ? "subtraction" : "narrowing", type: FALSY, targetExpression: condition }
 }
 
-export const propertiesOf = computedFn((
+export const propertiesOf = computedFn(function propertiesOf (
     type: TypeExpression
-): readonly Attribute[] | undefined => {
+): readonly Attribute[] | undefined {
     const resolvedType = resolveType(type)
 
     switch (resolvedType.kind) {

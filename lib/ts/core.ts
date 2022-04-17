@@ -1,5 +1,5 @@
 
-import { autorun, invalidate, observe, WHOLE_OBJECT } from "./_reactivity.ts";
+import { autorun, invalidate, observe, WHOLE_OBJECT } from "./reactivity.ts";
 
 
 type Element = { tagName: string, attributes: object, children: Element[] }
@@ -24,7 +24,7 @@ export {
     computedFn,
     action,
     WHOLE_OBJECT
-} from './_reactivity.ts'
+} from './reactivity.ts'
 
 
 // Errors

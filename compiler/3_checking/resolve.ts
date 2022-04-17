@@ -1,8 +1,8 @@
-import { computedFn } from "../mobx.ts";
+import { computedFn } from "../../lib/ts/reactivity.ts";
 import { AST } from "../_model/ast.ts";
 import { Binding } from "../_model/common.ts";
 
-export const resolve = computedFn((name: string, from: AST): Binding|undefined => {
+export const resolve = computedFn(function resolve (name: string, from: AST): Binding|undefined {
     return resolveInner(name, from, from)
 })
 

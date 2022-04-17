@@ -8,14 +8,14 @@ import { ancestors, findAncestor, getName, iterateParseTree, literalType, maybeO
 import { getConfig, getModuleByName } from "../store.ts";
 import { DEFAULT_OPTIONS, format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
-import { computedFn } from "../mobx.ts";
 import { resolve } from "./resolve.ts";
 import { ImportDeclaration, ValueDeclaration } from "../_model/declarations.ts";
+import { computedFn } from "../../lib/ts/reactivity.ts";
 
 const msgFormat = (ast: AST) => format(ast, { ...DEFAULT_OPTIONS, lineBreaks: false })
 
 
-export const typeerrors = computedFn((ast: Module): BagelError[] => {
+export const typeerrors = computedFn(function typeerrors (ast: Module): BagelError[] {
     const errors: BagelError[] = []
     typecheck(
         err => errors.push(err), 

@@ -1,6 +1,6 @@
 
+import { computedFn, observe } from "../../lib/ts/reactivity.ts";
 import { parsed } from "../1_parse/index.ts";
-import { computedFn } from "../mobx.ts";
 import { modules } from "../store.ts";
 import { getName } from "../utils/ast.ts";
 import { AST, PlainIdentifier } from '../_model/ast.ts'
@@ -18,7 +18,7 @@ export const DEFAULT_OPTIONS: FormatOptions = {
     lineBreaks: true
 }
 
-export const formatted = computedFn((moduleName: ModuleName): string => {
+export const formatted = computedFn(function formatted (moduleName: ModuleName): string {
     const ast = parsed(moduleName)?.ast
 
     if (ast?.moduleType === 'bgl') {
@@ -29,7 +29,8 @@ export const formatted = computedFn((moduleName: ModuleName): string => {
             )
         )
     } else {
-        return modules.get(moduleName)?.source ?? ''
+        observe(modules, moduleName)
+        return modules[moduleName]?.source ?? ''
     }
 })
 

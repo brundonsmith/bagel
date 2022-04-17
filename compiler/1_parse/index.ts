@@ -9,21 +9,22 @@ import { Assignment, CaseBlock, ValueDeclarationStatement, ForLoop, IfElseStatem
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, err, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
-import { computedFn } from "../mobx.ts";
 import { format } from "../other/format.ts";
 import { path } from '../deps.ts';
 import { AST_NOISE } from "../3_checking/typeinfer.ts";
 import { modules } from "../store.ts";
+import { computedFn, observe } from "../../lib/ts/reactivity.ts";
 
 export const parsed = (moduleName: ModuleName, excludePrelude?: boolean) => {
-    const source = modules.get(moduleName)?.source
+    observe(modules, moduleName)
+    const source = modules[moduleName]?.source
 
     if (source != null) {
         return parse(moduleName, source, excludePrelude)
     }
 }
 
-export const parse = computedFn((moduleName: ModuleName, code: string, excludePrelude?: boolean): { ast: Module, errors: readonly BagelError[] } | undefined => {
+export const parse = computedFn(function parse (moduleName: ModuleName, code: string, excludePrelude?: boolean): { ast: Module, errors: readonly BagelError[] } | undefined {
     const fileType = path.extname(moduleName)
 
     if (fileType === '.bgl') {

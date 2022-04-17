@@ -1,8 +1,8 @@
+import { computedFn } from "../../lib/ts/reactivity.ts";
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "../3_checking/resolve.ts";
 import { overlaps, resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
 import { inferType } from "../3_checking/typeinfer.ts";
-import { computedFn } from "../mobx.ts";
 import { BagelConfig } from "../store.ts";
 import { findAncestor, iterateParseTree, mapParseTree } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
@@ -35,7 +35,7 @@ export function lint(config: BagelConfig|undefined, ast: AST): LintProblem[] {
     return problems
 }
 
-export const autofixed = computedFn((moduleName: ModuleName): string => {
+export const autofixed = computedFn(function autofixed (moduleName: ModuleName): string {
     const ast = parsed(moduleName)?.ast
 
     if (!ast) {
