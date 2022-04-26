@@ -105,8 +105,8 @@ export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESU
     // invalidate cached function results that observed this obj/prop
     for (const entry of memoCache) {
         const entryIsInvalidated =
-            entry.observables.some(o => 
-                o.obj.deref() === obj && (prop === WHOLE_OBJECT || o.prop === WHOLE_OBJECT || prop === o.prop))
+            entry.observables.some(observable => 
+                observable.obj.deref() === obj && (prop === WHOLE_OBJECT || observable.prop === WHOLE_OBJECT || prop === observable.prop))
 
         if (entryIsInvalidated) {
             const alreadyInvalidated = entry.cached === EMPTY_CACHE
@@ -185,31 +185,24 @@ export function autorun(fn: Reaction) {
     }
 
     run()
+
+    return () => {
+        // unsubscribe
+        observablesToReactions = observablesToReactions.filter(r => r.effect !== run)
+    }
 }
 
 export function when(fn: () => boolean): Promise<void> {
     // return new Promise(resolve => setTimeout(resolve, 1000))
     return new Promise(resolve => {
-        function run() {
-
-            // remove this reaction's entries from the mapping
-            observablesToReactions = observablesToReactions.filter(r => r.effect !== run)
-    
-            // run the reaction and collect all new mappings
-            const previous = reportObservableAccessed
-            reportObservableAccessed = obs => observablesToReactions.push({ ...obs, effect: run })
+        const unsubscribe = autorun(() => {
             const conditionMet = fn()
-            reportObservableAccessed = previous
 
             if (conditionMet) {
-                // unsubscribe
-                observablesToReactions = observablesToReactions.filter(r => r.effect !== run)
-
+                unsubscribe()
                 resolve()
             }
-        }
-    
-        run()
+        })
     })
 }
 
