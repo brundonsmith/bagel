@@ -102,5 +102,3 @@ export type TestBlockDeclaration = SourceInfo & {
     readonly name: ExactStringLiteral,
     readonly block: Block,
 }
-
-// TODO: ClassReaction
