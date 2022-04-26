@@ -77,7 +77,7 @@ export function observe<O extends object, K extends (keyof O & string|number) | 
         : O[K] | O | undefined {
 
     // if something is observing, report this obj/prop to it
-    if (reportObservableAccessed) {
+    if (reportObservableAccessed && obj != null) {
         reportObservableAccessed({ obj: new WeakRef(obj), prop })
     }
     
