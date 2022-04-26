@@ -1,4 +1,0 @@
-
-MVP:
-- async/await (function keyword? what about async procs?)
-- passing foreign objects to pure functions (dirty function calls?)

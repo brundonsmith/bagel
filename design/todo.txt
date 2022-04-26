@@ -1,31 +1,100 @@
-MVP:
-- "error productions" for common errors; ESPECIALLY things that are different from JS
-- error handling system for procs
-- result monad?
-- parsing
-    - string escapes
-    - destructuring
-    - dynamic property definition/access (square brackets)
-    - anonymous blocks
-- "typeof X" in type expressions
-- "typeof X" at runtime (add "array" return value, to avoid Array.isArray(), as well as class-name possibility)
-- config file (bagel.config.json)? bagel.config.bgl??
-    - allowIOInFunctions
-    - allowJSInFunctions
-- Fix generic virtual members!!
-    - Implement arbitrary named generics for internal use only?
-- javascript funcs and procs
-- Nominal types
-- Named arguments
-- convert all tuples in AST to objects?
-- Automatically identify redundant checks, comparisons, etc
-- Continue trying to better-follow Bagel architecture
-- numeric range types? string template literal types?
-- suite of type refinements
-- optional object-type properties
-- alternate number syntaxes like hex?
-- array slices?
-- tail recursion?
 
-Long-term:
-- language server
+MVP
+- Destructuring arguments
+- Customization of memo caching behavior
+- parallel await
+- debugging utils (functional logging, etc)
+- Regex
+- implement more platform APIs
+- configuration
+- implement express integration
+- Bagel tests
+    - Mocking system
+- autoruns only allowed in index.bgl?
+    - maybe also in files that completely declare their "let" dependencies?
+    - only in project directory?
+      - This. TODO: forbid autoruns found in non-local modules.
+- Only auto-run main() proc in the actual entry file
+
+Design tasks:
+- Dates
+- Pattern-matching/destructuring/union splitting expression with exhaustiveness-checking
+
+Things to stew on:
+- Arbitrary-eval of bagel code from within compiler
+- Mocking
+- Circular types
+- JS escape syntax (delimiters)
+- generalize "JSX" syntax integration
+
+Chores
+- Docs
+- TextMate language
+- sourcemaps
+
+Ideas
+- Decorators?
+- "impure" keyword for functions?
+- specific-length array and string types?
+- numeric types with range information?
+- intermediate representation to simplify compiling?
+- lint against shadowing?
+- "generator" iterator?
+- some sort of previewing of constant values, and/or "explain" CLI for declarations
+- Overwrite import paths in the config
+- `if (cond) a else b` instead of `if cond { a } else { b }`?
+
+Cleanup tasks:
+- Generalize const wrapper-type
+- Generalize destructures
+- Generalize statements: decl/spread/await
+
+Improvement
+- Continue to flesh out various parts of type inference
+- Continue to increase test coverage
+- built-in, safe but limited deep-equals (also deep-clone?)
+    - look at lodash for more builtins?
+
+Features that exist but need more cases covered:
+  - Type refinements (resolveRefinements/conditionToRefinement)
+  - Generic inference (fitTemplate)
+  - Type-resolution (resolveType)
+  - Compiling static types to runtime types for instanceof calls (compileRuntimeType)
+    - Need to also statically check that type used in instanceof is supported at runtime
+    - Need to also normalize runtime types for aliased types
+  - propertiesOf, for some more things like object-unions
+
+Scattered thoughts:
+- Imba has explicit calls for starting a server, mounting an app, or even appending a child to an existing element
+- can we identify everything that causes side-effects and force it all to happen 
+in autoruns? note that this doesn't include all procs, because some 
+only get invoked by others
+    - Procs get triggered in one of a few ways:
+        - Startup
+        - Plan resolution
+        - Events (UI, system, etc)
+        - State changes (reactivity)
+        - (other procs)
+    - An action is a proc that changes state
+    - A *re*action is a proc that reacts to state
+    - Any given proc may respond to state and/or outside world, and then affect 
+    state and/or outside world
+    - Make sure effects on the outside world never get stale re: state?
+    - Can we define *all* possible effects on the outside world? (Elm does...)
+        - Triggering a Plan
+        - Modifying the DOM
+        - Modifying the location (really, any mutating browser API)
+
+- constraints on reactions:
+    - effect can reference anything
+    - data clause can only reference things that will get collected when the 
+      reaction itself should get collected
+        - local variables that don't escape the scope
+        - these can be passed to functions, but not to procs?
+            - if there's no global state, they actually could be passed to procs
+              (we'd know nothing could still be holding on to them)
+            - most importantly, can't be assigned to anything passed into the 
+              current scope from the outside
+            - generally: the "outside world" can be reduced to a) proc args, and 
+              b) global state (if we have that)
+            - No global state to start, and think about adding it later?

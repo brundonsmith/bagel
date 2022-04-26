@@ -5,5 +5,5 @@ Modules are loaded by URL; Bagel knows nothing of repositories, versioning, or e
 Current plan:
 - Put it in its own repository, like a third-party library would be
 - Tag commits with semver
-- Pipeline to push new versions to Cloudflare CDN, organized by *exact* version number
+- Pipeline to push new versions to CDN, organized by *exact* version number
 - Cloudflare worker (source kept in the same repository) will accept semver *patterns*, and serve up the appropriate version based on what's on the CDN

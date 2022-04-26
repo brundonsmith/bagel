@@ -1,7 +1,5 @@
 Notes from Elm:
-- Events like onClick in Elm just take a value (msg); we take a proc
 - Elm has no optional arguments?
 - classList function is built-in
 - Deeper type inference- Elm allows the total absence of type declarations
 even on top-level declarations
-- Automatic decoding should allow us to skip hand-written decoders
