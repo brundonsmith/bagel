@@ -224,6 +224,8 @@ const RULES = {
 } as const
 const _rules: {[name: string]: LintRule} = RULES
 
+// TODO: Lint for camel case vs underscores
+
 function conditionFrom(ast: AST): Expression|undefined {
     if (ast.kind === 'if-else-expression' || ast.kind === 'if-else-statement') {
         for (const { condition } of ast.cases) {

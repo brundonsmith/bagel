@@ -16,8 +16,7 @@ import { modules } from "../store.ts";
 import { computedFn, observe } from "../../lib/ts/reactivity.ts";
 
 export const parsed = (moduleName: ModuleName, excludePrelude?: boolean) => {
-    observe(modules, moduleName)
-    const source = modules[moduleName]?.source
+    const source = observe(observe(modules, moduleName), 'source')
 
     if (source != null) {
         return parse(moduleName, source, excludePrelude)

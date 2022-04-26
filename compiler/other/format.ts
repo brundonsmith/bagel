@@ -29,8 +29,7 @@ export const formatted = computedFn(function formatted (moduleName: ModuleName):
             )
         )
     } else {
-        observe(modules, moduleName)
-        return modules[moduleName]?.source ?? ''
+        return observe(observe(modules, moduleName), 'source') ?? ''
     }
 })
 
