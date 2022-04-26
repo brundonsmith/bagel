@@ -891,6 +891,24 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Complex narrowing",
+  fn() {
+    testTypecheck(`
+    func trim(s: true|string) =>
+      if s instanceof string {
+        s
+      } else {
+        'foo'
+      }
+
+    func foo(val: boolean|string): false|string =>
+      val && val.trim()
+    `,
+    false)
+  }
+})
+
+Deno.test({
   name: "Object type spread 1",
   fn() {
     testTypecheck(
@@ -1056,6 +1074,42 @@ Deno.test({
       
       func fn(obj: Obj): number|nil =>
         obj.foo.bar`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Optional chain indexer pass",
+  fn() {
+    testTypecheck(
+      `
+      type Obj = {
+        foo: nil | {
+          bar: number
+        }
+      }
+      
+      func fn(obj: Obj): number|nil =>
+        obj.foo?.['bar']`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Optional chain indexer fail",
+  fn() {
+    testTypecheck(
+      `
+      type Obj = {
+        foo: nil | {
+          bar: number
+        }
+      }
+      
+      func fn(obj: Obj): number|nil =>
+        obj.foo['bar']`,
       true,
     );
   },
