@@ -1,4 +1,4 @@
-import { AST, Block, Debug, PlainIdentifier, SourceInfo } from "./ast.ts";
+import { AST, Block, Debug, Destructure, NameAndType, PlainIdentifier, SourceInfo } from "./ast.ts";
 import { FuncType, GenericFuncType, GenericProcType, ProcType, TypeExpression } from "./type-expressions.ts";
 
 export type Expression = 
@@ -49,23 +49,13 @@ export type JsFunc = SourceInfo & {
 
 export type InlineConstGroup = SourceInfo & {
     readonly kind: "inline-const-group",
-    readonly declarations: readonly (InlineConstDeclaration|InlineDestructuringDeclaration)[],
+    readonly declarations: readonly InlineDeclaration[],
     readonly inner: Expression
 }
 
-export type InlineConstDeclaration = SourceInfo & {
-    readonly kind: "inline-const-declaration",
-    readonly name: PlainIdentifier,
-    readonly type?: TypeExpression,
-    readonly awaited: boolean,
-    readonly value: Expression,
-}
-
-export type InlineDestructuringDeclaration = SourceInfo & {
-    readonly kind: "inline-destructuring-declaration",
-    readonly properties: readonly PlainIdentifier[],
-    readonly spread: PlainIdentifier|undefined,
-    readonly destructureKind: 'array'|'object',
+export type InlineDeclaration = SourceInfo & {
+    readonly kind: "inline-declaration",
+    readonly destination: NameAndType | Destructure,
     readonly awaited: boolean,
     readonly value: Expression,
 }
@@ -127,6 +117,7 @@ export type Invocation = SourceInfo & {
     readonly args: readonly Expression[],
     readonly typeArgs: readonly TypeExpression[],
     readonly bubbles: boolean,
+    readonly awaited?: boolean, // only used when this is a statement in a proc!
 }
 
 export type PropertyAccessor = SourceInfo & {

@@ -670,7 +670,7 @@ Deno.test({
     `,
     `
     const doStuff = async (plan: ___Plan<string>): Promise<void> => { 
-      const str = await plan();
+      const str = await (plan)();
       log(str);
     };
     `)
@@ -743,7 +743,7 @@ Deno.test({
     `,
     `
     const foo = (obj: {a: string, b: number}) => ((() => {
-      const { a } = obj
+      const { a } = obj;
       return a;
     })());
     `)

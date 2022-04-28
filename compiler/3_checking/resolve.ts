@@ -130,16 +130,16 @@ const resolveInner = (name: string, from: AST, originator: AST): Binding|undefin
             for (let statementIndex = 0; statementIndex < parent.statements.length; statementIndex++) {
                 const statement = parent.statements[statementIndex]
 
-                if (statement.kind === "value-declaration-statement" || statement.kind === 'destructuring-declaration-statement' || statement.kind === 'await-statement') {
-                    if (statement.kind !== 'destructuring-declaration-statement') {
-                        if (statement.name?.name === name) {
+                if (statement.kind === "declaration-statement") {
+                    if (statement.destination.kind === 'name-and-type') {
+                        if (statement.destination.name?.name === name) {
                             return {
                                 owner: statement,
-                                identifier: statement.name
+                                identifier: statement.destination.name
                             }
                         }
                     } else {
-                        for (const property of statement.properties) {
+                        for (const property of statement.destination.properties) {
                             if (property.name === name) {
                                 return {
                                     owner: statement,
@@ -171,15 +171,15 @@ const resolveInner = (name: string, from: AST, originator: AST): Binding|undefin
             for (let declarationIndex = 0; declarationIndex < parent.declarations.length; declarationIndex++) {
                 const declaration = parent.declarations[declarationIndex]
 
-                if (declaration.kind === 'inline-const-declaration') {
-                    if (declaration.name.name === name) {
+                if (declaration.destination.kind === 'name-and-type') {
+                    if (declaration.destination.name.name === name) {
                         return {
                             owner: declaration,
-                            identifier: declaration.name
+                            identifier: declaration.destination.name
                         }
                     }
                 } else {
-                    for (const property of declaration.properties) {
+                    for (const property of declaration.destination.properties) {
                         if (property.name === name) {
                             return {
                                 owner: declaration,

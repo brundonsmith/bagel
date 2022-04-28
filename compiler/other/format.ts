@@ -83,17 +83,36 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "block":
             return `{${br}${ast.statements.map(s => nextIndentation + fIndent(s)).join(br)}${br}${currentIndentation}}`
         case "value-declaration":
-        case "value-declaration-statement":
-            return (ast.kind === 'value-declaration' ? exported(ast.exported) : '') + 
-                (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${f(ast.value)}` +
-                (ast.kind === 'value-declaration-statement' ? ';' : '')
+            return exported(ast.exported) + 
+                (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${f(ast.value)}`
+        case "declaration-statement":
+        case "inline-declaration": {
+            const keyword = (
+                ast.kind === 'declaration-statement' && !ast.isConst
+                    ? 'let'
+                    : 'const'
+            )
+            const value = f(ast.value)
+            const endCap = ast.kind === 'declaration-statement' ? ';' : ''
+
+            return `${keyword} ${f(ast.destination)} = ${ast.awaited ? 'await ' : ''}${value}${endCap}`
+        }
+        case "name-and-type":
+            return ast.name.name + maybeTypeAnnotation(options, indent, parent, ast.type)
+        case "destructure": {
+            const [l, r] = ast.destructureKind === 'object' ? ['{', '}'] : ['[', ']']
+            const entries = [
+                ast.properties.map(p => p.name),
+                ast.spread ? '...' + ast.spread.name : undefined
+            ].filter(s => s != null)
+
+            return `${l} ${entries.join(', ')} ${r}`
+        }
         case "derive-declaration":
         case "remote-declaration": {
             const keyword = ast.kind === 'derive-declaration' ? 'derive' : 'remote'
             return exported(ast.exported) + `${keyword} ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} => ${format(ast.expr)}`
         }
-        case "await-statement":
-            return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ` : '') + `await ${f(ast.plan)};`
         case "type-declaration":
             if (ast.type.kind === 'nominal-type') {
                 const inner = ast.type.inner ? `(${f(ast.type.inner)})` : ''
@@ -152,7 +171,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "while-loop":
             return `while ${f(ast.condition)} ${f(ast.body)}`
         case "invocation":
-            return `${f(ast.subject)}${maybeTypeArgs(options, indent, parent, ast.typeArgs)}(${ast.args.map(f).join(', ')})` + (parent?.kind === 'block' ? ';' : '')
+            return (ast.awaited ? 'await ' : '') + `${f(ast.subject)}${maybeTypeArgs(options, indent, parent, ast.typeArgs)}(${ast.args.map(f).join(', ')})` + (parent?.kind === 'block' ? ';' : '')
         case "property-accessor": {
             const operator = (
                 ast.optional ? '?.' :
@@ -204,20 +223,6 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return `!debug[${f(ast.inner)}]`
         case "inline-const-group":
             return ast.declarations.map(d => nextIndentation + fIndent(d) + ',' + br).join('') + fIndent(ast.inner)
-        case "inline-const-declaration":
-            return `const ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} = ${ast.awaited ? 'await ' : ''}${f(ast.value)}`
-        case "inline-destructuring-declaration":
-        case "destructuring-declaration-statement": {
-            const propsAndSpread = ast.properties.map(p => p.name).join(', ') + (ast.spread ? `, ...${ast.spread.name}` : '')
-            const value = ast.kind === "inline-destructuring-declaration" && ast.awaited ? `await ${f(ast.value)}` : f(ast.value)
-            const semicolon = ast.kind === "destructuring-declaration-statement" ? ';' : ''
-
-            if (ast.destructureKind === 'object') {
-                return `const { ${propsAndSpread} } = ${value}` + semicolon
-            } else {
-                return `const [ ${propsAndSpread} ] = ${value}` + semicolon
-            }
-        }
         case "element-tag": {
             const close = ast.children.length === 0
                 ? ' />'

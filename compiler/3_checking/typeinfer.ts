@@ -7,7 +7,7 @@ import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { areSame, expressionsEqual, getName, literalType, mapParseTree, maybeOf, typesEqual, unionOf } from "../utils/ast.ts";
 import { getModuleByName } from "../store.ts";
-import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration, ImportItem } from "../_model/declarations.ts";
+import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
 import { computedFn } from "../../lib/ts/reactivity.ts";
@@ -483,49 +483,77 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
     const decl = binding.owner
 
     switch (decl.kind) {
-        case 'value-declaration':
-        case 'value-declaration-statement': {
-            const baseType = decl.type ?? resolveType(inferType(decl.value, visited))
-            const mutability: MutabilityKind = given(baseType.mutability, mutability =>
-                decl.isConst || (decl.kind === 'value-declaration' && decl.exported === 'expose' && decl.module !== module)
+        case 'value-declaration':{
+            if (decl.type != null) return decl.type
+
+            const valueType = resolveType(inferType(decl.value, visited))
+            const mutability: MutabilityKind = given(valueType.mutability, mutability =>
+                decl.isConst || (decl.exported === 'expose' && decl.module !== module)
                     ? 'immutable'
                     : mutability
             )
 
             // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
-            const broadenedBaseType = (
+            const broadenedValueType = (
                 !decl.isConst
-                    ? broadenTypeForMutation(baseType)
-                    : baseType
+                    ? broadenTypeForMutation(valueType)
+                    : valueType
             )
 
             return {
-                ...broadenedBaseType,
+                ...broadenedValueType,
                 mutability: mutability === 'literal' ? 'mutable' : mutability
             } as TypeExpression
         }
         case 'func-declaration':
-        case 'proc-declaration':
-        case 'inline-const-declaration': {
-            const baseType = resolveType(inferType(decl.value, visited))
-            const mutability: MutabilityKind = given(baseType.mutability, () =>
-                decl.kind === 'func-declaration' || decl.kind === 'proc-declaration'
-                    ? 'immutable'
-                    : 'readonly')
+        case 'proc-declaration': {
+            return resolveType(inferType(decl.value, visited))
+        }
+        case 'declaration-statement':
+        case 'inline-declaration': {
+            if (decl.destination.kind === 'name-and-type' && decl.destination.type != null) return decl.destination.type
 
-            if (decl.kind === 'inline-const-declaration' && decl.awaited) {
-                if (baseType.kind === 'plan-type') {
-                    return baseType.inner
+            let valueType = resolveType(inferType(decl.value, visited))
+            if (decl.awaited) {
+                if (valueType.kind === 'plan-type') {
+                    valueType = valueType.inner
                 } else {
-                    return UNKNOWN_TYPE
+                    valueType = UNKNOWN_TYPE
                 }
             }
-            
-            return {
-                ...baseType,
-                mutability
-            } as TypeExpression
-        }
+
+            const mutability: MutabilityKind = given(valueType.mutability, mutability =>
+                decl.kind === 'declaration-statement' && decl.isConst
+                    ? 'immutable'
+                    : mutability
+            )
+
+            // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
+            const broadenedValueType = (
+                decl.kind === 'declaration-statement' && !decl.isConst
+                    ? broadenTypeForMutation(valueType)
+                    : valueType
+            )
+
+            if (decl.destination.kind === 'name-and-type') {
+                return {
+                    ...broadenedValueType,
+                    mutability: mutability === 'literal' ? 'mutable' : mutability
+                } as TypeExpression
+            } else {
+                if (decl.destination.destructureKind === 'object' && valueType.kind === 'object-type') {
+                    const props = propertiesOf(valueType)
+                    return props?.find(prop => getName(prop.name) === binding.identifier.name)?.type ?? UNKNOWN_TYPE
+                } else if (decl.destination.destructureKind === 'array') {
+                    if (valueType.kind === 'array-type') {
+                        return maybeOf(valueType.element)
+                    } else if (valueType.kind === 'tuple-type') {
+                        const index = decl.destination.properties.findIndex(p => p.name === binding.identifier.name)
+                        return valueType.members[index] ?? UNKNOWN_TYPE
+                    }
+                }
+            }
+        } break;
         case 'derive-declaration':
             return decl.type ?? resolveType(inferType(decl.expr, visited))
         case 'remote-declaration': {
@@ -540,46 +568,6 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
                 module, code, startIndex, endIndex
             }
         }
-        case 'await-statement': {
-
-            if (decl.type) {
-                return {
-                    ...decl.type,
-                    mutability: decl.type.mutability ? 'immutable' : undefined
-                } as TypeExpression
-            }
-
-            if (decl.name == null) {
-                return UNKNOWN_TYPE
-            }
-
-            const planType = resolveType(inferType(decl.plan, visited))
-            if (planType.kind !== 'plan-type') {
-                return UNKNOWN_TYPE
-            } else {
-                return {
-                    ...planType.inner,
-                    mutability: planType.inner.mutability ? 'immutable' : undefined
-                } as TypeExpression
-            }
-        }
-        case 'inline-destructuring-declaration':
-        case 'destructuring-declaration-statement': {
-            const objectOrArrayType = resolveType(inferType(decl.value, visited))
-
-            if (decl.destructureKind === 'object' && objectOrArrayType.kind === 'object-type') {
-                const props = propertiesOf(objectOrArrayType)
-
-                return props?.find(prop => getName(prop.name) === binding.identifier.name)?.type ?? UNKNOWN_TYPE
-            } else if (decl.destructureKind === 'array') {
-                if (objectOrArrayType.kind === 'array-type') {
-                    return maybeOf(objectOrArrayType.element)
-                } else if (objectOrArrayType.kind === 'tuple-type') {
-                    const index = decl.properties.findIndex(p => p.name === binding.identifier.name)
-                    return objectOrArrayType.members[index] ?? UNKNOWN_TYPE
-                }
-            }
-        } break;
         case 'func':
         case 'proc': {
             const funcOrProcType = decl.type.kind === 'generic-type' ? decl.type.inner : decl.type
@@ -1412,12 +1400,13 @@ function isAsync(block: Block): boolean {
     for (const statement of block.statements) {
         switch (statement.kind) {
             case 'invocation': {
-                const procType = inferType(statement.subject)
+                return statement.awaited === true
+                // const procType = inferType(statement.subject)
 
-                if (procType.kind === 'proc-type' && procType.isAsync) {
-                    return true
-                }
-            } break;
+                // if (procType.kind === 'proc-type' && procType.isAsync) {
+                //     return true
+                // }
+            }
             case 'for-loop':
             case 'while-loop':
                 if (isAsync(statement.body)) return true
@@ -1433,8 +1422,8 @@ function isAsync(block: Block): boolean {
                     return true
                 }
                 break;
-            case 'await-statement':
-                return true;
+            case 'declaration-statement':
+                return statement.awaited;
         }
     }
 

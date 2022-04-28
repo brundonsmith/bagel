@@ -1,7 +1,7 @@
-import { AwaitStatement, DestructuringDeclarationStatement, ForLoop, TryCatch, ValueDeclarationStatement } from "./statements.ts";
+import { ForLoop, TryCatch, DeclarationStatement } from "./statements.ts";
 import { GenericParamType, TypeExpression } from "./type-expressions.ts";
 import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, TypeDeclaration, ImportItem } from "./declarations.ts";
-import { Expression, Func, InlineConstDeclaration, InlineDestructuringDeclaration, Proc } from "./expressions.ts";
+import { Expression, Func, InlineDeclaration, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
 import { AST, PlainIdentifier } from "./ast.ts";
@@ -17,18 +17,15 @@ export type Binding = {
         | ValueDeclaration
         | ProcDeclaration
         | FuncDeclaration
-        | ValueDeclarationStatement
-        | InlineConstDeclaration
+        | DeclarationStatement
         | DeriveDeclaration
         | RemoteDeclaration
-        | AwaitStatement
         | ForLoop
         | Func
         | Proc
         | ImportAllDeclaration
         | ImportItem
-        | InlineDestructuringDeclaration
-        | DestructuringDeclarationStatement
+        | InlineDeclaration
         | TypeDeclaration
         | GenericParamType
         | TryCatch
@@ -48,17 +45,14 @@ export function getBindingMutability(binding: Binding, from: AST): "immutable"|"
             return 'mutable'
         case 'func-declaration':
         case 'proc-declaration':
-        case 'inline-const-declaration':
         case 'derive-declaration':
         case 'remote-declaration':
-        case 'await-statement':
-        case 'inline-destructuring-declaration':
-        case 'destructuring-declaration-statement':
+        case 'inline-declaration':
         case 'type-declaration':
         case 'generic-param-type':
         case 'try-catch':
             return 'immutable'
-        case 'value-declaration-statement':
+        case 'declaration-statement':
             return !binding.owner.isConst ? 'assignable' : 'immutable'
         default:
             // @ts-expect-error: exhaustiveness

@@ -1,34 +1,23 @@
-import { SourceInfo,PlainIdentifier,Block } from "./ast.ts";
+import { SourceInfo,PlainIdentifier,Block, Destructure, NameAndType } from "./ast.ts";
 import { Expression, Invocation, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions.ts";
-import { TypeExpression } from "./type-expressions.ts";
 
 export type Statement = 
     | JavascriptEscape
-    | ValueDeclarationStatement
-    | DestructuringDeclarationStatement
+    | DeclarationStatement
     | IfElseStatement
     | ForLoop
     | WhileLoop
     | Assignment
     | Invocation
-    | AwaitStatement
     | TryCatch
     | ThrowStatement
 
-export type ValueDeclarationStatement = SourceInfo & {
-    readonly kind: "value-declaration-statement",
-    readonly name: PlainIdentifier,
-    readonly type: TypeExpression|undefined,
+export type DeclarationStatement = SourceInfo & {
+    readonly kind: "declaration-statement",
+    readonly destination: NameAndType | Destructure,
     readonly value: Expression,
+    readonly awaited: boolean,
     readonly isConst: boolean,
-}
-
-export type DestructuringDeclarationStatement = SourceInfo & {
-    readonly kind: "destructuring-declaration-statement",
-    readonly properties: readonly PlainIdentifier[],
-    readonly spread: PlainIdentifier|undefined,
-    readonly destructureKind: 'array'|'object',
-    readonly value: Expression,
 }
 
 export type IfElseStatement = SourceInfo & {
@@ -60,14 +49,6 @@ export type Assignment = SourceInfo & {
     readonly kind: "assignment",
     readonly target: LocalIdentifier | PropertyAccessor,
     readonly value: Expression,
-}
-
-export type AwaitStatement = SourceInfo & {
-    readonly kind: "await-statement",
-    readonly plan: Expression,
-    readonly noAwait: boolean,
-    readonly name: PlainIdentifier|undefined,
-    readonly type: TypeExpression|undefined,
 }
 
 export type TryCatch = SourceInfo & {

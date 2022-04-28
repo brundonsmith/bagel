@@ -1,5 +1,5 @@
 import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws } from "./typeinfer.ts";
@@ -106,12 +106,12 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 for (const stmt of current.statements) {
                     const names = (() => {
                         switch(stmt.kind) {
-                            case "value-declaration-statement":
-                                return [stmt.name]
-                            case "destructuring-declaration-statement":
-                                return stmt.properties
-                            case "await-statement":
-                                return stmt.name ? [stmt.name] : []
+                            case "declaration-statement":
+                                if (stmt.destination.kind === 'name-and-type') {
+                                    return [stmt.destination.name]
+                                } else {
+                                    return stmt.destination.properties
+                                }
                             case "invocation":
                             case "if-else-statement":
                             case "for-loop":
@@ -174,17 +174,11 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 const duplicates = new Set<PlainIdentifier>()
 
                 for (const decl of current.declarations) {
-                    const names = (() => {
-                        switch(decl.kind) {
-                            case "inline-const-declaration":
-                                return [decl.name]
-                            case "inline-destructuring-declaration":
-                                return decl.properties
-                            default:
-                                // @ts-expect-error: exhaustiveness
-                                throw Error(decl.kind)
-                        }
-                    })()
+                    const names = (
+                        decl.destination.kind === 'name-and-type'
+                            ? [decl.destination.name]
+                            : decl.destination.properties
+                    )
 
                     for (const name of names) {
                         const existing = seen.get(name.name)
@@ -202,83 +196,53 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break
             case "value-declaration":
-            case "value-declaration-statement":
-            case "inline-const-declaration": {
+            case "declaration-statement":
+            case "inline-declaration": {
+                const declaredType = (
+                    current.kind === 'value-declaration' ? current.type :
+                    current.destination.kind === 'name-and-type' ? (
+                        current.awaited
+                            ? given(current.destination.type, planOf)
+                            : current.destination.type
+                    ) :
+                    undefined
+                )
 
-                if (current.kind === 'inline-const-declaration' && current.awaited) {
-                    const planType = inferType(current.value)
-
-                    if (subsumationIssues(PLAN_OF_ANY, planType)) {
-                        // make sure value is a plan
-                        reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${msgFormat(planType)}'`))
-                    } else if (current.type != null) {
-
-                        // make sure value fits declared type, if there is one
-                        const expectedPlanType = planOf(current.type)
-                        given(subsumationIssues(expectedPlanType, planType), issues => {
-                            reportError(assignmentError(current.value, expectedPlanType, planType, issues))
-                        })
-                    }
-                } else {
-                    // make sure value fits declared type, if there is one
-                    if (current.type != null) {
-                        expect(reportError, current.type, current.value)
-                    }
+                if (declaredType) {
+                    expect(reportError, declaredType, current.value)
                 }
-            } break;
-            case "await-statement": {
-                const planType = inferType(current.plan)
 
-                if (subsumationIssues(PLAN_OF_ANY, planType)) {
-                    // make sure value is a plan
-                    reportError(miscError(current.plan, `Can only await expressions of type Plan; found type '${msgFormat(planType)}'`))
-                } else if (current.type != null) {
-
-                    // make sure value fits declared type, if there is one
-                    const expectedPlanType = planOf(current.type)
-                    given(subsumationIssues(expectedPlanType, planType), issues => {
-                        reportError(assignmentError(current.plan, expectedPlanType, planType, issues))
-                    })
-                }
-            } break;
-            case "inline-destructuring-declaration":
-            case "destructuring-declaration-statement": {
-                let valueType = inferType(current.value)
-                
-                if (current.kind === 'inline-destructuring-declaration' && current.awaited) {
+                let valueType = resolveType(inferType(current.value))
+                if (current.kind !== 'value-declaration' && current.awaited) {
                     if (subsumationIssues(PLAN_OF_ANY, valueType)) {
                         // make sure value is a plan
                         reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${msgFormat(valueType)}'`))
                     } else {
-                        const resolvedValueType = resolveType(valueType)
-
-                        valueType = (
-                            resolvedValueType.kind === 'plan-type'
-                                ? resolvedValueType.inner
-                                : UNKNOWN_TYPE
-                        )
+                        valueType = (valueType as PlanType).inner
                     }
                 }
-                
-                if (current.destructureKind === 'object') {
-                    if (subsumationIssues(RECORD_OF_ANY, valueType)) {
-                        reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${msgFormat(valueType)}'`))
-                    } else {
-                        const objectProperties = propertiesOf(valueType)
-                        for (const property of current.properties) {
-                            if (!objectProperties?.find(prop => getName(prop.name) === property.name)) {
-                                reportError(miscError(property, `Property '${property.name}' does not exist on type '${msgFormat(valueType)}'`))
+
+                if (current.kind !== 'value-declaration' && current.destination.kind === 'destructure') {
+                    if (current.destination.destructureKind === 'object') {
+                        if (subsumationIssues(RECORD_OF_ANY, valueType)) {
+                            reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${msgFormat(valueType)}'`))
+                        } else {
+                            const objectProperties = propertiesOf(valueType)
+                            for (const property of current.destination.properties) {
+                                if (!objectProperties?.find(prop => getName(prop.name) === property.name)) {
+                                    reportError(miscError(property, `Property '${property.name}' does not exist on type '${msgFormat(valueType)}'`))
+                                }
                             }
                         }
-                    }
-                } else {
-                    if (subsumationIssues(ARRAY_OF_ANY, valueType)) {
-                        reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type '${msgFormat(valueType)}'`))
                     } else {
-                        const resolvedValueType = resolveType(valueType)
-                        if (resolvedValueType.kind === 'tuple-type') {
-                            for (let i = resolvedValueType.members.length; i < current.properties.length; i++) {
-                                reportError(miscError(current.properties[i], `Can't destructure element in index ${i}, because the provided tuple only has ${resolvedValueType.members.length} elements`))
+                        if (subsumationIssues(ARRAY_OF_ANY, valueType)) {
+                            reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type '${msgFormat(valueType)}'`))
+                        } else {
+                            const resolvedValueType = resolveType(valueType)
+                            if (resolvedValueType.kind === 'tuple-type') {
+                                for (let i = resolvedValueType.members.length; i < current.destination.properties.length; i++) {
+                                    reportError(miscError(current.destination.properties[i], `Can't destructure element in index ${i}, because the provided tuple only has ${resolvedValueType.members.length} elements`))
+                                }
                             }
                         }
                     }
@@ -549,9 +513,8 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                 if (binding) {
                     if (binding.kind === 'value-declaration' || 
-                        binding.kind === 'value-declaration-statement' ||
-                        binding.kind === 'inline-const-declaration' ||
-                        binding.kind === 'inline-destructuring-declaration') {
+                        binding.kind === 'declaration-statement' ||
+                        binding.kind === 'inline-declaration') {
 
                         // using a let-declaration to initialize a const
                         if (binding.kind === 'value-declaration' && 
@@ -562,10 +525,9 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         }
 
                         const declarations = (
-                            binding.kind === 'value-declaration' ? (binding.parent as Module).declarations :
-                            binding.kind === 'value-declaration-statement' ? (binding.parent as Block).statements :
-                            binding.kind === 'inline-const-declaration' ? (binding.parent as InlineConstGroup).declarations :
-                            binding.kind === 'inline-destructuring-declaration' ? (binding.parent as InlineConstGroup).declarations :
+                            binding.kind === 'value-declaration' ?     (binding.parent as Module).declarations :
+                            binding.kind === 'declaration-statement' ? (binding.parent as Block).statements :
+                            binding.kind === 'inline-declaration' ?    (binding.parent as InlineConstGroup).declarations :
                             undefined
                         )
 
@@ -723,6 +685,8 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     expect(reportError, VALID_RECORD_KEY, current.key)
                 }
                 break;
+            case "name-and-type":
+            case "destructure":
             case "autorun-declaration":
             case "if-else-expression":
             case "if-else-statement":

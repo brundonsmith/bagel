@@ -131,21 +131,38 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
             return compileProcDeclaration(excludeTypes, module, destination, ast)
         case "func-declaration":
             return compileFuncDeclaration(excludeTypes, module, destination, ast)
-        case "value-declaration":
-        case "value-declaration-statement": {
-            const prefix = ast.kind === 'value-declaration' ? exported(ast.exported) : ''
+        case "value-declaration": {
+            const prefix = exported(ast.exported)
 
-            if (ast.kind === 'value-declaration' && !ast.isConst) {
+            if (!ast.isConst) {
                 const type = !excludeTypes && ast.type ? `: { value: ${c(ast.type)} }` : ''
-                const value = `{ value: ${c(ast.value)} }`
-
-                return prefix + `const ${ast.name.name}${type} = ${value}`
+                return prefix + `const ${ast.name.name}${type} = { value: ${c(ast.value)} }`
             } else {
-                const type = !excludeTypes && ast.type ? `: ${c(ast.type)}` : ''
-                const value = c(ast.value)
-                
-                return prefix + (ast.isConst ? 'const' : 'let') + ` ${ast.name.name}${type} = ${value}`;
+                const type = maybeTypeAnnotation(excludeTypes, module, destination, ast.type)
+                return prefix + `const ${ast.name.name}${type} = ${c(ast.value)}`;
             }
+        }
+        case "declaration-statement":
+        case "inline-declaration": {
+            const keyword = (
+                ast.kind === 'declaration-statement' && !ast.isConst
+                    ? 'let'
+                    : 'const'
+            )
+            const value = c(ast.value)
+
+            return `${keyword} ${c(ast.destination)} = ${ast.awaited ? awaited(value) : value}` + (ast.kind === 'inline-declaration' ? ';' : '')
+        }
+        case "name-and-type":
+            return ast.name.name + maybeTypeAnnotation(excludeTypes, module, destination, ast.type)
+        case "destructure": {
+            const [l, r] = ast.destructureKind === 'object' ? ['{', '}'] : ['[', ']']
+            const entries = [
+                ast.properties.map(p => p.name),
+                ast.spread ? '...' + ast.spread.name : undefined
+            ].filter(s => s != null)
+
+            return `${l} ${entries.join(', ')} ${r}`
         }
         case "derive-declaration": 
             return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `: () => ${c(ast.type)}` : ``} = ${INT}computedFn(
@@ -157,17 +174,6 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
             )`
         }
         case "autorun-declaration": return `${INT}autorun(() => ${c(ast.effect)})`;
-        case "destructuring-declaration-statement":
-        case "inline-destructuring-declaration": {
-            const propsAndSpread = ast.properties.map(p => p.name).join(', ') + (ast.spread ? `, ...${ast.spread.name}` : '')
-            const value = ast.kind === "inline-destructuring-declaration" && ast.awaited ? `await (${c(ast.value)})()` : c(ast.value)
-
-            if (ast.destructureKind === 'object') {
-                return `const { ${propsAndSpread} } = ${value}`
-            } else {
-                return `const [ ${propsAndSpread} ] = ${value}`
-            }
-        }
         case "assignment": {
             const value = c(ast.value)
 
@@ -190,9 +196,6 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
 
                 return `${c(ast.target.subject)}${property} = ${value}; ${INT}invalidate(${c(ast.target.subject)}, ${propertyExpr})`
             }
-        }
-        case "await-statement": {
-            return (ast.name ? `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, destination, ast.type)} = ` : '') + `await ${c(ast.plan)}()`
         }
         case "if-else-statement": return 'if ' + ast.cases
             .map(({ condition, outcome }) => 
@@ -221,8 +224,6 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
                 return body
             }
         }
-        case "inline-const-declaration":
-            return `const ${ast.name.name}${maybeTypeAnnotation(excludeTypes, module, destination, ast.type)} = ${ast.awaited ? `await (${c(ast.value)})()` : c(ast.value)};`
         case "invocation": {
             
             // method call
@@ -233,7 +234,12 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
             const typeArgs = invocation.kind === "invocation" && invocation.typeArgs.length > 0 ? `<${invocation.typeArgs.map(c).join(',')}>` : ''
             const args = invocation.args.map(c).join(', ')
 
-            const compiledInvocation = `${c(invocation.subject)}${typeArgs}(${args})`
+            const baseInvocation = `${c(invocation.subject)}${typeArgs}(${args})`
+            const compiledInvocation = (
+                ast.awaited
+                    ? awaited(baseInvocation)
+                    : baseInvocation
+            )
 
             if (subjectType.kind === 'proc-type' && subjectType.throws) {
                 return `{
@@ -498,5 +504,8 @@ const truthify = (excludeTypes: boolean, module: ModuleName, destination: 'cache
     const negation = op === "&&" ? "" : "!"
     return `(${negation + truthinessOf(compiledExpr)} ? ${compileOne(excludeTypes, module, destination, rest)} : ${compiledExpr})`
 }
+
+const awaited = (plan: string) =>
+    `await (${plan})()`
 
 // TODO: const nominal types (generalized const wrapper for any given type?)

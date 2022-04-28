@@ -1,6 +1,6 @@
 import { ModuleName } from "./common.ts";
 import { Declaration, ImportItem } from "./declarations.ts";
-import { Case, Expression, InlineConstDeclaration, InlineDestructuringDeclaration, ObjectEntry, Operator, Spread, SwitchCase } from "./expressions.ts";
+import { Case, Expression, InlineDeclaration, ObjectEntry, Operator, Spread, SwitchCase } from "./expressions.ts";
 import { CaseBlock, Statement } from "./statements.ts";
 import { Arg, Attribute, TypeExpression } from "./type-expressions.ts";
 
@@ -21,9 +21,10 @@ export type AST = (
     | Arg
     | ImportItem
     | Spread
-    | InlineConstDeclaration
-    | InlineDestructuringDeclaration
+    | InlineDeclaration
     | ObjectEntry
+    | NameAndType
+    | Destructure
 )
 
 export type Module = SourceInfo & {
@@ -41,6 +42,19 @@ export type PlainIdentifier = SourceInfo & {
 export type Block = SourceInfo & {
     readonly kind: "block",
     readonly statements: readonly Statement[],
+}
+
+export type NameAndType = SourceInfo & {
+    readonly kind: "name-and-type",
+    readonly name: PlainIdentifier,
+    readonly type?: TypeExpression,
+}
+
+export type Destructure = SourceInfo & {
+    readonly kind: "destructure"
+    readonly properties: PlainIdentifier[],
+    readonly spread: PlainIdentifier|undefined,
+    readonly destructureKind: 'array'|'object',
 }
 
 export type Debug = SourceInfo & {
