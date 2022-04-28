@@ -355,7 +355,42 @@ const BAGEL_SNIPPETS = [
       func foo(a: number?, b: string?, c: boolean): number|string|boolean => a ?? b ?? c`, `
       func foo(a: string?, b: string?): string => a ?? b ?? 12`,
       `export nominal type Foo({ prop1: string, prop2: number })`,
-      `const el = <foo a='b' />`
+      `const el = <foo a='b' />`,
+      `import './foo.bgl' as bar`,
+      `from './foo.bgl' import { a, b as stuff }`,
+      `js proc foo() {#
+        console.log("hello world")
+      #}`,
+      `js func foo(): string => {#
+        console.log("hello world")
+      #}`,
+      `func foo<T>(x: T): T => x`,
+      `derive foo: string => ('a' + 'b')`,
+      `remote foo: string => fetch('foo')`,
+      `const str = 'Hello, \${name}!'`,
+      `proc foo() {
+        while true {
+          log('stuff');
+        }
+      }`,
+      `func foo(n: number, obj: { prop: string }, arr: number[]) =>
+        const a = n * 2,
+        const { prop } = obj,
+        const [el] = arr,
+        a + prop`,
+      `proc foo(n: number, obj: { prop: string }, arr: number[]) {
+        const a = n * 2;
+        const { prop } = obj;
+        const [el] = arr;
+      }`,
+      `const err = Error(12)`,
+      `const range = 0..9`,
+      `type P = (a: number) { }`,
+      `type F = (a: number) => string`,
+      `type A = typeof 12`,
+      `type A = keyof B`,
+      `type A = valueof B`,
+      `type A = elementof B`
 ]
 
 for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {

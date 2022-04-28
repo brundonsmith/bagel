@@ -128,7 +128,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                 ast.entries.map(f).join(', ')
             }]`
         case "string-literal":
-            return `'${ast.segments.map(segment => typeof segment === 'string' ? segment : '${' + f(segment) + '}')}'`
+            return `'${ast.segments.map(segment => typeof segment === 'string' ? segment : '${' + f(segment) + '}').join('')}'`
         case "exact-string-literal":
             return `'${ast.value}'`
         case "number-literal":
@@ -262,19 +262,27 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "nil-type": return `nil`;
         case "literal-type": return JSON.stringify(ast.value.value).replaceAll('"', "'");
         case "nominal-type": return ast.name ?? '<unnamed nominal>';
-        case "iterator-type": return ast.inner.kind === 'any-type' ? `Iterator` : `Iterator<${f(ast.inner)}>`;
-        case "plan-type":     return ast.inner.kind === 'any-type' ? `Plan` : `Plan<${f(ast.inner)}>`;
-        case "error-type":    return ast.inner.kind === 'any-type' ? `Error` : `Error<${f(ast.inner)}>`;
-        case "remote-type":   return ast.inner.kind === 'any-type' ? `Remote` : `Remote<${f(ast.inner)}>`
+        case "iterator-type":
+        case "plan-type":
+        case "error-type":
+        case "remote-type": {
+            const segment = ast.kind.split('-')[0]
+            const typeName = segment[0].toUpperCase() + segment.slice(1)
+
+            return ast.inner.kind === 'any-type' ? typeName : `${typeName}<${f(ast.inner)}>`
+        }
         case "unknown-type": return "unknown";
         case "any-type": return "<any>";
         case "never-type": return "<never>";
         case "element-type": return `Element`;
         case "parenthesized-type": return `(${f(ast.inner)})`;
         case "typeof-type": return `typeof ${f(ast.expr)}`;
-        case "keyof-type": return `keyof ${f(ast.inner)}`;
-        case "valueof-type": return `valueof ${f(ast.inner)}`;
-        case "elementof-type": return `elementof ${f(ast.inner)}`;
+        case "keyof-type":
+        case "valueof-type":
+        case "elementof-type": {
+            const keyword = ast.kind.split('-')[0]
+            return `${keyword} ${f(ast.inner)}`;
+        }
         // case "element-type": return `<${ast.tagName}>`;
         case "property-type": return `${f(ast.subject)}${ast.optional ? '?' : ''}.${ast.property.name}`;
         case "javascript-escape-type": return "<js escape>";

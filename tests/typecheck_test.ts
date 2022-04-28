@@ -2949,9 +2949,10 @@ Deno.test({
     testTypecheck(`
     proc foo(plan: Plan<string>) {
       const s1: string = await plan;
+      const x: string = s1;
 
       const s2 = await plan;
-      const x: string = s2;
+      const y: string = s2;
     }`,
     false)
   }
