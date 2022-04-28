@@ -153,50 +153,6 @@ export function memoize3<A1, A2, A3, R>(fn: (arg1: A1, arg2: A2, arg3: A3) => R)
     return mFn
 }
 
-export function memoize4<A1, A2, A3, A4, R>(fn: (arg1: A1, arg2: A2, arg3: A3, arg4: A4) => R): (arg1: A1, arg2: A2, arg3: A3, arg4: A4) => R {
-    if ((fn as any).memoized) {
-        return fn
-    }
-
-    const resultsMap = memoize3((_1: A1, _2: A2, _3: A3) => new Map<A4, R>())
-
-    const mFn = (arg1: A1, arg2: A2, arg3: A3, arg4: A4): R => {
-        const results = resultsMap(arg1, arg2, arg3)
-
-        if (!results.has(arg4)) {
-            results.set(arg4, fn(arg1, arg2, arg3, arg4))
-        }
-
-        return results.get(arg4) as R
-    }
-
-    mFn.memoized = true
-
-    return mFn
-}
-
-export function memoize5<A1, A2, A3, A4, A5, R>(fn: (arg1: A1, arg2: A2, arg3: A3, arg4: A4, arg5: A5) => R): (arg1: A1, arg2: A2, arg3: A3, arg4: A4, arg5: A5) => R {
-    if ((fn as any).memoized) {
-        return fn
-    }
-
-    const resultsMap = memoize4((_1: A1, _2: A2, _3: A3, _4: A4) => new Map<A5, R>())
-
-    const mFn = (arg1: A1, arg2: A2, arg3: A3, arg4: A4, arg5: A5): R => {
-        const results = resultsMap(arg1, arg2, arg3, arg4)
-
-        if (!results.has(arg5)) {
-            results.set(arg5, fn(arg1, arg2, arg3, arg4, arg5))
-        }
-
-        return results.get(arg5) as R
-    }
-
-    mFn.memoized = true
-
-    return mFn
-}
-
 export const cacheDir = () => {
     let baseDir;
     switch (Deno.build.os) {
