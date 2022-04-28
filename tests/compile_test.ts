@@ -570,7 +570,6 @@ Deno.test({
     const ___FooNominal = Symbol('FooNominal');
     const FooNominal = ((value: string): FooNominal => ({ kind: ___FooNominal, value })) as (((value: string) => FooNominal) & { sym: typeof ___FooNominal });
     FooNominal.sym = ___FooNominal;
-    (FooNominal as any).sym = ___FooNominal;
     type FooNominal = { kind: typeof ___FooNominal, value: string };
 
     const a = ___instanceOf(x, ___RT_STRING);
@@ -588,6 +587,195 @@ Deno.test({
     const m = ___instanceOf(x, { kind: ___RT_RECORD, key: ___RT_STRING, value: ___RT_NUMBER });
     const n = ___instanceOf(x, { kind: ___RT_OBJECT, entries: [{ key: 'a', value: ___RT_STRING, optional: false },{ key: 'b', value: ___RT_NUMBER, optional: false }] });
     const o = ___instanceOf(x, { kind: ___RT_OBJECT, entries: [{ key: 'a', value: ___RT_STRING, optional: false },{ key: 'b', value: ___RT_NUMBER, optional: true }] });
+    `)
+  }
+})
+
+Deno.test({
+  name: "Derive declaration",
+  fn() {
+    testCompile(`
+    let name = 'Brandon'
+    derive foo: string => 'Hello \${name}'
+    proc logFoo() {
+      log(foo);
+    }
+    `,
+    `
+    const name = { value: "Brandon" };
+    const foo: () => string = ___computedFn(
+      () => \`Hello \${___observe(name, 'value')}\`
+    );
+    const logFoo = (): void => { 
+      log(foo());
+    };
+    `)
+  }
+})
+
+Deno.test({
+  name: "Remote declaration",
+  fn() {
+    testCompile(`
+    let url = '/foo'
+    remote foo: JSON => fetch(url)
+    `,
+    `
+    const url = { value: "/foo" };
+    const foo: ___Remote<JSON> = new ___Remote(
+      () => fetch(___observe(url, 'value'))
+    );
+    `)
+  }
+})
+
+Deno.test({
+  name: "Non-JS truthiness",
+  fn() {
+    testCompile(`
+    func foo(n: number?) =>
+      n && n + 1
+    `,
+    `
+    const foo = (n: number|null|undefined) =>
+      (((n != null && (n as unknown) !== false && (n as any).kind !== ___ERROR_SYM)
+        ? (n + 1)
+        : n));
+    `)
+  }
+})
+
+Deno.test({
+  name: "Range operator",
+  fn() {
+    testCompile(`
+    const arr = (0..9).collectArray()
+    `,
+    `
+    const arr = collectArray((___range(0, 9)));
+    `)
+  }
+})
+
+Deno.test({
+  name: "Async proc",
+  fn() {
+    testCompile(`
+    proc doStuff(plan: Plan<string>) {
+      const str = await plan;
+      log(str);
+    }
+    `,
+    `
+    const doStuff = async (plan: ___Plan<string>): Promise<void> => { 
+      const str = await plan();
+      log(str);
+    };
+    `)
+  }
+})
+
+Deno.test({
+  name: "Async func",
+  fn() {
+    testCompile(`
+    func getStuff(plan: Plan<string>) => (
+      const str = await plan,
+      
+      str
+    )
+    `,
+    `
+    const getStuff = (plan: ___Plan<string>) => ((() => (async () => {
+      const str = await (plan)();
+      return str;
+    })()));
+    `)
+  }
+})
+
+Deno.test({
+  name: "Type declarations",
+  fn() {
+    testCompile(`
+    export type Foo = {
+      a: string[],
+      b: 'stuff',
+      c: Remote<Other>
+    }
+
+    export nominal type Bar(number)
+    `,
+    `
+    export type Foo = {a: string[], b: "stuff", c: ___Remote<Other>};
+
+    const ___Bar = Symbol('Bar');
+    export const Bar = ((value: number): Bar => ({ kind: ___Bar, value })) as (((value: number) => Bar) & { sym: typeof ___Bar });
+    Bar.sym = ___Bar;
+    export type Bar = { kind: typeof ___Bar, value: number };
+    `)
+  }
+})
+
+Deno.test({
+  name: "Imports",
+  fn() {
+    testCompile(`
+    from './foo.bgl' import { a, b as otherb }
+    import './bar.bgl' as bar
+    `,
+    `
+    import { a, b as otherb } from "${cachedFilePath(path.resolve(Deno.cwd(), 'foo.bgl.ts'))}";
+    import * as bar from "${cachedFilePath(path.resolve(Deno.cwd(), 'bar.bgl.ts'))}";
+    `)
+  }
+})
+
+Deno.test({
+  name: "Inline-destructuring declaration",
+  fn() {
+    testCompile(`
+    func foo(obj: { a: string, b: number }) =>
+      const { a } = obj,
+      a
+    `,
+    `
+    const foo = (obj: {a: string, b: number}) => ((() => {
+      const { a } = obj
+      return a;
+    })());
+    `)
+  }
+})
+
+Deno.test({
+  name: "Types",
+  fn() {
+    testCompile(`
+    type A = <T>({})
+    type B = (a: number) { }
+    type C = (a: string) => number
+    type D = Element
+    type E = { ...Other }
+    type F = {[string]: number}
+    type G = Error<string>
+    type H = unknown
+    type I = (string | number)
+    
+    const x = 'foo' as string
+    `,
+    `
+    type A = unknown;
+    type B = (a: number) => void;
+    type C = (a: string) => number;
+    type D = unknown;
+    type E = Other & {};
+    type F = Record<string, number>;
+    type G = ___Error<string>;
+    type H = unknown;
+    type I = (string | number);
+
+    const x = "foo" as string;
     `)
   }
 })

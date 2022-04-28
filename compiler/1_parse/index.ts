@@ -1151,13 +1151,13 @@ const statement: ParseFunction<Statement> = (module, code, startIndex) =>
     javascriptEscape(module, code, startIndex)
     ?? tryCatch(module, code, startIndex)
     ?? throwStatement(module, code, startIndex)
+    ?? awaitStatement(module, code, startIndex)
     ?? valueDeclarationStatement(module, code, startIndex)
     ?? ifElseStatement(module, code, startIndex)
     ?? forLoop(module, code, startIndex)
     ?? whileLoop(module, code, startIndex)
     ?? assignment(module, code, startIndex)
     ?? procCall(module, code, startIndex)
-    ?? awaitStatement(module, code, startIndex)
 
 const valueDeclarationStatement: ParseFunction<ValueDeclarationStatement|DestructuringDeclarationStatement> = (module, code, startIndex) => 
     given(parseExact("const")(module, code, startIndex) ?? parseExact("let")(module, code, startIndex), ({ parsed: kind, index }) =>
@@ -1230,6 +1230,7 @@ const awaitStatement: ParseFunction<AwaitStatement> = (module, code, startIndex)
     given(consume(code, index, "await"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(expression(module, code, index), ({ parsed: plan, index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ';'), err(code, index, '";"'), index => ({
         parsed: {
             kind: 'await-statement',
@@ -1243,7 +1244,7 @@ const awaitStatement: ParseFunction<AwaitStatement> = (module, code, startIndex)
             endIndex: index,
         },
         index
-    }))))))
+    })))))))
 
 const procCall: ParseFunction<Invocation> = (module, code, startIndex) =>
     given(invocationAccessorChain(module, code, startIndex), ({ parsed, index }) =>

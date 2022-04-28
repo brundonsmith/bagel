@@ -119,8 +119,7 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
                         (ast.type.kind === 'nominal-type' ?
                             `const ${INT}${ast.name.name} = Symbol('${ast.name.name}');\n` +
                             `${exported(ast.exported)}const ${ast.name.name} = ((${valueTypeDecl}): ${ast.name.name} => ({ kind: ${INT}${ast.name.name}, value })) as (((${valueTypeDecl}) => ${ast.name.name}) & { sym: typeof ${INT}${ast.name.name} });\n` +
-                            `${ast.name.name}.sym = ${INT}${ast.name.name};\n` +
-                            `(${ast.name.name} as any).sym = ${INT}${ast.name.name};\n`
+                            `${ast.name.name}.sym = ${INT}${ast.name.name};\n`
                         : '') +
                         `${exported(ast.exported)}type ${ast.name.name} = ${ast.type.kind === 'nominal-type'
                             ? `{ kind: typeof ${INT}${ast.name.name}${valueTypeDecl ? `, ${valueTypeDecl}` : '' } }`
@@ -149,11 +148,11 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
             }
         }
         case "derive-declaration": 
-            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `() => ${c(ast.type)}` : ``} = ${INT}computedFn(
+            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `: () => ${c(ast.type)}` : ``} = ${INT}computedFn(
                 () => ${c(ast.expr)}
             )`
         case "remote-declaration": {
-            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `${INT}Remote<${c(ast.type)}>` : ``} = new ${INT}Remote(
+            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `: ${INT}Remote<${c(ast.type)}>` : ``} = new ${INT}Remote(
                 () => ${c(ast.expr)}
             )`
         }
@@ -356,7 +355,7 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
         );
         case "attribute":
             return `${c(ast.name)}: ${c(ast.type)}`
-        case "record-type": return `{[key: ${c(ast.keyType)}]: ${c(ast.valueType)}}`;
+        case "record-type": return `Record<${c(ast.keyType)}, ${c(ast.valueType)}>`;
         case "array-type": return `${c(ast.element)}[]`;
         case "tuple-type": return `[${ast.members.map(c).join(", ")}]`;
         case "iterator-type": return `${INT}Iter<${c(ast.inner)}>`;
