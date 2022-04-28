@@ -46,8 +46,6 @@ Ideas
 
 Cleanup tasks:
 - Generalize const wrapper-type
-- Generalize destructures
-- Generalize statements: decl/spread/await
 
 Improvement
 - Continue to flesh out various parts of type inference
