@@ -149,11 +149,11 @@ export function prettyProblem(modulePath: ModuleName, error: BagelError|LintProb
         error.kind === 'lint-problem' ? error.ast.code : 
         undefined
     )
-    const atEndOfLine = error.kind === 'bagel-syntax-error' && error.code[error.index] === '\n'
+    const atEndOfLine = error.kind === 'bagel-syntax-error' && error.code?.[error.index ?? -1] === '\n'
     const startIndex = (
         error.kind === 'bagel-syntax-error' ? (
             atEndOfLine
-                ? error.index - 1
+                ? given(error.index, index => index - 1)
                 : error.index
          ) : 
         error.ast?.kind !== "module" ? error.ast?.startIndex : 

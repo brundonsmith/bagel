@@ -2465,8 +2465,10 @@ const TYPE_PARSER = new TieredParser<TypeExpression>([
 
 function err(code: string|undefined, index: number|undefined, expected: string): BagelError {
     
-    while (code[index - 1]?.match(/[\s]/)) {
-        index--
+    if (code != null && index != null) {
+        while (code[index - 1]?.match(/[\s]/)) {
+            index--
+        }
     }
     
     return {
