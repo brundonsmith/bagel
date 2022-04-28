@@ -8,7 +8,7 @@ import { AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { areSame, expressionsEqual, getName, literalType, mapParseTree, maybeOf, typesEqual, unionOf } from "../utils/ast.ts";
 import { getModuleByName } from "../store.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration, TypeDeclaration, ImportDeclaration, DeriveDeclaration, RemoteDeclaration, ImportItem } from "../_model/declarations.ts";
-import { resolve } from "./resolve.ts";
+import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
 import { computedFn } from "../../lib/ts/reactivity.ts";
 
@@ -163,7 +163,8 @@ const inferTypeInner = computedFn(function inferTypeInner(
             // Creation of nominal values looks like/parses as function 
             // invocation, but needs to be treated differently
             if (ast.subject.kind === "local-identifier") {
-                const binding = resolve(ast.subject.name, ast.subject)
+                const binding = resolve(ast.subject.name, ast.subject, true)
+
                 if (binding?.owner.kind === 'type-declaration') {
                     const resolvedType = resolveType(binding.owner.type)
 
@@ -544,7 +545,7 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
             if (decl.type) {
                 return {
                     ...decl.type,
-                    mutability: 'immutable'
+                    mutability: decl.type.mutability ? 'immutable' : undefined
                 } as TypeExpression
             }
 
@@ -558,7 +559,7 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
             } else {
                 return {
                     ...planType.inner,
-                    mutability: 'immutable'
+                    mutability: planType.inner.mutability ? 'immutable' : undefined
                 } as TypeExpression
             }
         }
@@ -1331,21 +1332,6 @@ export function invocationFromMethodCall(expr: Expression): Invocation|undefined
             return inv
         }
     }
-}
-
-export function resolveImport(importItem: ImportItem): ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined {
-    const importDeclaration = (importItem.parent as ImportDeclaration)
-    const otherModule = getModuleByName(importItem.module as ModuleName, importDeclaration.path.value)
-
-    return otherModule?.declarations.find(other =>
-        (other.kind === 'value-declaration' ||
-        other.kind === 'func-declaration' ||
-        other.kind === 'proc-declaration' ||
-        other.kind === 'type-declaration' ||
-        other.kind === 'derive-declaration' ||
-        other.kind === 'remote-declaration')
-        && other.name.name === importItem.name.name
-    ) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined
 }
 
 export const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] }> = {

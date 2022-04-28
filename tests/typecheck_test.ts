@@ -909,6 +909,24 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Complex narrowing 2",
+  fn() {
+    testTypecheck(`
+    func trim(s: true|string) =>
+      if s instanceof string {
+        s
+      } else {
+        'foo'
+      }
+
+    func foo(val: boolean): true|string =>
+      val || 'stuff'
+    `,
+    false)
+  }
+})
+
+Deno.test({
   name: "Object type spread 1",
   fn() {
     testTypecheck(
@@ -1025,7 +1043,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Destructure fail",
+  name: "Destructure fail 1",
   fn() {
     testTypecheck(`
       type Obj = {
@@ -1037,6 +1055,25 @@ Deno.test({
       func fn(obj: Obj): string =>
         const { foo } = obj,
         foo.bar
+      `,
+      true
+    )
+  }
+})
+
+Deno.test({
+  name: "Destructure fail 2",
+  fn() {
+    testTypecheck(`
+      type Obj = {
+        foo: {
+          bar: number
+        }
+      }
+
+      func fn(obj: Obj) =>
+        const [foo] = obj,
+        foo
       `,
       true
     )
@@ -2319,6 +2356,84 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Tuple indexer pass",
+  fn() {
+    testTypecheck(`
+    const tuple = [1, 'a', 3]
+    func getEl(index: number): number|string|nil => tuple[index]
+    `,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Tuple indexer fail",
+  fn() {
+    testTypecheck(`
+    const tuple = [1, 'a', 3]
+    func getEl(index: number): string => tuple[index]
+    `,
+    true)
+  }
+})
+
+Deno.test({
+  name: "String indexer pass",
+  fn() {
+    testTypecheck(`
+    func getEl(str: string, index: number): string? =>
+      str[index]
+    `,
+    false)
+  }
+})
+
+Deno.test({
+  name: "String indexer fail",
+  fn() {
+    testTypecheck(`
+    func getEl(str: string, index: number): string =>
+      str[index]
+    `,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Exact string indexer pass",
+  fn() {
+    testTypecheck(`
+    const str = 'hello world'
+    const letter: string = str[4]
+    func foo(index: number): string? => str[index]
+    `,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Exact string indexer fail 1",
+  fn() {
+    testTypecheck(`
+    const str = 'hello world'
+    const letter: string = str[20]
+    `,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Exact string indexer fail 2",
+  fn() {
+    testTypecheck(`
+    const str = 'hello world'
+    func foo(index: number): string => str[index]
+    `,
+    true)
+  }
+})
+
+Deno.test({
   name: "Mutability broadening",
   fn() {
     testTypecheck(`
@@ -2567,12 +2682,15 @@ Deno.test({
   name: "Nominal pass",
   fn() {
     testMultiModuleTypecheck({
+
       'a.bgl': `
       export nominal type A
       export nominal type B
+      export nominal type C(number)
       export type Thing = A | B`,
+
       'b.bgl': `
-      from 'a.bgl' import { A, B, Thing }
+      from 'a.bgl' import { A, B, C, Thing }
       
       func foo(thing: Thing) =>
         if thing instanceof A {
@@ -2581,7 +2699,8 @@ Deno.test({
           13
         }
         
-      const x: Thing = A`
+      const x: Thing = A
+      const y: C = C(12)`
     }, false)
   }
 })
@@ -2599,6 +2718,18 @@ Deno.test({
 
       const x: OtherA = A`
     }, true)
+  }
+})
+
+Deno.test({
+  name: "Nominal fail 2",
+  fn() {
+    testMultiModuleTypecheck({
+      'a.bgl': `
+      nominal type C(number)
+
+      const y: C = C(12)`
+    }, false)
   }
 })
 
@@ -2683,6 +2814,176 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Awaited const decl pass",
+  fn() {
+    testTypecheck(`
+    func foo(plan: Plan<string>, plan2: Plan<{ a: string }>) =>
+      const foo: string = await plan,
+      const { a } = await plan2,
+      foo`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Awaited const decl fail 1",
+  fn() {
+    testTypecheck(`
+    func foo(plan: Plan<string>) =>
+      const foo: number = await plan,
+      foo`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Awaited const decl fail 2",
+  fn() {
+    testTypecheck(`
+    func foo(plan: string) =>
+      const foo = await plan,
+      foo`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Awaited const decl fail 3",
+  fn() {
+    testTypecheck(`
+    func foo(plan2: Plan<{ a: string }>) =>
+      const { b } = await plan2,
+      b`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Object literal with embedded identifier pass",
+  fn() {
+    testTypecheck(`
+    const str = 'hello world'
+    
+    const obj = {
+      str
+    }
+    
+    const other: const {
+      str: string
+    } = obj`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Object literal with embedded identifier fail",
+  fn() {
+    testTypecheck(`
+    const str = 'hello world'
+    
+    const obj = {
+      str
+    }
+    
+    const other: const {
+      str: number
+    } = obj`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Object literal to record pass",
+  fn() {
+    testTypecheck(`
+    func foo(key: string) => {
+      foo: 'sdfasdf',
+      ['sfdgsdgf']: 'poijnk',
+      [key]: 12
+    }
+    
+    const x: {[string]: 'sdfasdf' | 'poijnk' | 12} = foo('stuff')`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Object literal to record fail",
+  fn() {
+    testTypecheck(`
+    func foo(key: string) => {
+      foo: 'sdfasdf',
+      ['sfdgsdgf']: 'poijnk',
+      [key]: 12
+    }
+    
+    const x: {foo: string, sfdgsdgf: string} = foo('stuff')`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Array spread pass",
+  fn() {
+    testTypecheck(`
+    const base = [1, 2, 3]
+    const other: (number|string)[] = [...base, 'foobar']`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Array spread fail",
+  fn() {
+    testTypecheck(`
+    const base = [1, 2, 3]
+    const other: number[] = [...base, 'foobar']`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Await statement pass",
+  fn() {
+    testTypecheck(`
+    proc foo(plan: Plan<string>) {
+      const s1: string = await plan;
+
+      const s2 = await plan;
+      const x: string = s2;
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Await statement fail 1",
+  fn() {
+    testTypecheck(`
+    proc foo(plan: string) {
+      const s = await plan;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Await statement fail 2",
+  fn() {
+    testTypecheck(`
+    proc foo(plan: Plan<string>) {
+      const s = await plan;
+      const x: number = s;
+    }`,
+    true)
+  }
+})
+
+// TODO: We could probably figure out the tuple type of `other` here ^
+
+
+
 
 // Deno.test({
 //   name: "Complex function type inference pass",
@@ -2715,13 +3016,14 @@ function testTypecheck(source: string, shouldFail: boolean): void {
       delete modules[module as ModuleName]
     }
 
-    modules[moduleName] = { source, isEntry: true, isProjectLocal: true }
+    modules[moduleName] = { source, isEntry: true, isProjectLocal: true, scannedForImports: true }
   })
 
   const parseResult = parsed(moduleName, true)
 
   if (parseResult) {
     const errors = [
+      ...parseResult.errors,
       ...lint(undefined, parseResult.ast).filter(e => e.severity === 'error'),
       ...typeerrors(parseResult.ast)
     ]
@@ -2746,7 +3048,7 @@ function testMultiModuleTypecheck(testModules: {[key: string]: string}, shouldFa
     }
 
     for (const [module, source] of Object.entries(testModules)) {
-      modules[canonicalModuleName(module as ModuleName, module)] = { source, isEntry: false, isProjectLocal: true }
+      modules[canonicalModuleName(module as ModuleName, module)] = { source, isEntry: false, isProjectLocal: true, scannedForImports: true }
     }
   })
 

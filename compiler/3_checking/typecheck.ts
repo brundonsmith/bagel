@@ -2,13 +2,13 @@ import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
 import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, resolveImport, throws } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
 import { ancestors, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
 import { getConfig, getModuleByName } from "../store.ts";
 import { DEFAULT_OPTIONS, format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
-import { resolve } from "./resolve.ts";
+import { resolve, resolveImport } from "./resolve.ts";
 import { ImportDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 import { computedFn } from "../../lib/ts/reactivity.ts";
 
@@ -243,29 +243,23 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "inline-destructuring-declaration":
             case "destructuring-declaration-statement": {
-                const valueType = inferType(current.value)
+                let valueType = inferType(current.value)
                 
                 if (current.kind === 'inline-destructuring-declaration' && current.awaited) {
                     if (subsumationIssues(PLAN_OF_ANY, valueType)) {
                         // make sure value is a plan
                         reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${msgFormat(valueType)}'`))
                     } else {
-                        // make sure destructuring matches value type
-                        if (current.destructureKind === 'object') {
-                            const expectedPlanType = planOf(RECORD_OF_ANY)
-                            if (subsumationIssues(expectedPlanType, valueType)) {
-                                reportError(miscError(current.value, `Can only destructure object types using '{ }'; found plan of type '${msgFormat(valueType)}'`))
-                            }
-                        } else {
-                            const expectedPlanType = planOf(ARRAY_OF_ANY)
-                            if (subsumationIssues(expectedPlanType, valueType)) {
-                                reportError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found plan of type '${msgFormat(valueType)}'`))
-                            }
-                        }
+                        const resolvedValueType = resolveType(valueType)
+
+                        valueType = (
+                            resolvedValueType.kind === 'plan-type'
+                                ? resolvedValueType.inner
+                                : UNKNOWN_TYPE
+                        )
                     }
                 }
-
-                // make sure destructuring matches value type
+                
                 if (current.destructureKind === 'object') {
                     if (subsumationIssues(RECORD_OF_ANY, valueType)) {
                         reportError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${msgFormat(valueType)}'`))
@@ -539,24 +533,19 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             } break;
             case "named-type": {
                 // make sure we err if identifier can't be resolved, even if it isn't used
-                const binding = resolve(current.name.name, current)
+                const binding = resolve(current.name.name, current, true)
 
                 if (!binding) {
                     reportError(cannotFindName(current, current.name.name))
                 } else {
-                    const decl = binding.owner.kind === 'import-item' 
-                        ? resolveImport(binding.owner)
-                        : binding.owner
-
-                    if (decl?.kind !== 'type-declaration' && decl?.kind !== 'generic-param-type') {
+                    if (binding.owner?.kind !== 'type-declaration' && binding.owner?.kind !== 'generic-param-type') {
                         reportError(miscError(current, `'${current.name.name}' is not a type`))
                     }
                 }
             } break;
             case "local-identifier": {
                 // make sure we err if identifier can't be resolved, even if it isn't used
-                const rawBinding = resolve(current.name, current)
-                const binding = rawBinding?.owner.kind === 'import-item' ? resolveImport(rawBinding.owner) : rawBinding?.owner
+                const binding = resolve(current.name, current, true)?.owner
 
                 if (binding) {
                     if (binding.kind === 'value-declaration' || 
@@ -594,7 +583,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             }
                         }
                     } else if (binding.kind === 'type-declaration') {
-                        if (binding.type.kind !== 'nominal-type' || binding.type.inner) { // nominals with no inner value are allowed here
+                        if (binding.type.kind !== 'nominal-type') { // nominals with no inner value are allowed here
                             reportError(miscError(current, `'${current.name}' is a type, but it's used like a value`))
                         }
                     } else if (config?.platforms && (binding.kind === 'proc-declaration' || binding.kind === 'func-declaration')) {

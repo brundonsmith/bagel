@@ -1,9 +1,23 @@
 import { computedFn } from "../../lib/ts/reactivity.ts";
+import { getModuleByName } from "../store.ts";
 import { AST } from "../_model/ast.ts";
-import { Binding } from "../_model/common.ts";
+import { Binding, ModuleName } from "../_model/common.ts";
+import { ImportItem,ValueDeclaration,FuncDeclaration,ProcDeclaration,TypeDeclaration,DeriveDeclaration,RemoteDeclaration,ImportDeclaration } from "../_model/declarations.ts";
 
-export const resolve = computedFn(function resolve (name: string, from: AST): Binding|undefined {
-    return resolveInner(name, from, from)
+export const resolve = computedFn(function resolve (name: string, from: AST, resolveImports?: boolean): Binding|undefined {
+    let resolved = resolveInner(name, from, from)
+
+    if (resolveImports) {
+        while (resolved?.owner.kind === 'import-item') {
+            const imported = resolveImport(resolved.owner)
+
+            if (!imported) return resolved
+
+            resolved = { identifier: resolved.identifier, owner: imported }
+        }
+    }
+
+    return resolved
 })
 
 /**
@@ -30,7 +44,7 @@ const resolveInner = (name: string, from: AST, originator: AST): Binding|undefin
                     case "value-declaration":
                     case "derive-declaration":
                     case "remote-declaration":
-                        case "import-all-declaration": {
+                    case "import-all-declaration": {
                         if (declaration.name.name === name) {
                             return {
                                 owner: declaration,
@@ -180,4 +194,19 @@ const resolveInner = (name: string, from: AST, originator: AST): Binding|undefin
 
     // if not resolved, recurse upward to the next AST node
     return resolveInner(name, parent, originator)
+}
+
+export function resolveImport(importItem: ImportItem) {
+    const importDeclaration = (importItem.parent as ImportDeclaration)
+    const otherModule = getModuleByName(importItem.module as ModuleName, importDeclaration.path.value)
+
+    return otherModule?.declarations.find(other =>
+        (other.kind === 'value-declaration' ||
+        other.kind === 'func-declaration' ||
+        other.kind === 'proc-declaration' ||
+        other.kind === 'type-declaration' ||
+        other.kind === 'derive-declaration' ||
+        other.kind === 'remote-declaration')
+        && other.name.name === importItem.name.name
+    ) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined
 }
