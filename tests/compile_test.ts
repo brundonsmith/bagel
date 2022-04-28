@@ -1,6 +1,8 @@
 import { parse } from "../compiler/1_parse/index.ts";
 import { compile } from "../compiler/4_compile/index.ts";
+import { path } from "../compiler/deps.ts";
 import { prettyProblem } from "../compiler/errors.ts";
+import { cachedFilePath } from "../compiler/utils/misc.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
