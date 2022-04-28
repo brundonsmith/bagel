@@ -222,10 +222,6 @@ export function expec<T, R>(val: T|BagelError|undefined, err: BagelError, fn: (v
     }
 }
 
-export function err(code: string|undefined, index: number|undefined, expected: string): BagelError {
-    return { kind: "bagel-syntax-error", ast: undefined, code, index, message: `${expected} expected`, stack: undefined };
-}
-
 export type ParseFunction<T> = (module: ModuleName, code: string, index: number) => ParseResult<T> | BagelError | undefined;
 
 export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize3((module, code, startIndex) => 

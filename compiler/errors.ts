@@ -149,8 +149,13 @@ export function prettyProblem(modulePath: ModuleName, error: BagelError|LintProb
         error.kind === 'lint-problem' ? error.ast.code : 
         undefined
     )
+    const atEndOfLine = error.kind === 'bagel-syntax-error' && error.code[error.index] === '\n'
     const startIndex = (
-        error.kind === 'bagel-syntax-error' ? error.index : 
+        error.kind === 'bagel-syntax-error' ? (
+            atEndOfLine
+                ? error.index - 1
+                : error.index
+         ) : 
         error.ast?.kind !== "module" ? error.ast?.startIndex : 
         error.kind === 'lint-problem' ? error.ast.startIndex : 
         undefined
@@ -204,7 +209,7 @@ export function prettyProblem(modulePath: ModuleName, error: BagelError|LintProb
 
             output += Colors.bgWhite(Colors.black(String(line))) + padding + lineContent.content + "\n"
 
-            const digitsInLineNum = String(line).length
+            const digitsInLineNum = String(line).length + (atEndOfLine ? 1 : 0)
             const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
 
             if (endIndex != null) {
