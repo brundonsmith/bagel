@@ -143,6 +143,12 @@ export type IfElseExpression = SourceInfo & {
     readonly defaultCase?: Expression
 }
 
+export type Case = SourceInfo & {
+    readonly kind: "case",
+    readonly condition: Expression,
+    readonly outcome: Expression,
+}
+
 export type SwitchExpression = SourceInfo & {
     readonly kind: "switch-expression",
     readonly value: Expression,
@@ -150,15 +156,9 @@ export type SwitchExpression = SourceInfo & {
     readonly defaultCase?: Expression
 }
 
-export type Case = SourceInfo & {
-    readonly kind: "case",
-    readonly condition: Expression,
-    readonly outcome: Expression,
-}
-
 export type SwitchCase = SourceInfo & {
     readonly kind: "switch-case",
-    readonly condition: Expression,
+    readonly type: TypeExpression,
     readonly outcome: Expression,
 }
 

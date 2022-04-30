@@ -2064,19 +2064,25 @@ Deno.test({
   name: "Switch expression pass",
   fn() {
     testTypecheck(`
-    func foo(n: number): string? =>
-      switch n {
-        case 0: 'zero',
-        case 1: 'one',
-        case 2: 'two'
-      }
-
-    func bar(n: number): string =>
+    func bar(n: number): 'zero' | 'one' | 'two' | 'I dunno!' =>
       switch n {
         case 0: 'zero',
         case 1: 'one',
         case 2: 'two',
         default: 'I dunno!'
+      }
+
+    func foo(s: 'a' | 'b' | 'c'): string =>
+      switch s {
+        case 'a': 'zero',
+        case 'b': 'one',
+        case 'c': 'two'
+      }
+      
+    func stuff(x: { a: number } | string): string =>
+      switch x {
+        case { a: number }: x.a + '',
+        case string: x
       }`,
     false)
   }
@@ -2086,7 +2092,7 @@ Deno.test({
   name: "Switch expression fail 1",
   fn() {
     testTypecheck(`
-    func foo(n: number): string =>
+    func bar(n: number): string =>
       switch n {
         case 0: 'zero',
         case 1: 'one',
@@ -2100,11 +2106,27 @@ Deno.test({
   name: "Switch expression fail 2",
   fn() {
     testTypecheck(`
-    func foo(n: number): string? =>
+    func foo(n: number): string =>
       switch n {
         case 0: 'zero',
         case 'a': 'one',
-        case 2: 'two'
+        case 2: 'two',
+        default: 'default'
+      }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Switch expression fail 3",
+  fn() {
+    testTypecheck(`
+    func foo(s: 'a' | 'b' | 'c'): string =>
+      switch s {
+        case 'a': 'zero',
+        case 'b': 'one',
+        case 'c': 'two',
+        default: 'other'
       }`,
     true)
   }

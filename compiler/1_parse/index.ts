@@ -1820,14 +1820,14 @@ const switchExpression: ParseFunction<SwitchExpression> = (module, code, startIn
 const switchCase: ParseFunction<SwitchCase> = (module, code, startIndex) =>
     given(consume(code, startIndex, 'case'), index =>
     given(consumeWhitespaceRequired(code, index), index =>
-    expec(expression(module, code, index), err(code, index, 'Case expression'), ({ parsed: condition, index }) =>
+    expec(typeExpression(module, code, index), err(code, index, 'Case expression'), ({ parsed: type, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ':'), err(code, index, '":"'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Case result'), ({ parsed: outcome, index }) => ({
         parsed: {
             kind: "switch-case",
-            condition,
+            type,
             outcome,
             module,
             code,
@@ -1843,7 +1843,10 @@ const _defaultCase: ParseFunction<Expression> = (module, code, startIndex) =>
     expec(consume(code, index, ':'), err(code, index, '":"'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Case result'), ({ parsed: outcome, index }) => ({
-        parsed: outcome,
+        parsed: {
+            ...outcome,
+            startIndex
+        },
         index
     }))))))
 

@@ -1,5 +1,5 @@
 import { Refinement, ModuleName, Binding } from "../_model/common.ts";
-import { BinaryOp, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry } from "../_model/expressions.ts";
+import { BinaryOp, Case, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry } from "../_model/expressions.ts";
 import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NEVER_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
@@ -11,6 +11,7 @@ import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/decl
 import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
 import { computedFn } from "../../lib/ts/reactivity.ts";
+import { CaseBlock } from "../_model/statements.ts";
 
 export function inferType(
     ast: Expression,
@@ -265,8 +266,10 @@ const inferTypeInner = computedFn(function inferTypeInner(
                         inferType(outcome, visited), visited),
                     ast.defaultCase 
                         ? inferType(ast.defaultCase, visited) 
-                        : NIL_TYPE
-                ],
+                        : (ast.kind === 'if-else-expression'
+                            ? NIL_TYPE
+                            : null)
+                ].filter(exists),
                 mutability: undefined,
                 parent, module, code, startIndex, endIndex
             }
@@ -918,8 +921,10 @@ function distillUnion(type: TypeExpression): TypeExpression {
 export function subtract(type: TypeExpression, without: TypeExpression): TypeExpression {
     type = resolveType(type)
     without = resolveType(without)
-    
-    if (without.kind === 'union-type') {
+
+    if (typesEqual(type, without)) {
+        return NEVER_TYPE
+    } else if (without.kind === 'union-type') {
         let t = type
 
         for (const member of without.members) {
@@ -974,28 +979,27 @@ function resolveRefinements(expr: Expression): Refinement[] {
     // traverse upwards through the AST, looking for nodes that refine the type 
     // of the current expression
     while (parent != null) {
-        if (parent.kind === 'case') {
-            if (grandparent?.kind === 'if-else-expression' && current === parent.outcome) {
-                
-                for (let i = 0; i < grandparent.cases.indexOf(parent); i++) {
-                    const condition = grandparent.cases[i]?.condition
+        if ((parent.kind === 'case' || parent.kind === 'case-block') && 
+            (grandparent?.kind === 'if-else-expression' || grandparent?.kind === 'if-else-statement') &&  // we know this, but TS doesn't
+            current === parent.outcome) {
+            const cases = grandparent.cases as readonly (Case|CaseBlock)[] // HACK
 
-                    // conditions for all past clauses are false
-                    const refinement = conditionToRefinement(condition, false)
-                    if (refinement) {
-                        refinements.push(refinement)
-                    }
-                }
-                
-                // condition for current clause is true
-                const refinement = conditionToRefinement(parent.condition, true)
+            for (let i = 0; i < cases.indexOf(parent); i++) {
+                const condition = cases[i]?.condition
+
+                // conditions for all past clauses are false
+                const refinement = conditionToRefinement(condition, false)
                 if (refinement) {
                     refinements.push(refinement)
                 }
-            } else if (grandparent?.kind === "switch-expression") {
-                // TODO
             }
-        } else if (parent.kind === 'if-else-expression' && current === parent.defaultCase) {
+            
+            // condition for current clause is true
+            const refinement = conditionToRefinement(parent.condition, true)
+            if (refinement) {
+                refinements.push(refinement)
+            }
+        } else if ((parent.kind === 'if-else-expression' || parent.kind === 'if-else-statement') && current === parent.defaultCase) {
             for (const { condition } of parent.cases) {
 
                 // conditions for all past clauses are false
@@ -1003,6 +1007,16 @@ function resolveRefinements(expr: Expression): Refinement[] {
                 if (refinement) {
                     refinements.push(refinement)
                 }
+            }
+        } else if (parent.kind === 'switch-case' &&  // || parent.kind === 'switch-statement'
+                    grandparent?.kind === 'switch-expression' &&  // we know this, but TS doesn't
+                    current === parent.outcome) {
+            refinements.push({ kind: 'narrowing', type: parent.type, targetExpression: grandparent.value })
+        } else if (parent.kind === 'switch-expression' && current === parent.defaultCase) { // || parent.kind === 'switch-statement') {
+            for (const { type } of parent.cases) {
+
+                // conditions for all past clauses are false
+                refinements.push({ kind: 'subtraction', type, targetExpression: current })
             }
         } else if (parent.kind === 'binary-operator' && current === parent.right) {
             if (parent.op.op === '&&') {

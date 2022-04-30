@@ -276,12 +276,13 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
         case "negation-operator": return `!(${fixTruthinessIfNeeded(excludeTypes, module, destination, ast.base)})`;
         case "operator": return ast.op;
         case "if-else-expression":
+            return '(' + ast.cases.map(c).join('\n') + (ast.defaultCase ? c(ast.defaultCase) : NIL) + ')'
+        case "case":
+            return fixTruthinessIfNeeded(excludeTypes, module, destination, ast.condition) + ` ? ${c(ast.outcome)} : `
         case "switch-expression": return '(' + ast.cases
-            .map(({ condition, outcome }) => 
-                (ast.kind === "if-else-expression"
-                    ? fixTruthinessIfNeeded(excludeTypes, module, destination, condition)
-                    : c(ast.value) + ' === ' + c(condition))
-                + ` ? ${c(outcome)} : `)
+            .map(({ type, outcome }) => 
+                `${INT}instanceOf(${c(ast.value)}, ${compileRuntimeType(resolveType(type))})` +
+                ` ? ${c(outcome)} : `)
             .join('\n')
         + (ast.defaultCase ? c(ast.defaultCase) : NIL) + ')'
         case "range": return `${INT}range(${c(ast.start)}, ${c(ast.end)})`;

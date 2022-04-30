@@ -212,7 +212,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "case-block":
             return `${f(ast.condition)} ${f(ast.outcome)}`
         case "switch-case":
-            return `case ${f(ast.condition)}: ${f(ast.outcome)}`
+            return `case ${f(ast.type)}: ${f(ast.outcome)}`
         case "switch-expression":
             return `switch ${f(ast.value)} {${br}${ast.cases.map(c => nextIndentation + fIndent(c)).join(br)}${br}${currentIndentation}}`
         case "test-expr-declaration":

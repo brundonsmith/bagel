@@ -421,8 +421,28 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "switch-expression": {
-                for (const { condition } of current.cases) {
-                    expect(reportError, inferType(current.value), condition)
+                const valueType = inferType(current.value)
+                let remainingType = valueType
+
+                for (const { type } of current.cases) {
+                    const isFirst = type === current.cases[0]?.type
+
+                    // check that no cases are redundant
+                    if (subsumationIssues(remainingType, type)) {
+                        const neverEver = isFirst || subsumationIssues(valueType, type)
+                        reportError(miscError(type, `${msgFormat(current.value)} can never be a ${msgFormat(type)}${neverEver ?  '' : ' at this point'}, so this case will never be reached`))
+                    }
+                    
+                    remainingType = subtract(remainingType, type)
+                }
+
+                const finalType = resolveType(remainingType)
+                if (current.defaultCase == null && finalType.kind !== 'never-type') {
+                    // if no default case, check that arms are exhaustive
+                    reportError(miscError(current, `Switch expression doesn't handle all possible values; ${msgFormat(current.value)} can still be a '${msgFormat(remainingType)}'. Either add cases to cover the rest of the possible values, or add a default case.`))
+                } else if (current.defaultCase != null && finalType.kind === 'never-type') {
+                    // if default case, check that arms are *not* exhaustive
+                    reportError(miscError(current.defaultCase, `Default case will never be reached, because all possible values for ${msgFormat(current.value)} are covered by cases above`))
                 }
             } break;
             case "property-accessor": {
