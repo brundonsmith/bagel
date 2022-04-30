@@ -1,4 +1,4 @@
-import { assert } from "https://deno.land/std@0.136.0/testing/asserts.ts";
+import { assertEquals } from "https://deno.land/std@0.136.0/testing/asserts.ts";
 
 import { observe, invalidate, autorun, when, computedFn, action, runInAction } from '../lib/ts/reactivity.ts'
 
@@ -17,10 +17,7 @@ Deno.test({
         obj.count++; invalidate(obj, 'count')
         obj.count++; invalidate(obj, 'count')
 
-        assert(outcomes[0] === 0)
-        assert(outcomes[1] === 1)
-        assert(outcomes[2] === 2)
-        assert(outcomes[3] === 3)
+        assertEquals(outcomes, [0, 1, 2, 3])
     }
 })
 
@@ -38,7 +35,7 @@ Deno.test({
 
         clearInterval(interval)
 
-        assert(obj.count === 4)
+        assertEquals(obj.count, 4)
     }
 })
 
@@ -60,10 +57,7 @@ Deno.test({
         obj.count++; invalidate(obj, 'count')
         obj.count++; invalidate(obj, 'count')
 
-        assert(outcomes[0] === 0)
-        assert(outcomes[1] === 4)
-        assert(outcomes[2] === 8)
-        assert(outcomes[3] === 12)
+        assertEquals(outcomes, [0, 4, 8, 12])
     }
 })
 
@@ -86,8 +80,7 @@ Deno.test({
 
         increment()
 
-        assert(outcomes[0] === 0)
-        assert(outcomes[1] === 3)
+        assertEquals(outcomes, [0, 3])
     }
 })
 
@@ -108,7 +101,7 @@ Deno.test({
             obj.count++; invalidate(obj, 'count')
         })
 
-        assert(outcomes[0] === 0)
-        assert(outcomes[1] === 3)
+
+        assertEquals(outcomes, [0, 3])
     }
 })
