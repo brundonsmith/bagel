@@ -1018,7 +1018,7 @@ const emptyToUndefined = (arr: ReturnType<typeof subsumationIssues>): ReturnType
  * simplify unions; generally collapse a type into its "real" form, whatever 
  * that means.
  */
-export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpression {
+export function resolveType(type: TypeExpression, encounteredNames: readonly string[] = []): TypeExpression {
     switch (type.kind) {
         case "named-type": {
             if (encounteredNames.includes(type.name.name)) {
@@ -1248,7 +1248,7 @@ function simplifyUnions(type: TypeExpression, encounteredNames: readonly string[
                         const a = members[i];
                         const b = members[j];
     
-                        if (!subsumationIssues(b, a) && !indicesToDrop.has(j) && resolveType(b).kind !== 'unknown-type') {
+                        if (!subsumationIssues(b, a, encounteredNames) && !indicesToDrop.has(j) && resolveType(b, encounteredNames).kind !== 'unknown-type') {
                             indicesToDrop.add(i);
                         }
                     }
