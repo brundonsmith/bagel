@@ -1,7 +1,7 @@
 import { computedFn } from "../../lib/ts/reactivity.ts";
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "../3_checking/resolve.ts";
-import { overlaps, resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
+import { resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
 import { inferType } from "../3_checking/typeinfer.ts";
 import { BagelConfig } from "../store.ts";
 import { findAncestor, iterateParseTree, mapParseTree } from "../utils/ast.ts";
@@ -9,7 +9,7 @@ import { AST } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { ALL_PLATFORMS, FuncDeclaration, ProcDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 import { Expression, Func, Proc } from "../_model/expressions.ts";
-import { BOOLEAN_TYPE, FALSY, NUMBER_TYPE, STRING_TYPE } from "../_model/type-expressions.ts";
+import { BOOLEAN_TYPE, FALSY, NUMBER_TYPE, STRING_TYPE, TypeExpression } from "../_model/type-expressions.ts";
 import { format,DEFAULT_OPTIONS } from "./format.ts";
 
 export function lint(config: BagelConfig|undefined, ast: AST): LintProblem[] {
@@ -259,6 +259,26 @@ function isAlways(condition: Expression): boolean|undefined {
     }
 
     return undefined
+}
+
+/**
+ * Determine whether or not two types have any overlap at all
+ */
+ function overlaps(a: TypeExpression, b: TypeExpression): boolean {
+    const resolvedA = resolveType(a)
+    const resolvedB = resolveType(b)
+
+    if (!subsumationIssues(resolvedA, resolvedB) || !subsumationIssues(resolvedB, resolvedA)) {
+        return true
+    } else if (resolvedA.kind === 'union-type' && resolvedB.kind === 'union-type') {
+        return resolvedA.members.some(memberA => resolvedB.members.some(memberB => overlaps(memberA, memberB)))
+    } else if (resolvedA.kind === 'union-type') {
+        return resolvedA.members.some(memberA => overlaps(memberA, resolvedB))
+    } else if (resolvedB.kind === 'union-type') {
+        return resolvedB.members.some(memberB => overlaps(memberB, resolvedA))
+    }
+
+    return false
 }
 
 // optional lint against all non-boolean conditionals?
