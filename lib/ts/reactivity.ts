@@ -55,11 +55,10 @@ type Observable = { obj: WeakRef<object>, prop: string|number|typeof COMPUTED_RE
 
 let reportObservableAccessed: ((obs: Observable) => void) | undefined;
 let queuedReactions: Set<Reaction>|undefined // if defined, we're in an action
-let observablesToReactions: Array<{
-    obj: WeakRef<object>,
-    prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT,
-    effect: Reaction
-}> = []
+let trigger: { readonly obj: object, readonly prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT }|undefined
+let observablesToReactions: Array<
+    Observable & { effect: Reaction }
+> = []
 const memoCache: Array<{
     fn: Function,
     args: unknown[],
@@ -100,7 +99,9 @@ export function observe<O extends object, K extends (keyof O & string|number) | 
 
 export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT = WHOLE_OBJECT) {
     const topOfAction = queuedReactions == null
-    const queue = queuedReactions = queuedReactions ?? new Set()
+    queuedReactions = queuedReactions ?? new Set()
+    // TODO: Don't invalidate if the new value is the same as the previous value
+    if (topOfAction) trigger = { obj, prop }
 
     // invalidate cached function results that observed this obj/prop
     for (const entry of memoCache) {
@@ -120,21 +121,24 @@ export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESU
     // queue up reactions that observed this obj/prop
     for (const entry of observablesToReactions) {
         if (obj === entry.obj.deref() && (prop === WHOLE_OBJECT || entry.prop === WHOLE_OBJECT || prop === entry.prop)) {
-            queue.add(entry.effect)
+            queuedReactions.add(entry.effect)
         }
     }
     
     // run queued reactions
     if (topOfAction) {
-        for (const effect of queue) {
+        for (const effect of queuedReactions) {
             effect()
         }
+        
+        if (topOfAction) trigger = undefined
+
         queuedReactions = undefined
     }
 }
 
 export function computedFn<F extends Function>(fn: F, options: {  } = {}): F {
-    return ((...args: any[]) => {
+    const computed = ((...args: any[]) => {
         observe(fn, COMPUTED_RESULT)
 
         // see if we have a cache entry for this function already
@@ -169,69 +173,78 @@ export function computedFn<F extends Function>(fn: F, options: {  } = {}): F {
             return result
         }
     }) as unknown as F
+    
+    Object.defineProperty(computed, 'name', {value: fn.name, writable: false});
+
+    return computed
 }
 
 export function autorun(fn: Reaction) {
-    function run() {
-
-        // remove this reaction's entries from the mapping
-        observablesToReactions = observablesToReactions.filter(r => r.effect !== run)
+    function effect() {
+        const newObservablesToReactions: typeof observablesToReactions = []
 
         // run the reaction and collect all new mappings
         const previous = reportObservableAccessed
-        reportObservableAccessed = obs => observablesToReactions.push({ ...obs, effect: run })
+        reportObservableAccessed = obs => newObservablesToReactions.push({ ...obs, effect })
         fn()
         reportObservableAccessed = previous
+
+        observablesToReactions = [
+            // remove this reaction's entries from the mapping    
+            ...observablesToReactions.filter(r => r.effect !== effect),
+            ...newObservablesToReactions
+        ]
     }
 
-    run()
+    Object.defineProperty(effect, 'name', {value: fn.name, writable: false});
+
+    effect()
 
     return () => {
         // unsubscribe
-        observablesToReactions = observablesToReactions.filter(r => r.effect !== run)
+        observablesToReactions = observablesToReactions.filter(r => r.effect !== effect)
     }
 }
 
 export function when(fn: () => boolean): Promise<void> {
     // return new Promise(resolve => setTimeout(resolve, 1000))
     return new Promise(resolve => {
-        const unsubscribe = autorun(() => {
+        function effect() {
             const conditionMet = fn()
 
             if (conditionMet) {
                 unsubscribe()
                 resolve()
             }
-        })
+        }
+
+        Object.defineProperty(effect, 'name', { value: 'when(' + fn.name + ')', writable: false });
+
+        const unsubscribe = autorun(effect)
     })
 }
 
 export function action<F extends (...args: any[]) => void>(fn: F): F {
     return ((...args: unknown[]) => {
         const topOfAction = queuedReactions == null
-        const queue = queuedReactions = queuedReactions ?? new Set()
+        queuedReactions = queuedReactions ?? new Set()
     
         fn(...args)
         
         if (topOfAction) {
-            for (const effect of queue) {
+            for (const effect of queuedReactions) {
                 effect()
             }
             queuedReactions = undefined
         }
-    }) as unknown as  F
+    }) as unknown as F
 }
 
 export function runInAction(fn: () => void) {
-    const topOfAction = queuedReactions == null
-    const queue = queuedReactions = queuedReactions ?? new Set()
+    const actionFn = action(fn)
+    actionFn()
+}
 
-    fn()
-    
-    if (topOfAction) {
-        for (const effect of queue) {
-            effect()
-        }
-        queuedReactions = undefined
-    }
+export function triggeredBy() {
+    return trigger
 }
