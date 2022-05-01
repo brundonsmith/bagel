@@ -782,7 +782,7 @@ function expect(reportError: ReportError, destinationType: TypeExpression, value
  * Determine whether `value` can "fit into" `destination`. Used for verifying 
  * values passed to consts, arguments, etc, but for other things too.
  */
-export function subsumationIssues(destination: TypeExpression, value: TypeExpression): Array<string | string[]> | undefined {
+export function subsumationIssues(destination: TypeExpression, value: TypeExpression, encounteredNames: readonly string[] = []): Array<string | string[]> | undefined {
 
     if (destination === value) {
         return undefined;
