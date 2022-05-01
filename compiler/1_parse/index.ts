@@ -2176,6 +2176,15 @@ const spread: ParseFunction<Spread> = (module, code, startIndex) =>
 const stringLiteral: ParseFunction<StringLiteral|ExactStringLiteral> = (module, code, startIndex) => {
     const segments: (string|Expression)[] = [];
     let index = startIndex;
+    let tag: PlainIdentifier | undefined
+
+    const tagResult = plainIdentifier(module, code, index)
+    if (isError(tagResult)) {
+        return tagResult
+    } else if (tagResult != null) {
+        index = tagResult.index
+        tag = tagResult.parsed
+    }
 
     if (code[index] === "'") {
         index++;
@@ -2215,7 +2224,7 @@ const stringLiteral: ParseFunction<StringLiteral|ExactStringLiteral> = (module, 
         } else {
             segments.push(code.substring(currentSegmentStart, index));
 
-            if (segments.length === 1 && typeof segments[0] === 'string') {
+            if (segments.length === 1 && typeof segments[0] === 'string' && tag == null) {
                 return {
                     parsed: {
                         kind: "exact-string-literal",
@@ -2231,6 +2240,7 @@ const stringLiteral: ParseFunction<StringLiteral|ExactStringLiteral> = (module, 
                 return {
                     parsed: {
                         kind: "string-literal",
+                        tag,
                         segments,
                         module,
                         code,

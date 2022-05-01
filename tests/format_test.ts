@@ -390,7 +390,11 @@ const BAGEL_SNIPPETS = [
       `type A = typeof 12`,
       `type A = keyof B`,
       `type A = valueof B`,
-      `type A = elementof B`
+      `type A = elementof B`,
+      `
+      const taggedStr = html'
+        <h1>hello world!</h1>
+      '`
 ]
 
 for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {

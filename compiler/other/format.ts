@@ -147,7 +147,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                 ast.entries.map(f).join(', ')
             }]`
         case "string-literal":
-            return `'${ast.segments.map(segment => typeof segment === 'string' ? segment : '${' + f(segment) + '}').join('')}'`
+            return (ast.tag ? ast.tag.name : '') + `'${ast.segments.map(segment => typeof segment === 'string' ? segment : '${' + f(segment) + '}').join('')}'`
         case "exact-string-literal":
             return `'${ast.value}'`
         case "number-literal":

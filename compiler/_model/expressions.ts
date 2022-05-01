@@ -185,6 +185,7 @@ export type Spread = SourceInfo & {
 
 export type StringLiteral = SourceInfo & {
     readonly kind: "string-literal",
+    readonly tag?: PlainIdentifier,
     readonly segments: readonly (string|Expression)[],
 }
 
