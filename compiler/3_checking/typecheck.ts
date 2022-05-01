@@ -1,8 +1,8 @@
 import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, NEVER_TYPE } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, simplifyUnions, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
 import { ancestors, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
 import { getConfig, getModuleByName } from "../store.ts";
@@ -788,12 +788,12 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
         return undefined;
     }
 
-    const resolvedDestination = resolveType(destination.kind === 'named-type' ? resolveNamedType(destination) : destination, true)
-    const resolvedValue = resolveType(value.kind === 'named-type' ? resolveNamedType(value) : value, true)
+    const resolvedDestination = resolveType(destination, encounteredNames)
+    const resolvedValue = resolveType(value, encounteredNames)
 
     const baseErrorMessage = `Type '${msgFormat(resolvedValue)}' is not assignable to type '${msgFormat(resolvedDestination)}'`
     const withBase = (inner: Array<string | string[]>) => [baseErrorMessage, ...inner]
-    const all = (...inner: Array<ReturnType<typeof subsumationIssues>>): ReturnType<typeof subsumationIssues> =>
+    const all = (...inner: Array<Array<string | string[]> | undefined>) =>
         given(emptyToUndefined(inner.filter(exists).flat()), withBase)
 
     // constants can't be assigned to mutable slots
@@ -825,7 +825,7 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
         if (resolvedValue.kind === "union-type") {
             const subsumed = resolvedValue.members.every(valueMember => 
                 resolvedDestination.members.some(destinationMember => 
-                    !subsumationIssues(destinationMember, valueMember)));
+                    !subsumationIssues(destinationMember, valueMember, encounteredNames)));
 
             if (subsumed) {
                 return undefined
@@ -834,7 +834,7 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
             }
         } else {
             const subsumed = resolvedDestination.members.some(member => 
-                !subsumationIssues(member, resolvedValue))
+                !subsumationIssues(member, resolvedValue, encounteredNames))
                 
             if (subsumed) {
                 return undefined
@@ -845,7 +845,7 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
     } else if (resolvedValue.kind === "union-type") {
         return all(
             resolvedValue.members.map(member =>
-                subsumationIssues(resolvedDestination, member))
+                subsumationIssues(resolvedDestination, member, encounteredNames))
             .filter(exists)
             .flat())
     } else if (resolvedDestination.kind === 'nominal-type' && resolvedValue.kind === 'nominal-type') {
@@ -873,8 +873,8 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
             return all(
                 ...resolvedDestination.args.map((_, i) => 
                     // NOTE: Value and destination are flipped on purpose for args!
-                    subsumationIssues(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE)),
-                subsumationIssues(resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)
+                    subsumationIssues(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE, encounteredNames)),
+                subsumationIssues(resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE, encounteredNames)
             )
         }
     } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type") {
@@ -887,12 +887,12 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
             return all(
                 ...resolvedDestination.args.map((_, i) => 
                     // NOTE: Value and destination are flipped on purpose for args!
-                    subsumationIssues(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE)))
+                    subsumationIssues(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE, encounteredNames)))
         }
     } else if (resolvedDestination.kind === "array-type") {
         if (resolvedValue.kind === "array-type") {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
-                return all(subsumationIssues(resolvedDestination.element, resolvedValue.element))
+                return all(subsumationIssues(resolvedDestination.element, resolvedValue.element, encounteredNames))
             } else {
                 if (typesEqual(resolvedDestination.element, resolvedValue.element)) {
                     return undefined
@@ -904,7 +904,7 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
         if (resolvedValue.kind === 'tuple-type') {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
                 return all(...resolvedValue.members.map(member =>
-                    subsumationIssues(resolvedDestination.element, member)))
+                    subsumationIssues(resolvedDestination.element, member, encounteredNames)))
             }
         }
     } else if (resolvedDestination.kind === "tuple-type") {
@@ -918,7 +918,7 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
                 return all(
                     ...resolvedValue.members.map((member, index) =>
-                        subsumationIssues(resolvedDestination.members[index], member))
+                        subsumationIssues(resolvedDestination.members[index], member, encounteredNames))
                 )
             } else {
                 if (resolvedValue.members.every((member, index) =>
@@ -933,8 +933,8 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
         if (resolvedValue.kind === "record-type") {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
                 return all(
-                    subsumationIssues(resolvedDestination.keyType, resolvedValue.keyType),
-                    subsumationIssues(resolvedDestination.valueType, resolvedValue.valueType)
+                    subsumationIssues(resolvedDestination.keyType, resolvedValue.keyType, encounteredNames),
+                    subsumationIssues(resolvedDestination.valueType, resolvedValue.valueType, encounteredNames)
                 )
             } else {
                 if (typesEqual(resolvedDestination.keyType, resolvedValue.keyType) &&
@@ -949,8 +949,8 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
                 // TODO: Spreads
                 return all(...resolvedValue.entries.map(({ name, type }) => all(
-                    subsumationIssues(resolvedDestination.keyType, literalType(name)),
-                    subsumationIssues(resolvedDestination.valueType, type)
+                    subsumationIssues(resolvedDestination.keyType, literalType(name), encounteredNames),
+                    subsumationIssues(resolvedDestination.valueType, type, encounteredNames)
                 )))
             }
         }
@@ -973,7 +973,7 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
                     missingProperties.push(getName(key))
                 }
             } else {
-                propertyTypeIssues.push(...all(subsumationIssues(destinationValue, valueEntry.type)) ?? [])
+                propertyTypeIssues.push(...all(subsumationIssues(destinationValue, valueEntry.type, encounteredNames)) ?? [])
             }
         }
         const missingPropertiesMessage = missingProperties.length > 0
@@ -1004,7 +1004,7 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
                 (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") ||
                 (resolvedDestination.kind === "error-type" && resolvedValue.kind === "error-type") ||
                 (resolvedDestination.kind === "remote-type" && resolvedValue.kind === "remote-type")) {
-        return all(subsumationIssues(resolvedDestination.inner, resolvedValue.inner));
+        return all(subsumationIssues(resolvedDestination.inner, resolvedValue.inner, encounteredNames));
     }
 
     return [baseErrorMessage];
@@ -1014,26 +1014,6 @@ const emptyToUndefined = (arr: ReturnType<typeof subsumationIssues>): ReturnType
     arr?.length === 0 ? undefined : arr?.filter(el => el.length > 0)
 
 /**
- * Determine whether or not two types have any overlap at all
- */
-export function overlaps(a: TypeExpression, b: TypeExpression): boolean {
-    const resolvedA = resolveType(a)
-    const resolvedB = resolveType(b)
-
-    if (!subsumationIssues(resolvedA, resolvedB) || !subsumationIssues(resolvedB, resolvedA)) {
-        return true
-    } else if (resolvedA.kind === 'union-type' && resolvedB.kind === 'union-type') {
-        return resolvedA.members.some(memberA => resolvedB.members.some(memberB => overlaps(memberA, memberB)))
-    } else if (resolvedA.kind === 'union-type') {
-        return resolvedA.members.some(memberA => overlaps(memberA, resolvedB))
-    } else if (resolvedB.kind === 'union-type') {
-        return resolvedB.members.some(memberB => overlaps(memberB, resolvedA))
-    }
-
-    return false
-}
-
-/**
  * Resolve named types, unpack parenthesized types, bind generic types, 
  * simplify unions; generally collapse a type into its "real" form, whatever 
  * that means.
@@ -1041,25 +1021,27 @@ export function overlaps(a: TypeExpression, b: TypeExpression): boolean {
 export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpression {
     switch (type.kind) {
         case "named-type": {
-            if (skipNamed) {
+            if (encounteredNames.includes(type.name.name)) {
                 return type
             } else {
+                encounteredNames = [...encounteredNames, type.name.name]
+
                 const binding = resolve(type.name.name, type.name)
 
                 if (binding) {
                     if (binding.owner.kind === 'type-declaration') {
-                        return resolveType(binding.owner.type, skipNamed)
+                        return resolveType(binding.owner.type, encounteredNames)
                     }
         
                     if (binding.owner.kind === 'generic-param-type') {
-                        return resolveType(binding.owner, skipNamed)
+                        return resolveType(binding.owner, encounteredNames)
                     }
 
                     if (binding.owner.kind === 'import-item') {
                         const imported = resolveImport(binding.owner)
 
                         if (imported && imported.exported && imported.kind === 'type-declaration') {
-                            return resolveType(imported.type, skipNamed)
+                            return resolveType(imported.type, encounteredNames)
                         }
                     }
                 }
@@ -1068,13 +1050,13 @@ export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpr
             }
         }
         case "generic-param-type":
-            return resolveType(type.extends ?? UNKNOWN_TYPE, skipNamed)
+            return resolveType(type.extends ?? UNKNOWN_TYPE, encounteredNames)
         case "parenthesized-type":
-            return resolveType(type.inner, skipNamed)
+            return resolveType(type.inner, encounteredNames)
         case "typeof-type":
             return inferType(type.expr)
         case "keyof-type": {
-            const inner = resolveType(type.inner, skipNamed)
+            const inner = resolveType(type.inner, encounteredNames)
 
             if (inner.kind === 'record-type') {
                 return inner.keyType
@@ -1093,7 +1075,7 @@ export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpr
             }
         }
         case "valueof-type": {
-            const inner = resolveType(type.inner, skipNamed)
+            const inner = resolveType(type.inner, encounteredNames)
             
             if (inner.kind === 'record-type') {
                 return inner.valueType
@@ -1111,7 +1093,7 @@ export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpr
             }
         }
         case "elementof-type": {
-            const inner = resolveType(type.inner, skipNamed)
+            const inner = resolveType(type.inner, encounteredNames)
             
             if (inner.kind === 'array-type') {
                 return inner.element
@@ -1133,7 +1115,7 @@ export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpr
         case "iterator-type": {
             return {
                 ...type,
-                inner: resolveType(type.inner, skipNamed)
+                inner: resolveType(type.inner, encounteredNames)
             }
         }
         case "plan-type": {
@@ -1144,7 +1126,7 @@ export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpr
 
             return {
                 ...type,
-                inner: resolveType(inner, skipNamed)
+                inner: resolveType(inner, encounteredNames)
             }
         }
         case "maybe-type": {
@@ -1158,48 +1140,48 @@ export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpr
                 ],
                 mutability: undefined,
                 parent, module, code, startIndex, endIndex
-            }, skipNamed)
+            }, encounteredNames)
         }
         case "bound-generic-type": {
-            const resolvedGeneric = resolveType(type.generic, skipNamed)
+            const resolvedGeneric = resolveType(type.generic, encounteredNames)
 
             if (resolvedGeneric.kind !== 'generic-type') {
                 return UNKNOWN_TYPE
             } else {
-                return resolveType(parameterizedGenericType(resolvedGeneric, type.typeArgs), skipNamed)
+                return resolveType(parameterizedGenericType(resolvedGeneric, type.typeArgs), encounteredNames)
             }
         }
         case "union-type": {
             const resolved = {
                 ...type,
-                members: type.members.map(m => resolveType(m, skipNamed))
+                members: type.members.map(m => resolveType(m, encounteredNames))
             }
 
-            const simplified = simplifyUnions(resolved)
+            const simplified = simplifyUnions(resolved, encounteredNames)
 
             if (simplified.kind === 'union-type') {
                 return simplified
             } else {
-                return resolveType(simplified, skipNamed)
+                return resolveType(simplified, encounteredNames)
             }
         }
         case "array-type": {
             return {
                 ...type,
-                element: resolveType(type.element, skipNamed)
+                element: resolveType(type.element, encounteredNames)
             }
         }
         case "tuple-type": {
             return {
                 ...type,
-                members: type.members.map(m => resolveType(m, skipNamed))
+                members: type.members.map(m => resolveType(m, encounteredNames))
             }
         }
         case "record-type": {
             return {
                 ...type,
-                keyType: resolveType(type.keyType, skipNamed),
-                valueType: resolveType(type.valueType, skipNamed)
+                keyType: resolveType(type.keyType, encounteredNames),
+                valueType: resolveType(type.valueType, encounteredNames)
             }
         }
         case "object-type": {
@@ -1207,19 +1189,19 @@ export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpr
                 ...type,
                 entries: type.entries.map(entry => ({
                     ...entry,
-                    type: resolveType(entry.type, skipNamed)
+                    type: resolveType(entry.type, encounteredNames)
                 }))
             }
         }
         case "property-type": {
-            const subjectType = resolveType(type.subject, skipNamed)
+            const subjectType = resolveType(type.subject, encounteredNames)
             const nilTolerantSubjectType = type.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
                 ? subtract(subjectType, NIL_TYPE)
                 : subjectType;
             const property = propertiesOf(nilTolerantSubjectType)?.find(entry => getName(entry.name) === type.property.name)
             
             if (type.optional && property) {
-                return resolveType(maybeOf(property.type), skipNamed)
+                return resolveType(maybeOf(property.type), encounteredNames)
             } else {
                 const mutability = (
                     property?.type?.mutability == null ? undefined :
@@ -1233,7 +1215,7 @@ export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpr
                             property.optional
                                 ?  maybeOf({ ...property.type, mutability } as TypeExpression)
                                 : { ...property.type, mutability } as TypeExpression
-                            ), skipNamed)) 
+                            ), encounteredNames)) 
                         ?? UNKNOWN_TYPE
                 )
             }
@@ -1243,26 +1225,45 @@ export function resolveType(type: TypeExpression, skipNamed?: boolean): TypeExpr
     return type
 }
 
-function resolveNamedType(type: NamedType): TypeExpression {
-    const binding = resolve(type.name.name, type.name)
+/**
+ * Apply all union simplifications
+ */
+function simplifyUnions(type: TypeExpression, encounteredNames: readonly string[]): TypeExpression {
+    if (type.kind === "union-type") {
+        let members: TypeExpression[] = (
+            // flatten inner unions
+            type.members.map(member =>
+                member.kind === 'union-type'
+                    ? member.members
+                    : [member]).flat()
+        )
 
-    if (binding) {
-        if (binding.owner.kind === 'type-declaration') {
-            return binding.owner.type
-        }
+        // distill overlapping members
+        members = members.filter((typeA, indexA) =>
+            typeA.kind !== 'never-type' && 
+            !members.some((typeB, indexB) => 
+                indexA !== indexB && // skip comparing A with itself
+                !subsumationIssues(typeB, typeA, encounteredNames) && // B encompasses A
+                resolveType(typeB, encounteredNames).kind !== 'unknown-type')) // if B is unknown, that's cheating, keep A
 
-        if (binding.owner.kind === 'generic-param-type') {
-            return binding.owner
-        }
-
-        if (binding.owner.kind === 'import-item') {
-            const imported = resolveImport(binding.owner)
-
-            if (imported && imported.exported && imported.kind === 'type-declaration') {
-                return imported.type
+        // handle singleton and empty unions
+        if (members.length === 1) {
+            return members[0];
+        } else if (members.length === 0) {
+            return NEVER_TYPE
+        } else {
+            return {
+                kind: "union-type",
+                members,
+                mutability: undefined,
+                parent: type.parent,
+                module: type.module,
+                code: type.code,
+                startIndex: type.startIndex,
+                endIndex: type.endIndex,
             }
         }
+    } else {
+        return type;
     }
-
-    return UNKNOWN_TYPE
 }

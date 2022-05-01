@@ -37,7 +37,7 @@ export function inferType(
         }
     }
 
-    return simplifyUnions(refinedType)
+    return refinedType
 }
 
 const inferTypeInner = computedFn(function inferTypeInner(
@@ -446,7 +446,7 @@ const inferTypeInner = computedFn(function inferTypeInner(
             } else {
                 return {
                     kind: "array-type",
-                    element: simplifyUnions({
+                    element: resolveType({
                         kind: "union-type",
                         members: [...memberTypes, ...arraySpreads.map(t => t.element)],
                         mutability: undefined,
@@ -823,99 +823,6 @@ export function parameterizedGenericType(generic: GenericType, typeArgs: readonl
 
         return ast
     }) as TypeExpression
-}
-
-/**
- * Apply all union simplifications
- */
-export function simplifyUnions(type: TypeExpression): TypeExpression {
-    return handleSingletonUnion(
-        distillUnion(
-            flattenUnions(type)));
-}
-
-/**
- * Nested unions can be flattened
- */
-function flattenUnions(type: TypeExpression): TypeExpression {
-    if (type.kind === "union-type") {
-        const members: TypeExpression[] = [];
-
-        for (const member of type.members) {
-            if (member.kind === "union-type") {
-                members.push(...member.members.map(flattenUnions));
-            } else {
-                members.push(member);
-            }
-        }
-
-        return {
-            kind: "union-type",
-            members,
-            mutability: undefined,
-            parent: type.parent,
-            module: type.module,
-            code: type.code,
-            startIndex: type.startIndex,
-            endIndex: type.endIndex,
-        }
-    } else {
-        return type;
-    }
-}
-
-/**
- * Remove redundant members in union type (members subsumed by other members)
- */
-function distillUnion(type: TypeExpression): TypeExpression {
-    if (type.kind === "union-type") {
-        const indicesToDrop = new Set<number>();
-
-        for (let i = 0; i < type.members.length; i++) {
-            for (let j = 0; j < type.members.length; j++) {
-                if (i !== j) {
-                    const a = type.members[i];
-                    const b = type.members[j];
-
-                    if (!subsumationIssues(b, a) && !indicesToDrop.has(j) && resolveType(b).kind !== 'unknown-type') {
-                        indicesToDrop.add(i);
-                    }
-                }
-            }
-        }
-
-        const members = type.members.filter((type, index) =>
-            !indicesToDrop.has(index) && type.kind !== 'never-type')
-
-        return {
-            kind: "union-type",
-            members,
-            mutability: undefined,
-            parent: type.parent,
-            module: type.module,
-            code: type.code,
-            startIndex: type.startIndex,
-            endIndex: type.endIndex,
-        }
-    } else {
-        return type;
-    }
-}
-
-/**
- * If union only has one member, putting it in a union-type is redundant
- */
- function handleSingletonUnion(type: TypeExpression): TypeExpression {
-    if (type.kind === "union-type") {
-        if (type.members.length === 1) {
-            return type.members[0];
-        }
-        if (type.members.length === 0) {
-            return NEVER_TYPE
-        }
-    }
-    
-    return type;
 }
 
 export function subtract(type: TypeExpression, without: TypeExpression): TypeExpression {
@@ -1306,7 +1213,7 @@ function fitTemplate(
             if (parameterizedMembersRemaining.length === 1 && isGenericParam(parameterizedMembersRemaining[0])) {
                 const matches = new Map<string, TypeExpression>();
 
-                matches.set(parameterizedMembersRemaining[0].name.name, simplifyUnions({
+                matches.set(parameterizedMembersRemaining[0].name.name, resolveType({
                     kind: "union-type",
                     members: reifiedMembersRemaining,
                     mutability: undefined,
