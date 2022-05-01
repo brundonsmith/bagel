@@ -3,13 +3,13 @@ import { Colors, path, fs } from "./deps.ts";
 import { BagelError, prettyProblem } from "./errors.ts";
 import { all, cacheDir, cachedFilePath, esOrNone, sOrNone, bagelFileToTsFile, jsFileLocation, given, pathIsRemote } from "./utils/misc.ts";
 
-import { allProblems, canonicalModuleName, done, entry, hasProblems, modules } from "./store.ts";
+import { allProblems, canonicalModuleName, done, projectEntry, hasProblems, modules } from "./store.ts";
 import { ModuleName } from "./_model/common.ts";
 import { autofixed, LintProblem } from "./other/lint.ts";
 import { compiled } from "./4_compile/index.ts";
 import { formatted } from "./other/format.ts";
 import { parsed } from "./1_parse/index.ts";
-import { autorun, invalidate, observe, runInAction, when, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
+import { action, autorun, invalidate, observe, runInAction, triggeredBy, when, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
 
 const POSSIBLE_COMMANDS = ['new', 'init', 'build', 'run', 'transpile', 'check', 
     'test', 'format', 'autofix', 'clean'] as const
@@ -36,12 +36,12 @@ async function main() {
     const { command, target, flags } = parseArgs(Deno.args)
     
     if (command == null) {
-        // error
+        fail(`Must provide a valid command:\n${POSSIBLE_COMMANDS.join(', ')}`)
     } else if (command === 'build' || command === 'run') {
         const entry = await entryPointFrom(target)
         
         if (!entry) {
-            // error
+            fail(`Couldn't find entry '${target}'`)
         } else {
             if (flags.clean) {
                 // TODO: Only clean modules relevant to entry
@@ -49,9 +49,9 @@ async function main() {
                 console.log(Colors.yellow(pad('Cleaned')) + 'Bagel cache (' + numFiles + ' files)')
             }
 
-            modules[entry] = { source: undefined, isEntry: true, isProjectLocal: true }; invalidate(modules, entry)
+            modules[entry] = { source: undefined, isEntry: true, isProjectLocal: true, loading: false }; invalidate(modules, entry)
 
-            await when(() => done())
+            await when(done)
 
             printProblems(allProblems(), false)
 
@@ -117,7 +117,7 @@ async function main() {
         }
     } else if (command === 'transpile' || command === 'check' || command === 'test' || command === 'format' || command === 'autofix' || command === 'clean') {
         if (!(await fs.exists(target))) {
-            // error
+            fail(`Couldn't find '${target}'`)
         } else {
             if (command === 'clean' || flags.clean) {
                 // TODO: Only clean modules relevant to target
@@ -135,12 +135,12 @@ async function main() {
                 
                 runInAction(() => {
                     for (const module of allModules) {
-                        modules[module] = { source: undefined, isEntry: false, isProjectLocal: false }; invalidate(modules, module)
+                        modules[module] = { source: undefined, isEntry: false, isProjectLocal: true, loading: false }; invalidate(modules, module)
                     }
                 })
 
                 if (command === 'transpile' || command === 'check') {
-                    await when(() => done())
+                    await when(done)
 
                     printProblems(allProblems(), false)
 
@@ -170,9 +170,11 @@ async function main() {
         }
     } else if (command === 'new' || command === 'init') {
         if (await fs.exists(target)) {
-            // error
-            // fail(`Cannot create project directory ${providedEntry} because it already exists`)
-            // fail(`Can't initialize Bagel project here because one already exists`)
+            if (command === 'new') {
+                fail(`Cannot create project directory ${target} because it already exists`)
+            } else if (command === 'init') {
+                fail(`Can't initialize Bagel project here because one already exists`)
+            }
         } else {
             if (command === 'new') {
                 await fs.ensureDir(target)
@@ -241,8 +243,8 @@ function printProblems (problems: Map<ModuleName, (BagelError|LintProblem)[]>, c
     const modulesWithErrors = new Array(...problems.values()).filter(errs => errs.length > 0).length
 
     if (modulesWithErrors === 0) {
-        const localModules = [...Object.entries(modules)].filter(entry => entry[1].isProjectLocal).length
-        console.log(Colors.green(pad('Checked')) + `${localModules} module${sOrNone(localModules)} and found no problems`)
+        const localModules = [...Object.entries(modules)].length
+        console.log(Colors.green(pad('Checked')) + `${problems.size} module${sOrNone(localModules)} and found no problems`)
     } else {
         console.log()
 
@@ -254,7 +256,7 @@ function printProblems (problems: Map<ModuleName, (BagelError|LintProblem)[]>, c
             }
         }
 
-        console.log(`Found ${totalErrors} problem${sOrNone(totalErrors)} across ${modulesWithErrors} module${sOrNone(modulesWithErrors)}`)
+        console.log(`Found ${totalErrors} problem${sOrNone(totalErrors)} across ${modulesWithErrors} module${sOrNone(modulesWithErrors)} (${problems.size} module${sOrNone(problems.size)} checked)`)
     }
 }
 
@@ -477,71 +479,91 @@ async function test() {
 //     })
 // }
 
-// add imported modules to set
-autorun(() => {
-    observe(modules, WHOLE_OBJECT)
+const setSource = action((module: ModuleName, source: string) => {
+    const data = observe(modules, module)
 
-    const entryModule = entry()
+    data.source = source; invalidate(data, 'source')
+    addImportedModules(module)
+})
+
+function addImportedModules(module: ModuleName) {
+    const entryModule = projectEntry()
     const projectDir = given(entryModule, path.dirname)
-
-    for (const _module of Object.keys(modules)) {
-        const module = _module as ModuleName
-
-        const parseResult = parsed(module)
-
-        if (parseResult) {
+    const parseResult = parsed(module)
+    
+    if (parseResult) {
+        runInAction(() => {
             for (const decl of parseResult.ast.declarations) {
                 if (decl.kind === "import-declaration" || decl.kind === "import-all-declaration") {
                     const importedModule = canonicalModuleName(module, decl.path.value)
-
-                    if (modules[importedModule] == null) {
+    
+                    if (observe(modules, importedModule) == null) {
                         const isProjectLocal = projectDir != null && isWithin(projectDir, importedModule)
 
-                        modules[importedModule] = { source: undefined, isEntry: false, isProjectLocal }; invalidate(modules, importedModule)
+                        modules[importedModule] = {
+                            source: undefined,
+                            isEntry: false,
+                            isProjectLocal,
+                            loading: false,
+                        }; invalidate(modules, importedModule)
                     }
                 }
             }
-        }
+        })
     }
-})
+}
 
 // Load modules from disk or web
-autorun(async () => {
-    observe(modules, WHOLE_OBJECT)
-
-    for (const [_module, data] of Object.entries(modules)) {
+autorun(function loadSource() {
+    for (const [_module, data] of Object.entries(observe(modules, WHOLE_OBJECT))) {
         const module = _module as ModuleName
-        try {
-            if (data.source == null) {
-                if (pathIsRemote(module)) {  // http import
-                    const path = cachedFilePath(module)
 
-                    if (fs.existsSync(path)) {  // module has already been cached locally
-                        const source = await Deno.readTextFile(path)
-                        modules[module] = { ...data, source }; invalidate(modules, module)
-                    } else {  // need to download module before compiling
-                        Deno.writeTextFileSync(path, '') // immediately write a file to mark it as in-progress
-                        const res = await fetch(module)
+        if (observe(data, 'source') == null && !observe(data, 'loading')) {
+            data.loading = true; invalidate(data, 'loading')
 
-                        if (res.status === 200) {
-                            console.log(Colors.green(pad('Downloaded')) + module)
-                            const source = await res.text()
-                            await Deno.writeTextFile(path, source)
-                            modules[module] = { ...data, source }; invalidate(modules, module)
-                        } else {
-                            if (await fs.exists(path)) {
-                                await Deno.remove(path)
+            if (pathIsRemote(module)) {  // http import
+                const cachePath = cachedFilePath(module)
+
+                if (fs.existsSync(cachePath)) {  // module has already been cached locally
+                    Deno.readTextFile(cachePath)
+                        .then(source => {
+                            setSource(module, source)
+                            data.loading = false; invalidate(data, 'loading')
+                        })
+                        .catch(() => {
+                            console.error(Colors.red(pad('Error')) + `couldn't find module '${module}'`)
+                        })
+                } else {  // need to download module before compiling
+                    fetch(module)
+                        .then(async res => {
+                            if (res.status === 200) {
+                                console.log(Colors.green(pad('Downloaded')) + module)
+                                const source = await res.text()
+                                await Deno.writeTextFile(cachePath, source)
+                                setSource(module, source)
+                                data.loading = false; invalidate(data, 'loading')
+                            } else {
+                                if (await fs.exists(cachePath)) {
+                                    await Deno.remove(cachePath)
+                                }
+                                fail(module)
                             }
-                            fail(module)
-                        }
-                    }
-                } else {  // local disk import
-                    const source = await Deno.readTextFile(module)
-                    modules[module] = { ...data, source }; invalidate(modules, module)
+                        })
+                        .catch(() => {
+                            console.error(Colors.red(pad('Error')) + `couldn't find module '${module}'`)
+                        })
+
                 }
+            } else {  // local disk import
+                Deno.readTextFile(module)
+                    .then(source => {
+                        setSource(module, source)
+                        data.loading = false; invalidate(data, 'loading')
+                    })
+                    .catch(() => {
+                        console.error(Colors.red(pad('Error')) + `couldn't find module '${module}'`)
+                    })
             }
-        } catch {
-            console.error(Colors.red(pad('Error')) + `couldn't find module '${module}'`)
         }
     }
 })

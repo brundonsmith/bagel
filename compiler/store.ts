@@ -14,18 +14,17 @@ import { computedFn, observe, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
 type ModuleData = {
     source: string|undefined,
     isEntry: boolean,
-    isProjectLocal: boolean
+    isProjectLocal: boolean,
+    loading: boolean,
 }
 export const modules: Record<ModuleName, ModuleData> = {}
 
-export const entry = computedFn(function entry() {
-    observe(modules, WHOLE_OBJECT)
-
-    for (const _module in modules) {
+export const projectEntry = computedFn(function entry() {
+    for (const _module in observe(modules, WHOLE_OBJECT)) {
         const module = _module as ModuleName
-        const data = modules[module]
+        const data = observe(modules, module)
 
-        if (data.isEntry) {
+        if (observe(data, 'isEntry')) {
             return module
         }
     }
@@ -34,15 +33,15 @@ export const entry = computedFn(function entry() {
 })
 
 export const done = computedFn(function done () {
-    observe(modules, WHOLE_OBJECT)
+    if (Object.keys(observe(modules, WHOLE_OBJECT)).length === 0) {
+        return false
+    }
 
-    if (Object.keys(modules).length === 0) return false
-
-    for (const _module in modules) {
+    for (const _module in observe(modules, WHOLE_OBJECT)) {
         const module = _module as ModuleName
-        const data = modules[module]
+        const data = observe(modules, module)
 
-        if (data?.source == null) {
+        if (observe(data, 'source') == null) {
             return false
         }
     }
@@ -61,7 +60,7 @@ export const allProblems = computedFn(function allProblems (excludePrelude?: boo
 
     for (const _module in modules) {
         const module = _module as ModuleName
-        const data = modules[module]
+        const data = observe(modules, module)
 
         const parseResult = parsed(module, excludePrelude)
         if (parseResult) {
@@ -69,7 +68,7 @@ export const allProblems = computedFn(function allProblems (excludePrelude?: boo
             const { ast, errors: parseErrors } = parseResult
             const typecheckErrors = typeerrors(ast)
             const lintProblems = (
-                data.isProjectLocal
+                observe(data, 'isProjectLocal')
                     ? lint(getConfig(), parseResult.ast)
                     : []
             )
@@ -109,7 +108,7 @@ export type BagelConfig = {
 }
 
 export const getConfig = computedFn(function getConfig (): BagelConfig|undefined {
-    const entryFile = entry()
+    const entryFile = projectEntry()
 
     if (!entryFile) return undefined
 
