@@ -1239,12 +1239,25 @@ function simplifyUnions(type: TypeExpression, encounteredNames: readonly string[
         )
 
         // distill overlapping members
-        members = members.filter((typeA, indexA) =>
-            typeA.kind !== 'never-type' && 
-            !members.some((typeB, indexB) => 
-                indexA !== indexB && // skip comparing A with itself
-                !subsumationIssues(typeB, typeA, encounteredNames) && // B encompasses A
-                resolveType(typeB, encounteredNames).kind !== 'unknown-type')) // if B is unknown, that's cheating, keep A
+        {
+            const indicesToDrop = new Set<number>();
+    
+            for (let i = 0; i < members.length; i++) {
+                for (let j = 0; j < members.length; j++) {
+                    if (i !== j) {
+                        const a = members[i];
+                        const b = members[j];
+    
+                        if (!subsumationIssues(b, a) && !indicesToDrop.has(j) && resolveType(b).kind !== 'unknown-type') {
+                            indicesToDrop.add(i);
+                        }
+                    }
+                }
+            }
+    
+            members = members.filter((type, index) =>
+                !indicesToDrop.has(index) && type.kind !== 'never-type')
+        }    
 
         // handle singleton and empty unions
         if (members.length === 1) {
