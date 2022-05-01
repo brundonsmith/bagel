@@ -3003,6 +3003,36 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Property of union type pass",
+  fn() {
+    testTypecheck(`
+    type Objs =
+      | { a: string, b: boolean }
+      | { a: string, b: number, c: number}
+
+    func foo(o: Objs): string => o.a
+    
+    func bar(o: Objs): number|boolean => o.b
+    `,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Property of union type fail",
+  fn() {
+    testTypecheck(`
+    type Objs =
+      | { a: string, b: boolean }
+      | { a: string, b: number, c: number}
+
+    func foo(o: Objs): string => o.c
+    `,
+    true)
+  }
+})
+
 // TODO: We could probably figure out the tuple type of `other` here ^
 
 

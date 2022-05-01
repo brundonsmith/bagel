@@ -462,12 +462,13 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         ? propertiesOf(subtract(subjectType, NIL_TYPE))
                         : propertiesOf(subjectType)
 
-                    if (property.kind === 'plain-identifier') {
+
+                    if (property.kind === 'plain-identifier' || property.kind === 'exact-string-literal') {
                         if (subjectProperties == null) {
                             // TODO: I don't think this allows accessing record properties with dot
                             reportError(miscError(current.subject, `Can only use dot operator (".") on objects with properties (value is of type "${msgFormat(subjectType)}")`));
-                        } else if (!subjectProperties.some(property => getName(property.name) === getName(property.name))) {
-                            reportError(miscError(property, `Property '${property.name}' does not exist on type '${msgFormat(subjectType)}'`));
+                        } else if (!subjectProperties.some(p => getName(p.name) === getName(property))) {
+                            reportError(miscError(property, `Property '${getName(property)}' does not exist on type '${msgFormat(subjectType)}'`));
                         }
                     } else {
                         const indexType = resolveType(inferType(property))

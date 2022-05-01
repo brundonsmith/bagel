@@ -1126,6 +1126,37 @@ export const propertiesOf = computedFn(function propertiesOf (
                 // TODO: reload() proc
             ]
         }
+        case "union-type": {
+            const allProperties = resolvedType.members.map(propertiesOf)
+            let sharedProperties: readonly Attribute[] | undefined
+
+            for (const props of allProperties) {
+                if (sharedProperties == null) {
+                    sharedProperties = [...(props ?? [])]
+                } else {
+                    const newSharedProperties: Attribute[] = []
+
+                    for (const prop of (sharedProperties as readonly Attribute[])) {
+                        const matched = props?.find(p => getName(p.name) === getName(prop.name))
+
+                        if (matched) {
+                            if (!typesEqual(matched.type, prop.type)) {
+                                newSharedProperties.push({
+                                    ...prop,
+                                    type: unionOf([matched.type, prop.type])
+                                })
+                            } else {
+                                newSharedProperties.push(prop)
+                            }
+                        }
+                    }
+
+                    sharedProperties = newSharedProperties
+                }
+            }
+
+            return sharedProperties
+        }
     }
 })
 
