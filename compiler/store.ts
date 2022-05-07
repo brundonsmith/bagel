@@ -103,7 +103,6 @@ export const getModuleByName = computedFn(function getModuleByName (importer: Mo
 
 export type BagelConfig = {
     platforms: Platform[]|undefined,
-    markupFunction: Expression|undefined
     lintRules: {[key: string]: string}|undefined
 }
 
@@ -120,7 +119,6 @@ export const getConfig = computedFn(function getConfig (): BagelConfig|undefined
     // just walk its AST
     if (configDecl?.value.kind === 'object-literal') {
         let platforms: Platform[]|undefined
-        let markupFunction: Expression|undefined
         let lintRules: {[key: string]: string}|undefined
         
         {
@@ -132,11 +130,6 @@ export const getConfig = computedFn(function getConfig (): BagelConfig|undefined
             : undefined
         }
         
-        {
-            markupFunction = (configDecl.value.entries.find(e =>
-                Array.isArray(e) && (e[0] as PlainIdentifier).name === 'markupFunction') as any)?.[1] as Expression|undefined
-        }
-
         {
             const lintRulesExpr = (configDecl.value.entries.find(e =>
                 Array.isArray(e) && (e[0] as PlainIdentifier).name === 'lintRules') as any)?.[1] as Expression|undefined
@@ -153,7 +146,6 @@ export const getConfig = computedFn(function getConfig (): BagelConfig|undefined
         
         return {
             platforms,
-            markupFunction,
             lintRules
         }
     }

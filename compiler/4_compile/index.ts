@@ -40,9 +40,6 @@ export const IMPORTED_ITEMS = [
     // reactivity
     'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'WHOLE_OBJECT', 
 
-    // rendering
-    'defaultMarkupFunction',
-    
     // used in compiler output
     'range', 'Iter', 'Plan', 'Error', 'ERROR_SYM', 'Remote',
     
