@@ -2684,7 +2684,21 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Circular type",
+  name: "Circular type pass 1",
+  fn() {
+    testTypecheck(`
+    type Foo =
+      | { a: Foo }
+      | nil
+    
+    const foo: Foo = { a: nil }`,
+    false)
+  }
+})
+
+
+Deno.test({
+  name: "Circular type pass 2",
   fn() {
     testTypecheck(`
     type JSON =
@@ -2697,6 +2711,23 @@ Deno.test({
     
     const foo: JSON = { bar: 'stuff' }`,
     false)
+  }
+})
+
+Deno.test({
+  name: "Circular type fail 1",
+  fn() {
+    testTypecheck(`
+    type JSON =
+      | {[string]: JSON}
+      | JSON[]
+      | string
+      | number
+      | boolean
+      | nil
+    
+    const foo: JSON = { bar: () => 12 }`,
+    true)
   }
 })
 
