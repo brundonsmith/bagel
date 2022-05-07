@@ -7,6 +7,8 @@ export js proc render(el: Element) {#
     function convertToElements(el) {
         if (el?.tag) {
             return ___h(el.tag, el.attributes, ...el.children.map(convertToElements))
+        } else if (Array.isArray(el)) {
+            return el.map(convertToElements)
         } else {
             return el
         }
