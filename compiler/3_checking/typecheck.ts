@@ -1,5 +1,5 @@
 import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, EMPTY_TYPE, isEmptyType } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, EMPTY_TYPE, isEmptyType, UnionType } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws } from "./typeinfer.ts";
@@ -812,8 +812,6 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
         return undefined;
     } else if (resolvedValue.kind === "unknown-type") {
         return [baseErrorMessage];
-    } else if (isEmptyType(resolvedValue)) {
-        return [baseErrorMessage];
     } else if (
         (resolvedDestination.kind === "number-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "number-literal") ||
         (resolvedDestination.kind === "string-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "exact-string-literal") ||
@@ -821,32 +819,30 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
     ) {
         return undefined;
     } else if(resolvedDestination.kind === "union-type") {
-        if (resolvedValue.kind === "union-type") {
-            const subsumed = resolvedValue.members.every(valueMember => 
-                resolvedDestination.members.some(destinationMember => 
-                    !subsumationIssues(destinationMember, valueMember, encounteredNames)));
+        const valueMembers = (
+            resolvedValue.kind === "union-type"
+                ? resolvedValue.members
+                : [resolvedValue]
+        )
 
-            if (subsumed) {
-                return undefined
-            } else {
-                return [baseErrorMessage]
-            }
+        const subsumed = valueMembers.every(valueMember => 
+            resolvedDestination.members.some(destinationMember => 
+                !subsumationIssues(destinationMember, valueMember, encounteredNames)));
+
+        if (subsumed) {
+            return undefined
         } else {
-            const subsumed = resolvedDestination.members.some(member => 
-                !subsumationIssues(member, resolvedValue, encounteredNames))
-                
-            if (subsumed) {
-                return undefined
-            } else {
-                return [baseErrorMessage]
-            }
+            return [baseErrorMessage]
         }
     } else if (resolvedValue.kind === "union-type") {
-        return all(
-            resolvedValue.members.map(member =>
-                subsumationIssues(resolvedDestination, member, encounteredNames))
-            .filter(exists)
-            .flat())
+        const subsumed = resolvedValue.members.every(valueMember => 
+            !subsumationIssues(resolvedDestination, valueMember, encounteredNames))
+
+        if (subsumed) {
+            return undefined
+        } else {
+            return [baseErrorMessage]
+        }
     } else if (resolvedDestination.kind === 'nominal-type' && resolvedValue.kind === 'nominal-type') {
         if (
             resolvedDestination.module != null && resolvedValue.module != null &&
@@ -1156,7 +1152,7 @@ export function resolveType(type: TypeExpression, encounteredNames: readonly str
                 members: type.members.map(m => resolveType(m, encounteredNames))
             }
 
-            const simplified = simplifyUnions(resolved, encounteredNames)
+            const simplified = simplifyUnion(resolved, encounteredNames)
 
             if (simplified.kind === 'union-type') {
                 return simplified
@@ -1227,55 +1223,28 @@ export function resolveType(type: TypeExpression, encounteredNames: readonly str
 /**
  * Apply all union simplifications
  */
-function simplifyUnions(type: TypeExpression, encounteredNames: readonly string[]): TypeExpression {
-    if (type.kind === "union-type") {
-        let members: TypeExpression[] = (
-            // flatten inner unions
-            type.members.map(member =>
-                member.kind === 'union-type'
-                    ? member.members
-                    : [member]).flat()
-        )
+function simplifyUnion(type: UnionType, encounteredNames: readonly string[]): TypeExpression {
+    let members: TypeExpression[] = (
+        // flatten inner unions
+        type.members.map(member =>
+            member.kind === 'union-type'
+                ? member.members
+                : [member]).flat()
+    )
 
-        // distill overlapping members
-        {
-            const indicesToDrop = new Set<number>();
-    
-            for (let i = 0; i < members.length; i++) {
-                for (let j = 0; j < members.length; j++) {
-                    if (i !== j) {
-                        const a = members[i];
-                        const b = members[j];
-    
-                        if (!subsumationIssues(b, a, encounteredNames) && !indicesToDrop.has(j) && resolveType(b, encounteredNames).kind !== 'unknown-type') {
-                            indicesToDrop.add(i);
-                        }
-                    }
-                }
-            }
-    
-            members = members.filter((type, index) =>
-                !indicesToDrop.has(index) && !isEmptyType(type))
-        }    
-
-        // handle singleton and empty unions
-        if (members.length === 1) {
-            return members[0];
-        } else if (members.length === 0) {
-            return EMPTY_TYPE
-        } else {
-            return {
-                kind: "union-type",
-                members,
-                mutability: undefined,
-                parent: type.parent,
-                module: type.module,
-                code: type.code,
-                startIndex: type.startIndex,
-                endIndex: type.endIndex,
-            }
-        }
+    // handle singleton and empty unions
+    if (members.length === 1) {
+        return members[0];
     } else {
-        return type;
+        return {
+            kind: "union-type",
+            members,
+            mutability: undefined,
+            parent: type.parent,
+            module: type.module,
+            code: type.code,
+            startIndex: type.startIndex,
+            endIndex: type.endIndex,
+        }
     }
 }

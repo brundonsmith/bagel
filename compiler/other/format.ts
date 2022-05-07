@@ -1,6 +1,7 @@
 
 import { computedFn, observe } from "../../lib/ts/reactivity.ts";
 import { parsed } from "../1_parse/index.ts";
+import { distillOverlappingUnionMembers } from "../3_checking/typeinfer.ts";
 import { modules } from "../store.ts";
 import { getName } from "../utils/ast.ts";
 import { AST, PlainIdentifier } from '../_model/ast.ts'
@@ -245,7 +246,15 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         }
         case "javascript-escape":
             return `js#${ast.js}#js`
-        case "union-type": return ast.members.map(f).join(" | ") || '<never>';
+        case "union-type": {                    
+            const distilled = distillOverlappingUnionMembers(ast) 
+
+            if (distilled.members.length === 0) {
+                return '<never>'
+            } else {
+                return distilled.members.map(f).join(" | ")
+            }
+        }
         case "maybe-type": return f(ast.inner) + '?';
         case "named-type":
         case "generic-param-type": return ast.name.name;

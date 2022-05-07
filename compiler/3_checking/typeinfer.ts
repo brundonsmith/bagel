@@ -1,6 +1,6 @@
 import { Refinement, ModuleName, Binding } from "../_model/common.ts";
 import { BinaryOp, Case, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType } from "../_model/type-expressions.ts";
 import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
@@ -696,7 +696,9 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
  * a bit to allow for "normal" kinds of mutation
  */
 function broadenTypeForMutation(type: TypeExpression): TypeExpression {
-    if (type.kind === 'literal-type') {
+    if (type.kind === 'union-type') {
+        return distillOverlappingUnionMembers(type)
+    } else if (type.kind === 'literal-type') {
         if (type.value.kind === 'exact-string-literal') {
             return STRING_TYPE
         }
@@ -708,7 +710,7 @@ function broadenTypeForMutation(type: TypeExpression): TypeExpression {
         }
     } else if (type.mutability === 'mutable' || type.mutability === 'literal') {
         if (type.kind === 'tuple-type') {
-            return { ...type, kind: 'array-type', element: { kind: 'union-type', members: type.members.map(broadenTypeForMutation), parent: type.parent, ...TYPE_AST_NOISE } }
+            return { ...type, kind: 'array-type', element: distillOverlappingUnionMembers({ kind: 'union-type', members: type.members.map(broadenTypeForMutation), parent: type.parent, ...TYPE_AST_NOISE }) }
         } else if (type.kind === 'array-type') {
             return { ...type, element: broadenTypeForMutation(type.element) }
         } else if (type.kind === 'object-type') {
@@ -719,6 +721,29 @@ function broadenTypeForMutation(type: TypeExpression): TypeExpression {
     }
 
     return type
+}
+
+export function distillOverlappingUnionMembers(type: UnionType): UnionType {
+    const indicesToDrop = new Set<number>();
+
+    for (let i = 0; i < type.members.length; i++) {
+        for (let j = 0; j < type.members.length; j++) {
+            if (i !== j) {
+                const a = type.members[i];
+                const b = type.members[j];
+
+                if (!subsumationIssues(b, a) && !indicesToDrop.has(j) && resolveType(b).kind !== 'unknown-type') {
+                    indicesToDrop.add(i);
+                }
+            }
+        }
+    }
+
+    return {
+        ...type,
+        members: type.members.filter((type, index) =>
+            !indicesToDrop.has(index) && !isEmptyType(type))
+    }
 }
 
 /**
