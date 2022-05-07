@@ -3,8 +3,8 @@ from './todo-item.bgl' import { TodoItem, renderTodoItem }
 
 export func renderApp(items: const TodoItem[], addItem: () {}, clearDone: () {}) =>
     <div>
-        {iter(items)
-            .map<TodoItem, Element>(renderTodoItem)
+        {items.iter<TodoItem>()
+            .map(renderTodoItem)
             .collectArray()}
 
         <button onClick={addItem}>{'Add'}</button>

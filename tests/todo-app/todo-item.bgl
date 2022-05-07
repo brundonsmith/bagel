@@ -1,6 +1,4 @@
 
-from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/html.bgl' import { Event }
-
 export type TodoItem = {
     text: string,
     done: boolean
@@ -16,11 +14,11 @@ export func memo renderTodoItem(item: TodoItem) =>
 
 
 func memo itemChangeHandler(item: TodoItem) =>
-    (e: Event) {
+    (e: { target: { value: string } }) {
         item.text = e.target.value;
     }
 
 func memo itemDoneChangeHandler(item: TodoItem) =>
-    (e: Event) {
-        item.done = e.target.checked == true;
+    (e: { target: { checked: boolean }}) {
+        item.done = e.target.checked;
     }

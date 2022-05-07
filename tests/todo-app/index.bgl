@@ -1,9 +1,9 @@
-from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/html.bgl' import { render }
+from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/integrations/preact.bgl' import { render }
 
 from './app.bgl' import { renderApp }
 import './store.bgl' as store
 
-autorun () {
+autorun {
     log(store.items);
     render(renderApp(store.items, store.addItem, store.clearDone));
 }
