@@ -33,8 +33,8 @@ export const formatted = computedFn(function formatted (moduleName: ModuleName):
     }
 })
 
-export function format(ast: AST, options: FormatOptions = DEFAULT_OPTIONS): string {
-    return formatInner(options, 0, undefined)(ast)
+export function format(ast: AST, options?: Partial<FormatOptions>): string {
+    return formatInner({ ...DEFAULT_OPTIONS, ...options }, 0, undefined)(ast)
 }
 
 const formatInner = (options: FormatOptions, indent: number, parent: AST|undefined) => (ast: AST): string => {
@@ -259,7 +259,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                 .join(',')}${br}${currentIndentation}}`;
         case "attribute": return  `${f(ast.name)}: ${f(ast.type)}`
         case "record-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
-        case "array-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `${f(ast.element)}[]`;
+        case "array-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `${f(ast.element)}[]`; // TODO: Add parens if union type (and also keyof, etc?)
         case "tuple-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `[${ast.members.map(f).join(", ")}]`;
         case "string-type": return `string`;
         case "number-type": return `number`;
