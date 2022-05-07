@@ -7,7 +7,7 @@ MVP
 - Regex
 - implement more platform APIs
 - configuration
-- implement express integration
+- implement web server integration
 - Bagel tests
     - Mocking system
 - autoruns only allowed in index.bgl?
@@ -18,14 +18,11 @@ MVP
 
 Design tasks:
 - Dates
-- Pattern-matching/destructuring/union splitting expression with exhaustiveness-checking
 
 Things to stew on:
 - Arbitrary-eval of bagel code from within compiler
 - Mocking
-- Circular types
 - JS escape syntax (delimiters)
-- generalize "JSX" syntax integration
 
 Chores
 - Docs
