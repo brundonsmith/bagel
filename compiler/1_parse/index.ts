@@ -6,7 +6,7 @@ import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
-import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, ElementType, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
@@ -430,27 +430,17 @@ const unionType: ParseFunction<UnionType> = (module, code, startIndex) =>
             }
             : undefined)
 
-const namedType: ParseFunction<NamedType|ElementType> = (module, code, startIndex) =>
+const namedType: ParseFunction<NamedType> = (module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) => ({
-        parsed: 
-            name.name === 'Element'
-                ? {
-                    kind: "element-type",
-                    module,
-                    mutability: undefined,
-                    code,
-                    startIndex,
-                    endIndex: index,
-                }
-                : {
-                    kind: "named-type",
-                    name,
-                    module,
-                    mutability: undefined,
-                    code,
-                    startIndex,
-                    endIndex: index,
-                },
+        parsed: {
+            kind: "named-type",
+            name,
+            module,
+            mutability: undefined,
+            code,
+            startIndex,
+            endIndex: index,
+        },
         index,
     }))
 
@@ -1987,24 +1977,17 @@ export const elementTag: ParseFunction<ElementTag> = (module, code, startIndex) 
     given(consume(code, startIndex, "<"), index =>
     given(plainIdentifier(module, code, index), ({ parsed: tagName, index }) =>
     given(consumeWhitespace(code, index), index =>
-    given(parseSeries(module, code, index, _tagAttribute), ({ parsed: attributes, index }) => 
+    given(parseSeries(module, code, index, _tagAttribute), ({ parsed: parsedAttributes, index }) => 
     given(consumeWhitespace(code, index), index => {
-        const attributesObj: ObjectLiteral = {
-            kind: 'object-literal',
-            entries: attributes.map(([key, value]) => ({
-                kind: 'object-entry',
-                key,
-                value,
-                module: key.module,
-                code: key.code,
-                startIndex: key.startIndex,
-                endIndex: value.endIndex
-            })),
-            module,
-            code,
-            startIndex: attributes[0]?.[0]?.startIndex ?? startIndex,
-            endIndex: attributes[attributes.length - 1]?.[1]?.endIndex ?? index,
-        }
+        const attributes: ObjectEntry[] = parsedAttributes.map(([key, value]) => ({
+            kind: 'object-entry',
+            key,
+            value,
+            module: key.module,
+            code: key.code,
+            startIndex: key.startIndex,
+            endIndex: value.endIndex
+        }))
 
         const singletonClose = consume(code, index, '/>')
 
@@ -2013,7 +1996,7 @@ export const elementTag: ParseFunction<ElementTag> = (module, code, startIndex) 
                 parsed: {
                     kind: "element-tag",
                     tagName,
-                    attributes: attributesObj,
+                    attributes,
                     children: [],
                     module,
                     code,
@@ -2033,22 +2016,7 @@ export const elementTag: ParseFunction<ElementTag> = (module, code, startIndex) 
                     parsed: {
                         kind: "element-tag",
                         tagName,
-                        attributes: {
-                            kind: 'object-literal',
-                            entries: attributes.map(([key, value]) => ({
-                                kind: 'object-entry',
-                                key,
-                                value,
-                                module: key.module,
-                                code: key.code,
-                                startIndex: key.startIndex,
-                                endIndex: value.endIndex
-                            })),
-                            module,
-                            code,
-                            startIndex: attributes[0]?.[0]?.startIndex ?? startIndex,
-                            endIndex: attributes[attributes.length - 1]?.[1]?.endIndex ?? index,
-                        },
+                        attributes,
                         children,
                         module,
                         code,

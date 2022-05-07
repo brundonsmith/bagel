@@ -2,7 +2,7 @@ import { computedFn } from "../../lib/ts/reactivity.ts";
 import { parsed } from "../1_parse/index.ts";
 import { resolve } from "../3_checking/resolve.ts";
 import { resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
-import { inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
+import { elementTagToObject, inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
 import { format } from "../other/format.ts";
 import { canonicalModuleName, getModuleByName } from "../store.ts";
 import { getName } from "../utils/ast.ts";
@@ -343,7 +343,7 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
         case "nil-literal": return NIL;
         case "javascript-escape": return ast.js;
         case "block": return `{ ${blockContents(excludeTypes, module, destination, ast)} }`;
-        case "element-tag": return `${INT}defaultMarkupFunction('${ast.tagName.name}', ${c(ast.attributes)}, [ ${ast.children.map(c).join(', ')} ])`;
+        case "element-tag": return c(elementTagToObject(ast));
         case "union-type": return ast.members.map(c).join(" | ");
         case "maybe-type": return c(ast.inner) + '|null|undefined'
         case "named-type": return ast.name.name;
@@ -351,7 +351,6 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
         case "bound-generic-type": return `unknown`;
         case "proc-type": return `(${compileArgs(excludeTypes, module, destination, ast.args)}) => void`;
         case "func-type": return `(${compileArgs(excludeTypes, module, destination, ast.args)}) => ${c(ast.returnType ?? UNKNOWN_TYPE)}`;
-        case "element-type": return `unknown`;
         case "object-type": return (
             ast.spreads.map(s => c(s) + ' & ').join('') +
             `{${

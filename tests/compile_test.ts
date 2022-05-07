@@ -757,7 +757,6 @@ Deno.test({
     type A = <T>({})
     type B = (a: number) { }
     type C = (a: string) => number
-    type D = Element
     type E = { ...Other }
     type F = {[string]: number}
     type G = Error<string>
@@ -770,7 +769,6 @@ Deno.test({
     type A = unknown;
     type B = (a: number) => void;
     type C = (a: string) => number;
-    type D = unknown;
     type E = Other & {};
     type F = Record<string, number>;
     type G = ___Error<string>;

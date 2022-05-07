@@ -10,7 +10,6 @@ export type TypeExpression =
     | FuncType
     | GenericType
     | BoundGenericType
-    | ElementType
     | ObjectType
     | RecordType
     | ArrayType
@@ -105,12 +104,6 @@ export type Arg = SourceInfo & {
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly optional: boolean,
-}
-
-export type ElementType = SourceInfo & NoMutability & {
-    readonly kind: "element-type",
-    // tagName: PlainIdentifier,
-    // attributes: [PlainIdentifier, Expression][],
 }
 
 export type ObjectType = SourceInfo & Mutability & {
@@ -495,46 +488,6 @@ export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
     startIndex: undefined,
     endIndex: undefined,
 }
-export const ELEMENT_TAG_CHILD_TYPE: TypeExpression = {
-    kind: "union-type",
-    members: [
-        STRING_TYPE,
-        NUMBER_TYPE,
-        NIL_TYPE,
-        FALSE_TYPE,
-        { kind: "element-type", mutability: undefined, parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
-        { kind: "array-type", element: {
-            kind: "union-type",
-            members: [
-                STRING_TYPE,
-                NUMBER_TYPE,
-                NIL_TYPE,
-                { kind: "element-type", mutability: undefined, parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined },
-            ],
-            code: undefined,
-            parent: undefined,
-            module: undefined,
-            startIndex: undefined,
-            endIndex: undefined,
-            mutability: undefined,
-        }, mutability: "immutable", parent: undefined, module: undefined, code: undefined, startIndex: undefined, endIndex: undefined}
-    ],
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
-}
-export const ELEMENT_TYPE: ElementType = {
-    kind: "element-type",
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
-}
 export const TRUTHINESS_SAFE_TYPES: UnionType = {
     kind: "union-type",
     members: [
@@ -542,7 +495,6 @@ export const TRUTHINESS_SAFE_TYPES: UnionType = {
         NIL_TYPE,
         RECORD_OF_ANY,
         ARRAY_OF_ANY,
-        ELEMENT_TYPE,
         ITERATOR_OF_ANY,
         PLAN_OF_ANY,
         REMOTE_OF_ANY,

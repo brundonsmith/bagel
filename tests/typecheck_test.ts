@@ -2853,7 +2853,7 @@ Deno.test({
   name: "Element type pass",
   fn() {
     testTypecheck(`
-    const x: Element = <div />`,
+    const x: { tag: 'div', attributes: {}, children: [] } = <div />`,
     false)
   }
 })

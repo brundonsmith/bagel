@@ -211,7 +211,7 @@ export type NilLiteral = SourceInfo & {
 export type ElementTag = SourceInfo & {
     readonly kind: "element-tag",
     readonly tagName: PlainIdentifier,
-    readonly attributes: ObjectLiteral,
+    readonly attributes: ObjectLiteral['entries'],
     readonly children: readonly Expression[],
 }
 

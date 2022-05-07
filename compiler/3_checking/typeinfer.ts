@@ -1,5 +1,5 @@
 import { Refinement, ModuleName, Binding } from "../_model/common.ts";
-import { BinaryOp, Case, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry } from "../_model/expressions.ts";
+import { BinaryOp, Case, ElementTag, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry, ObjectLiteral } from "../_model/expressions.ts";
 import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType } from "../_model/type-expressions.ts";
 import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
@@ -323,13 +323,7 @@ const inferTypeInner = computedFn(function inferTypeInner(
             return UNKNOWN_TYPE
         }
         case "element-tag": {
-            return {
-                kind: "element-type",
-                // tagName: ast.tagName,
-                // attributes: ast.attributes
-                mutability: undefined,
-                parent, module, code, startIndex, endIndex
-            };
+            return inferType(elementTagToObject(ast))
         }
         case "object-literal": {
             const entries = ast.entries.map((entry): Attribute | readonly Attribute[] | ObjectEntry | undefined => {
@@ -1416,4 +1410,57 @@ const identifierToExactString = (ident: PlainIdentifier): ExactStringLiteral => 
     code: ident.code,
     startIndex: ident.startIndex,
     endIndex: ident.endIndex,
+})
+
+export const elementTagToObject = computedFn((tag: ElementTag): ObjectLiteral => {
+    const { parent, module, code, startIndex, endIndex } = tag
+
+    return {
+        kind: 'object-literal',
+        entries: [
+            {
+                kind: 'object-entry',
+                key: { kind: 'plain-identifier', name: 'tag', ...AST_NOISE },
+                value: {
+                    kind: 'exact-string-literal',
+                    value: tag.tagName.name,
+                    module: tag.tagName.module,
+                    code: tag.tagName.code,
+                    parent: tag.tagName.parent,
+                    startIndex: tag.tagName.startIndex,
+                    endIndex: tag.tagName.endIndex
+                },
+                module: tag.tagName.module,
+                code: tag.tagName.code,
+                parent: tag.tagName.parent,
+                startIndex: tag.tagName.startIndex,
+                endIndex: tag.tagName.endIndex
+            },
+            {
+                kind: 'object-entry',
+                key: { kind: 'plain-identifier', name: 'attributes', ...AST_NOISE },
+                value: {
+                    kind: 'object-literal',
+                    entries: tag.attributes,
+                    parent, module, code,
+                    startIndex: tag.attributes[0]?.startIndex,
+                    endIndex: tag.attributes[tag.children.length - 1]?.endIndex
+                },
+                parent, module, code, startIndex, endIndex
+            },
+            {
+                kind: 'object-entry',
+                key: { kind: 'plain-identifier', name: 'children', ...AST_NOISE },
+                value: {
+                    kind: 'array-literal',
+                    entries: tag.children,
+                    parent, module, code,
+                    startIndex: tag.children[0]?.startIndex,
+                    endIndex: tag.children[tag.children.length - 1]?.endIndex
+                },
+                parent, module, code, startIndex, endIndex
+            }
+        ],
+        parent, module, code, startIndex, endIndex
+    }
 })

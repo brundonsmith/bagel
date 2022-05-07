@@ -1,7 +1,6 @@
 
 import { computedFn, observe } from "../../lib/ts/reactivity.ts";
 import { parsed } from "../1_parse/index.ts";
-import { distillOverlappingUnionMembers } from "../3_checking/typeinfer.ts";
 import { modules } from "../store.ts";
 import { getName } from "../utils/ast.ts";
 import { AST, PlainIdentifier } from '../_model/ast.ts'
@@ -234,7 +233,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                 }${br}${currentIndentation}</${ast.tagName.name}>`
 
             return `<${ast.tagName.name} ${
-                ast.attributes.entries.map(entry =>
+                ast.attributes.map(entry =>
                     entry.kind === 'local-identifier' ? entry.name :
                     entry.kind === 'spread' ? `{...${f(entry.expr)}}` :
                     `${getName(entry.key as PlainIdentifier | ExactStringLiteral)}=${
@@ -285,7 +284,6 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         }
         case "unknown-type": return "unknown";
         case "any-type": return "<any>";
-        case "element-type": return `Element`;
         case "parenthesized-type": return `(${f(ast.inner)})`;
         case "typeof-type": return `typeof ${f(ast.expr)}`;
         case "keyof-type":

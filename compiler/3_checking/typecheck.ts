@@ -1,5 +1,5 @@
 import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, EMPTY_TYPE, isEmptyType, UnionType } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws } from "./typeinfer.ts";
@@ -620,11 +620,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 expect(reportError, ERROR_OF_ANY, current.errorExpression,
                     (_, val) => `Can only thow Errors; this is a '${msgFormat(val)}'`)
                 break;
-            case "element-tag": {
-                for (const child of current.children) {
-                    expect(reportError, ELEMENT_TAG_CHILD_TYPE, child)
-                }
-            } break;
             case "spread": {
                 if (parent?.kind === 'object-literal') {
                     expect(reportError, RECORD_OF_ANY, current.expr, 
@@ -735,7 +730,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "union-type":
             case "maybe-type":
             case "generic-param-type":
-            case "element-type":
             case "record-type":
             case "array-type":
             case "tuple-type":
@@ -759,6 +753,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "proc-declaration":
             case "func-declaration":
             case "typeof-type":
+            case "element-tag":
                 break;
             default:
                 // @ts-expect-error: exhaustiveness
@@ -1152,7 +1147,7 @@ export function resolveType(type: TypeExpression, encounteredNames: readonly str
                 members: type.members.map(m => resolveType(m, encounteredNames))
             }
 
-            const simplified = simplifyUnion(resolved, encounteredNames)
+            const simplified = simplifyUnion(resolved)
 
             if (simplified.kind === 'union-type') {
                 return simplified
@@ -1196,7 +1191,7 @@ export function resolveType(type: TypeExpression, encounteredNames: readonly str
             const property = propertiesOf(nilTolerantSubjectType)?.find(entry => getName(entry.name) === type.property.name)
             
             if (type.optional && property) {
-                return resolveType(maybeOf(property.type), encounteredNames)
+                return resolveType(maybeOf(property.type))
             } else {
                 const mutability = (
                     property?.type?.mutability == null ? undefined :
@@ -1223,7 +1218,7 @@ export function resolveType(type: TypeExpression, encounteredNames: readonly str
 /**
  * Apply all union simplifications
  */
-function simplifyUnion(type: UnionType, encounteredNames: readonly string[]): TypeExpression {
+function simplifyUnion(type: UnionType): TypeExpression {
     let members: TypeExpression[] = (
         // flatten inner unions
         type.members.map(member =>
