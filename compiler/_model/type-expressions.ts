@@ -345,7 +345,7 @@ export const EMPTY_TYPE: UnionType = {
     startIndex: undefined,
     endIndex: undefined,
 }
-export function isEmptyType(type: TypeExpression): type is UnionType {
+export function isEmptyType(type: TypeExpression) {
     return type.kind === 'union-type' && type.members.length === 0
 }
 export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
