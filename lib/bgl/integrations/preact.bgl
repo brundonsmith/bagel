@@ -1,6 +1,6 @@
 
 js#
-import { h as ___h, render as ___render } from 'https://cdn.skypack.dev/preact@10.6.5'
+import { h as ___h, render as ___render } from 'https://ga.jspm.io/npm:preact@10.6.5/dist/preact.js'
 #js
 
 export js proc render(el: Element) {#
