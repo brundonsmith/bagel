@@ -1232,6 +1232,26 @@ function simplifyUnion(type: UnionType, encounteredNames: readonly string[]): Ty
                 : [member]).flat()
     )
 
+    {
+        const indicesToDrop = new Set<number>();
+
+        for (let i = 0; i < type.members.length; i++) {
+            for (let j = 0; j < type.members.length; j++) {
+                if (i !== j) {
+                    const a = type.members[i];
+                    const b = type.members[j];
+
+                    if (typesEqual(b, a) && !indicesToDrop.has(j) && resolveType(b).kind !== 'unknown-type') {
+                        indicesToDrop.add(i);
+                    }
+                }
+            }
+        }
+
+        members = members.filter((type, index) =>
+            !indicesToDrop.has(index) && !isEmptyType(type))
+    }
+
     // handle singleton and empty unions
     if (members.length === 1) {
         return members[0];

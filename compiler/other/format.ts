@@ -247,12 +247,10 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "javascript-escape":
             return `js#${ast.js}#js`
         case "union-type": {                    
-            const distilled = distillOverlappingUnionMembers(ast) 
-
-            if (distilled.members.length === 0) {
+            if (ast.members.length === 0) {
                 return '<never>'
             } else {
-                return distilled.members.map(f).join(" | ")
+                return ast.members.map(f).join(" | ")
             }
         }
         case "maybe-type": return f(ast.inner) + '?';

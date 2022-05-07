@@ -15,6 +15,8 @@ import { AST_NOISE } from "../3_checking/typeinfer.ts";
 import { modules } from "../store.ts";
 import { computedFn, observe } from "../../lib/ts/reactivity.ts";
 
+// TODO: Array and tuple types for function type arguments
+
 export const parsed = (moduleName: ModuleName, excludePrelude?: boolean) => {
     const source = observe(observe(modules, moduleName), 'source')
 
