@@ -23,4 +23,4 @@ export js func count<T>(iter: Iterator<T>): number =>                           
 export js func concat<T>(iter: Iterator<T>, other: Iterator<T>): Iterator<T> =>         {# return iter.concat(other) #}
 export js func zip<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<[T?, R?]> =>   {# return iter.zip(other) #}
 export js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
-export js func collectObject<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} =>  {# return iter.collectObject()) #}
+export js func collectObject<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} =>  {# return iter.collectObject() #}
