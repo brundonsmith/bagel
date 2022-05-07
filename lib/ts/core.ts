@@ -1,21 +1,6 @@
 
 import { autorun, invalidate, observe, WHOLE_OBJECT } from "./reactivity.ts";
 
-
-type Element = { tagName: string, attributes: object, children: Element[] }
-
-export function defaultMarkupFunction(tagName: string, attributes: object, children: Element[]): Element {
-    return { tagName, attributes, children }
-}
-
-export function defaultRender(el: Element) {
-    // @ts-ignore
-    document.body.innerHTML = _renderInner(el)
-}
-function _renderInner({ tagName, attributes, children }: Element): string {
-    return `<${tagName} ${Object.entries(attributes ?? {}).map(([key, value]) => `${key}="${value}"`)}>${children.map(_renderInner)}</${tagName}>`
-}
-
 // Custom reactivity
 export {
     observe,

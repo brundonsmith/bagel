@@ -30,6 +30,11 @@ type LintRuleSeverity = 'error'|'warning'|'info'|'off'
 
 export type BagelConfig = {
     platforms?: ('browser'|'node'|'deno')[],
-    markupFunction?: (tag: string, props: UnknownObject, children: Element[]) => Element,
     lintRules?: {[LintRuleName]: LintRuleSeverity}
+}
+
+export type Element = {
+    tag: string,
+    attributes: UnknownObject,
+    children: unknown[]
 }

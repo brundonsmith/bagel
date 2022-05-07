@@ -2853,16 +2853,58 @@ Deno.test({
   name: "Element type pass",
   fn() {
     testTypecheck(`
-    const x: { tag: 'div', attributes: {}, children: [] } = <div />`,
+    const x: {
+      tag: 'div',
+      attributes: { foo: 12 },
+      children: [
+        'stuff'
+      ]
+    } = <div foo={12}>{'stuff'}</div>`,
     false)
   }
 })
 
 Deno.test({
-  name: "Element type fail",
+  name: "Element type fail 1",
   fn() {
     testTypecheck(`
-    const x: string = <div />`,
+    const x: {
+      tag: 'div',
+      attributes: { foo: 12 },
+      children: [
+        'stuff'
+      ]
+    } = <link foo={12}>{'stuff'}</link>`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Element type fail 2",
+  fn() {
+    testTypecheck(`
+    const x: {
+      tag: 'div',
+      attributes: { foo: 12 },
+      children: [
+        'stuff'
+      ]
+    } = <div foo={13}>{'stuff'}</div>`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Element type fail 3",
+  fn() {
+    testTypecheck(`
+    const x: {
+      tag: 'div',
+      attributes: { foo: 12 },
+      children: [
+        'stuff'
+      ]
+    } = <div foo={12}>{'other'}</div>`,
     true)
   }
 })

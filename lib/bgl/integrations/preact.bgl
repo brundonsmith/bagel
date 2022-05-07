@@ -1,12 +1,12 @@
 
 js#
-import { h as ___h, render as ___render } from 'https://jspm.dev/npm:preact@10.6.5'
+import { h as ___h, render as ___render } from 'https://cdn.skypack.dev/preact@10.6.5'
 #js
 
-export js func markupFunction(tagName: string, attributes: UnknownObject, children: Element[]): Element => {#
-    return ___h(tagName, attributes, ...children)
-#}
-
 export js proc render(el: Element) {#
-    ___render(el, document.body)
+    function convertToElements(el) {
+        return ___h(el.tag, el.attributes, ...el.children.map(convertToElements))
+    }
+
+    ___render(convertToElements(el), document.body)
 #}
