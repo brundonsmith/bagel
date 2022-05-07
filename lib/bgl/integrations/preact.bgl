@@ -5,7 +5,11 @@ import { h as ___h, render as ___render } from 'https://ga.jspm.io/npm:preact@10
 
 export js proc render(el: Element) {#
     function convertToElements(el) {
-        return ___h(el.tag, el.attributes, ...el.children.map(convertToElements))
+        if (el?.tag) {
+            return ___h(el.tag, el.attributes, ...el.children.map(convertToElements))
+        } else {
+            return el
+        }
     }
 
     ___render(convertToElements(el), document.body)
