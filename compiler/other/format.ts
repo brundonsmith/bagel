@@ -245,7 +245,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         }
         case "javascript-escape":
             return `js#${ast.js}#js`
-        case "union-type": return ast.members.map(f).join(" | ");
+        case "union-type": return ast.members.map(f).join(" | ") || '<never>';
         case "maybe-type": return f(ast.inner) + '?';
         case "named-type":
         case "generic-param-type": return ast.name.name;
@@ -278,7 +278,6 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         }
         case "unknown-type": return "unknown";
         case "any-type": return "<any>";
-        case "never-type": return "<never>";
         case "element-type": return `Element`;
         case "parenthesized-type": return `(${f(ast.inner)})`;
         case "typeof-type": return `typeof ${f(ast.expr)}`;

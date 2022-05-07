@@ -32,7 +32,6 @@ export type TypeExpression =
     | ElementofType
     | UnknownType
     | AnyType
-    | NeverType
     | PropertyType
     | JavascriptEscapeType
 
@@ -232,10 +231,6 @@ export type AnyType = SourceInfo & NoMutability & {
     readonly kind: "any-type",
 }
 
-export type NeverType = SourceInfo & NoMutability & {
-    readonly kind: "never-type",
-}
-
 export type PropertyType = SourceInfo & NoMutability & {
     readonly kind: "property-type",
     readonly subject: TypeExpression,
@@ -340,14 +335,18 @@ export const ANY_TYPE: AnyType = {
     startIndex: undefined,
     endIndex: undefined,
 }
-export const NEVER_TYPE: NeverType = {
-    kind: "never-type",
+export const EMPTY_TYPE: UnionType = {
+    kind: "union-type",
+    members: [],
     mutability: undefined,
     parent: undefined,
     module: undefined,
     code: undefined,
     startIndex: undefined,
     endIndex: undefined,
+}
+export function isEmptyType(type: TypeExpression): type is UnionType {
+    return type.kind === 'union-type' && type.members.length === 0
 }
 export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
     kind: "javascript-escape-type",

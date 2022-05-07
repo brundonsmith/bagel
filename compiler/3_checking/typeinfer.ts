@@ -1,6 +1,6 @@
 import { Refinement, ModuleName, Binding } from "../_model/common.ts";
 import { BinaryOp, Case, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, NEVER_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
@@ -830,7 +830,7 @@ export function subtract(type: TypeExpression, without: TypeExpression): TypeExp
     without = resolveType(without)
 
     if (typesEqual(type, without)) {
-        return NEVER_TYPE
+        return EMPTY_TYPE
     } else if (without.kind === 'union-type') {
         let t = type
 
@@ -842,7 +842,9 @@ export function subtract(type: TypeExpression, without: TypeExpression): TypeExp
     } else if (type.kind === "union-type") {
         return {
             ...type,
-            members: type.members.filter(member => !typesEqual(member, without)).map(member => subtract(member, without))
+            members: type.members
+                .filter(member => !typesEqual(member, without))
+                .map(member => subtract(member, without))
         }
     } else if(type.kind === 'boolean-type' && without.kind === 'literal-type' && without.value.kind === 'boolean-literal') {
         if (without.value.value) {
@@ -869,7 +871,7 @@ function narrow(type: TypeExpression, fit: TypeExpression): TypeExpression {
     } else if (!subsumationIssues(fit, type)) {
         return type
     } else {
-        return NEVER_TYPE
+        return EMPTY_TYPE
     }
 }
 

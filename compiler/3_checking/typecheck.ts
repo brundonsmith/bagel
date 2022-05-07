@@ -1,5 +1,5 @@
 import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, NEVER_TYPE } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, ELEMENT_TAG_CHILD_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, NamedType, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, EMPTY_TYPE, isEmptyType } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws } from "./typeinfer.ts";
@@ -437,10 +437,10 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
 
                 const finalType = resolveType(remainingType)
-                if (current.defaultCase == null && finalType.kind !== 'never-type') {
+                if (current.defaultCase == null && !isEmptyType(finalType)) {
                     // if no default case, check that arms are exhaustive
                     reportError(miscError(current, `Switch expression doesn't handle all possible values; ${msgFormat(current.value)} can still be a '${msgFormat(remainingType)}'. Either add cases to cover the rest of the possible values, or add a default case.`))
-                } else if (current.defaultCase != null && finalType.kind === 'never-type') {
+                } else if (current.defaultCase != null && isEmptyType(finalType)) {
                     // if default case, check that arms are *not* exhaustive
                     reportError(miscError(current.defaultCase, `Default case will never be reached, because all possible values for ${msgFormat(current.value)} are covered by cases above`))
                 }
@@ -751,7 +751,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "parenthesized-type":
             case "unknown-type":
             case "any-type":
-            case "never-type":
             case "property-type":
             case "javascript-escape-type":
             case "error-type":
@@ -813,7 +812,7 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
         return undefined;
     } else if (resolvedValue.kind === "unknown-type") {
         return [baseErrorMessage];
-    } else if (resolvedValue.kind === 'never-type' || resolvedDestination.kind === 'never-type') {
+    } else if (isEmptyType(resolvedValue)) {
         return [baseErrorMessage];
     } else if (
         (resolvedDestination.kind === "number-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "number-literal") ||
@@ -1256,14 +1255,14 @@ function simplifyUnions(type: TypeExpression, encounteredNames: readonly string[
             }
     
             members = members.filter((type, index) =>
-                !indicesToDrop.has(index) && type.kind !== 'never-type')
+                !indicesToDrop.has(index) && !isEmptyType(type))
         }    
 
         // handle singleton and empty unions
         if (members.length === 1) {
             return members[0];
         } else if (members.length === 0) {
-            return NEVER_TYPE
+            return EMPTY_TYPE
         } else {
             return {
                 kind: "union-type",
