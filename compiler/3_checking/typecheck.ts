@@ -799,14 +799,6 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
     const all = (...inner: Array<Array<string | string[]> | undefined>) =>
         given(emptyToUndefined(inner.filter(exists).flat()), withBase)
 
-    // constants can't be assigned to mutable slots
-    if (resolvedDestination.mutability === "mutable" && (resolvedValue.mutability !== "mutable" && resolvedValue.mutability !== "literal")) {
-        return [
-            baseErrorMessage,
-            `Value with constant type '${msgFormat(value)}' can't be assigned to slot with mutable type '${msgFormat(destination)}'`
-        ];
-    }
-
     if (
         resolvedValue.kind === "javascript-escape-type" || 
         resolvedValue.kind === "any-type" || 
@@ -814,6 +806,12 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
         resolvedDestination.kind === "unknown-type"
     ) {
         return undefined;
+    } else if (resolvedDestination.mutability === "mutable" && (resolvedValue.mutability !== "mutable" && resolvedValue.mutability !== "literal")) {
+        // constants can't be assigned to mutable slots
+        return [
+            baseErrorMessage,
+            `Value with constant type '${msgFormat(value)}' can't be assigned to slot with mutable type '${msgFormat(destination)}'`
+        ];
     } else if (resolvedValue.kind === "unknown-type") {
         return [baseErrorMessage];
     } else if (
