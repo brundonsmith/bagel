@@ -7,7 +7,7 @@ import { BagelConfig } from "../store.ts";
 import { findAncestor, iterateParseTree, mapParseTree } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
-import { ALL_PLATFORMS, FuncDeclaration, ProcDeclaration, ValueDeclaration } from "../_model/declarations.ts";
+import { FuncDeclaration, ProcDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 import { Expression, Func, Proc } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, FALSY, NUMBER_TYPE, STRING_TYPE, TypeExpression } from "../_model/type-expressions.ts";
 import { format,DEFAULT_OPTIONS } from "./format.ts";
