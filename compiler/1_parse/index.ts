@@ -54,6 +54,7 @@ export const parse = computedFn(function parse (moduleName: ModuleName, code: st
                         isConst: true,
                         exported: "export",
                         value: jsonToAST(contents),
+                        platforms: ALL_PLATFORMS,
                         ...AST_NOISE
                     }
                 ]),
@@ -85,6 +86,7 @@ export const parse = computedFn(function parse (moduleName: ModuleName, code: st
                         value: code,
                         ...AST_NOISE
                     },
+                    platforms: ALL_PLATFORMS,
                     ...AST_NOISE
                 }
             ]),
@@ -814,7 +816,7 @@ const unknownType: ParseFunction<UnknownType> = (module, code, startIndex) =>
 
 const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
-    given(parseOptional(module, code, index, parsePlatform), ({ parsed: platform, index }) =>
+    given(parseOptional(module, code, index, parseJsOrPlatform), ({ parsed: platform, index }) =>
     given(consume(code, index, "proc"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(parseKeyword(code, index, 'action'), ({ parsed: action, index }) =>
@@ -886,7 +888,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startIndex) => 
     given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
-    given(parseOptional(module, code, index, parsePlatform), ({ parsed: platform, index }) =>
+    given(parseOptional(module, code, index, parseJsOrPlatform), ({ parsed: platform, index }) =>
     given(consume(code, index, "func"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(parseKeyword(code, index, 'memo'), ({ parsed: memo, index }) =>
@@ -952,9 +954,13 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
             index,
         })))))))))))
 
-const parsePlatform: ParseFunction<'js' | Platform> = (module, code, index) =>
+const parseJsOrPlatform: ParseFunction<'js' | Platform> = (module, code, index) =>
+    parsePlatform(module, code, index) ??
+    given(parseExact('js')(module, code, index), ({ parsed: js, index }) =>
+    given(consumeWhitespaceRequired(code, index), index => ({ parsed: js, index })))
+
+const parsePlatform: ParseFunction<Platform> = (module, code, index) =>
     given(
-        parseExact('js')(module, code, index) ??
         parseExact('node')(module, code, index) ??
         parseExact('deno')(module, code, index) ??
         parseExact('browser')(module, code, index), ({ parsed: platform, index }) =>
@@ -964,6 +970,7 @@ const valueDeclaration: ParseFunction<ValueDeclaration> = (module, code, startIn
     given(parseOptional(module, code, startIndex, (module, code, index) =>
         given(parseExact("export")(module, code, index) ?? parseExact("expose")(module, code, index), ({ parsed: exported, index }) =>
         given(consumeWhitespaceRequired(code, index), index => ({ parsed: exported, index })))), ({ parsed: exported, index }) =>
+    given(parseOptional(module, code, index, parsePlatform), ({ parsed: platform, index }) =>
     given(parseExact("const")(module, code, index) ?? parseExact("let")(module, code, index), ({ parsed: kind, index }) =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(plainIdentifier(module, code, index), ({ parsed: name, index}) =>
@@ -980,13 +987,18 @@ const valueDeclaration: ParseFunction<ValueDeclaration> = (module, code, startIn
                 value,
                 isConst: kind === 'const',
                 exported,
+                platforms: (
+                    platform == null
+                        ? ALL_PLATFORMS
+                        : [platform]
+                ),
                 module,
                 code,
                 startIndex,
                 endIndex: index,
             },
             index,
-    })))))))))))
+    }))))))))))))
 
 const deriveOrRemoteDelcaration: ParseFunction<DeriveDeclaration|RemoteDeclaration> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>

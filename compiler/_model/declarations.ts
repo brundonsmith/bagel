@@ -66,6 +66,7 @@ export type ValueDeclaration = SourceInfo & {
     readonly value: Expression,
     readonly isConst: boolean,
     readonly exported: undefined|'export'|'expose',
+    readonly platforms: readonly Platform[],
 }
 
 export const ALL_PLATFORMS = ["node", "deno", "browser"] as const

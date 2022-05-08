@@ -569,7 +569,9 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         if (binding.type.kind !== 'nominal-type') { // nominals with no inner value are allowed here
                             reportError(miscError(current, `'${current.name}' is a type, but it's used like a value`))
                         }
-                    } else if (config?.platforms && (binding.kind === 'proc-declaration' || binding.kind === 'func-declaration')) {
+                    }
+                    
+                    if (config?.platforms && (binding.kind === 'proc-declaration' || binding.kind === 'func-declaration' || binding.kind === 'value-declaration')) {
                         const unmetPlatforms = config.platforms.filter(platform => !binding.platforms.includes(platform))
 
                         if (unmetPlatforms.length > 0) {
