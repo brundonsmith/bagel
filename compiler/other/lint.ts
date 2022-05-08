@@ -121,7 +121,6 @@ const RULES = {
                     const f: FuncDeclaration = {
                         kind: 'func-declaration',
                         memo: false,
-                        platforms: ALL_PLATFORMS,
                         exported: exported != null,
                         name,
                         value,
@@ -133,7 +132,6 @@ const RULES = {
                     const p: ProcDeclaration = {
                         kind: 'proc-declaration',
                         action: false,
-                        platforms: ALL_PLATFORMS,
                         exported: exported != null,
                         name,
                         value,
