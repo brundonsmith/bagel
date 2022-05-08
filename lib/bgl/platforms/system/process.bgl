@@ -1,0 +1,4 @@
+
+export deno const args: string[] = js# Deno.args #js
+
+export deno const env: {[string]: string} = js# Deno.env.toObject() #js
