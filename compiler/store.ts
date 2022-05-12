@@ -5,7 +5,7 @@ import { BagelError, errorsEquivalent, isError } from "./errors.ts";
 import { pathIsRemote } from "./utils/misc.ts";
 import { ModuleName } from "./_model/common.ts";
 import { lint, LintProblem } from "./other/lint.ts";
-import { Platform, ValueDeclaration } from "./_model/declarations.ts";
+import { ALL_PLATFORMS, Platform, ValueDeclaration } from "./_model/declarations.ts";
 import { PlainIdentifier } from "./_model/ast.ts";
 import { ExactStringLiteral, Expression, ObjectEntry } from "./_model/expressions.ts";
 import { getName } from "./utils/ast.ts";
@@ -18,6 +18,9 @@ type ModuleData = {
     loading: boolean,
 }
 export const modules: Record<ModuleName, ModuleData> = {}
+export const args = {
+    platforms: undefined as undefined | Platform[]
+}
 
 export const projectEntry = computedFn(function entry() {
     for (const _module in observe(modules, WHOLE_OBJECT)) {
@@ -145,7 +148,7 @@ export const getConfig = computedFn(function getConfig (): BagelConfig|undefined
         }
         
         return {
-            platforms,
+            platforms: observe(args, 'platforms') ?? platforms,
             lintRules
         }
     }

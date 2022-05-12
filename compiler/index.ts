@@ -1,9 +1,9 @@
 import { Colors, path, fs } from "./deps.ts";
 
 import { BagelError, prettyProblem } from "./errors.ts";
-import { all, cacheDir, cachedFilePath, esOrNone, sOrNone, bagelFileToTsFile, jsFileLocation, given, pathIsRemote } from "./utils/misc.ts";
+import { all, cacheDir, cachedFilePath, esOrNone, sOrNone, bagelFileToTsFile, jsFileLocation, given, pathIsRemote, exists } from "./utils/misc.ts";
 
-import { allProblems, canonicalModuleName, done, projectEntry, hasProblems, modules } from "./store.ts";
+import { allProblems, canonicalModuleName, done, projectEntry, hasProblems, modules, args } from "./store.ts";
 import { ModuleName } from "./_model/common.ts";
 import { autofixed, LintProblem } from "./other/lint.ts";
 import { compiled } from "./4_compile/index.ts";
@@ -34,6 +34,11 @@ function parseArgs(args: readonly string[]) {
 
 async function main() {
     const { command, target, flags } = parseArgs(Deno.args)
+
+    args.platforms = [
+        flags.deno ? 'deno' : undefined,
+        flags.node ? 'node' : undefined,
+    ].filter(exists); invalidate(args, 'platforms')
     
     if (command == null) {
         fail(`Must provide a valid command:\n${POSSIBLE_COMMANDS.join(', ')}`)
