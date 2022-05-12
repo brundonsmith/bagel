@@ -80,7 +80,7 @@ async function main() {
                     const denoPath = Deno.env.get('BAGEL_DENO_BIN')
                     
                     const nodeCommand = [nodePath || "node", bundlePath]
-                    const denoCommand = [denoPath || "deno", "run", bundlePath, "--allow-all", "--unstable"]
+                    const denoCommand = [denoPath || "deno", "run", "--unstable", "--allow-all", bundlePath]
 
                     if (flags.node) {
                         console.log(Colors.green('Running (node) ') + bundlePath)

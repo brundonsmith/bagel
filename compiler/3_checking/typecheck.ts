@@ -464,11 +464,18 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
 
                     if (property.kind === 'plain-identifier') {
-                        if (subjectProperties == null) {
-                            // TODO: I don't think this allows accessing record properties with dot
-                            reportError(miscError(current.subject, `Can only use dot operator (".") on objects with properties (value is of type "${msgFormat(subjectType)}")`));
-                        } else if (!subjectProperties.some(p => getName(p.name) === getName(property))) {
-                            reportError(miscError(property, `Property '${getName(property)}' does not exist on type '${msgFormat(subjectType)}'`));
+                        const { name } = property
+
+                        if (subjectType.kind === 'record-type') {
+                            if (subsumationIssues(subjectType.keyType, literalType(name))) {
+                                reportError(miscError(current.subject, `Property '${name}' will never be found on object with type '${msgFormat(subjectType)}'`))
+                            }
+                        } else {
+                            if (subjectProperties == null) {
+                                reportError(miscError(current.subject, `Can only use dot operator (".") on objects with properties (value is of type "${msgFormat(subjectType)}")`));
+                            } else if (!subjectProperties.some(p => getName(p.name) === name)) {
+                                reportError(miscError(property, `Property '${name}' does not exist on type '${msgFormat(subjectType)}'`));
+                            }
                         }
                     } else {
                         const indexType = resolveType(inferType(property))
@@ -792,14 +799,6 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
     const all = (...inner: Array<Array<string | string[]> | undefined>) =>
         given(emptyToUndefined(inner.filter(exists).flat()), withBase)
 
-    // constants can't be assigned to mutable slots
-    if (resolvedDestination.mutability === "mutable" && (resolvedValue.mutability !== "mutable" && resolvedValue.mutability !== "literal")) {
-        return [
-            baseErrorMessage,
-            `Value with constant type '${msgFormat(value)}' can't be assigned to slot with mutable type '${msgFormat(destination)}'`
-        ];
-    }
-
     if (
         resolvedValue.kind === "javascript-escape-type" || 
         resolvedValue.kind === "any-type" || 
@@ -807,6 +806,12 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
         resolvedDestination.kind === "unknown-type"
     ) {
         return undefined;
+    } else if (resolvedDestination.mutability === "mutable" && (resolvedValue.mutability !== "mutable" && resolvedValue.mutability !== "literal")) {
+        // constants can't be assigned to mutable slots
+        return [
+            baseErrorMessage,
+            `Value with constant type '${msgFormat(value)}' can't be assigned to slot with mutable type '${msgFormat(destination)}'`
+        ];
     } else if (resolvedValue.kind === "unknown-type") {
         return [baseErrorMessage];
     } else if (
