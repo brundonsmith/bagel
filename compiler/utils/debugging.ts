@@ -20,3 +20,9 @@ export function stripSourceInfo(ast: AST) {
         delete current.endIndex
     }
 }
+
+export function assert(condition: () => boolean) {
+    if (!condition() && Deno.env.get('DEV_MODE')) {
+        throw Error('Assertion failed: ' + condition.toString())
+    }
+}

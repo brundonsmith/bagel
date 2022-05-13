@@ -382,7 +382,7 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
         case "throw-statement": return `return ${c(ast.errorExpression)};`
 
         default:
-            throw Error("Couldn't compile '" + ast.kind + "'");
+            throw Error("Couldn't compile '" + format(ast) + "'");
     }
 }
 

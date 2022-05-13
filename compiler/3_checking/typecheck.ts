@@ -1,10 +1,10 @@
 import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType, Arg, SpreadArgs } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws, argsBounds } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
-import { ancestors, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
+import { ancestors, elementOf, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
 import { getConfig, getModuleByName } from "../store.ts";
 import { DEFAULT_OPTIONS, format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
@@ -284,40 +284,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 const inferred = inferType(current) as FuncType|ProcType|GenericFuncType|GenericProcType
                 const funcOrProcType = inferred.kind === 'generic-type' ? inferred.inner : inferred
 
-                {
-                    const seen = new Map<string, PlainIdentifier>()
-                    const duplicates = new Set<PlainIdentifier>()
-    
-                    for (const { name } of funcOrProcType.args) {
-                        const existing = seen.get(name.name)
-                        if (existing) {
-                            duplicates.add(existing)
-                            duplicates.add(name)
-                        } else {
-                            seen.set(name.name, name)
-                        }
-                    }
-
-                    for (const duplicate of duplicates) {
-                        reportError(alreadyDeclared(duplicate))
-                    }
-                }
-
-                {
-                    let encounteredOptional = false;
-
-                    for (const arg of funcOrProcType.args) {
-                        if (arg.optional) {
-                            encounteredOptional = true
-                        }
-                        
-                        if (!arg.optional && encounteredOptional) {
-                            reportError(miscError(arg, `Required args can't come after optional args`))
-                        }
-                    }
-                }
-
-                if (current.kind === 'func' && funcOrProcType.kind === 'func-type' && funcOrProcType.returnType != null) {
+                if (current.kind === 'func' && funcOrProcType.kind === 'func-type' && funcOrProcType.returnType != null) {    
                     // make sure body expression fits declared return type, if there is one
                     expect(reportError, funcOrProcType.returnType, current.body)
                 }
@@ -388,18 +355,36 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         reportError(miscError(invocation.subject, `Only procedures can be called as statements, not functions`))
                     }
 
-                    const nonOptionalArgs = invoked.args.filter(a => !a.optional).length
+                    {
+                        const minMaxArgs = argsBounds(invoked.args)
 
-                    // check that the right number of arguments are passed
-                    if (invocation.args.length > invoked.args.length || invocation.args.length < nonOptionalArgs) {
-                        const functionOrProcedure = invoked.kind === "func-type" ? "Function" : "Procedure"
-                        const argsStr = nonOptionalArgs !== invoked.args.length ? `${nonOptionalArgs}-${invoked.args.length}` : invoked.args.length
-                        reportError(miscError(invocation, `${functionOrProcedure} expected ${argsStr} arguments but got ${invocation.args.length}`));
-                    } else { // check that each argument matches the expected type
+                        // check that the right number of arguments are passed
+                        if (minMaxArgs != null && (invocation.args.length > minMaxArgs.max || invocation.args.length < minMaxArgs.min)) {
+                            const functionOrProcedure = invoked.kind === "func-type" ? "Function" : "Procedure"
+                            const argsStr = (
+                                minMaxArgs.min !== minMaxArgs.max ? `${minMaxArgs.min}-${minMaxArgs.max}` :
+                                minMaxArgs.min
+                            )
+                            reportError(miscError(invocation, `${functionOrProcedure} expected ${argsStr} arguments but got ${invocation.args.length}`));
+                        }
+
+                        // check that each argument matches the expected type
                         for (let i = 0; i < invocation.args.length; i++) {
                             const arg = invocation.args[i]
-                            const subjectArgType = invoked.args[i].type ?? UNKNOWN_TYPE
-                            expect(reportError, subjectArgType, arg)
+
+                            if (invoked.args.kind === 'args') {
+                                const expectedType = invoked.args.args[i]?.type ?? UNKNOWN_TYPE
+                                expect(reportError, expectedType, arg)
+                            } else {
+                                const resolvedSpreadType = resolveType(invoked.args.type)
+
+                                if (resolvedSpreadType.kind === 'array-type') {
+                                    expect(reportError, resolvedSpreadType.element, arg)
+                                } else if (resolvedSpreadType.kind === 'tuple-type') {
+                                    const expectedType = resolvedSpreadType.members[i] ?? UNKNOWN_TYPE
+                                    expect(reportError, expectedType, arg)
+                                }
+                            }
                         }
                     }
                 }
@@ -638,18 +623,45 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                         (_, val) => `Only arrays or tuples can be spread into an array; found ${msgFormat(val)}`)
                 }
             } break;
-            case "proc-type":
-            case "func-type": {
-                let encounteredOptional = false;
+            case "args": {
+                { // make sure no duplicate arg names
+                    const seen = new Map<string, PlainIdentifier>()
+                    const duplicates = new Set<PlainIdentifier>()
+    
+                    for (const { name } of current.args) {
+                        if (name) {
+                            const existing = seen.get(name.name)
+                            if (existing) {
+                                duplicates.add(existing)
+                                duplicates.add(name)
+                            } else {
+                                seen.set(name.name, name)
+                            }
+                        }
+                    }
 
-                for (const arg of current.args) {
-                    if (arg.optional) {
-                        encounteredOptional = true
+                    for (const duplicate of duplicates) {
+                        reportError(alreadyDeclared(duplicate))
                     }
-                    
-                    if (!arg.optional && encounteredOptional) {
-                        reportError(miscError(arg, `Required args can't come after optional args`))
+                }
+
+                { // make sure no required arguments after optional arguments
+                    let encounteredOptional = false;
+
+                    for (const arg of current.args) {
+                        if (arg.optional) {
+                            encounteredOptional = true
+                        }
+                        
+                        if (!arg.optional && encounteredOptional) {
+                            reportError(miscError(arg, `Required args can't come after optional args`))
+                        }
                     }
+                }
+            } break;
+            case "spread-args": {
+                if (subsumationIssues(ARRAY_OF_ANY, current.type)) {
+                    reportError(miscError(current.type, `Can only spread an array or tuple type as args`))
                 }
             } break;
             case "object-type": {
@@ -710,6 +722,8 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     expect(reportError, VALID_RECORD_KEY, current.key)
                 }
                 break;
+            case "proc-type":
+            case "func-type":
             case "name-and-type":
             case "destructure":
             case "autorun-declaration":
@@ -858,33 +872,66 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
                 `'${msgFormat(resolvedValue)}' and '${msgFormat(resolvedDestination)}' are different nominal types`
             ]
         }
-    } else if(typesEqual(resolvedDestination, resolvedValue)) {
+    } else if (typesEqual(resolvedDestination, resolvedValue)) {
         return undefined;
-    } else if (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type") {
-        if (resolvedValue.args.length > resolvedDestination.args.length) {
-            return [
-                baseErrorMessage,
-                `'${msgFormat(resolvedValue)}' requires ${resolvedValue.args.length} arguments, but '${msgFormat(resolvedDestination)}' is only provided with ${resolvedDestination.args.length}`
-            ]
-        } else {
-            return all(
-                ...resolvedDestination.args.map((_, i) => 
-                    // NOTE: Value and destination are flipped on purpose for args!
-                    subsumationIssues(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE, encounteredNames)),
-                subsumationIssues(resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE, encounteredNames)
-            )
+    } else if (
+        (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type") ||
+        (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type")
+    ) {
+        {
+            const minMaxArgsValue = argsBounds(resolvedValue.args)
+            const minMaxArgsDestination = argsBounds(resolvedDestination.args)
+            if (minMaxArgsValue != null) {
+                if (minMaxArgsDestination != null) {
+                    if (minMaxArgsValue.min > minMaxArgsDestination.min) {
+                        return [
+                            baseErrorMessage,
+                            `'${msgFormat(resolvedValue)}' requires ${minMaxArgsValue.min} arguments, but '${msgFormat(resolvedDestination)}' is only provided with ${minMaxArgsDestination.min}`
+                        ]
+                    }
+                } else {
+                    return [
+                        baseErrorMessage,
+                        `'${msgFormat(resolvedValue)}' requires ${minMaxArgsValue.min} arguments, but '${msgFormat(resolvedDestination)}' may not be passed that many`
+                    ]
+                }
+            }
         }
-    } else if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type") {
-        if (resolvedValue.args.length > resolvedDestination.args.length) {
-            return [
-                baseErrorMessage,
-                `'${msgFormat(resolvedValue)}' requires ${resolvedValue.args.length} arguments, but '${msgFormat(resolvedDestination)}' is only provided with ${resolvedDestination.args.length}`
-            ]
-        } else {
-            return all(
-                ...resolvedDestination.args.map((_, i) => 
-                    // NOTE: Value and destination are flipped on purpose for args!
-                    subsumationIssues(resolvedValue.args[i]?.type ?? UNKNOWN_TYPE, resolvedDestination.args[i]?.type ?? UNKNOWN_TYPE, encounteredNames)))
+        
+        {
+            const valueArgs = resolvedValue.args
+            const destinationArgs = resolvedDestination.args
+            if (valueArgs.kind === 'args') {
+                if (destinationArgs.kind === 'args') {
+                    return all(
+                        ...destinationArgs.args.map((_, i) => 
+                            // NOTE: Value and destination are flipped on purpose for args!
+                            subsumationIssues(valueArgs.args[i]?.type ?? UNKNOWN_TYPE, destinationArgs.args[i]?.type ?? UNKNOWN_TYPE, encounteredNames)),
+                        (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type"
+                            ? subsumationIssues(resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE, encounteredNames)
+                            : undefined)
+                    )
+                } else {
+                    const elementOfDestination = elementOf(destinationArgs.type)
+
+                    return all(
+                        ...valueArgs.args.map(valueArg =>
+                            subsumationIssues(valueArg.type ?? UNKNOWN_TYPE, elementOfDestination))
+                    )
+                }
+            } else {
+                if (destinationArgs.kind === 'args') {
+                    const elementOfValue = elementOf(valueArgs.type)
+
+                    return all(
+                        ...destinationArgs.args.map(destinationArg =>
+                            subsumationIssues(elementOfValue, destinationArg.type ?? UNKNOWN_TYPE))
+                    )
+                    
+                } else {
+                    return all(subsumationIssues(valueArgs.type, destinationArgs.type))
+                }
+            }
         }
     } else if (resolvedDestination.kind === "array-type") {
         if (resolvedValue.kind === "array-type") {

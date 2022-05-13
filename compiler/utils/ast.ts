@@ -1,7 +1,7 @@
 import { AST_NOISE } from "../3_checking/typeinfer.ts";
 import { AST,PlainIdentifier,SourceInfo } from "../_model/ast.ts";
 import { BooleanLiteral, ExactStringLiteral, Expression, LocalIdentifier, NumberLiteral } from "../_model/expressions.ts";
-import { LiteralType, MaybeType, PlanType, TypeExpression, UnionType } from "../_model/type-expressions.ts";
+import { ElementofType, LiteralType, MaybeType, PlanType, TypeExpression, UnionType } from "../_model/type-expressions.ts";
 import { deepEquals } from "./misc.ts";
 
 export function areSame(a: AST|undefined, b: AST|undefined) {
@@ -151,6 +151,17 @@ export function planOf(inner: TypeExpression): PlanType {
     return {
         kind: 'plan-type',
         inner,
+        mutability: undefined,
+        parent, module, code, startIndex, endIndex
+    }
+}
+
+export function elementOf(arrType: TypeExpression): ElementofType {
+    const { parent, module, code, startIndex, endIndex } = arrType
+
+    return {
+        kind: 'elementof-type',
+        inner: arrType,
         mutability: undefined,
         parent, module, code, startIndex, endIndex
     }

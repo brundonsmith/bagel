@@ -1,9 +1,9 @@
 import { Refinement, ModuleName, Binding } from "../_model/common.ts";
 import { BinaryOp, Case, ElementTag, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry, ObjectLiteral } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType } from "../_model/type-expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, SpreadArgs, Args } from "../_model/type-expressions.ts";
 import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
-import { stripSourceInfo } from "../utils/debugging.ts";
+import { assert, stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { areSame, expressionsEqual, getName, literalType, mapParseTree, maybeOf, typesEqual, unionOf } from "../utils/ast.ts";
 import { getModuleByName } from "../store.ts";
@@ -12,6 +12,7 @@ import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
 import { computedFn } from "../../lib/ts/reactivity.ts";
 import { CaseBlock } from "../_model/statements.ts";
+import { format } from "../other/format.ts";
 
 export function inferType(
     ast: Expression,
@@ -46,6 +47,8 @@ const inferTypeInner = computedFn(function inferTypeInner(
 ): TypeExpression {
     const { parent, module, code, startIndex, endIndex, ..._rest } = ast
 
+    // assert(() => !previouslyVisited.includes(ast))
+
     if (previouslyVisited.includes(ast)) {
         return UNKNOWN_TYPE
     }
@@ -75,7 +78,7 @@ const inferTypeInner = computedFn(function inferTypeInner(
         case "func": {
             
             // infer callback type based on context
-            const typeDictatedByParent = (() => {
+            const typeDictatedByInvocation = (() => {
                 const parent = ast.parent
 
                 if (parent?.kind === "invocation") {
@@ -83,10 +86,14 @@ const inferTypeInner = computedFn(function inferTypeInner(
                     const thisArgIndex = parent.args.findIndex(a => areSame(a, ast))
 
                     if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
-                        const thisArgParentType = parentSubjectType.args[thisArgIndex]?.type
+                        const thisArgParentType = argType(parentSubjectType.args, thisArgIndex)
 
                         if (thisArgParentType && thisArgParentType.kind === ast.type.kind) {
-                            return thisArgParentType.kind === 'generic-type' ? thisArgParentType.inner as FuncType : thisArgParentType;
+                            return (
+                                thisArgParentType.kind === 'generic-type'
+                                    ? thisArgParentType.inner as FuncType 
+                                    : thisArgParentType
+                            )
                         }
                     }
                 }
@@ -96,16 +103,23 @@ const inferTypeInner = computedFn(function inferTypeInner(
 
             const inferredFuncType = {
                 ...funcType,
-                args: funcType.args.map((arg, index) =>
-                    ({ ...arg, type: arg.type ?? typeDictatedByParent?.args[index].type })),
+                args: (
+                    funcType.args.kind === 'args'
+                        ? {
+                            ...funcType.args,
+                            args: funcType.args.args.map((arg, index) =>
+                                ({ ...arg, type: arg.type ?? given(typeDictatedByInvocation, ({ args }) => argType(args, index)) }))
+                        }
+                        : funcType.args
+                ),
                 returnType: (
                     funcType.returnType ??
-                    typeDictatedByParent?.returnType ??
+                    typeDictatedByInvocation?.returnType ??
                     // if no return-type is declared, try inferring the type from the inner expression
                     inferType(ast.body, visited)
                 )
             }
-    
+
             if (ast.type.kind === 'generic-type') {
                 return {
                     ...ast.type,
@@ -151,10 +165,12 @@ const inferTypeInner = computedFn(function inferTypeInner(
                     !subsumationIssues(left, leftType) && 
                     !subsumationIssues(right, rightType))
 
-                if (types == null) {
+                if (types != null) {
+                    return types.output
+                } else if (BINARY_OPERATOR_TYPES[ast.op.op]?.length === 1) {
                     return BINARY_OPERATOR_TYPES[ast.op.op]?.[0].output ?? UNKNOWN_TYPE
                 } else {
-                    return types.output;
+                    return UNKNOWN_TYPE
                 }
             }
         }
@@ -318,17 +334,17 @@ const inferTypeInner = computedFn(function inferTypeInner(
 
             if (binding) {
                 return getBindingType(ast, binding, visited)
+            } else {
+                return UNKNOWN_TYPE
             }
-
-            return UNKNOWN_TYPE
         }
         case "element-tag": {
-            return inferType(elementTagToObject(ast))
+            return inferType(elementTagToObject(ast), visited)
         }
         case "object-literal": {
             const entries = ast.entries.map((entry): Attribute | readonly Attribute[] | ObjectEntry | undefined => {
                 if (entry.kind === 'local-identifier') {
-                    return attribute(entry.name, resolveType(inferType(entry)), false)
+                    return attribute(entry.name, resolveType(inferType(entry, visited)), false)
                 } else if (entry.kind === 'spread') {
                     const spreadObj = entry.expr
                     const spreadObjType = resolveType(inferType(spreadObj, visited));
@@ -365,9 +381,11 @@ const inferTypeInner = computedFn(function inferTypeInner(
 
                 const keyType = unionOf(entries.map(entry =>
                     entry.kind === 'object-entry' ? inferType(
-                        entry.key.kind === 'plain-identifier'
-                            ? identifierToExactString(entry.key)
-                            : entry.key) :
+                            entry.key.kind === 'plain-identifier'
+                                ? identifierToExactString(entry.key)
+                                : entry.key,
+                            visited
+                        ) :
                     entry.name.kind === 'exact-string-literal' ? {
                         kind: 'literal-type',
                         value: entry.name,
@@ -389,7 +407,7 @@ const inferTypeInner = computedFn(function inferTypeInner(
                 ))
 
                 const valueType = unionOf(entries.map(entry =>
-                    entry.kind === 'object-entry' ? inferType(entry.value) :
+                    entry.kind === 'object-entry' ? inferType(entry.value, visited) :
                     entry.type
                 ))
 
@@ -568,32 +586,43 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
         case 'func':
         case 'proc': {
             const funcOrProcType = decl.type.kind === 'generic-type' ? decl.type.inner : decl.type
-            const arg = funcOrProcType.args.find(a => a.name.name === binding.identifier.name)
 
-            if (arg?.type) {
-                if (arg.optional) {
-                    return maybeOf(arg.type)
-                } else {
-                    return arg.type
-                }
-            }
+            if (funcOrProcType.args.kind === 'args') {
+                const arg = funcOrProcType.args.args.find(a => a.name.name === binding.identifier.name)
 
-            const inferredHolderType = inferType(decl, visited)
-            if (inferredHolderType.kind === 'func-type' || inferredHolderType.kind === 'proc-type') {
-                const inferredArg = inferredHolderType.args.find(a => a.name.name === binding.identifier.name)
-                const declaredType = inferredArg?.type
-
-                if (declaredType) {
-                    if (!inferredArg?.optional) {
-                        return declaredType
+                if (arg?.type) {
+                    if (arg.optional) {
+                        return maybeOf(arg.type)
                     } else {
-                        return maybeOf(declaredType)
+                        return arg.type
                     }
                 }
-                
-                return UNKNOWN_TYPE
+            } else {
+                if (funcOrProcType.args.name?.name === binding.identifier.name) {
+                    return funcOrProcType.args.type
+                }
             }
-            
+
+
+            const inferredHolderType = inferType(decl, visited)
+
+
+            if (inferredHolderType.kind !== 'func-type' && inferredHolderType.kind !== 'proc-type') return UNKNOWN_TYPE
+
+            if (inferredHolderType.args.kind === 'args') {
+                const inferredArg = inferredHolderType.args.args.find(a => a.name?.name === binding.identifier.name)
+
+                if (inferredArg?.type) {
+                    if (inferredArg.optional) {
+                        return maybeOf(inferredArg.type)
+                    } else {
+                        return inferredArg.type
+                    }
+                }
+            } else if (inferredHolderType.args.name?.name === binding.identifier.name) {
+                return inferredHolderType.args.type
+            }
+
             return UNKNOWN_TYPE
         }
         case 'for-loop': {
@@ -655,7 +684,7 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
                     decl.kind === 'value-declaration' && decl.name.name === JSON_AND_PLAINTEXT_EXPORT_NAME)
 
                 if (contents) {
-                    return inferType(contents.value)
+                    return inferType(contents.value, visited)
                 } else {
                     return UNKNOWN_TYPE
                 }
@@ -679,7 +708,7 @@ function getBindingType(importedFrom: LocalIdentifier, binding: Binding, visited
             return UNKNOWN_TYPE
         default:
             // @ts-expect-error: exhaustiveness
-            throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
+            if (Deno.env.get('DEV_MODE')) throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
     }
 
     return UNKNOWN_TYPE
@@ -776,13 +805,22 @@ export function bindInvocationGenericArgs(invocation: Invocation): TypeExpressio
 
             const invocationSubjectType: FuncType|ProcType = {
                 ...funcOrProcType,
-                args: funcOrProcType.args.map((arg, index) => ({
-                    ...arg,
-                    type: inferType(invocation.args[index])
-                }))
+                args: (
+                    funcOrProcType.args.kind === 'args'
+                        ? {
+                            ...funcOrProcType.args,
+                            args: funcOrProcType.args.args.map((arg, index) => ({
+                                ...arg,
+                                type: inferType(invocation.args[index])
+                            }))
+                        }
+                        : {
+                            ...funcOrProcType.args,
+                            type: unionOf(invocation.args.map(arg => inferType(arg)))
+                        }
+                )
             }
 
-                    
             // attempt to infer params for generic
             const inferredBindings = fitTemplate(
                 funcOrProcType, 
@@ -1134,10 +1172,28 @@ function fitTemplate(
 
     if ((parameterized.kind === "func-type" && reified.kind === "func-type") 
      || (parameterized.kind === "proc-type" && reified.kind === "proc-type")) {
-        const matchGroups = [
-            ...parameterized.args.map((arg, index) =>
-                fitTemplate(arg.type ?? UNKNOWN_TYPE, reified.args[index].type ?? UNKNOWN_TYPE)),
-        ]
+        const parameterizedArgs = parameterized.args
+        const reifiedArgs = reified.args
+        const matchGroups = (
+            parameterizedArgs.kind === 'args' 
+                ? (
+                    reifiedArgs.kind === 'args'
+                        ? parameterizedArgs.args.map((arg, index) =>
+                            fitTemplate(arg.type ?? UNKNOWN_TYPE, reifiedArgs.args[index].type ?? UNKNOWN_TYPE))
+                        : [
+                            fitTemplate(unionOf(parameterizedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE)), reifiedArgs.type)
+                        ]
+                )
+                : (
+                    reifiedArgs.kind === 'args'
+                        ? [
+                            fitTemplate(parameterizedArgs.type, unionOf(reifiedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE)))
+                        ]
+                        : [
+                            fitTemplate(parameterizedArgs.type, reifiedArgs.type)
+                        ]
+                )
+        )
 
         if (parameterized.kind === 'func-type' && reified.kind === 'func-type' &&
             parameterized.returnType && reified.returnType) {
@@ -1464,3 +1520,37 @@ export const elementTagToObject = computedFn((tag: ElementTag): ObjectLiteral =>
         parent, module, code, startIndex, endIndex
     }
 })
+
+export function argType(args: Args | SpreadArgs, index: number): TypeExpression | undefined {
+    if (args.kind === 'args') {
+        return args.args[index]?.type
+    } else {
+        const resolved = resolveType(args.type)
+
+        if (resolved.kind === 'tuple-type') {
+            return resolved.members[index]
+        } else if (resolved.kind === 'array-type') {
+            return maybeOf(resolved.element)
+        } else {
+            return undefined
+        }
+    }
+}
+
+export function argsBounds(args: Args | SpreadArgs) {
+    if (args.kind === 'args') {
+        return {
+            min: args.args.filter(a => !a.optional).length,
+            max: args.args.length
+        }
+    } else {
+        const resolved = resolveType(args.type)
+
+        if (resolved.kind === 'tuple-type') {
+            return {
+                min: resolved.members.length,
+                max: resolved.members.length
+            }
+        }
+    }
+}
