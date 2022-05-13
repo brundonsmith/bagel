@@ -3038,6 +3038,9 @@ Deno.test({
   }
 })
 
+// TODO: We could probably figure out the tuple type of `other` here ^
+
+
 Deno.test({
   name: "Await statement pass",
   fn() {
@@ -3106,8 +3109,49 @@ Deno.test({
   }
 })
 
-// TODO: We could probably figure out the tuple type of `other` here ^
+Deno.test({
+  name: "Spread arguments pass",
+  fn() {
+    testTypecheck(`
+    func foo(...args: number[]): number? => args[0]
 
+    const a = foo(1)
+    const b = foo(1, 2)
+    const c = foo(1, 2, 3)
+
+    func hof(fn: (num: number) => nil) => nil
+
+    const x = hof(foo)
+    `,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Spread arguments fail 1",
+  fn() {
+    testTypecheck(`
+    func foo(...args: number[]): number? => args[0]
+
+    const a = foo('stuff')
+    `,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Spread arguments fail 2",
+  fn() {
+    testTypecheck(`
+    func foo(...args: string[]): number? => args[0]
+
+    func hof(fn: (num: number) => nil) => nil
+
+    const x = hof(foo)
+    `,
+    true)
+  }
+})
 
 
 
