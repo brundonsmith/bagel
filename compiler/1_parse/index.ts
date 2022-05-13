@@ -1513,7 +1513,9 @@ const args: ParseFunction<Args> = (module, code, startIndex) =>
     , ","), ({ parsed: args, index }) => ({
         parsed: {
             kind: "args",
-            args: args.map((a, i) => ({ ...a, name: { ...a.name, name: `arg${i}` } })),
+            args: args.map((a, i) => a.name.name 
+                ? a 
+                : ({ ...a, name: { ...a.name, name: `arg${i}` } })),
             module,
             code,
             startIndex,
