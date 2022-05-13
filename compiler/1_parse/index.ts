@@ -1481,7 +1481,7 @@ const spreadArgs: ParseFunction<SpreadArgs> = (module, code, startIndex) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ':'), index =>
     given(consumeWhitespace(code, index), index =>
-    given(typeExpression(module, code, index), ({ parsed: type }) => ({
+    given(typeExpression(module, code, index), ({ parsed: type, index }) => ({
         parsed: {
             kind: 'spread-args',
             name,
