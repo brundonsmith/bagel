@@ -57,14 +57,14 @@ export type GenericParamType = SourceInfo & NoMutability & {
 
 export type ProcType = SourceInfo & NoMutability & {
     readonly kind: "proc-type",
-    readonly args: readonly Arg[],
+    readonly args: Args | SpreadArgs,
     readonly isAsync: boolean,
     readonly throws: TypeExpression|undefined,
 }
 
 export type FuncType = SourceInfo & NoMutability & {
     readonly kind: "func-type",
-    readonly args: readonly Arg[],
+    readonly args: Args | SpreadArgs,
     readonly returnType?: TypeExpression,
 }
 
@@ -99,11 +99,22 @@ export type BoundGenericType = SourceInfo & NoMutability & {
     readonly generic: TypeExpression,
 }
 
+export type Args = SourceInfo & {
+    readonly kind: "args",
+    readonly args: readonly Arg[],
+}
+
 export type Arg = SourceInfo & {
     readonly kind: "arg",
     readonly name: PlainIdentifier,
     readonly type?: TypeExpression,
     readonly optional: boolean,
+}
+
+export type SpreadArgs = SourceInfo & {
+    readonly kind: "spread-args",
+    readonly name?: PlainIdentifier,
+    readonly type: TypeExpression,
 }
 
 export type ObjectType = SourceInfo & Mutability & {
@@ -413,29 +424,17 @@ export const REMOTE_OF_ANY: RemoteType = {
     endIndex: undefined,
 }
 
-// TODO: These produce weird error messages with their 100 arguments; come up 
-// with a better way to represent "all functions" and "all procs"
 export const FUNC: FuncType = {
     kind: "func-type",
-    args: new Array(100).fill({
-        kind: "arg",
-        name: {
-            kind: "plain-identifier",
-            name: '',
-            parent: undefined,
-            module: undefined,
-            code: undefined,
-            startIndex: undefined,
-            endIndex: undefined,
-        },
-        type: ANY_TYPE,
-        optional: true,
+    args: {
+        kind: 'spread-args',
+        type: ARRAY_OF_ANY,
         parent: undefined,
         module: undefined,
         code: undefined,
         startIndex: undefined,
         endIndex: undefined,
-    }),
+    },
     returnType: ANY_TYPE,
     mutability: undefined,
     parent: undefined,
@@ -446,25 +445,15 @@ export const FUNC: FuncType = {
 }
 export const PROC: ProcType = {
     kind: "proc-type",
-    args: new Array(100).fill({
-        kind: "arg",
-        name: {
-            kind: "plain-identifier",
-            name: '',
-            parent: undefined,
-            module: undefined,
-            code: undefined,
-            startIndex: undefined,
-            endIndex: undefined,
-        },
-        type: ANY_TYPE,
-        optional: true,
+    args: {
+        kind: 'spread-args',
+        type: ARRAY_OF_ANY,
         parent: undefined,
         module: undefined,
         code: undefined,
         startIndex: undefined,
         endIndex: undefined,
-    }),
+    },
     isAsync: false,
     throws: undefined,
     mutability: undefined,

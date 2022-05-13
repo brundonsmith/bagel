@@ -3,10 +3,11 @@ import { computedFn, observe } from "../../lib/ts/reactivity.ts";
 import { parsed } from "../1_parse/index.ts";
 import { modules } from "../store.ts";
 import { getName } from "../utils/ast.ts";
+import { given } from "../utils/misc.ts";
 import { AST, PlainIdentifier } from '../_model/ast.ts'
 import { ModuleName } from "../_model/common.ts";
 import { ExactStringLiteral } from "../_model/expressions.ts";
-import { TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { FuncType, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 export type FormatOptions = {
     spaces: number,
@@ -68,18 +69,22 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
 
             return front + 
                 (ast.value.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.value.type.typeParams) : '') +
-                `(${subjectType.args.map(f).join(', ')})` +
+                `(${f(subjectType.args)})` +
                 (subjectType.kind === 'func-type' ? maybeTypeAnnotation(options, indent, parent, subjectType.returnType) : '') +
                 (subjectType.kind === 'func-type' ? ' => ' : '') +
                 (ast.value.kind === 'js-func' || ast.value.kind === 'js-proc'
                     ? `{#${ast.value.body}#}`
                     : f(ast.value.body))
         }
+        case "args":
+            return ast.args.map(f).join(', ')
+        case "arg":
+            return (ast.name?.name ?? '') + (ast.name && ast.type ? ': ' : '') + (given(ast.type, f) ?? '')
+        case "spread-args":
+            return '...' + (ast.name ? ast.name?.name + ': ' : '') + f(ast.type)
         case "js-func":
         case "js-proc":
             throw Error(ast.kind + ` should always be handled at the declaration level!`)
-        case "arg":
-            return ast.name.name + maybeTypeAnnotation(options, indent, parent, ast.type)
         case "block":
             return `{${br}${ast.statements.map(s => nextIndentation + fIndent(s)).join(br)}${br}${currentIndentation}}`
         case "value-declaration":
@@ -187,13 +192,25 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
 
             return `${f(ast.subject)}${operator}${property}`
         }
-        case "func": {
-            const funcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
-            return `${ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''}(${funcType.args.map(f).join(', ')})${maybeTypeAnnotation(options, indent, parent, funcType.returnType)} =>${br}${nextIndentation}${fIndent(ast.body)}`
-        }
+        case "func":
         case "proc": {
-            const procType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
-            return `${ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''}(${procType.args.map(f).join(', ')}) ${f(ast.body)}`
+            const funcOrProcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
+            const typeParams = ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''
+            const args = (
+                funcOrProcType.args.kind === 'args' && 
+                funcOrProcType.args.args.length === 1 && 
+                funcOrProcType.args.args[0].name != null && 
+                funcOrProcType.args.args[0].type == null &&
+                (funcOrProcType.kind === 'proc-type' || funcOrProcType.returnType == null)
+                    ? funcOrProcType.args.args[0].name.name
+                    : `(${f(funcOrProcType.args)})`
+            )
+
+            if (ast.kind === 'func') {
+                return typeParams + `${args}${maybeTypeAnnotation(options, indent, parent, (funcOrProcType as FuncType).returnType)} =>${br}${nextIndentation}${fIndent(ast.body)}`
+            } else {
+                return typeParams + `${args} ${f(ast.body)}`
+            }
         }
         case "instance-of":
             return `${f(ast.expr)} instanceof ${f(ast.type)}`
@@ -257,8 +274,16 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "generic-param-type": return ast.name.name;
         case "generic-type": return maybeTypeParams(options, indent, parent, ast.typeParams) + f(ast.inner);
         case "bound-generic-type": return f(ast.generic) + maybeTypeArgs(options, indent, parent, ast.typeArgs)
-        case "proc-type": return `(${ast.args.map(arg => arg.name.name + (arg.type ? `: ${f(arg.type)}` : '')).join(', ')}) {}`;
-        case "func-type": return `(${ast.args.map(arg => arg.name.name + (arg.type ? `: ${f(arg.type)}` : '')).join(', ')}) => ${f(ast.returnType ?? UNKNOWN_TYPE)}`;
+        case "proc-type":
+        case "func-type": {
+            const args = `(${f(ast.args)})`
+
+            if (ast.kind === 'proc-type') {
+                return `${args} {}`;
+            } else {
+                return `${args} => ${f(ast.returnType ?? UNKNOWN_TYPE)}`;
+            }
+        }
         case "object-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `{${
             ast.spreads.map(s => br + nextIndentation + '...' + fIndent(s)).concat(
             ast.entries.map(e => br + nextIndentation + fIndent(e)))

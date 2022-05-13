@@ -11,7 +11,7 @@ import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func, JsFunc, JsProc } from "../_model/expressions.ts";
-import { Arg, FuncType, GenericFuncType, GenericProcType, ProcType, TRUTHINESS_SAFE_TYPES, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { FuncType, GenericFuncType, GenericProcType, ProcType, TRUTHINESS_SAFE_TYPES, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 export const compiled = (moduleName: ModuleName, destination: 'cache'|'project', excludeJsPrelude?: boolean, includeTests?: boolean): string => {
     const ast = parsed(moduleName)?.ast
@@ -346,8 +346,12 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
         case "named-type": return ast.name.name;
         case "generic-type": return "unknown";
         case "bound-generic-type": return `unknown`;
-        case "proc-type": return `(${compileArgs(excludeTypes, module, destination, ast.args)}) => void`;
-        case "func-type": return `(${compileArgs(excludeTypes, module, destination, ast.args)}) => ${c(ast.returnType ?? UNKNOWN_TYPE)}`;
+        case "proc-type": return `(${c(ast.args)}) => void`;
+        case "func-type": return `(${c(ast.args)}) => ${c(ast.returnType ?? UNKNOWN_TYPE)}`;
+        case "args": return ast.args.map(
+            (arg, index) => (arg.name?.name ?? `_arg${index}`) + maybeTypeAnnotation(excludeTypes, module, destination, arg.type)
+        ).join(', ')
+        case "spread-args": return `...${ast.name?.name ?? '_args'}` + maybeTypeAnnotation(excludeTypes, module, destination, ast.type)
         case "object-type": return (
             ast.spreads.map(s => c(s) + ' & ').join('') +
             `{${
@@ -453,16 +457,11 @@ const compileProcOrFunctionSignature = (excludeTypes: boolean, module: ModuleNam
 
     return (functionType.kind === 'proc-type' && functionType.isAsync ? 'async ' : '') +
         typeParams + 
-        `(${compileArgs(excludeTypes, module, destination, functionType.args)})` +
+        `(${compileOne(excludeTypes, module, destination, functionType.args)})` +
         (excludeTypes ? '' : 
         functionType.kind === 'proc-type' ? (functionType.isAsync ? ': Promise<void>' : ': void') : 
         functionType.returnType != null ? `: ${compileOne(excludeTypes, module, destination, functionType.returnType)}` :
         '')
-}
-
-function compileArgs(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', args: readonly Arg[]): string {
-    return args.map(arg =>
-        arg.name.name + maybeTypeAnnotation(excludeTypes, module, destination, arg.type)).join(', ')
 }
 
 function exported(e: boolean|"export"|"expose"|undefined): string {

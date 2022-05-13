@@ -6,7 +6,7 @@ import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
-import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
@@ -601,11 +601,7 @@ const primitiveType: ParseFunction<PrimitiveType> = (module, code, startIndex) =
 
 const funcType: ParseFunction<FuncType|GenericFuncType> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index: indexAfterTypeParams }) =>
-    given(consume(code, indexAfterTypeParams ?? startIndex, "("), index =>
-    given(consumeWhitespace(code, index), index =>
-    given(parseSeries(module, code, index, arg, ","), ({ parsed: args, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, ")"), index =>
+    given(_parenthesizedArguments(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "=>"), index =>
     given(consumeWhitespace(code, index), index =>
@@ -638,15 +634,11 @@ const funcType: ParseFunction<FuncType|GenericFuncType> = (module, code, startIn
             ),
             index
         }
-    }))))))))))
+    }))))))
 
 const procType: ParseFunction<ProcType|GenericProcType> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index: indexAfterTypeParams }) =>
-    given(consume(code, indexAfterTypeParams ?? startIndex, "("), index =>
-    given(consumeWhitespace(code, index), index =>
-    given(parseSeries(module, code, index, arg, ","), ({ parsed: args, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    given(consume(code, index, ")"), index =>
+    given(_parenthesizedArguments(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "{"), index =>
     given(consumeWhitespace(code, index), index =>
@@ -680,7 +672,7 @@ const procType: ParseFunction<ProcType|GenericProcType> = (module, code, startIn
             ),
             index
         }
-    }))))))))))
+    }))))))
 
 const _typeParam: ParseFunction<TypeParam> = (module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
@@ -1121,7 +1113,7 @@ const proc: ParseFunction<Proc> = (module, code, startIndex) =>
 
 const _procHeader: ParseFunction<ProcType|GenericProcType> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index }) =>
-    given(_seriesOfArguments(module, code, index), ({ parsed: args, index }) => {
+    given(_parenthesizedArguments(module, code, index), ({ parsed: args, index }) => {
         const procType: ProcType = {
             kind: "proc-type",
             args,
@@ -1448,32 +1440,87 @@ const _typeParams: ParseFunction<TypeParam[]> = (module, code, index) =>
     given(consumeWhitespace(code, index), index => 
     given(consume(code, index, ">"), index => ({ parsed: typeParams, index }))))))
 
-const _funcArgs: ParseFunction<Arg[]> = (module, code, startIndex) => 
-    _singleArgument(module, code, startIndex) ?? _seriesOfArguments(module, code, startIndex)
+const _funcArgs: ParseFunction<Args | SpreadArgs> = (module, code, startIndex) => 
+    _singleArgument(module, code, startIndex) ??
+    _parenthesizedArguments(module, code, startIndex)
 
-const _singleArgument: ParseFunction<Arg[]> = (module, code, startIndex) =>
+const _singleArgument: ParseFunction<Args> = (module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) => ({
-        parsed: [
-            {
-                kind: "arg",
-                name,
-                optional: false,
-                module,
-                code,
-                startIndex,
-                endIndex: index
-            }
-        ],
+        parsed: {
+            kind: 'args',
+            args: [
+                {
+                    kind: "arg",
+                    name,
+                    optional: false,
+                    module,
+                    code,
+                    startIndex,
+                    endIndex: index
+                }
+            ],
+            module,
+            code,
+            startIndex,
+            endIndex: index
+        },
         index
     }))
 
-const _seriesOfArguments: ParseFunction<Arg[]> = (module, code, startIndex) =>
+const _parenthesizedArguments: ParseFunction<Args | SpreadArgs> = (module, code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
-    given(parseSeries(module, code, index, arg, ","), ({ parsed: args, index }) =>
+    given(spreadArgs(module, code, index) ?? args(module, code, index), ({ parsed: args, index }) =>
     given(consume(code, index, ")"), index => ({
         parsed: args,
         index
     }))))
+
+const spreadArgs: ParseFunction<SpreadArgs> = (module, code, startIndex) =>
+    given(consume(code, startIndex, '...'), index =>
+    given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    given(consume(code, index, ':'), index =>
+    given(consumeWhitespace(code, index), index =>
+    given(typeExpression(module, code, index), ({ parsed: type }) => ({
+        parsed: {
+            kind: 'spread-args',
+            name,
+            type,
+            module,
+            code,
+            startIndex,
+            endIndex: index
+        },
+        index
+    })))))))
+
+const args: ParseFunction<Args> = (module, code, startIndex) =>
+    given(parseSeries(module, code, startIndex, (module, code, index) =>
+        arg(module, code, index) ?? 
+        given(typeExpression(module, code, index), ({ parsed: type, index }): ParseResult<Arg> => ({
+            parsed: {
+                kind: "arg",
+                name: { kind: 'plain-identifier', name: '', ...AST_NOISE },
+                type,
+                optional: false,
+                module: type.module,
+                code: type.code,
+                startIndex: type.startIndex,
+                endIndex: type.endIndex
+            },
+            index
+        }))
+    , ","), ({ parsed: args, index }) => ({
+        parsed: {
+            kind: "args",
+            args: args.map((a, i) => ({ ...a, name: { ...a.name, name: `arg${i}` } })),
+            module,
+            code,
+            startIndex,
+            endIndex: index
+        },
+        index
+    }))
 
 const arg: ParseFunction<Arg> = (module, code, startIndex) => 
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>

@@ -115,13 +115,24 @@ const resolveInner = (name: string, from: AST, originator: AST): Binding|undefin
 
             // resolve func or proc arguments
             const funcOrProcType = parent.type.kind === 'generic-type' ? parent.type.inner : parent.type
-            for (let i = 0; i < funcOrProcType.args.length; i++) {
-                const arg = funcOrProcType.args[i]
+            if (funcOrProcType.args.kind === 'args') {
+                for (let i = 0; i < funcOrProcType.args.args.length; i++) {
+                    const arg = funcOrProcType.args.args[i]
 
-                if (arg.name.name === name) {
+                    if (arg.name?.name === name) {
+                        return {
+                            owner: parent,
+                            identifier: arg.name
+                        }
+                    }
+                }
+            } else {
+                const spreadName = funcOrProcType.args.name
+
+                if (spreadName?.name === name) {
                     return {
                         owner: parent,
-                        identifier: arg.name
+                        identifier: spreadName
                     }
                 }
             }
