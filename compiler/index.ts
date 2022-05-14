@@ -10,6 +10,7 @@ import { compiled } from "./4_compile/index.ts";
 import { formatted } from "./other/format.ts";
 import { parsed } from "./1_parse/index.ts";
 import { action, autorun, invalidate, observe, runInAction, triggeredBy, when, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
+import { Platform } from "./_model/declarations.ts";
 
 const POSSIBLE_COMMANDS = ['new', 'init', 'build', 'run', 'transpile', 'check', 
     'test', 'format', 'autofix', 'clean'] as const
@@ -38,7 +39,7 @@ async function main() {
     args.platforms = [
         flags.deno ? 'deno' : undefined,
         flags.node ? 'node' : undefined,
-    ].filter(exists); invalidate(args, 'platforms')
+    ].filter(exists) as Platform[]; invalidate(args, 'platforms')
     
     if (command == null) {
         fail(`Must provide a valid command:\n${POSSIBLE_COMMANDS.join(', ')}`)
