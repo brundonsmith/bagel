@@ -343,6 +343,13 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     } else if (subject.typeParams.length !== invocation.typeArgs.length) {
                         reportError(miscError(invocation, `Expected ${subject.typeParams.length} type arguments, but got ${invocation.typeArgs.length}`))
                     }
+
+                    for (let i = 0; i < Math.min(subject.typeParams.length, invocation.typeArgs.length); i++) {
+                        const constraint = subject.typeParams[i].extends
+                        if (constraint && subsumationIssues(constraint, invocation.typeArgs[i])) {
+                            reportError(miscError(invocation.typeArgs[i], `${format(invocation.typeArgs[i])} is not a valid type argument for ${subject.typeParams[i].name.name} because it doesn't match the extends clause (${format(constraint)})`))
+                        }
+                    }
                 } else if ( // check that subject is callable
                     subjectType.kind !== "func-type" && subjectType.kind !== "proc-type" 
                 && (subjectType.kind !== 'generic-type' || (subjectType.inner.kind !== 'func-type' && subjectType.inner.kind !== 'proc-type'))) {

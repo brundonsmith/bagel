@@ -621,6 +621,18 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Generic extends clause fail",
+  fn() {
+    testTypecheck(`
+    func foo<T extends string>(x: T) => x
+
+    const z = foo<number>(12)
+    `,
+    true)
+  }
+})
+
+Deno.test({
   name: "Function consts out of order",
   fn() {
     testTypecheck(

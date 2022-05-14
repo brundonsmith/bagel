@@ -774,6 +774,7 @@ export function distillOverlappingUnionMembers(type: UnionType): UnionType {
  * a) infer its subject's type
  * b) if the subject is generic, bind its provided type args or try to infer 
  *    them
+ * c) return the subject's type with generic params filled in, if possible
  */
 export function bindInvocationGenericArgs(invocation: Invocation): TypeExpression|undefined {
     const subjectType = resolveType(inferType(invocation.subject))
