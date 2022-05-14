@@ -1,8 +1,8 @@
 import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType, Arg, SpreadArgs } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,BagelError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws, argsBounds } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws, argsBounds, AST_NOISE, TYPE_AST_NOISE } from "./typeinfer.ts";
 import { getBindingMutability, ModuleName, ReportError } from "../_model/common.ts";
 import { ancestors, elementOf, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
 import { getConfig, getModuleByName } from "../store.ts";
@@ -722,6 +722,43 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     expect(reportError, VALID_RECORD_KEY, current.key)
                 }
                 break;
+            case "proc-declaration":
+            case "func-declaration": {
+                const declType = inferType(current.value)
+
+                const requiredDecoratorType: FuncType = {
+                    kind: 'func-type',
+                    args: {
+                        kind: 'args',
+                        args: [{
+                            kind: 'arg',
+                            name: {
+                                kind: 'plain-identifier',
+                                name: '',
+                                ...AST_NOISE
+                            },
+                            type: declType,
+                            optional: false,
+                            ...AST_NOISE
+                        }],
+                        ...AST_NOISE
+                    },
+                    returnType: declType,
+                    ...TYPE_AST_NOISE
+                }
+
+                for (const decorator of current.decorators) {
+                    const type = inferType(decorator.decorator)
+
+                    if (type.kind !== 'func-type' && (type.kind !== 'generic-type' || type.inner.kind !== 'func-type')) {
+                        reportError(miscError(decorator, `Decorators must be functions, but ${format(decorator.decorator)} is a ${format(type)}`))
+                    } else if (subsumationIssues(requiredDecoratorType, type)) {
+                        const funcOrProc = current.kind === 'proc-declaration' ? 'proc' : 'func'
+                        reportError(miscError(decorator, `${format(decorator.decorator)} can't be used as a decorator for ${funcOrProc} of type ${format(declType)}`))
+                    }
+                }
+            } break;
+            case "decorator":
             case "proc-type":
             case "func-type":
             case "name-and-type":
@@ -773,8 +810,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "error-type":
             case "error-expression":
             case "type-declaration":
-            case "proc-declaration":
-            case "func-declaration":
             case "typeof-type":
             case "element-tag":
                 break;

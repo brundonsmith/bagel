@@ -3,7 +3,7 @@ import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo, Destructure, NameAndType } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem } from "../_model/declarations.ts";
+import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args } from "../_model/type-expressions.ts";
@@ -807,7 +807,8 @@ const unknownType: ParseFunction<UnknownType> = (module, code, startIndex) =>
     }))
 
 const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
+    given(parseSeries(module, code, startIndex, decorator), ({ parsed: decorators, index }) =>
+    given(parseKeyword(code, index, 'export'), ({ parsed: exported, index }) =>
     given(parseOptional(module, code, index, parseJsOrPlatform), ({ parsed: platform, index }) =>
     given(consume(code, index, "proc"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
@@ -841,6 +842,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
                         endIndex
                     },
                     platforms: platform === 'js' ? ALL_PLATFORMS : [platform],
+                    decorators,
                     exported,
                     module,
                     code,
@@ -869,6 +871,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
                     endIndex: index
                 },
                 platforms: ALL_PLATFORMS,
+                decorators,
                 exported,
                 module,
                 code,
@@ -876,10 +879,11 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
                 endIndex: index
             },
             index,
-        })))))))))))
+        }))))))))))))
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startIndex) => 
-    given(parseKeyword(code, startIndex, 'export'), ({ parsed: exported, index }) =>
+    given(parseSeries(module, code, startIndex, decorator), ({ parsed: decorators, index }) =>
+    given(parseKeyword(code, index, 'export'), ({ parsed: exported, index }) =>
     given(parseOptional(module, code, index, parseJsOrPlatform), ({ parsed: platform, index }) =>
     given(consume(code, index, "func"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
@@ -913,6 +917,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
                         endIndex,
                     },
                     platforms: platform === 'js' ? ALL_PLATFORMS : [platform],
+                    decorators,
                     exported,
                     module,
                     code,
@@ -937,6 +942,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
                     endIndex: index,
                 },
                 platforms: ALL_PLATFORMS,
+                decorators,
                 exported,
                 module,
                 code,
@@ -944,7 +950,36 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
                 endIndex: index,
             },
             index,
-        })))))))))))
+        }))))))))))))
+    
+const decorator: ParseFunction<Decorator> = (module, code, startIndex) =>
+    given(consume(code, startIndex, '@'), index =>
+    given(localIdentifier(module, code, index), ({ parsed: ident, index }) =>
+    given(parseOptional(module, code, index, _invocationArgs), ({ parsed: args, index }) => ({
+        parsed: {
+            kind: 'decorator',
+            decorator: (
+                args
+                    ? {
+                        kind: 'invocation',
+                        subject: ident,
+                        typeArgs: args.typeArgs,
+                        args: args.exprs,
+                        bubbles: false,
+                        module,
+                        code,
+                        startIndex,
+                        endIndex: index,
+                    }
+                    : ident
+            ),
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    }))))
 
 const parseJsOrPlatform: ParseFunction<'js' | Platform> = (module, code, index) =>
     parsePlatform(module, code, index) ??

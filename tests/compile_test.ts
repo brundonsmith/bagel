@@ -780,6 +780,37 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Decorators",
+  fn() {
+    testCompile(`
+    func myDecorator1(fn: (n: number) => number): (n: number) => number => fn
+    func myDecorator2(fn: (n: number) => number): (n: number) => number => fn
+    
+    @myDecorator1
+    @myDecorator2
+    func foo(n: number): number => n
+
+    func myProcDecorator(p: () {}): () {} => p
+
+    @myProcDecorator
+    proc bar() {
+    }
+    `,
+    `
+    const myDecorator1 = (fn: (n: number) => number): (n: number) => number => (fn);
+    const myDecorator2 = (fn: (n: number) => number): (n: number) => number => (fn);
+
+    const foo = myDecorator1(myDecorator2((n: number): number => (n)));
+
+    const myProcDecorator = (p: () => void): () => void => (p);
+
+    const bar = myProcDecorator((): void => { 
+    });
+    `)
+  }
+})
+
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>.bgl' as ModuleName
 

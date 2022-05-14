@@ -1,5 +1,5 @@
 import { Block, Debug, PlainIdentifier, SourceInfo } from "./ast.ts";
-import { ExactStringLiteral, Expression, Func, JavascriptEscape, JsFunc, JsProc, Proc } from "./expressions.ts";
+import { ExactStringLiteral, Expression, Func, Invocation, JavascriptEscape, JsFunc, JsProc, LocalIdentifier, Proc } from "./expressions.ts";
 import { TypeExpression } from "./type-expressions.ts";
 
 export type Declaration =
@@ -49,6 +49,7 @@ export type ProcDeclaration = SourceInfo & Exported & {
     readonly name: PlainIdentifier,
     readonly value: Proc|JsProc,
     readonly platforms: readonly Platform[],
+    readonly decorators: readonly Decorator[],
 }
 
 export type FuncDeclaration = SourceInfo & Exported & {
@@ -57,6 +58,7 @@ export type FuncDeclaration = SourceInfo & Exported & {
     readonly name: PlainIdentifier,
     readonly value: Func|JsFunc,
     readonly platforms: readonly Platform[],
+    readonly decorators: readonly Decorator[],
 }
 
 export type ValueDeclaration = SourceInfo & {
@@ -67,6 +69,11 @@ export type ValueDeclaration = SourceInfo & {
     readonly isConst: boolean,
     readonly exported: undefined|'export'|'expose',
     readonly platforms: readonly Platform[],
+}
+
+export type Decorator = SourceInfo & {
+    readonly kind: 'decorator',
+    readonly decorator: LocalIdentifier | Invocation
 }
 
 export const ALL_PLATFORMS = ["node", "deno", "browser"] as const

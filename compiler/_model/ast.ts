@@ -1,5 +1,5 @@
 import { ModuleName } from "./common.ts";
-import { Declaration, ImportItem } from "./declarations.ts";
+import { Declaration, Decorator, ImportItem } from "./declarations.ts";
 import { Case, Expression, InlineDeclaration, ObjectEntry, Operator, Spread, SwitchCase } from "./expressions.ts";
 import { CaseBlock, Statement } from "./statements.ts";
 import { Arg, Args, Attribute, SpreadArgs, TypeExpression } from "./type-expressions.ts";
@@ -27,6 +27,7 @@ export type AST = (
     | ObjectEntry
     | NameAndType
     | Destructure
+    | Decorator
 )
 
 export type Module = SourceInfo & {

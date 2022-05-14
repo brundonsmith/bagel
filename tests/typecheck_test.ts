@@ -3153,7 +3153,77 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Decorators pass",
+  fn() {
+    testTypecheck(`
+    func myDecorator1(fn: (n: number) => number): (n: number) => number => fn
+    func myDecorator2(fn: (n: number) => number): (n: number) => number => fn
+    
+    @myDecorator1
+    @myDecorator2
+    func foo(n: number): number => n
 
+    func myProcDecorator(p: () {}): () {} => p
+
+    @myProcDecorator
+    proc bar() {
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Decorators fail 1",
+  fn() {
+    testTypecheck(`
+    const myDecorator = nil
+    
+    @myDecorator
+    func foo(n: number): number => n
+    `,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Decorators fail 2",
+  fn() {
+    testTypecheck(`
+    func myDecorator1(fn: (n: number) => number): (n: number) => number => fn
+    func myDecorator2(fn: (n: string) => number): (n: number) => number => fn
+    
+    @myDecorator1
+    @myDecorator2
+    func foo(n: number): number => n`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Decorators fail 3",
+  fn() {
+    testTypecheck(`
+    func myProcDecorator(p: () {}): () {} => p
+
+    @myProcDecorator
+    func foo(n: number): number => n`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Decorators fail 4",
+  fn() {
+    testTypecheck(`
+    func myDecorator(fn: (n: number) => number): (n: string) => number =>
+      (n: string) => n.length
+    
+    @myDecorator
+    func foo(n: number): number => n`,
+    true)
+  }
+})
 
 // Deno.test({
 //   name: "Complex function type inference pass",

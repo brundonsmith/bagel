@@ -67,7 +67,9 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
 
             const subjectType = ast.value.type.kind === 'generic-type' ? ast.value.type.inner : ast.value.type
 
-            return front + 
+            const decorators = ast.decorators.map(d => f(d) + '\n').join('')
+
+            return decorators + front + 
                 (ast.value.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.value.type.typeParams) : '') +
                 `(${f(subjectType.args)})` +
                 (subjectType.kind === 'func-type' ? maybeTypeAnnotation(options, indent, parent, subjectType.returnType) : '') +
@@ -82,6 +84,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return (ast.name?.name ?? '') + (ast.name && ast.type ? ': ' : '') + (given(ast.type, f) ?? '')
         case "spread-args":
             return '...' + (ast.name ? ast.name?.name + ': ' : '') + f(ast.type)
+        case "decorator":
+            return `@${f(ast.decorator)}`
         case "js-func":
         case "js-proc":
             throw Error(ast.kind + ` should always be handled at the declaration level!`)

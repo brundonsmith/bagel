@@ -429,13 +429,23 @@ const NIL = `undefined`;
 
 const compileProcDeclaration = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', decl: ProcDeclaration): string => {
     const baseProc = compileOne(excludeTypes, module, destination, decl.value)
-    const proc = decl.action ? `${INT}action(${baseProc})` : baseProc
+    let proc = decl.action ? `${INT}action(${baseProc})` : baseProc
+    
+    for (let i = decl.decorators.length - 1; i >= 0; i--) {
+        const dec = decl.decorators[i]
+        proc = compileOne(excludeTypes, module, destination, dec.decorator) + `(${proc})`
+    }
     
     return exported(decl.exported) + `const ${decl.name.name} = ` + proc;
 }
 const compileFuncDeclaration = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', decl: FuncDeclaration): string => {
     const baseFunc = compileOne(excludeTypes, module, destination, decl.value)
-    const func = decl.memo ? `${INT}computedFn(${baseFunc})` : baseFunc
+    let func = decl.memo ? `${INT}computedFn(${baseFunc})` : baseFunc
+
+    for (let i = decl.decorators.length - 1; i >= 0; i--) {
+        const dec = decl.decorators[i]
+        func = compileOne(excludeTypes, module, destination, dec.decorator) + `(${func})`
+    }
     
     return exported(decl.exported) + `const ${decl.name.name} = ` + func;
 }
