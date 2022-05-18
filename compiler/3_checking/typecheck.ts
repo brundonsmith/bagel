@@ -755,7 +755,16 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
 
                 for (const decorator of current.decorators) {
-                    const type = inferType(decorator.decorator)
+                    const type = bindInvocationGenericArgs({
+                        kind: 'invocation',
+                        subject: decorator.decorator,
+                        args: [
+                            current.value
+                        ],
+                        typeArgs: [],
+                        bubbles: false,
+                        ...AST_NOISE
+                    }) ?? inferType(decorator.decorator)
 
                     if (type.kind !== 'func-type' && (type.kind !== 'generic-type' || type.inner.kind !== 'func-type')) {
                         reportError(miscError(decorator, `Decorators must be functions, but ${format(decorator.decorator)} is a ${format(type)}`))
