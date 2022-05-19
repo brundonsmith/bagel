@@ -17,7 +17,7 @@ export js func iter<T>(x: const T[]): Iterator<T> => {#
 #}
 
 export func assert(condition: boolean, message: string): Error<string>? =>
-    if exp {
+    if condition {
         nil
     } else {
         Error(message)
