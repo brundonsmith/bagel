@@ -1,13 +1,13 @@
 
 from './model.bgl' import { AST, JSONObject, JSONArray, JSONString, JSONNumber, JSONBoolean, JSONNull, ParseError }
 
-export func json(str: string): AST? =>
+export func json(str: string): AST|Error<string>|nil =>
     const res = jsonParse(str, 0),
-    if res != nil {
+    if res {
         res[0]
     }
 
-func jsonParse(str: string, index: number): [AST, number]? =>
+func jsonParse(str: string, index: number): [AST, number]|Error<string>|nil =>
     jsonParseObject(str, index) ??
     jsonParseArray(str, index) ??
     jsonParseString(str, index) ??
@@ -15,26 +15,19 @@ func jsonParse(str: string, index: number): [AST, number]? =>
     jsonParseBoolean(str, index) ??
     jsonParseNull(str, index)
 
-func jsonParseObject(str: string, index: number): [JSONObject, number]? => nil
+func jsonParseObject(str: string, index: number): [JSONObject, number]|Error<string>|nil => nil
 
-func jsonParseArray(str: string, index: number): [JSONArray, number]? => nil
+func jsonParseArray(str: string, index: number): [JSONArray, number]|Error<string>|nil => nil
 
-func jsonParseString(str: string, index: number): [JSONString, number]? => nil
+func jsonParseString(str: string, index: number): [JSONString, number]|Error<string>|nil => nil
 
-func jsonParseNumber(str: string, index: number): [JSONNumber, number]? => nil
+func jsonParseNumber(str: string, index: number): [JSONNumber, number]|Error<string>|nil => nil
 
-func jsonParseBoolean(str: string, index: number): [JSONBoolean, number]? =>
-    const trueEnd = consume(str, index, 'true'),
-    if trueEnd != nil {
-        [JSONBoolean(true), trueEnd]
-    } else {
-        const falseEnd = consume(str, index, 'false'),
-        if falseEnd != nil {
-            [JSONBoolean(false), falseEnd]
-        }
-    }
+func jsonParseBoolean(str: string, index: number): [JSONBoolean, number]|Error<string>|nil =>
+    (const endIndex = consume(str, index, 'true'),  endIndex && [JSONBoolean(true),  endIndex]) ||
+    (const endIndex2 = consume(str, index, 'false'), endIndex2 && [JSONBoolean(false), endIndex2])
 
-func jsonParseNull(str: string, index: number): [JSONNull, number]? =>
+func jsonParseNull(str: string, index: number): [JSONNull, number]|Error<string>|nil =>
     const end = consume(str, index, 'null'),
     if end != nil {
         [JSONNull(nil), end]
@@ -45,3 +38,8 @@ func consume(str: string, index: number, exact: string): number? =>
     if str.substring(index, index + exact.length) == exact {
         end
     }
+
+func foo(n: number) =>
+    const doubled = n * 2,
+    const andOne = doubled + 1,
+    andOne

@@ -6,7 +6,7 @@ from './app.bgl' import { renderApp }
 
 let searchString = 'charizard'
 
-remote searchResults () => searchCards(searchString)
+remote searchResults => searchCards(searchString)
 
 autorun () {
     render(renderApp(searchResults, searchString, (val: string) { searchString = val; }));
