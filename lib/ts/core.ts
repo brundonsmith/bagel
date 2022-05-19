@@ -529,6 +529,10 @@ export function* exec(exp: RegExp, s: string) {
     while (result = expr.exec(s)) {
         const [match, ...groups] = result
         yield { match, groups }
+
+        if (!exp.flags.includes('g')) {
+            return
+        }
     }
 }
 
