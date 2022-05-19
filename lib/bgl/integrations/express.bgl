@@ -1,6 +1,6 @@
 js#
-import ___express from 'https://jspm.dev/npm:express@4.17.3'
-import ___cookieParser from 'https://jspm.dev/npm:cookie-parser@1.4.6'
+import ___express from 'https://cdn.skypack.dev/express@4.17.3'
+import ___cookieParser from 'https://cdn.skypack.dev/cookie-parser@1.4.6'
 #js
 
 export type MediaType = const {
@@ -56,9 +56,9 @@ export type Response = const {
     status: (code: number) { },
     sendStatus: (code: number) { },
     links: (links: {[string]: string}) { },
-    send: (body: JSON) { },
-    json: (body: JSON) { },
-    jsonp: (body: JSON) { },
+    send: (body: unknown) { },
+    json: (body: unknown) { },
+    jsonp: (body: unknown) { },
     sendFile: (path: string) { },
     download: (path: string, filename?: string) { },
     type: (type: string) { },
@@ -86,7 +86,7 @@ export type Application = {
 
     use: (paths: const string[], handler: RequestHandler) { },
 
-    listen: (port?: number) { },
+    listen: (port?: number, cb?: () {}) { },
 }
 
 export js func express(requestBodyType?: 'text'|'json'|'urlencoded'): Application => {#

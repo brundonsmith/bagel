@@ -1,0 +1,268 @@
+js#
+import { ___Application, ___Router } from 'https://deno.land/x/oak/mod.ts';
+#js
+
+export js func newApplication(): Application => {#
+    return new ___Application();
+#}
+
+export js func newRouter(): Router => {#
+    return new ___Router();
+#}
+
+app.use((ctx) => {
+  ctx.response.body = "Hello world!";
+});
+
+await app.listen({ port: 8000 });
+export type Application = {
+    get: (path: string, handler: RequestHandler) { },
+    post: (path: string, handler: RequestHandler) { },
+    put: (path: string, handler: RequestHandler) { },
+    delete: (path: string, handler: RequestHandler) { },
+
+    use: (paths: const string[], handler: RequestHandler) { },
+
+    listen: (port?: number) { },
+}
+
+// <S extends AS = State, AS extends State = Record<string, any>>
+export type Context = {
+    // constructor(
+    //     app: Application<AS>,
+    //     serverRequest: ServerRequest,
+    //     state: S,
+    //     secure?,
+    // );
+
+    // app: Application<AS>;
+    cookies: Cookies;
+    // get isUpgradable(): boolean;
+    request: Request;
+    // respond: boolean;
+    response: Response;
+    // get socket(): WebSocket | undefined;
+    state: S;
+    
+    // assert(
+    //     condition: any,
+    //     errorStatus?: ErrorStatus,
+    //     message?: string,
+    //     props?: Record<string, unknown>,
+    // ): asserts condition;
+
+    // send(options: ContextSendOptions): Promise<string | undefined>;
+    // sendEvents(options?: ServerSentEventTargetOptions): ServerSentEventTarget;
+    // throw(
+    //     errorStatus: ErrorStatus,
+    //     message?: string,
+    //     props?: Record<string, unknown>,
+    // ): never;
+
+    // upgrade(options?: UpgradeWebSocketOptions): WebSocket;
+}
+
+// <RS extends State = Record<string, any>>
+export type Router = {
+    // constructor(opts?: RouterOptions);
+    // all<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+    //     name: string,
+    //     path: R,
+    //     middleware: RouterMiddleware<R, P, S>,
+    //     ...middlewares: RouterMiddleware<R, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // all<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+    //     path: R,
+    //     middleware: RouterMiddleware<R, P, S>,
+    //     ...middlewares: RouterMiddleware<R, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // all<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(
+    //     nameOrPath: string,
+    //     pathOrMiddleware: string | RouterMiddleware<string, P, S>,
+    //     ...middleware: RouterMiddleware<string, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // allowedMethods(options?: RouterAllowedMethodsOptions): Middleware;
+    delete<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+        name: string,
+        path: R,
+        middleware: RouterMiddleware<R, P, S>,
+        ...middlewares: RouterMiddleware<R, P, S>[],
+    ): Router<S extends RS ? S : (S & RS)>;
+    // delete<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+    //     path: R,
+    //     middleware: RouterMiddleware<R, P, S>,
+    //     ...middlewares: RouterMiddleware<R, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // delete<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(
+    //     nameOrPath: string,
+    //     pathOrMiddleware: string | RouterMiddleware<string, P, S>,
+    //     ...middleware: RouterMiddleware<string, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // *entries(): IterableIterator<[Route<string>, Route<string>]>;
+    // forEach(callback: (
+    //     value1: Route<string>,
+    //     value2: Route<string>,
+    //     router: this,
+    // ) => void, thisArg?: any): void;
+    get<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+        name: string,
+        path: R,
+        middleware: RouterMiddleware<R, P, S>,
+        ...middlewares: RouterMiddleware<R, P, S>[],
+    ): Router<S extends RS ? S : (S & RS)>;
+    // get<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+    //     path: R,
+    //     middleware: RouterMiddleware<R, P, S>,
+    //     ...middlewares: RouterMiddleware<R, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // get<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(
+    //     nameOrPath: string,
+    //     pathOrMiddleware: string | RouterMiddleware<string, P, S>,
+    //     ...middleware: RouterMiddleware<string, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    head<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+        name: string,
+        path: R,
+        middleware: RouterMiddleware<R, P, S>,
+        ...middlewares: RouterMiddleware<R, P, S>[],
+    ): Router<S extends RS ? S : (S & RS)>;
+    // head<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+    //     path: R,
+    //     middleware: RouterMiddleware<R, P, S>,
+    //     ...middlewares: RouterMiddleware<R, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // head<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(
+    //     nameOrPath: string,
+    //     pathOrMiddleware: string | RouterMiddleware<string, P, S>,
+    //     ...middleware: RouterMiddleware<string, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // *keys(): IterableIterator<Route<string>>;
+    options<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+        name: string,
+        path: R,
+        middleware: RouterMiddleware<R, P, S>,
+        ...middlewares: RouterMiddleware<R, P, S>[],
+    ): Router<S extends RS ? S : (S & RS)>;
+    // options<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+    //     path: R,
+    //     middleware: RouterMiddleware<R, P, S>,
+    //     ...middlewares: RouterMiddleware<R, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // options<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(
+    //     nameOrPath: string,
+    //     pathOrMiddleware: string | RouterMiddleware<string, P, S>,
+    //     ...middleware: RouterMiddleware<string, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    param<R extends string, S extends State = RS>(param: keyof RouteParams<R>, middleware: RouterParamMiddleware<R, RouteParams<R>, S>): Router<S>;
+    patch<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+        name: string,
+        path: R,
+        middleware: RouterMiddleware<R, P, S>,
+        ...middlewares: RouterMiddleware<R, P, S>[],
+    ): Router<S extends RS ? S : (S & RS)>;
+    // patch<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+    //     path: R,
+    //     middleware: RouterMiddleware<R, P, S>,
+    //     ...middlewares: RouterMiddleware<R, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // patch<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(
+    //     nameOrPath: string,
+    //     pathOrMiddleware: string | RouterMiddleware<string, P, S>,
+    //     ...middleware: RouterMiddleware<string, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    post<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+        name: string,
+        path: R,
+        middleware: RouterMiddleware<R, P, S>,
+        ...middlewares: RouterMiddleware<R, P, S>[],
+    ): Router<S extends RS ? S : (S & RS)>;
+    // post<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+    //     path: R,
+    //     middleware: RouterMiddleware<R, P, S>,
+    //     ...middlewares: RouterMiddleware<R, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // post<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(
+    //     nameOrPath: string,
+    //     pathOrMiddleware: string | RouterMiddleware<string, P, S>,
+    //     ...middleware: RouterMiddleware<string, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // prefix(prefix: string): this;
+    put<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+        name: string,
+        path: R,
+        middleware: RouterMiddleware<R, P, S>,
+        ...middlewares: RouterMiddleware<R, P, S>[],
+    ): Router<S extends RS ? S : (S & RS)>;
+    // put<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+    //     path: R,
+    //     middleware: RouterMiddleware<R, P, S>,
+    //     ...middlewares: RouterMiddleware<R, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // put<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(
+    //     nameOrPath: string,
+    //     pathOrMiddleware: string | RouterMiddleware<string, P, S>,
+    //     ...middleware: RouterMiddleware<string, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    redirect(
+        source: string,
+        destination: string | URL,
+        status?: RedirectStatus,
+    ): this;
+    // routes(): Middleware;
+    url<P extends RouteParams<string> = RouteParams<string>>(
+        name: string,
+        params?: P,
+        options?: UrlOptions,
+    ): string | undefined;
+    use<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(middleware: RouterMiddleware<string, P, S>, ...middlewares: RouterMiddleware<string, P, S>[]): Router<S extends RS ? S : (S & RS)>;
+    // use<R extends string, P extends RouteParams<R> = RouteParams<R>, S extends State = RS>(
+    //     path: R,
+    //     middleware: RouterMiddleware<R, P, S>,
+    //     ...middlewares: RouterMiddleware<R, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // use<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(
+    //     path: string[],
+    //     middleware: RouterMiddleware<string, P, S>,
+    //     ...middlewares: RouterMiddleware<string, P, S>[],
+    // ): Router<S extends RS ? S : (S & RS)>;
+    // use<P extends RouteParams<string> = RouteParams<string>, S extends State = RS>(pathOrMiddleware: string | string[] | RouterMiddleware<string, P, S>, ...middleware: RouterMiddleware<string, P, S>[]): Router<S extends RS ? S : (S & RS)>;
+    // *values(): IterableIterator<Route<string, RouteParams<string>, RS>>;
+
+    // static url<R extends string>(
+    //     path: R,
+    //     params?: RouteParams<R>,
+    //     options?: UrlOptions,
+    // ): string;
+}
+
+export type Cookies = {
+    delete(name: string, options?: CookiesSetDeleteOptions): boolean;
+        async *entries(): AsyncIterableIterator<[string, string]>;
+        async forEach(callback: (
+        key: string,
+        value: string,
+        cookies: this,
+    ) => void, thisArg?: any): Promise<void>;
+
+    async get(name: string, options?: CookiesGetOptions): Promise<string | undefined>;
+
+    async *keys(): AsyncIterableIterator<string>;
+
+    async set(
+        name: string,
+        value: string | null,
+        options?: CookiesSetDeleteOptions,
+    ): Promise<this>;
+
+    async *values(): AsyncIterableIterator<string>;
+
+    async *[Symbol.asyncIterator](): AsyncIterableIterator<[string, string]>;
+
+    [Symbol.for("Deno.customInspect")]();
+
+    [Symbol.for("nodejs.util.inspect.custom")](
+        depth: number,
+        options: any,
+    inspect: (value: unknown, options?: unknown) => string,
+    );
+}
