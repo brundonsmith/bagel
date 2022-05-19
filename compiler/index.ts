@@ -483,8 +483,10 @@ async function test() {
 const setSource = action((module: ModuleName, source: string) => {
     const data = observe(modules, module)
 
-    data.source = source; invalidate(data, 'source')
-    addImportedModules(module)
+    if (source !== data.source) {
+        data.source = source; invalidate(data, 'source')
+        addImportedModules(module)
+    }
 })
 
 function addImportedModules(module: ModuleName) {
