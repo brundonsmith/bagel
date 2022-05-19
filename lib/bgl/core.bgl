@@ -16,6 +16,13 @@ export js func iter<T>(x: const T[]): Iterator<T> => {#
     return ___iter(x)
 #}
 
+export func assert(condition: boolean, message: string): Error<string>? =>
+    if exp {
+        nil
+    } else {
+        Error(message)
+    }
+
 export type UnknownObject = {[string]: unknown} | (const {[string]: unknown})
 
 type LintRuleName =
