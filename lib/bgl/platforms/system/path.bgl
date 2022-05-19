@@ -1,0 +1,24 @@
+
+js#
+import * as ___path from 'https://deno.land/std@0.107.0/path/mod.ts'
+#js
+
+export deno func basename(path: string, ext?: string): string => {#
+    return ___path.basename(path, ext)
+#}
+
+export deno func dirname(path: string): string => {#
+    return ___path.dirname(path, ext)
+#}
+
+export deno func extname(path: string): string => {#
+    return ___path.extname(path, ext)
+#}
+
+export deno func relative(fromPath: string, toPath: string): string => {#
+    return ___path.relative(fromPath, toPath)
+#}
+
+export deno func resolve(...segments: string[]): string => {#
+    return ___path.extname(...segments)
+#}
