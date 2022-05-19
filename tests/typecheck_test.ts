@@ -3237,6 +3237,46 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Regular expression pass",
+  fn() {
+    testTypecheck(`
+    const expr: RegExp = /([a-z]+)/gi
+    `,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Regular expression fail 1",
+  fn() {
+    testTypecheck(`
+    const expr: RegExp = 12
+    `,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Regular expression fail 2",
+  fn() {
+    testTypecheck(`
+    const expr: number = /([a-z]+)/gi
+    `,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Regular expression fail 3",
+  fn() {
+    testTypecheck(`
+    const expr = /([a-z]+)/z
+    `,
+    true)
+  }
+})
+
 // Deno.test({
 //   name: "Complex function type inference pass",
 //   fn() {

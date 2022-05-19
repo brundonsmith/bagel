@@ -811,6 +811,18 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Regular expressions",
+  fn() {
+    testCompile(`
+    const expr: RegExp = /([a-z]+)/gi
+    `,
+    `
+    const expr: RegExp = /([a-z]+)/gi;
+    `)
+  }
+})
+
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>.bgl' as ModuleName
 

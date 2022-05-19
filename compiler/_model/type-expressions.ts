@@ -31,6 +31,7 @@ export type TypeExpression =
     | ElementofType
     | UnknownType
     | AnyType
+    | RegularExpressionType
     | PropertyType
     | JavascriptEscapeType
 
@@ -199,6 +200,11 @@ export type RemoteType = SourceInfo & NoMutability & {
 export type ErrorType = SourceInfo & NoMutability & {
     readonly kind: "error-type",
     readonly inner: TypeExpression,
+}
+
+export type RegularExpressionType = SourceInfo & NoMutability & {
+    readonly kind: "regular-expression-type",
+    // TODO: Number of match groups?
 }
 
 export type ParenthesizedType = SourceInfo & NoMutability & {

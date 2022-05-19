@@ -380,6 +380,8 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
         case "as-cast": return `${c(ast.inner)} as ${c(ast.type)}`
         case "error-expression": return `{ kind: ${INT}ERROR_SYM, value: ${c(ast.inner)} }`
         case "throw-statement": return `return ${c(ast.errorExpression)};`
+        case "regular-expression": return `/${ast.expr}/${ast.flags.join('')}`
+        case "regular-expression-type": return 'RegExp'
 
         default:
             throw Error("Couldn't compile '" + format(ast) + "'");

@@ -29,6 +29,7 @@ export type Expression =
     | InstanceOf
     | AsCast
     | ErrorExpression
+    | RegularExpression
 
 export type JavascriptEscape = SourceInfo & {
     readonly kind: "javascript-escape",
@@ -232,6 +233,15 @@ export type ErrorExpression = SourceInfo & {
     readonly inner: Expression,
 }
 
+export type RegularExpression = SourceInfo & {
+    readonly kind: "regular-expression",
+    readonly expr: string,
+    readonly flags: readonly RegularExpressionFlag[]
+}
+
+export const ALL_REG_EXP_FLAGS = ['d', 'g', 'i', 'm', 's', 'u', 'y'] as const
+export type RegularExpressionFlag = typeof ALL_REG_EXP_FLAGS[number]
+
 const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "proc": undefined,
     "js-proc": undefined,
@@ -260,6 +270,7 @@ const ALL_EXPRESSION_TYPES: { [key in Expression["kind"]]: undefined } = {
     "instance-of": undefined,
     "as-cast": undefined,
     "error-expression": undefined,
+    "regular-expression": undefined,
 };
 
 export function isExpression(ast: AST): ast is Expression {

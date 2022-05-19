@@ -469,6 +469,11 @@ const inferTypeInner = computedFn(function inferTypeInner(
                 }
             }
         }
+        case "regular-expression": return {
+            kind: "regular-expression-type",
+            mutability: undefined,
+            parent, module, code, startIndex, endIndex
+        }
         case "string-literal": return STRING_TYPE;
         case "exact-string-literal":
         case "number-literal":

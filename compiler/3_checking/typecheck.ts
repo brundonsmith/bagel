@@ -828,10 +828,12 @@ export function typecheck(reportError: ReportError, ast: Module): void {
             case "type-declaration":
             case "typeof-type":
             case "element-tag":
+            case "regular-expression":
+            case "regular-expression-type":
                 break;
             default:
                 // @ts-expect-error: exhaustiveness
-                throw Error(current.kind)
+                throw Error("No typecheck logic for: " + current.kind)
         }        
     }
 }

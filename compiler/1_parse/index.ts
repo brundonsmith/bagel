@@ -4,9 +4,9 @@ import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo, Destructure, NameAndType } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator } from "../_model/declarations.ts";
-import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration } from "../_model/expressions.ts";
+import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration, ALL_REG_EXP_FLAGS, RegularExpression, RegularExpressionFlag } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
-import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { iterateParseTree, setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
@@ -422,8 +422,8 @@ const unionType: ParseFunction<UnionType> = (module, code, startIndex) =>
                 parsed: {
                     kind: "union-type",
                     members,
-                    module,
                     mutability: undefined,
+                    module,
                     code,
                     startIndex,
                     endIndex: index,
@@ -432,17 +432,28 @@ const unionType: ParseFunction<UnionType> = (module, code, startIndex) =>
             }
             : undefined)
 
-const namedType: ParseFunction<NamedType> = (module, code, startIndex) =>
+const namedType: ParseFunction<NamedType|RegularExpressionType> = (module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) => ({
-        parsed: {
-            kind: "named-type",
-            name,
-            module,
-            mutability: undefined,
-            code,
-            startIndex,
-            endIndex: index,
-        },
+        parsed: (
+            name.name === 'RegExp'
+                ? {
+                    kind: "regular-expression-type",
+                    mutability: undefined,
+                    module,
+                    code,
+                    startIndex,
+                    endIndex: index,
+                }
+                : {
+                    kind: "named-type",
+                    name,
+                    mutability: undefined,
+                    module,
+                    code,
+                    startIndex,
+                    endIndex: index,
+                }
+        ),
         index,
     }))
 
@@ -2238,6 +2249,37 @@ const spread: ParseFunction<Spread> = (module, code, startIndex) =>
         index
     })))
 
+const regExp: ParseFunction<RegularExpression> = (module, code, startIndex) => 
+    given(consume(code, startIndex, '/'), index => {
+        const exprStart = index
+        while (code[index] !== '/' && index < code.length) index++;
+        const exprEnd = index
+
+        index++
+
+        if (index >= code.length) return undefined
+
+        const flags: RegularExpressionFlag[] = []
+
+        while((ALL_REG_EXP_FLAGS as readonly string[]).includes(code[index])) {
+            flags.push(code[index] as RegularExpressionFlag)
+            index++
+        }
+
+        return {
+            parsed: {
+                kind: 'regular-expression',
+                expr: code.substring(exprStart, exprEnd),
+                flags,
+                module,
+                code,
+                startIndex,
+                endIndex: index,
+            },
+            index
+        }
+    })
+
 
 const stringLiteral: ParseFunction<StringLiteral|ExactStringLiteral> = (module, code, startIndex) => {
     const segments: (string|Expression)[] = [];
@@ -2466,7 +2508,7 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ parenthesized ],
     [ ifElseExpression, switchExpression, inlineConstGroup, booleanLiteral, nilLiteral, objectLiteral, arrayLiteral, 
         stringLiteral, numberLiteral ],
-    [ localIdentifier ],
+    [ localIdentifier, regExp ],
 ])
 
 const TYPE_PARSER = new TieredParser<TypeExpression>([
