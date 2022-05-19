@@ -193,24 +193,24 @@ const RULES = {
         },
         autofix: undefined
     },
-    'pureFunctions': {
-        message: (ast: AST) => `Function declarations should not reference global state (referencing '${format(ast)}'). Convert "let" to "const" if the value is never mutated, or consider passing state in as an explicit function argument.`,
-        match: (ast: AST) => {
+    // 'pureFunctions': {
+    //     message: (ast: AST) => `Function declarations should not reference global state (referencing '${format(ast)}'). Convert "let" to "const" if the value is never mutated, or consider passing state in as an explicit function argument.`,
+    //     match: (ast: AST) => {
             
-            // local identifier, inside a func declaration
-            if (ast.kind === 'local-identifier' && findAncestor(ast, a => a.kind === 'func-declaration') != null) {
-                const binding = resolve(ast.name, ast)
+    //         // local identifier, inside a func declaration
+    //         if (ast.kind === 'local-identifier' && findAncestor(ast, a => a.kind === 'func-declaration') != null) {
+    //             const binding = resolve(ast.name, ast)
 
-                // bound to let-declaration
-                if (binding?.owner.kind === 'value-declaration' && !binding.owner.isConst) {
-                    return ast
-                }
-            }
+    //             // bound to let-declaration
+    //             if (binding?.owner.kind === 'value-declaration' && !binding.owner.isConst) {
+    //                 return ast
+    //             }
+    //         }
 
-            return undefined
-        },
-        autofix: undefined
-    },
+    //         return undefined
+    //     },
+    //     autofix: undefined
+    // },
     // 'unnecessary-nil-coalescing': {
     //     message: "Nil-coalescing operator is redundant because the left operand will never be nil",
     //     match: (ast: AST) => {
@@ -292,6 +292,6 @@ const DEFAULT_SEVERITY: { readonly [rule in LintRuleName]: LintRuleSeverity } = 
     'redundantConditional': 'error',
     'stringNumberConditional': 'warning',
     'explicitBooleansOnly': 'off',
-    'pureFunctions': 'error',
+    // 'pureFunctions': 'error',
     // 'unnecessary-nil-coalescing': 'warning'
 }
