@@ -126,6 +126,10 @@ async function main() {
                             console.error(Colors.red('Failed to run: ') + 'Couldn\'t find a Node or Deno installation; please install one of the two or supply a path as BAGEL_NODE_BIN or BAGEL_DENO_BIN')
                             Deno.exit(1)
                         }
+                    } else {
+                        if (!flags.watch) {
+                            Deno.exit(1)
+                        }
                     }
                 }
             })
@@ -167,7 +171,11 @@ async function main() {
                             }
 
                             if (!flags.watch) {
-                                Deno.exit(0)
+                                Deno.exit(
+                                    hasProblems()
+                                        ? 1
+                                        : 0
+                                )
                             }
                         }
                     })
