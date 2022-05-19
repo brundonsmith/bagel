@@ -454,7 +454,7 @@ const compileFuncDeclaration = (excludeTypes: boolean, module: ModuleName, desti
 
 function compileProc(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', proc: Proc|JsProc): string {
     const signature = compileProcOrFunctionSignature(excludeTypes, module, destination, proc.type)
-    return signature + ` => ${proc.kind === 'js-proc' ? `{${proc.body}}` : compileOne(excludeTypes, module, destination, proc.body)}`;
+    return (proc.kind === 'proc' && proc.isAsync ? 'async ' : '') + signature + ` => ${proc.kind === 'js-proc' ? `{${proc.body}}` : compileOne(excludeTypes, module, destination, proc.body)}`;
 }
 const compileFunc = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', func: Func|JsFunc): string => {
     const signature = compileProcOrFunctionSignature(excludeTypes, module, destination, func.type)
@@ -467,13 +467,14 @@ const compileProcOrFunctionSignature = (excludeTypes: boolean, module: ModuleNam
         : ''
     const functionType = subject.kind === 'generic-type' ? subject.inner : subject
 
-    return (functionType.kind === 'proc-type' && functionType.isAsync ? 'async ' : '') +
+    return (
         typeParams + 
         `(${compileOne(excludeTypes, module, destination, functionType.args)})` +
         (excludeTypes ? '' : 
         functionType.kind === 'proc-type' ? (functionType.isAsync ? ': Promise<void>' : ': void') : 
         functionType.returnType != null ? `: ${compileOne(excludeTypes, module, destination, functionType.returnType)}` :
         '')
+    )
 }
 
 function exported(e: boolean|"export"|"expose"|undefined): string {
