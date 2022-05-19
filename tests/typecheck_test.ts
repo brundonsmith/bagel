@@ -2726,6 +2726,32 @@ Deno.test({
   }
 })
 
+// Deno.test({
+//   name: "Circular type pass 3",
+//   fn() {
+//     testTypecheck(`
+//     export type JSON =
+//       | {[string]: JSON}
+//       | JSON[]
+//       | string
+//       | number
+//       | boolean
+//       | nil
+
+//     export func clone<T extends JSON>(val: T): T =>
+//         if val instanceof {[string]: unknown} {
+//             val.entries()
+//                 .map(entry => [entry[0], entry[1].clone()])
+//                 .collectObject()
+//         } else if val instanceof unknown[] {
+//             val.map(clone).collectArray()
+//         } else {
+//             val
+//         }`,
+//     false)
+//   }
+// })
+
 Deno.test({
   name: "Circular type fail 1",
   fn() {
