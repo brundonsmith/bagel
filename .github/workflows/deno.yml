@@ -36,3 +36,6 @@ jobs:
 
       - name: Run tests
         run: DEV_MODE=test deno test -A --unstable
+
+      - name: Check lib/bgl
+        run: compiler/run.sh check lib/bgl
