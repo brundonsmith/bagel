@@ -22,7 +22,9 @@ Blog posts on the language:
 
 Bagel runs on Deno, so you'll first need that [installed](https://deno.land/#installation).
 
-If you're using VSCode, there's a (very much in-progress) extension [here](https://github.com/brundonsmith/bagel-language) which will provide some basic syntax highlighting. It includes scripts for automatically installing it on Windows or macOS.
+> When it's ready for wide use, the Bagel compiler and tooling will be compiled together with the Deno runtime into a [standalone executable](https://deno.land/manual/tools/compiler), so you won't have to install Deno separately.
+
+If you're using VSCode, there's a (very much in-progress) extension [here](https://github.com/brundonsmith/bagel-language) which will provide some basic syntax highlighting. Included in the repo are scripts for automatically installing the extension into VSCode on Windows or macOS (it's not available on the marketplace yet).
 
 You can run the Bagel compiler directly via Deno, but that can be a little annoying, so `compiler/run.sh` and `compiler/run.bat` are provided. For the optimal experience, I recommend symlinking one of these scripts into your path under the name `bagel`.
 
