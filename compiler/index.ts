@@ -319,6 +319,7 @@ async function cleanCache() {
     return numFiles
 }
 
+// TODO when auto-detecting runtime, incorporate platform-specific functions/procs/consts?
 
 // Utils
 const bundleOutput = async (entryFile: string, outfile: string) => {

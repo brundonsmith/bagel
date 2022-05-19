@@ -24,6 +24,8 @@ export const typeerrors = computedFn(function typeerrors (ast: Module): BagelErr
     return errors
 })
 
+// TODO: Funcs that return a Plan<> must be marked async
+
 /**
  * Walk an entire AST and report all issues that we find
  */
