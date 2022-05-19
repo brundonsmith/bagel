@@ -3,14 +3,14 @@ js#
 export * as ___fs from 'https://deno.land/std@0.107.0/fs/mod.ts'
 #js
 
-export deno func exists(filePath: string): Plan<boolean> => {#
+export async deno func exists(filePath: string): Plan<boolean> => {#
     return () => ___fs.exists(filePath)
 #}
 
-export deno func readDir(path: string): Plan<DirEntry[]> => {#
-    return () => {
+export async deno func readDir(path: string): Plan<DirEntry[]> => {#
+    return async () => {
         const all: Deno.DirEntry[] = []
-        for await (const entry of Deno.readDir('foo')) {
+        for await (const entry of Deno.readDir(path)) {
             all.push(entry)
         }
         return all
@@ -21,11 +21,11 @@ export async deno proc writeTextFile(path: string, data: string) {#
     return () => Deno.writeTextFile(path, data)
 #}
 
-export deno func readTextFile(path: string): Plan<string> => {#
+export async deno func readTextFile(path: string): Plan<string> => {#
     return () => Deno.readTextFile(path)
 #}
 
-export deno func stat(path: string): Plan<FileInfo> => {#
+export async deno func stat(path: string): Plan<FileInfo> => {#
     return () => Deno.stat(path)
 #}
 
