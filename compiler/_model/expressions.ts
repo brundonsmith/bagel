@@ -39,12 +39,14 @@ export type JavascriptEscape = SourceInfo & {
 export type Func = SourceInfo & {
     readonly kind: "func",
     readonly type: FuncType|GenericFuncType,
+    readonly isAsync: boolean,
     readonly body: Expression,
 }
 
 export type JsFunc = SourceInfo & {
     readonly kind: "js-func",
     readonly type: FuncType|GenericFuncType,
+    readonly isAsync: boolean,
     readonly body: string,
 }
 
@@ -64,12 +66,14 @@ export type InlineDeclaration = SourceInfo & {
 export type Proc = SourceInfo & {
     readonly kind: "proc",
     readonly type: ProcType|GenericProcType,
+    readonly isAsync: boolean,
     readonly body: Block,
 }
 
 export type JsProc = SourceInfo & {
     readonly kind: "js-proc",
     readonly type: ProcType|GenericProcType,
+    readonly isAsync: boolean,
     readonly body: string,
 }
 

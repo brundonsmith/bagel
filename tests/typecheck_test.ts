@@ -2951,7 +2951,7 @@ Deno.test({
   name: "Awaited const decl pass",
   fn() {
     testTypecheck(`
-    func foo(plan: Plan<string>, plan2: Plan<{ a: string }>) =>
+    async func foo(plan: Plan<string>, plan2: Plan<{ a: string }>) =>
       const foo: string = await plan,
       const { a } = await plan2,
       foo`,
@@ -2963,7 +2963,7 @@ Deno.test({
   name: "Awaited const decl fail 1",
   fn() {
     testTypecheck(`
-    func foo(plan: Plan<string>) =>
+    async func foo(plan: Plan<string>) =>
       const foo: number = await plan,
       foo`,
     true)
@@ -2974,7 +2974,7 @@ Deno.test({
   name: "Awaited const decl fail 2",
   fn() {
     testTypecheck(`
-    func foo(plan: string) =>
+    async func foo(plan: string) =>
       const foo = await plan,
       foo`,
     true)
@@ -2985,9 +2985,21 @@ Deno.test({
   name: "Awaited const decl fail 3",
   fn() {
     testTypecheck(`
-    func foo(plan2: Plan<{ a: string }>) =>
+    async func foo(plan2: Plan<{ a: string }>) =>
       const { b } = await plan2,
       b`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Awaited const decl fail 4",
+  fn() {
+    testTypecheck(`
+    func foo(plan: Plan<string>, plan2: Plan<{ a: string }>) =>
+      const foo: string = await plan,
+      const { a } = await plan2,
+      foo`,
     true)
   }
 })
@@ -3083,12 +3095,17 @@ Deno.test({
   name: "Await statement pass",
   fn() {
     testTypecheck(`
-    proc foo(plan: Plan<string>) {
+    async proc other() {
+    }
+
+    async proc foo(plan: Plan<string>) {
       const s1: string = await plan;
       const x: string = s1;
 
       const s2 = await plan;
       const y: string = s2;
+
+      await other();
     }`,
     false)
   }
@@ -3098,7 +3115,7 @@ Deno.test({
   name: "Await statement fail 1",
   fn() {
     testTypecheck(`
-    proc foo(plan: string) {
+    async proc foo(plan: string) {
       const s = await plan;
     }`,
     true)
@@ -3109,10 +3126,34 @@ Deno.test({
   name: "Await statement fail 2",
   fn() {
     testTypecheck(`
-    proc foo(plan: Plan<string>) {
+    async proc foo(plan: Plan<string>) {
       const s = await plan;
       const x: number = s;
     }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Await statement fail 3",
+  fn() {
+    testTypecheck(`
+    proc foo(plan: Plan<string>) {
+      const s1: string = await plan;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Async proc type fail",
+  fn() {
+    testTypecheck(`
+    async proc foo() {
+    }
+
+    const x: () {} = foo
+    `,
     true)
   }
 })

@@ -534,7 +534,7 @@ export function instanceOf(val: any, type: RuntimeType): boolean {
 // | JavascriptEscapeType
 
 export function* exec(exp: RegExp, s: string) {
-    let expr = new RegExp(exp)
+    const expr = new RegExp(exp)
     let result
 
     while (result = expr.exec(s)) {

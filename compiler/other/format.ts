@@ -60,6 +60,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             const front = 
                 (ast.value.kind === 'js-func' || ast.value.kind === 'js-proc' ? 'js ' : '') +
                 exported(ast.exported) + 
+                (ast.value.isAsync ? 'async ' : '') +
                 (ast.kind === 'func-declaration' ? 'func ' : 'proc ') +
                 (ast.kind === 'func-declaration' && ast.memo ? 'memo ' : '') +
                 (ast.kind === 'proc-declaration' && ast.action ? 'action ' : '') +
@@ -199,6 +200,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "func":
         case "proc": {
             const funcOrProcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
+            const azync = ast.isAsync ? 'async ' : ''
             const typeParams = ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''
             const args = (
                 funcOrProcType.args.kind === 'args' && 
@@ -211,9 +213,9 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             )
 
             if (ast.kind === 'func') {
-                return typeParams + `${args}${maybeTypeAnnotation(options, indent, parent, (funcOrProcType as FuncType).returnType)} =>${br}${nextIndentation}${fIndent(ast.body)}`
+                return azync + typeParams + `${args}${maybeTypeAnnotation(options, indent, parent, (funcOrProcType as FuncType).returnType)} =>${br}${nextIndentation}${fIndent(ast.body)}`
             } else {
-                return typeParams + `${args} ${f(ast.body)}`
+                return azync + typeParams + `${args} ${f(ast.body)}`
             }
         }
         case "instance-of":
@@ -283,7 +285,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             const args = `(${f(ast.args)})`
 
             if (ast.kind === 'proc-type') {
-                return `${args} {}`;
+                return (ast.isAsync ? 'async ' : '') + `${args} {}`;
             } else {
                 return `${args} => ${f(ast.returnType ?? UNKNOWN_TYPE)}`;
             }

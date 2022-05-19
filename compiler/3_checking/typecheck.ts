@@ -7,7 +7,7 @@ import { getBindingMutability, ModuleName, ReportError } from "../_model/common.
 import { ancestors, elementOf, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
 import { getConfig, getModuleByName } from "../store.ts";
 import { DEFAULT_OPTIONS, format } from "../other/format.ts";
-import { ExactStringLiteral, Expression, InlineConstGroup } from "../_model/expressions.ts";
+import { ExactStringLiteral, Expression, Func, InlineConstGroup, Proc } from "../_model/expressions.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { ImportDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 import { computedFn } from "../../lib/ts/reactivity.ts";
@@ -214,6 +214,16 @@ export function typecheck(reportError: ReportError, ast: Module): void {
 
                 let valueType = resolveType(inferType(current.value))
                 if (current.kind !== 'value-declaration' && current.awaited) {
+                    {
+                        const nearestFuncOrProc = getNearestFuncOrProc(current)
+
+                        if (!nearestFuncOrProc == null) {
+                            reportError(miscError(current, `Can only await within an async func or proc`))
+                        } else if (!nearestFuncOrProc?.isAsync) {
+                            reportError(miscError(current, `Containing ${nearestFuncOrProc?.kind} must be async to have await ${nearestFuncOrProc?.kind === 'func' ? 'expressions' : 'statements'}`))
+                        }
+                    }
+
                     if (subsumationIssues(PLAN_OF_ANY, valueType)) {
                         // make sure value is a plan
                         reportError(miscError(current.value, `Can only await expressions of type Plan; found type '${msgFormat(valueType)}'`))
@@ -309,6 +319,15 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "invocation": {
+                if (current.awaited) {
+                    const nearestFuncOrProc = getNearestFuncOrProc(current)
+
+                    if (!nearestFuncOrProc == null) {
+                        reportError(miscError(current, `Can only await within an async proc`))
+                    } else if (!nearestFuncOrProc?.isAsync) {
+                        reportError(miscError(current, `Proc must be async to contain await`))
+                    }
+                }
 
                 // Creation of nominal values looks like/parses as function 
                 // invocation, but needs to be treated differently
@@ -950,6 +969,16 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
                 }
             }
         }
+
+        console.log(resolvedDestination.kind, resolvedValue.kind)
+        if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type") {
+            if (resolvedDestination.isAsync !== resolvedValue.isAsync) {
+                return [
+                    baseErrorMessage,
+                    `'${msgFormat(resolvedValue)}' is ${resolvedValue.isAsync ? '' : 'not '}async, but '${msgFormat(resolvedDestination)}' is ${resolvedDestination.isAsync ? '' : 'not '}async`
+                ]
+            }
+        }
         
         {
             const valueArgs = resolvedValue.args
@@ -1109,6 +1138,16 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
 
 const emptyToUndefined = (arr: ReturnType<typeof subsumationIssues>): ReturnType<typeof subsumationIssues> =>
     arr?.length === 0 ? undefined : arr?.filter(el => el.length > 0)
+
+const getNearestFuncOrProc = (node: AST): Func|Proc|undefined => {
+    let current: AST|undefined = node
+
+    while (current && current.kind !== 'func' && current.kind !== 'proc') {
+        current = current.parent
+    }
+
+    return current
+}
 
 /**
  * Resolve named types, unpack parenthesized types, bind generic types, 

@@ -663,7 +663,7 @@ Deno.test({
   name: "Async proc",
   fn() {
     testCompile(`
-    proc doStuff(plan: Plan<string>) {
+    async proc doStuff(plan: Plan<string>) {
       const str = await plan;
       log(str);
     }
