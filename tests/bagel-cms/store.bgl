@@ -1,0 +1,43 @@
+
+export type EntityDescriptor = {
+    id: string,
+    fields: FieldDescriptor[],
+}
+
+type FieldDescriptor = {
+    name: string,
+    kind: 'text-short'|'text-long'|'boolean'
+}
+
+export type Entity = {
+    id: string,
+    fieldValues: {
+        [string]: string|boolean
+    }
+}
+
+export let entityTypes: EntityDescriptor[] = [
+    {
+        id: 'blogPost',
+        fields: [
+            { name: 'title', kind: 'text-short' },
+            { name: 'published', kind: 'boolean' },
+            { name: 'body', kind: 'text-long' },
+        ]
+    }
+]
+
+export let entitiesByType: {[string]: Entity[]} = {
+    blogPost: [
+        {
+            id: 'first-blog-post',
+            fieldValues: {
+                title: 'First Post',
+                published: true,
+                body: 'Lorem ipsum fdglksdjfhglskdfjh sdfgkjhsdfg sdfgkl hsdfgklsfg sdjfhk'
+            }
+        }
+    ]
+}
+
+// TODO: More detailed error messages for nested type-problems

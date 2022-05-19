@@ -1,0 +1,17 @@
+from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/html.bgl' import { render }
+
+from './app.bgl' import { renderApp }
+import './store.bgl' as store
+
+autorun {
+    // render(renderApp(store.items, store.addItem, store.clearDone));
+}
+
+export const config: BagelConfig = {
+
+    // Remove entries from this list to enable different platform-specific APIs
+    platforms: ['node', 'deno', 'browser'],
+
+    // You can override individual rules here, or leave empty for the default linter behavior
+    lintRules: { },
+}

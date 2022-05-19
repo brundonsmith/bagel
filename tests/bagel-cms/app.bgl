@@ -1,0 +1,30 @@
+
+import './app.css' as styles
+
+from './store.bgl' import { EntityDescriptor, Entity }
+
+export func memo renderApp(entityTypes: EntityDescriptor[], entitiesByType: {[string]: Entity[]}) =>
+    <div className='app'>
+        <style __dangerouslySetInnerHTML={{ __html: styles }} />
+        
+        <ul>
+            {entityTypes
+                .iter()
+                .map((t: EntityDescriptor): Element =>
+                    <li>
+                        {t.id}
+
+                        <ul>
+                            {entitiesByType[t.id] &&
+                                entitiesByType[t.id]
+                                    .iter<Entity>()
+                                    .map<Entity, Element>((e: Entity) =>
+                                        <li>
+                                            {e.id}
+                                        </li>)
+                                    .collectArray<Element>()}
+                        </ul>
+                    </li>)
+                .collectArray()}
+        </ul>
+    </div>
