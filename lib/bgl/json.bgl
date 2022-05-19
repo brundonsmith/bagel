@@ -20,13 +20,13 @@ export type JSON =
     | boolean
     | nil
 
-export func clone<T extends JSON>(val: T): T =>
-    if val instanceof {[string]: unknown} {
-        val.entries()
-            .map(entry => [entry[0], entry[1].clone()])
-            .collectObject()
-    } else if val instanceof unknown[] {
-        val.map(clone).collectArray()
-    } else {
-        val
-    }
+// export func clone<T extends JSON>(val: T): T =>
+//     if val instanceof {[string]: unknown} {
+//         val.entries()
+//             .map(entry => [entry[0], entry[1].clone()])
+//             .collectObject()
+//     } else if val instanceof unknown[] {
+//         val.map(clone).collectArray()
+//     } else {
+//         val
+//     }
