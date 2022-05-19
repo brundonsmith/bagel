@@ -1782,15 +1782,15 @@ Deno.test({
   }
 })
 
-Deno.test({
-  name: "Impure function",
-  fn() {
-    testTypecheck(`
-    let a = 12
-    func foo(b: number) => a * b`,
-    true)
-  }
-})
+// Deno.test({
+//   name: "Impure function",
+//   fn() {
+//     testTypecheck(`
+//     let a = 12
+//     func foo(b: number) => a * b`,
+//     true)
+//   }
+// })
 
 Deno.test({
   name: "Import all pass",
