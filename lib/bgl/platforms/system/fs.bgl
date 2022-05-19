@@ -51,50 +51,50 @@ export type FileInfo = const {
     /** The last modification time of the file. This corresponds to the `mtime`
      * field from `stat` on Linux/Mac OS and `ftLastWriteTime` on Windows. This
      * may not be available on all platforms. */
-    mtime: Date | null,
+    mtime: Date?,
     /** The last access time of the file. This corresponds to the `atime`
      * field from `stat` on Unix and `ftLastAccessTime` on Windows. This may not
      * be available on all platforms. */
-    atime: Date | null,
+    atime: Date?,
     /** The creation time of the file. This corresponds to the `birthtime`
      * field from `stat` on Mac/BSD and `ftCreationTime` on Windows. This may
      * not be available on all platforms. */
-    birthtime: Date | null,
+    birthtime: Date?,
     /** ID of the device containing the file.
      *
      * _Linux/Mac OS only._ */
-    dev: number | null,
+    dev: number?,
     /** Inode number.
      *
      * _Linux/Mac OS only._ */
-    ino: number | null,
+    ino: number?,
     /** **UNSTABLE**: Match behavior with Go on Windows for `mode`.
      *
      * The underlying raw `st_mode` bits that contain the standard Unix
      * permissions for this file/directory. */
-    mode: number | null,
+    mode: number?,
     /** Number of hard links pointing to this file.
      *
      * _Linux/Mac OS only._ */
-    nlink: number | null,
+    nlink: number?,
     /** User ID of the owner of this file.
      *
      * _Linux/Mac OS only._ */
-    uid: number | null,
+    uid: number?,
     /** Group ID of the owner of this file.
      *
      * _Linux/Mac OS only._ */
-    gid: number | null,
+    gid: number?,
     /** Device ID of this file.
      *
      * _Linux/Mac OS only._ */
-    rdev: number | null,
+    rdev: number?,
     /** Blocksize for filesystem I/O.
      *
      * _Linux/Mac OS only._ */
-    blksize: number | null,
+    blksize: number?,
     /** Number of blocks allocated to the file, in 512-byte units.
      *
      * _Linux/Mac OS only._ */
-    blocks: number | null,
+    blocks: number?,
   }
