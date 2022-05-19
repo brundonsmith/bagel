@@ -1,10 +1,10 @@
 
 js#
-export * as ___fs from 'https://deno.land/std@0.107.0/fs/mod.ts'
+export { exists as ___exists } from 'https://deno.land/std@0.107.0/fs/mod.ts'
 #js
 
 export async deno func exists(filePath: string): Plan<boolean> => {#
-    return () => ___fs.exists(filePath)
+    return () => ___exists(filePath)
 #}
 
 export async deno func readDir(path: string): Plan<DirEntry[]> => {#
