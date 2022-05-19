@@ -165,6 +165,18 @@ export class Iter<T> {
         return count;
     }
 
+    first(): T | undefined {
+        const inner = this.inner
+
+        if (inner[Symbol.iterator]) {
+            observe(inner, WHOLE_OBJECT)
+        }
+
+        for (const item of inner) {
+            return item
+        }
+    }
+
     concat(other: Iter<T>): Iter<T> {
         return new Iter(concat(this[INNER_ITER], other[INNER_ITER] ?? other))
     }
@@ -508,6 +520,16 @@ export function instanceOf(val: any, type: RuntimeType): boolean {
     }
 
     throw Error('Received invalid runtime type')
+}
+
+export function* exec(exp: RegExp, s: string) {
+    let expr = new RegExp(exp)
+    let result
+
+    while (result = expr.exec(s)) {
+        const [match, ...groups] = result
+        yield { match, groups }
+    }
 }
 
 // | MaybeType
