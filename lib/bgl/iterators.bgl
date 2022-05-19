@@ -20,6 +20,7 @@ export js func sorted<T>(iter: Iterator<T>, fn: (a: T, b: T) => number): Iterato
 export js func every<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean =>          {# return iter.every(fn) #}
 export js func some<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean =>           {# return iter.some(fn) #}
 export js func count<T>(iter: Iterator<T>): number =>                                   {# return iter.count() #}
+export js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
 export js func concat<T>(iter: Iterator<T>, other: Iterator<T>): Iterator<T> =>         {# return iter.concat(other) #}
 export js func zip<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<[T?, R?]> =>   {# return iter.zip(other) #}
 export js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
