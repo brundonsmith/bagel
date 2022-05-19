@@ -28,8 +28,8 @@ export js func padStart(s: string, targetLength: number, padString: string): str
     return s.padStart(targetLength, padString)
 #}
 export js func repeat(s: string, count: number): string => {# return s.repeat(count) #}
-export js func replace(s: string, searchFor: string, replaceWith: string): string => {# return s.replaceAll(searchFor, replaceWith) #}
-export js func split(s: string, sep: string): string[] => {# return s.split(sep) #}
+export js func replace(s: string, searchFor: string | RegExp, replaceWith: string): string => {# return s.replaceAll(searchFor, replaceWith) #}
+export js func split(s: string, sep: string | RegExp): string[] => {# return s.split(sep) #}
 export js func startsWith(s: string, piece: string): boolean => {# return s.startsWith(piece) #}
 export js func substring(s: string, start: number, end?: number): string => {# return s.substring(start, end) #}
 export js func toLowerCase(s: string): string => {# return s.toLocaleLowerCase() #}
