@@ -19,49 +19,58 @@ export type Declaration =
 
 type Exported = { exported: boolean }
 
-export nominal type ImportAllDeclaration(const {
+export nominal type ImportAllDeclaration({
     ...SourceInfo,
-    alias: PlainIdentifier,
+    
+    name: PlainIdentifier,
     path: ExactStringLiteral,
 })
 
-export nominal type ImportDeclaration(const {
+export nominal type ImportDeclaration({
     ...SourceInfo,
+    
     imports: ImportItem[],
     path: ExactStringLiteral,
 })
 
-export nominal type ImportItem(const {
+export nominal type ImportItem({
     ...SourceInfo,
+    
     name: PlainIdentifier,
-    alias?: PlainIdentifier,
+    alias: PlainIdentifier?,
 })
 
-export nominal type TypeDeclaration(const {
+export nominal type TypeDeclaration({
     ...SourceInfo,
     ...Exported,
+
     name: PlainIdentifier,
     type: TypeExpression,
 })
 
-export nominal type ProcDeclaration(const {
+export nominal type ProcDeclaration({
     ...SourceInfo,
     ...Exported,
+
     action: boolean,
     name: PlainIdentifier,
     value: Proc|JsProc,
+    platforms: Platform[],
 })
 
-export nominal type FuncDeclaration(const {
+export nominal type FuncDeclaration({
     ...SourceInfo,
     ...Exported,
+
     memo: boolean,
     name: PlainIdentifier,
     value: Func|JsFunc,
+    platforms: Platform[],
 })
 
-export nominal type ValueDeclaration(const {
+export nominal type ValueDeclaration({
     ...SourceInfo,
+    
     name: PlainIdentifier,
     type: TypeExpression?,
     value: Expression,
@@ -69,37 +78,43 @@ export nominal type ValueDeclaration(const {
     exported: nil|'export'|'expose',
 })
 
-export nominal type DeriveDeclaration(const {
+export nominal type DeriveDeclaration({
     ...SourceInfo,
     ...Exported,
+
     name: PlainIdentifier,
     type: TypeExpression?,
-    fn: Func,
+    expr: Expression,
 })
 
-export nominal type RemoteDeclaration(const {
+export nominal type RemoteDeclaration({
     ...SourceInfo,
     ...Exported,
+
     name: PlainIdentifier,
     type: TypeExpression?,
-    fn: Func,
+    expr: Expression,
 })
 
-export nominal type TestExprDeclaration(const {
+export nominal type AutorunDeclaration({
     ...SourceInfo,
+    
+    effect: Block,
+})
+
+export nominal type TestExprDeclaration({
+    ...SourceInfo,
+    
     name: ExactStringLiteral,
     expr: Expression,
 })
 
-export nominal type TestBlockDeclaration(const {
+export nominal type TestBlockDeclaration({
     ...SourceInfo,
+    
     name: ExactStringLiteral,
     block: Block,
 })
 
-export nominal type AutorunDeclaration(const {
-    ...SourceInfo,
-    effect: Expression
-})
-
-// TODO: ClassReaction
+export const ALL_PLATFORMS = ['node', 'deno', 'browser']
+export type Platform = elementof ALL_PLATFORMS

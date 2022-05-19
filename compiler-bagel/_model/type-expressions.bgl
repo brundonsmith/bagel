@@ -58,7 +58,6 @@ export nominal type GenericParamType(const {
 export nominal type ProcType(const {
     ...SourceInfo,
     args: Arg[],
-    invalidatesParent: boolean,
     isAsync: boolean|nil,
     mutability: nil,
 })

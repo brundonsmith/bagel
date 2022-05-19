@@ -2,28 +2,28 @@ from './common.bgl' import { ModuleName }
 
 export type AST = unknown
 
-export nominal type Module(const {
+export nominal type Module({
     ...SourceInfo,
     hasMain: boolean,
     // declarations: Declaration[],
 })
 
-export nominal type PlainIdentifier(const {
+export nominal type PlainIdentifier({
     ...SourceInfo,
     name: string
 })
 
-export nominal type Block(const {
+export nominal type Block({
     ...SourceInfo,
     // statements: Statement[]
 })
 
-export nominal type Debug(const {
+export nominal type Debug({
     ...SourceInfo,
     inner: AST
 })
 
-export type SourceInfo = const {
+export type SourceInfo = {
     parent?: AST?,
     module: ModuleName?,
     code: string?,

@@ -31,35 +31,37 @@ export type Expression =
     | InstanceOf
     | AsCast
 
-export nominal type JavascriptEscape(const {
+export nominal type JavascriptEscape({
     ...SourceInfo,
+    
     js: string
 })
 
-export nominal type Func(const {
+export nominal type Func({
     ...SourceInfo,
+    
     type: FuncType|GenericFuncType,
     body: Expression,
 })
 
-export nominal type JsFunc(const {
+export nominal type JsFunc({
     type: FuncType|GenericFuncType,
     body: string,
 })
 
-export nominal type InlineConstGroup(const {
+export nominal type InlineConstGroup({
     declarations: (InlineConstDeclaration|InlineDestructuringDeclaration)[],
     inner: Expression
 })
 
-export nominal type InlineConstDeclaration(const {
+export nominal type InlineConstDeclaration({
     name: PlainIdentifier,
     type?: TypeExpression,
     awaited: boolean,
     value: Expression,
 })
 
-export nominal type InlineDestructuringDeclaration(const {
+export nominal type InlineDestructuringDeclaration({
     properties: PlainIdentifier[],
     spread: PlainIdentifier?,
     destructureKind: 'array'|'object',
@@ -67,32 +69,32 @@ export nominal type InlineDestructuringDeclaration(const {
     value: Expression,
 })
 
-export nominal type Proc(const {
+export nominal type Proc({
     type: ProcType|GenericProcType,
     body: Block,
 })
 
-export nominal type JsProc(const {
+export nominal type JsProc({
     type: ProcType|GenericProcType,
     body: string,
 })
 
-export nominal type Range(const {
+export nominal type Range({
     start: Expression,
     end: Expression,
 })
 
-export nominal type BinaryOperator(const {
+export nominal type BinaryOperator({
     base: Expression,
     ops: [Operator, Expression][] //[[Operator, Expression], ...[Operator, Expression][]],
     // TODO: Once generics are fully functional, create a `type: FuncType` property
 })
 
-export nominal type NegationOperator(const {
+export nominal type NegationOperator({
     base: Expression,
 })
 
-export nominal type Operator(const {
+export nominal type Operator({
     op: BinaryOp,
 })
 
@@ -105,7 +107,7 @@ export const BINARY_OPS = [
     ['+', '-'],
     ['*', '/'],
 ]
-// export const ALL_BINARY_OPS = BINARY_OPS.flat()
+// export ALL_BINARY_OPS = BINARY_OPS.flat()
 // export type BinaryOp = typeof BINARY_OPS[number][number];
 export type BinaryOp = string
 
@@ -113,94 +115,94 @@ export type BinaryOp = string
 //     return (ALL_BINARY_OPS as string[]).includes(str);
 // }
 
-export nominal type Invocation(const {
+export nominal type Invocation({
     subject: Expression,
     args: Expression[],
     typeArgs: TypeExpression[],
 })
 
-export nominal type Indexer(const {
+export nominal type Indexer({
     subject: Expression,
     indexer: Expression,
 })
 
-export nominal type PropertyAccessor(const {
+export nominal type PropertyAccessor({
     subject: Expression,
     property: PlainIdentifier,
     optional: boolean,
 })
 
-export nominal type ParenthesizedExpression(const {
+export nominal type ParenthesizedExpression({
     inner: Expression,
 })
 
-export nominal type LocalIdentifier(const {
+export nominal type LocalIdentifier({
     name: string,
 })
 
-export nominal type IfElseExpression(const {
+export nominal type IfElseExpression({
     cases: Case[],
     defaultCase?: Expression
 })
 
-export nominal type SwitchExpression(const {
+export nominal type SwitchExpression({
     value: Expression,
     cases: SwitchCase[],
     defaultCase?: Expression
 })
 
-export nominal type Case(const {
+export nominal type Case({
     condition: Expression,
     outcome: Expression,
 })
 
-export nominal type SwitchCase(const {
+export nominal type SwitchCase({
     condition: Expression,
     outcome: Expression,
 })
 
-export nominal type ObjectLiteral(const {
+export nominal type ObjectLiteral({
     entries: ([PlainIdentifier, Expression]|Spread)[],
 })
 
-export nominal type ArrayLiteral(const {
+export nominal type ArrayLiteral({
     entries: (Expression | Spread)[],
 })
 
-export nominal type Spread(const {
+export nominal type Spread({
     expr: Expression,
 })
 
-export nominal type StringLiteral(const {
+export nominal type StringLiteral({
     segments: (string|Expression)[],
 })
 
-export nominal type ExactStringLiteral(const {
+export nominal type ExactStringLiteral({
     value: string,
 })
 
-export nominal type NumberLiteral(const {
+export nominal type NumberLiteral({
     value: number,
 })
 
-export nominal type BooleanLiteral(const {
+export nominal type BooleanLiteral({
     value: boolean,
 })
 
 export nominal type NilLiteral(nil)
 
-export nominal type ElementTag(const {
+export nominal type ElementTag({
     tagName: PlainIdentifier,
     attributes: ([PlainIdentifier, Expression])[],
     children: Expression[],
 })
 
-export nominal type InstanceOf(const {
+export nominal type InstanceOf({
     expr: Expression,
     type: TypeExpression,
 })
 
-export nominal type AsCast(const {
+export nominal type AsCast({
     inner: Expression,
     type: TypeExpression,
 })
