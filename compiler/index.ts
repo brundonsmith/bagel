@@ -531,7 +531,13 @@ autorun(function loadSource() {
                             if (res.status === 200) {
                                 console.log(Colors.green(pad('Downloaded')) + module)
                                 const source = await res.text()
-                                await Deno.writeTextFile(cachePath, source)
+
+                                try {
+                                    await Deno.writeTextFile(cachePath, source)
+                                } catch {
+                                    console.warn(Colors.yellow(pad('Warning')) + `failed writing cache of remote module ${module}`)
+                                }
+
                                 setSource(module, source)
                                 data.loading = false; invalidate(data, 'loading')
                             } else {
