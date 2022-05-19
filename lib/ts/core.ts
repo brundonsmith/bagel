@@ -521,6 +521,17 @@ export function instanceOf(val: any, type: RuntimeType): boolean {
 
     throw Error('Received invalid runtime type')
 }
+// | MaybeType
+// | GenericParamType
+// | ProcType
+// | FuncType
+// | GenericType
+// | BoundGenericType
+// | ElementType
+// | TupleType
+// | NominalType
+// | AnyType
+// | JavascriptEscapeType
 
 export function* exec(exp: RegExp, s: string) {
     let expr = new RegExp(exp)
@@ -535,15 +546,3 @@ export function* exec(exp: RegExp, s: string) {
         }
     }
 }
-
-// | MaybeType
-// | GenericParamType
-// | ProcType
-// | FuncType
-// | GenericType
-// | BoundGenericType
-// | ElementType
-// | TupleType
-// | NominalType
-// | AnyType
-// | JavascriptEscapeType
