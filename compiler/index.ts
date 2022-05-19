@@ -525,16 +525,7 @@ autorun(function loadSource() {
             if (pathIsRemote(module)) {  // http import
                 const cachePath = cachedFilePath(module)
 
-                if (fs.existsSync(cachePath)) {  // module has already been cached locally
-                    Deno.readTextFile(cachePath)
-                        .then(source => {
-                            setSource(module, source)
-                            data.loading = false; invalidate(data, 'loading')
-                        })
-                        .catch(() => {
-                            console.error(Colors.red(pad('Error')) + `couldn't find module '${module}'`)
-                        })
-                } else {  // need to download module before compiling
+                function loadRemote() {
                     fetch(module)
                         .then(async res => {
                             if (res.status === 200) {
@@ -551,9 +542,21 @@ autorun(function loadSource() {
                             }
                         })
                         .catch(() => {
-                            console.error(Colors.red(pad('Error')) + `couldn't find module '${module}'`)
+                            console.error(Colors.red(pad('Error')) + `couldn't load remote module '${module}'`)
                         })
+                }
 
+                if (fs.existsSync(cachePath)) {  // module has already been cached locally
+                    Deno.readTextFile(cachePath)
+                        .then(source => {
+                            setSource(module, source)
+                            data.loading = false; invalidate(data, 'loading')
+                        })
+                        .catch(() => {
+                            loadRemote()
+                        })
+                } else {  // need to download module before compiling
+                    loadRemote()
                 }
             } else {  // local disk import
                 watch(module, source => {
@@ -567,7 +570,7 @@ autorun(function loadSource() {
                         data.loading = false; invalidate(data, 'loading')
                     })
                     .catch(() => {
-                        console.error(Colors.red(pad('Error')) + `couldn't find module '${module}'`)
+                        console.error(Colors.red(pad('Error')) + `couldn't find local module '${module}'`)
                     })
             }
         }
