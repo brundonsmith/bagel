@@ -36,6 +36,8 @@ export type DirEntry = const {
     isSymlink: boolean,
 }
 
+type Date = unknown // TODO
+
 export type FileInfo = const {
     /** True if this is info for a regular file. Mutually exclusive to
      * `FileInfo.isDirectory` and `FileInfo.isSymlink`. */
