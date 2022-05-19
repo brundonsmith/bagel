@@ -972,7 +972,6 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
             }
         }
 
-        console.log(resolvedDestination.kind, resolvedValue.kind)
         if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type") {
             if (resolvedDestination.isAsync !== resolvedValue.isAsync) {
                 return [
