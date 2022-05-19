@@ -17,8 +17,7 @@ export deno func readDir(path: string): Plan<DirEntry[]> => {#
     }
 #}
 
-// TODO: Gotta be able to declare `async` so we can have async JS procs!
-export deno proc writeTextFile(path: string, data: string) {#
+export async deno proc writeTextFile(path: string, data: string) {#
     return () => Deno.writeTextFile(path, data)
 #}
 
