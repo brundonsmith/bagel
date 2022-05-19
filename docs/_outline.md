@@ -1,0 +1,55 @@
+1. Getting Started
+    - Installation
+    - Hello, World!
+    - bagel Command
+2. Programming a ___________ (todo app? minesweeper? rock paper scissors?)
+    - todo-app or minesweeper
+        - rendering
+        - "components"
+        - data modeling
+        - reactive store
+        - iteration
+3. Common Programming Concepts
+    - Variables and Mutability
+        - Declarations
+        - Expression constants
+        - Declarations in procedures
+    - Data Types
+    - Functions and Procedures
+    - Comments
+    - Control Flow
+        - Conditionals
+        - Loops and Iterators
+            - Range expression
+    - Method-call syntax
+
+- Reactivity
+    - memo
+    - action
+    - Derives
+    - Remotes
+    - Autoruns
+- Nominal Types
+- Type refinement
+    - instanceof
+    - Switch expressions and statements
+- Modules
+    - Importing modules (named vs all)
+    - Exporting and exposing
+    - Importing remote modules
+- Projects
+    - index.bgl
+    - Bagel config
+- Async
+    - Plans vs Promises
+    - async/await
+- Error handling
+- Iterators
+- Generic functions and procedures
+- Tests
+- Building a web server
+
+- Regexp
+- Platform-specific declarations
+- JS integration
+- Standard library
