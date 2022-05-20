@@ -1,74 +1,60 @@
 import { Colors, path, fs } from "./deps.ts";
 
 import { BagelError, prettyProblem } from "./errors.ts";
-import { all, cacheDir, cachedFilePath, esOrNone, sOrNone, bagelFileToTsFile, jsFileLocation, given, pathIsRemote, exists } from "./utils/misc.ts";
+import { all, globalCacheDir, cachedFilePath, esOrNone, sOrNone, pathIsRemote, command, flags, target, POSSIBLE_COMMANDS, isWithin, pathIsInProject, entry as _entry, cacheDir, buildFilePath, buildDir, transpileJsPath } from "./utils/misc.ts";
 
-import { allProblems, canonicalModuleName, done, projectEntry, hasProblems, modules, args } from "./store.ts";
+import { allProblems, canonicalModuleName, done, hasProblems, modules } from "./store.ts";
 import { ModuleName } from "./_model/common.ts";
 import { autofixed, LintProblem } from "./other/lint.ts";
 import { compiled } from "./4_compile/index.ts";
 import { formatted } from "./other/format.ts";
 import { parsed } from "./1_parse/index.ts";
-import { action, autorun, invalidate, observe, runInAction, triggeredBy, when, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
-import { Platform } from "./_model/declarations.ts";
+import { action, autorun, invalidate, observe, runInAction, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
 import { watch } from "./watchers.ts";
 
-const POSSIBLE_COMMANDS = ['new', 'init', 'build', 'run', 'transpile', 'check', 
-    'test', 'format', 'autofix', 'clean'] as const
-type Command = typeof POSSIBLE_COMMANDS[number]
-
-function parseArgs(args: readonly string[]) {
-    const flags = args.filter(arg => arg.startsWith('--'))
-    const nonFlags = args.filter(arg => !arg.startsWith('--'))
-
-    return {
-        command: (POSSIBLE_COMMANDS as readonly string[]).includes(nonFlags[0]) ? nonFlags[0] as Command : undefined,
-        target: path.resolve(Deno.cwd(), nonFlags[1] || '.'),
-        flags: {
-            watch: flags.includes('--watch'),
-            clean: flags.includes('--clean'),
-            node: flags.includes('--node'),
-            deno: flags.includes('--deno'),
-            bundle: flags.includes('--bundle'),
-        }
-    }
-}
-
 async function main() {
-    const { command, target, flags } = parseArgs(Deno.args)
-
-    args.platforms = [
-        flags.deno ? 'deno' : undefined,
-        flags.node ? 'node' : undefined,
-    ].filter(exists) as Platform[]; invalidate(args, 'platforms')
-    
     if (command == null) {
         fail(`Must provide a valid command:\n${POSSIBLE_COMMANDS.join(', ')}`)
     } else if (command === 'build' || command === 'run') {
-        const entry = await entryPointFrom(target)
-        
-        if (!entry) {
+        if (!_entry) {
             fail(`Couldn't find entry '${target}'`)
         } else {
+            const entry = _entry as ModuleName
+            const bundlePath = path.resolve(
+                buildDir,
+                path.basename(path.basename(entry) === 'index.bgl' 
+                    ? path.dirname(entry)
+                    : entry) + '.bundle.js'
+            )
+
             if (flags.clean) {
                 // TODO: Only clean modules relevant to entry
                 const numFiles = await cleanCache()
                 console.log(Colors.yellow(pad('Cleaned')) + 'Bagel cache (' + numFiles + ' files)')
             }
 
-            modules[entry] = { source: undefined, isEntry: true, isProjectLocal: true, loading: false }; invalidate(modules, entry)
+            modules[entry] = { source: undefined, loading: false }; invalidate(modules, entry)
 
             autorun(async () => {
                 if (done()) {
                     printProblems(allProblems(), flags.watch)
 
                     if (!hasProblems()) {
-                        await writeCompiledModules('cache')
+                        await Promise.all([...Object.keys(modules)].map(async _module => {
+                            const module = _module as ModuleName
+                            const jsPath = buildFilePath(module)
+                            const js = compiled(module, 'build-dir')
+                            
+                            // TODO: in run mode, we need to put built files in global build dir
             
+                            await fs.ensureDir(path.dirname(jsPath))
+                            await Deno.writeTextFile(jsPath, js)
+                        }))
+
                         if (command === 'build') {
                             await bundleOutput(
-                                cachedFilePath(entry + '.ts'), 
-                                bagelFileToTsFile(entry, true),
+                                buildFilePath(entry),
+                                bundlePath,
                                 !flags.watch
                             )
 
@@ -76,10 +62,8 @@ async function main() {
                                 Deno.exit(0)
                             }
                         } else if (command === 'run') {
-                            const bundlePath = cachedFilePath(bagelFileToTsFile(entry, true))
-
                             await bundleOutput(
-                                cachedFilePath(entry + '.ts'), 
+                                buildFilePath(entry),
                                 bundlePath,
                                 true
                             )
@@ -154,7 +138,7 @@ async function main() {
                 
                 runInAction(() => {
                     for (const module of allModules) {
-                        modules[module] = { source: undefined, isEntry: false, isProjectLocal: true, loading: false }; invalidate(modules, module)
+                        modules[module] = { source: undefined, loading: false }; invalidate(modules, module)
                     }
                 })
 
@@ -163,10 +147,16 @@ async function main() {
                         if (done()) {
                             printProblems(allProblems(), flags.watch)
 
-                            if (command === 'transpile' && !hasProblems()) {
-                                await writeCompiledModules('project')
+                            if (command === 'transpile' && !hasProblems()) {                                                            
+                                await Promise.all([...Object.keys(modules)].map(async _module => {
+                                    const module = _module as ModuleName
+                                    const jsPath = transpileJsPath(module)
+                                    const js = compiled(module, 'adjacent')
+
+                                    await Deno.writeTextFile(jsPath, js)
+                                }))
         
-                                const localModules = [...Object.entries(modules)].filter(entry => entry[1].isProjectLocal).length
+                                const localModules = [...Object.entries(modules)].filter(([module]) => pathIsInProject(module)).length
                                 console.log(Colors.green(pad('Transpiled')) + `${localModules} Bagel file${sOrNone(localModules)}`)
                             }
 
@@ -183,14 +173,14 @@ async function main() {
                     observe(modules, WHOLE_OBJECT)
 
                     await Promise.all([...Object.entries(modules)]
-                        .filter(entry => entry[1].isProjectLocal)
+                        .filter(([module]) => pathIsInProject(module))
                         .map(([module]) =>
                             Deno.writeTextFile(module, formatted(module as ModuleName))))
                 } else if (command === 'autofix') {
                     observe(modules, WHOLE_OBJECT)
 
                     await Promise.all([...Object.entries(modules)]
-                        .filter(entry => entry[1].isProjectLocal)
+                        .filter(([module]) => pathIsInProject(module))
                         .map(([module]) =>
                             Deno.writeTextFile(module, autofixed(module as ModuleName))))
                 }
@@ -214,22 +204,6 @@ async function main() {
                 console.log(Colors.green(pad('Initialized')) + `Bagel project in current directory`)
             }
         }
-    }
-}
-
-const entryPointFrom = async (target: string): Promise<ModuleName | undefined> => {
-    const info = await Deno.stat(target)
-
-    const entryPath = (
-        info.isDirectory
-            ? path.resolve(target, 'index.bgl')
-            : target
-    )
-
-    if (await fs.exists(entryPath) && path.extname(entryPath) === '.bgl') {
-        return entryPath as ModuleName
-    } else {
-        return undefined
     }
 }
 
@@ -289,23 +263,12 @@ function printProblems (problems: Map<ModuleName, (BagelError|LintProblem)[]>, c
     }
 }
 
-async function writeCompiledModules(destination: 'cache'|'project') {
-    await Promise.all([...Object.keys(modules)].map(_module => {
-        const module = _module as ModuleName
-        const jsPath = jsFileLocation(module, destination)
-        const js = compiled(module, destination)
-
-        Deno.writeTextFile(jsPath, js)
-    }))
-}
-
 async function cleanCache() {
-    const dir = cacheDir()
-
     let numFiles = 0;
-    for await (const file of Deno.readDir(dir)) {
+
+    for await (const file of Deno.readDir(globalCacheDir)) {
         numFiles++
-        await Deno.remove(path.resolve(dir, file.name))
+        await Deno.remove(path.resolve(globalCacheDir, file.name))
     }
 
     return numFiles
@@ -490,8 +453,6 @@ const setSource = action((module: ModuleName, source: string) => {
 })
 
 function addImportedModules(module: ModuleName) {
-    const entryModule = projectEntry()
-    const projectDir = given(entryModule, path.dirname)
     const parseResult = parsed(module)
     
     if (parseResult) {
@@ -501,12 +462,8 @@ function addImportedModules(module: ModuleName) {
                     const importedModule = canonicalModuleName(module, decl.path.value)
     
                     if (observe(modules, importedModule) == null) {
-                        const isProjectLocal = projectDir != null && isWithin(projectDir, importedModule)
-
                         modules[importedModule] = {
                             source: undefined,
-                            isEntry: false,
-                            isProjectLocal,
                             loading: false,
                         }; invalidate(modules, importedModule)
                     }
@@ -517,31 +474,39 @@ function addImportedModules(module: ModuleName) {
 }
 
 // Load modules from disk or web
-autorun(function loadSource() {
+autorun(async function loadSource() {
     for (const [_module, data] of Object.entries(observe(modules, WHOLE_OBJECT))) {
         const module = _module as ModuleName
 
         if (observe(data, 'source') == null && !observe(data, 'loading')) {
             data.loading = true; invalidate(data, 'loading')
+            
+            const cachePath = cachedFilePath(module)
+            const isCachable = pathIsRemote(module) || !pathIsInProject(module)
 
-            if (pathIsRemote(module)) {  // http import
-                const cachePath = cachedFilePath(module)
+            async function setAndCache(source: string) {
+                if (isCachable) {
+                    try {
+                        await fs.ensureDir(cacheDir)
+                        await Deno.writeTextFile(cachePath, source)
+                    } catch {
+                        console.warn(Colors.yellow(pad('Warning')) + `failed writing cache of module ${module}`)
+                    }
+                }
 
-                function loadRemote() {
-                    fetch(module)
+                setSource(module, source)
+                data.loading = false; invalidate(data, 'loading')
+            }
+
+            async function loadModule() {
+                if (pathIsRemote(module)) {
+                    await fetch(module)
                         .then(async res => {
                             if (res.status === 200) {
                                 console.log(Colors.green(pad('Downloaded')) + module)
                                 const source = await res.text()
 
-                                try {
-                                    await Deno.writeTextFile(cachePath, source)
-                                } catch {
-                                    console.warn(Colors.yellow(pad('Warning')) + `failed writing cache of remote module ${module}`)
-                                }
-
-                                setSource(module, source)
-                                data.loading = false; invalidate(data, 'loading')
+                                await setAndCache(source)
                             } else {
                                 if (await fs.exists(cachePath)) {
                                     await Deno.remove(cachePath)
@@ -552,43 +517,27 @@ autorun(function loadSource() {
                         .catch(() => {
                             console.error(Colors.red(pad('Error')) + `couldn't load remote module '${module}'`)
                         })
-                }
+                } else {
+                    watch(module, setAndCache)
 
-                if (fs.existsSync(cachePath)) {  // module has already been cached locally
-                    Deno.readTextFile(cachePath)
-                        .then(source => {
-                            setSource(module, source)
-                            data.loading = false; invalidate(data, 'loading')
-                        })
+                    await Deno.readTextFile(module)
+                        .then(setAndCache)
                         .catch(() => {
-                            loadRemote()
+                            console.error(Colors.red(pad('Error')) + `couldn't find local module '${module}'`)
                         })
-                } else {  // need to download module before compiling
-                    loadRemote()
                 }
-            } else {  // local disk import
-                watch(module, source => {
-                    setSource(module, source)
-                    data.loading = false; invalidate(data, 'loading')
-                })
+            }
 
-                Deno.readTextFile(module)
-                    .then(source => {
-                        setSource(module, source)
-                        data.loading = false; invalidate(data, 'loading')
-                    })
-                    .catch(() => {
-                        console.error(Colors.red(pad('Error')) + `couldn't find local module '${module}'`)
-                    })
+            if (await fs.exists(cachePath)) {
+                Deno.readTextFile(cachePath)
+                    .then(setAndCache)
+                    .catch(loadModule)
+            } else {
+                loadModule()
             }
         }
     }
 })
-
-function isWithin(dir: string, other: string) {
-    const relative = path.relative(dir, other)
-    return !relative.startsWith('../') && relative !== '..'
-}
 
 
 await main();

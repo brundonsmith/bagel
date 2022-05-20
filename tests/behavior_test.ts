@@ -128,7 +128,7 @@ async function testSideEffects(bgl: string, expected: any[]) {
     const moduleName = "<test>.bgl" as ModuleName;
 
     const { ast, errors } = parse(moduleName, bgl, true) as { ast: Module, errors: BagelError[] };
-    const compiled = compile(moduleName, ast, 'cache', true, false, true);
+    const compiled = compile(moduleName, ast, 'build-dir', true, false, true);
     if (errors.length > 0) {
         throw `\n${bgl}\nFailed to parse:\n` +
         errors.map((err) => prettyProblem(moduleName, err)).join("\n");

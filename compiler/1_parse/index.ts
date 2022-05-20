@@ -159,10 +159,9 @@ function jsonToAST(json: unknown): Expression {
 }
 
 function preludeFor(module: ModuleName) {
-    const normalizedModule = canonicalLibName(module)
-
     return '\n\n' + BGL_PRELUDE_DATA
-        .filter(m => canonicalLibName(m.module) !== normalizedModule)
+        .filter(m =>
+            module !== m.module && decodeURIComponent(module.match(/bagel_modules\/(.*)/)?.[1] ?? '') !== m.module)
         .map(({ module, imports }) =>
             `from '${module}' import { ${imports.join(', ')} }`)
         .join('\n')
@@ -181,10 +180,6 @@ const BGL_PRELUDE_DATA = [
     { module: LIB_LOCATION + '/plans.bgl' as ModuleName, imports: [ 'timeout' ] },
     { module: LIB_LOCATION + '/json.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSON' ] },
 ] as const
-
-function canonicalLibName(module: ModuleName): string {
-    return module.match(/lib\/bgl\/(.*)/)?.[1] as string
-}
 
 function parseInner(module: ModuleName, code: string, reportError: ReportError): Module {
     let index = 0;

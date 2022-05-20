@@ -1,5 +1,6 @@
-import { path } from "../deps.ts";
+import { path, fs } from "../deps.ts";
 import { ModuleName } from "../_model/common.ts";
+import { Platform } from "../_model/declarations.ts";
 
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
     if (val != null) {
@@ -153,7 +154,7 @@ export function memoize3<A1, A2, A3, R>(fn: (arg1: A1, arg2: A2, arg3: A3) => R)
     return mFn
 }
 
-export const cacheDir = () => {
+export const globalScratchDir = (() => {
     let baseDir;
     switch (Deno.build.os) {
         case "darwin":
@@ -187,44 +188,95 @@ export const cacheDir = () => {
     if (!baseDir)
         throw new Error("Failed to find cache directory");
 
-    const finalDir = path.resolve(baseDir, `./bagel/cache`);
-    return finalDir
-}
+    return path.resolve(baseDir, 'bagel')
+})()
+
+export const globalCacheDir = path.resolve(globalScratchDir, `bagel_modules`)
+export const globalBuildDir = path.resolve(globalScratchDir, 'bagel_out')
 
 export function cachedFilePath(module: string): string {
-    return path.resolve(cacheDir(), encodeURIComponent(module))
+    return path.resolve(cacheDir, encodeURIComponent(module))
+}
+
+export function buildFilePath(module: string): string {
+    return path.resolve(buildDir, pathRelativeToProject(module)) + '.ts'
+}
+
+export function pathIsInProject(module: string): boolean {
+    return !targetIsScript && isWithin(target, module)
+}
+
+export function transpileJsPath(module: string): string {
+    return (
+        pathIsInProject(module)
+            ? module + '.ts'
+            : cachedFilePath(module) + '.ts'
+    )
+}
+
+export function pathRelativeToProject(module: string): string {
+    return (
+        pathIsInProject(module) 
+            ? path.relative(target, module)
+            : path.relative(target, cachedFilePath(module))
+    )
 }
 
 export function pathIsRemote(path: string): boolean {
     return path.match(/^https?:\/\//) != null
 }
 
-export function jsFileLocation(module: ModuleName, destination: 'cache'|'project') {
-    return pathIsRemote(module) || destination === 'cache'
-        ? cachedFilePath(module + '.ts')
-        : bagelFileToTsFile(module)
-}
-
-
-export function bagelFileToTsFile(module: ModuleName, isBundle?: boolean): string {
-    const basename = path.basename(module)
-    const filename = basename.substring(0, basename.indexOf(path.extname(basename)))
-
-    let bundleFile = filename + '.bgl.ts'
-
-    if (isBundle) {
-        const bundleName = filename !== 'index'
-            ? filename
-            : path.basename(path.dirname(module))
-
-        bundleFile = bundleName + '.bundle.js'
-    }
-
-    return path.resolve(
-        path.dirname(module),
-        bundleFile
-    )
+export function isWithin(dir: string, other: string) {
+    const relative = path.relative(dir, other)
+    return !relative.startsWith('../') && relative !== '..'
 }
 
 const NOMINAL_FLAG = Symbol('NOMINAL_FLAG')
 export type NominalType<T, S extends symbol> = T & { [NOMINAL_FLAG]: S }
+
+
+export const POSSIBLE_COMMANDS = ['new', 'init', 'build', 'run', 'transpile', 'check', 
+    'test', 'format', 'autofix', 'clean'] as const
+type Command = typeof POSSIBLE_COMMANDS[number]
+
+function parseArgs(args: readonly string[]) {
+    const flags = args.filter(arg => arg.startsWith('--'))
+    const nonFlags = args.filter(arg => !arg.startsWith('--'))
+
+    return {
+        command: (POSSIBLE_COMMANDS as readonly string[]).includes(nonFlags[0]) ? nonFlags[0] as Command : undefined,
+        target: path.resolve(Deno.cwd(), nonFlags[1] || '.'),
+        flags: {
+            watch: flags.includes('--watch'),
+            clean: flags.includes('--clean'),
+            node: flags.includes('--node'),
+            deno: flags.includes('--deno'),
+            bundle: flags.includes('--bundle'),
+        } as const
+    }
+}
+
+export const { command, target, flags } = parseArgs(Deno.args)
+export const targetIsScript = Deno.statSync(target).isFile
+export const cacheDir = targetIsScript ? globalCacheDir : path.resolve(target, 'bagel_modules')
+export const buildDir = targetIsScript ? globalBuildDir : path.resolve(target, 'bagel_out')
+export const cliPlatforms = [
+    flags.deno ? 'deno' : undefined,
+    flags.node ? 'node' : undefined,
+].filter(exists) as Platform[]
+
+export const entry: ModuleName|undefined = (() => {
+    const info = Deno.statSync(target)
+
+    const entryPath = (
+        info.isDirectory
+            ? path.resolve(target, 'index.bgl')
+            : target
+    )
+
+    if (fs.existsSync(entryPath) && path.extname(entryPath) === '.bgl') {
+        return entryPath as ModuleName
+    } else {
+        return undefined
+    }
+})()

@@ -1,8 +1,6 @@
 import { parse } from "../compiler/1_parse/index.ts";
 import { compile } from "../compiler/4_compile/index.ts";
-import { path } from "../compiler/deps.ts";
 import { prettyProblem } from "../compiler/errors.ts";
-import { cachedFilePath } from "../compiler/utils/misc.ts";
 import { ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
@@ -727,8 +725,8 @@ Deno.test({
     import './bar.bgl' as bar
     `,
     `
-    import { a, b as otherb } from "${cachedFilePath(path.resolve(Deno.cwd(), 'foo.bgl.ts'))}";
-    import * as bar from "${cachedFilePath(path.resolve(Deno.cwd(), 'bar.bgl.ts'))}";
+    import { a, b as otherb } from "./foo.bgl.ts";
+    import * as bar from "./bar.bgl.ts";
     `)
   }
 })
@@ -831,7 +829,7 @@ function testCompile(code: string, exp: string) {
   if (parseResult) {
     const { ast, errors } = parseResult
 
-    const compiled = compile(moduleName, ast, 'cache', true)
+    const compiled = compile(moduleName, ast, 'build-dir', true)
   
     if (errors.length > 0) {
       throw `\n${code}\nFailed to parse:\n` +

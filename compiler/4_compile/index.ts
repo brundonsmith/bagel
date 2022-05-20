@@ -3,17 +3,18 @@ import { parsed } from "../1_parse/index.ts";
 import { resolve } from "../3_checking/resolve.ts";
 import { resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
 import { elementTagToObject, inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
+import { path } from "../deps.ts";
 import { format } from "../other/format.ts";
 import { canonicalModuleName, getModuleByName } from "../store.ts";
 import { getName } from "../utils/ast.ts";
-import { jsFileLocation } from "../utils/misc.ts";
+import { buildDir, buildFilePath, transpileJsPath } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func, JsFunc, JsProc } from "../_model/expressions.ts";
 import { FuncType, GenericFuncType, GenericProcType, ProcType, TRUTHINESS_SAFE_TYPES, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
-export const compiled = (moduleName: ModuleName, destination: 'cache'|'project', excludeJsPrelude?: boolean, includeTests?: boolean): string => {
+export const compiled = (moduleName: ModuleName, destination: 'build-dir'|'adjacent', excludeJsPrelude?: boolean, includeTests?: boolean): string => {
     const ast = parsed(moduleName)?.ast
 
     if (!ast) {
@@ -23,7 +24,7 @@ export const compiled = (moduleName: ModuleName, destination: 'cache'|'project',
     return compile(moduleName, ast, destination, excludeJsPrelude, includeTests)
 }
 
-export const compile = computedFn(function compile (moduleName: ModuleName, ast: Module, destination: 'cache'|'project', excludeJsPrelude?: boolean, includeTests?: boolean, excludeTypes?: boolean): string {
+export const compile = computedFn(function compile (moduleName: ModuleName, ast: Module, destination: 'build-dir'|'adjacent', excludeJsPrelude?: boolean, includeTests?: boolean, excludeTypes?: boolean): string {
     return (
         (excludeJsPrelude ? '' : JS_PRELUDE) + 
         compileInner(
@@ -58,7 +59,7 @@ import { ${
 `
 
 
-function compileInner(module: Module, modulePath: ModuleName, destination: 'cache'|'project', includeTests?: boolean, excludeTypes = false): string {
+function compileInner(module: Module, modulePath: ModuleName, destination: 'build-dir'|'adjacent', includeTests?: boolean, excludeTypes = false): string {
     const runtimeCode = module.declarations
         .filter(decl => decl.kind !== 'test-expr-declaration' && decl.kind !== 'test-block-declaration')
         .map(decl => compileOne(excludeTypes, modulePath, destination, decl) + ';')
@@ -86,7 +87,7 @@ function compileInner(module: Module, modulePath: ModuleName, destination: 'cach
     }
 }
 
-function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', ast: AST): string {
+function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', ast: AST): string {
     const c = (ast: AST) => compileOne(excludeTypes, module, destination, ast)
 
     switch(ast.kind) {
@@ -102,8 +103,14 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'cac
                     `* as ${ast.name.name}`
             )
 
-            const jsImportPath = jsFileLocation(canonicalModuleName(module, ast.path.value), destination).replaceAll(/\\/g, '/')
-                
+            const importedModule = canonicalModuleName(module, ast.path.value)
+
+            const jsImportPath = (
+                destination === 'build-dir'
+                    ? './' + path.relative(path.dirname(buildFilePath(module)), buildFilePath(importedModule))
+                    : './' + path.relative(path.dirname(transpileJsPath(module)), transpileJsPath(importedModule))
+            ).replaceAll(/\\/g, '/')
+            
             return `import ${imported} from "${jsImportPath}"`
         }
         case "type-declaration": {
@@ -412,7 +419,7 @@ function compileRuntimeType(type: TypeExpression): string {
     throw Error(`Couldn't runtime-compile type ${format(type)}`)
 }
 
-function propertyAsExpression (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', property: PlainIdentifier | Expression) {
+function propertyAsExpression (excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', property: PlainIdentifier | Expression) {
     return (
         property.kind === 'plain-identifier'
             ? `'${property.name}'`
@@ -420,7 +427,7 @@ function propertyAsExpression (excludeTypes: boolean, module: ModuleName, destin
     )
 }
 
-function blockContents(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', block: Block) {
+function blockContents(excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', block: Block) {
     return block.statements.map(s => '\n' + compileOne(excludeTypes, module, destination, s) + ';').join('') + '\n'
 }
 
@@ -429,7 +436,7 @@ export const INT = `___`;
 const NIL = `undefined`;
 
 
-const compileProcDeclaration = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', decl: ProcDeclaration): string => {
+const compileProcDeclaration = (excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', decl: ProcDeclaration): string => {
     const baseProc = compileOne(excludeTypes, module, destination, decl.value)
     let proc = decl.action ? `${INT}action(${baseProc})` : baseProc
     
@@ -440,7 +447,7 @@ const compileProcDeclaration = (excludeTypes: boolean, module: ModuleName, desti
     
     return exported(decl.exported) + `const ${decl.name.name} = ` + proc;
 }
-const compileFuncDeclaration = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', decl: FuncDeclaration): string => {
+const compileFuncDeclaration = (excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', decl: FuncDeclaration): string => {
     const baseFunc = compileOne(excludeTypes, module, destination, decl.value)
     let func = decl.memo ? `${INT}computedFn(${baseFunc})` : baseFunc
 
@@ -452,16 +459,16 @@ const compileFuncDeclaration = (excludeTypes: boolean, module: ModuleName, desti
     return exported(decl.exported) + `const ${decl.name.name} = ` + func;
 }
 
-function compileProc(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', proc: Proc|JsProc): string {
+function compileProc(excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', proc: Proc|JsProc): string {
     const signature = compileProcOrFunctionSignature(excludeTypes, module, destination, proc.type)
     return (proc.kind === 'proc' && proc.isAsync ? 'async ' : '') + signature + ` => ${proc.kind === 'js-proc' ? `{${proc.body}}` : compileOne(excludeTypes, module, destination, proc.body)}`;
 }
-const compileFunc = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', func: Func|JsFunc): string => {
+const compileFunc = (excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', func: Func|JsFunc): string => {
     const signature = compileProcOrFunctionSignature(excludeTypes, module, destination, func.type)
     return signature + ' => ' + (func.kind === 'js-func' ? `{${func.body}}` : `(${compileOne(excludeTypes, module, destination, func.body)})`)
 }
 
-const compileProcOrFunctionSignature = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', subject: ProcType|GenericProcType|FuncType|GenericFuncType): string => {
+const compileProcOrFunctionSignature = (excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', subject: ProcType|GenericProcType|FuncType|GenericFuncType): string => {
     const typeParams = !excludeTypes && subject.kind === 'generic-type'
         ? maybeTypeParams(excludeTypes, module, destination, subject.typeParams)
         : ''
@@ -481,7 +488,7 @@ function exported(e: boolean|"export"|"expose"|undefined): string {
     return e ? 'export ' : ''
 }
 
-function maybeTypeParams(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', typeParams: readonly TypeParam[]): string {
+function maybeTypeParams(excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', typeParams: readonly TypeParam[]): string {
     if (excludeTypes || typeParams.length === 0) {
         return ''
     } else {
@@ -491,11 +498,11 @@ function maybeTypeParams(excludeTypes: boolean, module: ModuleName, destination:
     }
 }
 
-function maybeTypeAnnotation(excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', type: TypeExpression|undefined): string {
+function maybeTypeAnnotation(excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', type: TypeExpression|undefined): string {
     return !excludeTypes && type ? `: ${compileOne(excludeTypes, module, destination, type)}` : ''
 }
 
-const fixTruthinessIfNeeded = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', expr: Expression) =>
+const fixTruthinessIfNeeded = (excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', expr: Expression) =>
     needsTruthinessFix(expr)
         ? truthinessOf(compileOne(excludeTypes, module, destination, expr))
         : compileOne(excludeTypes, module, destination, expr)
@@ -508,7 +515,7 @@ const needsTruthinessFix = (expr: Expression) => {
 const truthinessOf = (compiledExpr: string) => 
     `(${compiledExpr} != null && (${compiledExpr} as unknown) !== false && (${compiledExpr} as any).kind !== ${INT}ERROR_SYM)`
 
-const truthify = (excludeTypes: boolean, module: ModuleName, destination: 'cache'|'project', leftExpr: Expression, op: "&&"|"||", rest: Expression) => {
+const truthify = (excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', leftExpr: Expression, op: "&&"|"||", rest: Expression) => {
     const compiledExpr = compileOne(excludeTypes, module, destination, leftExpr)
     const negation = op === "&&" ? "" : "!"
     return `(${negation + truthinessOf(compiledExpr)} ? ${compileOne(excludeTypes, module, destination, rest)} : ${compiledExpr})`

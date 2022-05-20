@@ -3375,7 +3375,7 @@ function testTypecheck(source: string, shouldFail: boolean): void {
       delete modules[module as ModuleName]
     }
 
-    modules[moduleName] = { source, isEntry: true, isProjectLocal: true, loading: false }
+    modules[moduleName] = { source, loading: false }
   })
 
   const parseResult = parsed(moduleName, true)
@@ -3407,7 +3407,7 @@ function testMultiModuleTypecheck(testModules: {[key: string]: string}, shouldFa
     }
 
     for (const [module, source] of Object.entries(testModules)) {
-      modules[canonicalModuleName(module as ModuleName, module)] = { source, isEntry: false, isProjectLocal: true, loading: false }
+      modules[canonicalModuleName(module as ModuleName, module)] = { source, loading: false }
     }
   })
 

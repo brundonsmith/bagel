@@ -2,10 +2,10 @@ import { parsed } from "./1_parse/index.ts";
 import { typeerrors } from "./3_checking/typecheck.ts";
 import { path } from "./deps.ts";
 import { BagelError, errorsEquivalent, isError } from "./errors.ts";
-import { pathIsRemote } from "./utils/misc.ts";
+import { cliPlatforms, entry, pathIsInProject, pathIsRemote } from "./utils/misc.ts";
 import { ModuleName } from "./_model/common.ts";
 import { lint, LintProblem } from "./other/lint.ts";
-import { ALL_PLATFORMS, Platform, ValueDeclaration } from "./_model/declarations.ts";
+import { Platform, ValueDeclaration } from "./_model/declarations.ts";
 import { PlainIdentifier } from "./_model/ast.ts";
 import { ExactStringLiteral, Expression, ObjectEntry } from "./_model/expressions.ts";
 import { getName } from "./utils/ast.ts";
@@ -13,27 +13,9 @@ import { computedFn, observe, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
 
 type ModuleData = {
     source: string|undefined,
-    isEntry: boolean,
-    isProjectLocal: boolean,
     loading: boolean,
 }
 export const modules: Record<ModuleName, ModuleData> = {}
-export const args = {
-    platforms: undefined as undefined | Platform[]
-}
-
-export const projectEntry = computedFn(function entry() {
-    for (const _module in observe(modules, WHOLE_OBJECT)) {
-        const module = _module as ModuleName
-        const data = observe(modules, module)
-
-        if (observe(data, 'isEntry')) {
-            return module
-        }
-    }
-
-    return undefined
-})
 
 export const done = computedFn(function done () {
     if (Object.keys(observe(modules, WHOLE_OBJECT)).length === 0) {
@@ -63,7 +45,6 @@ export const allProblems = computedFn(function allProblems (excludePrelude?: boo
 
     for (const _module in modules) {
         const module = _module as ModuleName
-        const data = observe(modules, module)
 
         const parseResult = parsed(module, excludePrelude)
         if (parseResult) {
@@ -71,7 +52,7 @@ export const allProblems = computedFn(function allProblems (excludePrelude?: boo
             const { ast, errors: parseErrors } = parseResult
             const typecheckErrors = typeerrors(ast)
             const lintProblems = (
-                observe(data, 'isProjectLocal')
+                pathIsInProject(module)
                     ? lint(getConfig(), parseResult.ast)
                     : []
             )
@@ -110,11 +91,9 @@ export type BagelConfig = {
 }
 
 export const getConfig = computedFn(function getConfig (): BagelConfig|undefined {
-    const entryFile = projectEntry()
+    if (!entry) return undefined
 
-    if (!entryFile) return undefined
-
-    const res = parsed(entryFile)
+    const res = parsed(entry)
     const configDecl = res?.ast.declarations.find(decl =>
         decl.kind === 'value-declaration' && decl.isConst && decl.name.name === 'config') as ValueDeclaration|undefined
 
@@ -148,7 +127,7 @@ export const getConfig = computedFn(function getConfig (): BagelConfig|undefined
         }
         
         return {
-            platforms: observe(args, 'platforms') ?? platforms,
+            platforms: cliPlatforms.length > 0 ? cliPlatforms : platforms,
             lintRules
         }
     }

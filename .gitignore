@@ -5,3 +5,6 @@ node_modules
 *.bundle.js
 tests/sample-files*/*.js
 coverage
+
+bagel_modules
+bagel_out
