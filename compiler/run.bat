@@ -1,1 +1,1 @@
-deno run --allow-read --allow-write --allow-net --allow-env --allow-run --unstable %~dp0/index.ts %*
+deno run --allow-all --unstable --check %~dp0/index.ts %*
