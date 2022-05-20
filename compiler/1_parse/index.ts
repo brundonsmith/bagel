@@ -161,7 +161,9 @@ function jsonToAST(json: unknown): Expression {
 function preludeFor(module: ModuleName) {
     return '\n\n' + BGL_PRELUDE_DATA
         .filter(m =>
-            module !== m.module && decodeURIComponent(module.match(/bagel_modules\/(.*)/)?.[1] ?? '') !== m.module)
+            module !== m.module && 
+            decodeURIComponent(module.match(/bagel_modules\/(.*)/)?.[1] ?? '') !== m.module &&
+            module.match(/lib\/bgl\/(.*)/)?.[1] !== m.module.match(/lib\/bgl\/(.*)/)?.[1])
         .map(({ module, imports }) =>
             `from '${module}' import { ${imports.join(', ')} }`)
         .join('\n')
