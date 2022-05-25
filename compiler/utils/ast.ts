@@ -1,7 +1,7 @@
 import { AST_NOISE } from "../3_checking/typeinfer.ts";
 import { AST,PlainIdentifier,SourceInfo } from "../_model/ast.ts";
 import { BooleanLiteral, ExactStringLiteral, Expression, LocalIdentifier, NumberLiteral } from "../_model/expressions.ts";
-import { ElementofType, LiteralType, MaybeType, PlanType, TypeExpression, UnionType } from "../_model/type-expressions.ts";
+import { ElementofType, LiteralType, MaybeType, PlanType, TupleType, TypeExpression, UnionType } from "../_model/type-expressions.ts";
 import { deepEquals } from "./misc.ts";
 
 export function areSame(a: AST|undefined, b: AST|undefined) {
@@ -124,13 +124,32 @@ export function setParents(ast: AST) {
 }
 
 export function unionOf(members: TypeExpression[]): UnionType {
-    const { parent, module, code, startIndex, endIndex } = members[0]
+    const { parent, module, code, startIndex } = members[0]
 
     return {
         kind: 'union-type',
         members,
         mutability: undefined,
-        parent, module, code, startIndex, endIndex
+        parent, module, code, startIndex,
+        endIndex: members[members.length - 1]?.endIndex
+    }
+}
+
+export function tupleOf(members: TypeExpression[], mutability?: "immutable"|"readonly"|"mutable"|"literal"): TupleType {
+    const { parent, module, code, startIndex } = members[0]
+    const memberMutability = members.map(m => m.mutability).filter((el, index, arr) => arr.indexOf(el) === index)
+
+    return {
+        kind: 'tuple-type',
+        members,
+        mutability: mutability ?? (
+            memberMutability.length === 0 ? "readonly" :
+            memberMutability.length === 1 ? memberMutability[0] as "immutable"|"readonly"|"mutable"|"literal" :
+            memberMutability.includes('immutable') || memberMutability.includes('readonly') ? 'readonly' :
+            'mutable'
+        ),
+        parent, module, code, startIndex,
+        endIndex: members[members.length - 1]?.endIndex
     }
 }
 
