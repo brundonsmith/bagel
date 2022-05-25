@@ -5,7 +5,7 @@ import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { assert, stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, PlainIdentifier } from "../_model/ast.ts";
-import { areSame, elementOf, expressionsEqual, getName, literalType, mapParseTree, maybeOf, typesEqual, unionOf } from "../utils/ast.ts";
+import { areSame, elementOf, expressionsEqual, getName, literalType, mapParseTree, maybeOf, tupleOf, typesEqual, unionOf } from "../utils/ast.ts";
 import { getModuleByName } from "../store.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
 import { resolve, resolveImport } from "./resolve.ts";
@@ -823,18 +823,18 @@ export function bindInvocationGenericArgs(invocation: Invocation): TypeExpressio
                                 })),
                                 ...(
                                     spreadArgType?.kind === 'tuple-type' ? spreadArgType.members.map((type, index) => {
-                                        const { module, code, startIndex, endIndex } = type
+                                        const { parent, module, code, startIndex, endIndex } = type
 
                                         return {
                                             kind: 'arg',
                                             name: {
                                                 kind: 'plain-identifier',
                                                 name: `arg${index}`,
-                                                module, code, startIndex, endIndex
+                                                parent, module, code, startIndex, endIndex
                                             },
                                             type,
                                             optional: false,
-                                            module, code, startIndex, endIndex
+                                            parent, module, code, startIndex, endIndex
                                         } as const
                                     }) :
                                     // TODO: Spreading an array value into a function with explicit arg types isn't handled yet
@@ -1209,26 +1209,26 @@ function fitTemplate(
      || (parameterized.kind === "proc-type" && reified.kind === "proc-type")) {
         const parameterizedArgs = parameterized.args
         const reifiedArgs = reified.args
-        const matchGroups = (
-            parameterizedArgs.kind === 'args' 
-                ? (
-                    reifiedArgs.kind === 'args'
-                        ? parameterizedArgs.args.map((arg, index) =>
-                            fitTemplate(arg.type ?? UNKNOWN_TYPE, reifiedArgs.args[index].type ?? UNKNOWN_TYPE))
-                        : [
-                            fitTemplate(unionOf(parameterizedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE)), reifiedArgs.type)
-                        ]
-                )
-                : (
-                    reifiedArgs.kind === 'args'
-                        ? [
-                            fitTemplate(parameterizedArgs.type, unionOf(reifiedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE)))
-                        ]
-                        : [
-                            fitTemplate(parameterizedArgs.type, reifiedArgs.type)
-                        ]
-                )
-        )
+        const matchGroups: (ReadonlyMap<string, TypeExpression> | undefined)[] = []
+        
+        if (parameterizedArgs.kind === 'args') {
+            matchGroups.push(...(
+                reifiedArgs.kind === 'args'
+                    ? parameterizedArgs.args.map((arg, index) =>
+                        fitTemplate(arg.type ?? UNKNOWN_TYPE, reifiedArgs.args[index].type ?? UNKNOWN_TYPE))
+                    : [
+                        fitTemplate(unionOf(parameterizedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE)), reifiedArgs.type)
+                    ]
+            ))
+        } else {
+            const reifiedArgsType = (
+                reifiedArgs.kind === 'args'
+                    ? tupleOf(reifiedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE), 'readonly')
+                    : reifiedArgs.type
+            )
+
+            matchGroups.push(fitTemplate(parameterizedArgs.type, reifiedArgsType))
+        }
 
         if (parameterized.kind === 'func-type' && reified.kind === 'func-type' &&
             parameterized.returnType && reified.returnType) {
@@ -1237,28 +1237,28 @@ function fitTemplate(
             )
         }
 
-        if (matchGroups.some(g => g == null)) {
+        if (matchGroups.some(g => g == null)) { // some match errored
             return undefined
-        }
+        } else { // combine all matches and return
+            const matches = new Map<string, TypeExpression>();
 
-        const matches = new Map<string, TypeExpression>();
-
-        for (const map of matchGroups as ReadonlyMap<string, TypeExpression>[]) {
-            for (const [key, value] of map.entries()) {
-                if (!isGenericParam(value)) {
-                    const existing = matches.get(key)
-                    if (existing) {
-                        if (subsumationIssues(existing, value)) {
-                            return undefined
+            for (const map of matchGroups as ReadonlyMap<string, TypeExpression>[]) {
+                for (const [key, value] of map.entries()) {
+                    if (!isGenericParam(value)) {
+                        const existing = matches.get(key)
+                        if (existing) {
+                            if (subsumationIssues(existing, value)) {
+                                return undefined
+                            }
+                        } else {
+                            matches.set(key, value);
                         }
-                    } else {
-                        matches.set(key, value);
                     }
                 }
             }
+            
+            return matches;
         }
-        
-        return matches;
     }
 
     if (parameterized.kind === "array-type" && reified.kind === "array-type") {
