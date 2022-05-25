@@ -824,6 +824,7 @@ export function bindInvocationGenericArgs(invocation: Invocation): TypeExpressio
                                 ...(
                                     spreadArgType?.kind === 'tuple-type' ? spreadArgType.members.map((type, index) => {
                                         const { module, code, startIndex, endIndex } = type
+
                                         return {
                                             kind: 'arg',
                                             name: {
@@ -834,7 +835,7 @@ export function bindInvocationGenericArgs(invocation: Invocation): TypeExpressio
                                             type,
                                             optional: false,
                                             module, code, startIndex, endIndex
-                                        }
+                                        } as const
                                     }) :
                                     // TODO: Spreading an array value into a function with explicit arg types isn't handled yet
                                     []
