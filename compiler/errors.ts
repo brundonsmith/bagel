@@ -173,6 +173,7 @@ export function prettyProblem(modulePath: ModuleName, error: BagelError|LintProb
     )
     const severity = (
         error.kind === 'lint-problem' ? error.severity :
+        error.kind === 'bagel-syntax-error' ? 'parse error' :
         'error'
     )
     const color = (
