@@ -987,22 +987,26 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
         {
             const valueArgs = resolvedValue.args
             const destinationArgs = resolvedDestination.args
+            
+            const returnTypeIssues = resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type"
+                ? subsumationIssues(resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE, encounteredNames)
+                : undefined
+
             if (valueArgs.kind === 'args') {
                 if (destinationArgs.kind === 'args') {
                     return all(
                         ...destinationArgs.args.map((_, i) => 
                             // NOTE: Value and destination are flipped on purpose for args!
                             subsumationIssues(valueArgs.args[i]?.type ?? UNKNOWN_TYPE, destinationArgs.args[i]?.type ?? UNKNOWN_TYPE, encounteredNames)),
-                        (resolvedDestination.kind === "func-type" && resolvedValue.kind === "func-type"
-                            ? subsumationIssues(resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE, encounteredNames)
-                            : undefined)
+                        returnTypeIssues
                     )
                 } else {
                     const elementOfDestination = elementOf(destinationArgs.type)
 
                     return all(
                         ...valueArgs.args.map(valueArg =>
-                            subsumationIssues(valueArg.type ?? UNKNOWN_TYPE, elementOfDestination))
+                            subsumationIssues(valueArg.type ?? UNKNOWN_TYPE, elementOfDestination)),
+                        returnTypeIssues
                     )
                 }
             } else {
@@ -1011,11 +1015,15 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
 
                     return all(
                         ...destinationArgs.args.map(destinationArg =>
-                            subsumationIssues(elementOfValue, destinationArg.type ?? UNKNOWN_TYPE))
+                            subsumationIssues(elementOfValue, destinationArg.type ?? UNKNOWN_TYPE)),
+                        returnTypeIssues
                     )
                     
                 } else {
-                    return all(subsumationIssues(valueArgs.type, destinationArgs.type))
+                    return all(
+                        subsumationIssues(valueArgs.type, destinationArgs.type),
+                        returnTypeIssues
+                    )
                 }
             }
         }
