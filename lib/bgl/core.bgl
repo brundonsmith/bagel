@@ -16,7 +16,7 @@ export js func iter<T>(x: const T[]): Iterator<T> => {#
     return ___iter(x)
 #}
 
-export js func computedFn<
+export js func memo<
     TArgs extends const unknown[],
     TReturn extends unknown
 >(fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => {#
