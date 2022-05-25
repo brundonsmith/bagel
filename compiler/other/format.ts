@@ -3,7 +3,7 @@ import { computedFn, observe } from "../../lib/ts/reactivity.ts";
 import { parsed } from "../1_parse/index.ts";
 import { modules } from "../store.ts";
 import { getName } from "../utils/ast.ts";
-import { given } from "../utils/misc.ts";
+import { exists, given } from "../utils/misc.ts";
 import { AST, PlainIdentifier } from '../_model/ast.ts'
 import { ModuleName } from "../_model/common.ts";
 import { ExactStringLiteral } from "../_model/expressions.ts";
@@ -181,7 +181,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "while-loop":
             return `while ${f(ast.condition)} ${f(ast.body)}`
         case "invocation":
-            return (ast.awaited ? 'await ' : '') + `${f(ast.subject)}${maybeTypeArgs(options, indent, parent, ast.typeArgs)}(${ast.args.map(f).join(', ')})` + (parent?.kind === 'block' ? ';' : '')
+            return (ast.awaited ? 'await ' : '') + `${f(ast.subject)}${maybeTypeArgs(options, indent, parent, ast.typeArgs)}(${[...ast.args, ast.spreadArg].filter(exists).map(f).join(', ')})` + (parent?.kind === 'block' ? ';' : '')
         case "property-accessor": {
             const operator = (
                 ast.optional ? '?.' :

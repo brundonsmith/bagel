@@ -7,7 +7,7 @@ import { path } from "../deps.ts";
 import { format } from "../other/format.ts";
 import { canonicalModuleName, getModuleByName } from "../store.ts";
 import { getName } from "../utils/ast.ts";
-import { buildDir, buildFilePath, transpileJsPath } from "../utils/misc.ts";
+import { buildDir, buildFilePath, exists, transpileJsPath } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
@@ -236,7 +236,7 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'bui
             const subjectType = inferType(invocation.subject)
 
             const typeArgs = invocation.kind === "invocation" && invocation.typeArgs.length > 0 ? `<${invocation.typeArgs.map(c).join(',')}>` : ''
-            const args = invocation.args.map(c).join(', ')
+            const args = [...invocation.args, invocation.spreadArg].filter(exists).map(c).join(', ')
 
             const baseInvocation = `${c(invocation.subject)}${typeArgs}(${args})`
             const compiledInvocation = (

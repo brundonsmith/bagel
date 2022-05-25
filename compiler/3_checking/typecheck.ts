@@ -356,7 +356,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 // bound generic
                 const subjectType = bindInvocationGenericArgs(invocation)
 
-                if (subjectType == null) {
+                if (subjectType == null) { // failed to bind
                     const subject = resolvedSubject as GenericType
 
                     if (invocation.typeArgs.length === 0) {
@@ -783,6 +783,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             current.value
                         ],
                         typeArgs: [],
+                        spreadArg: undefined,
                         bubbles: false,
                         ...AST_NOISE
                     }) ?? inferType(decorator.decorator)
@@ -955,19 +956,21 @@ export function subsumationIssues(destination: TypeExpression, value: TypeExpres
         {
             const minMaxArgsValue = argsBounds(resolvedValue.args)
             const minMaxArgsDestination = argsBounds(resolvedDestination.args)
-            if (minMaxArgsValue != null) {
-                if (minMaxArgsDestination != null) {
+            if (minMaxArgsValue != null) { // value func requires a certain number of arguments
+                if (minMaxArgsDestination != null) { // destination will pass a certain number of arguments
                     if (minMaxArgsValue.min > minMaxArgsDestination.min) {
                         return [
                             baseErrorMessage,
                             `'${msgFormat(resolvedValue)}' requires ${minMaxArgsValue.min} arguments, but '${msgFormat(resolvedDestination)}' is only provided with ${minMaxArgsDestination.min}`
                         ]
                     }
-                } else {
-                    return [
-                        baseErrorMessage,
-                        `'${msgFormat(resolvedValue)}' requires ${minMaxArgsValue.min} arguments, but '${msgFormat(resolvedDestination)}' may not be passed that many`
-                    ]
+                } else { // destination could pass any number of arguments
+                    if (minMaxArgsValue.min > 0) {
+                        return [
+                            baseErrorMessage,
+                            `'${msgFormat(resolvedValue)}' requires ${minMaxArgsValue.min} arguments, but '${msgFormat(resolvedDestination)}' may not be passed that many`
+                        ]
+                    }
                 }
             }
         }

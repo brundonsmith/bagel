@@ -8,7 +8,7 @@ import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, F
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
-import { iterateParseTree, setParents } from "../utils/ast.ts";
+import { setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
 import { path } from '../deps.ts';
 import { AST_NOISE } from "../3_checking/typeinfer.ts";
@@ -608,8 +608,8 @@ const primitiveType: ParseFunction<PrimitiveType> = (module, code, startIndex) =
     }))
 
 const funcType: ParseFunction<FuncType|GenericFuncType> = (module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index: indexAfterTypeParams }) =>
-    given(_parenthesizedArguments(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, index }) =>
+    given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index }) =>
+    given(_parenthesizedArguments(module, code, index), ({ parsed: args, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "=>"), index =>
     given(consumeWhitespace(code, index), index =>
@@ -738,9 +738,9 @@ const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType|Err
 const parenthesizedType: ParseFunction<ParenthesizedType> = (module, code, startIndex) =>
     given(consume(code, startIndex, "("), index =>
     given(consumeWhitespace(code, index), index =>
-    expec(typeExpression(module, code, index), err(code, index, "Type"), ({ parsed: inner, index }) =>
+    given(typeExpression(module, code, index), ({ parsed: inner, index }) =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
+    given(consume(code, index, ")"), index => ({
         parsed: {
             kind: 'parenthesized-type',
             inner,
@@ -975,7 +975,8 @@ const decorator: ParseFunction<Decorator> = (module, code, startIndex) =>
                         kind: 'invocation',
                         subject: ident,
                         typeArgs: args.typeArgs,
-                        args: args.exprs,
+                        args: args.args,
+                        spreadArg: args.spreadArg,
                         bubbles: false,
                         module,
                         code,
@@ -1444,8 +1445,8 @@ const func: ParseFunction<Func> = (module, code, startIndex) =>
     })))))
 
 const _funcHeader: ParseFunction<FuncType|GenericFuncType> = (module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index: indexAfterTypeParams }) =>
-    given(_funcArgs(module, code, indexAfterTypeParams ?? startIndex), ({ parsed: args, index }) =>
+    given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index }) =>
+    given(_funcArgs(module, code, index), ({ parsed: args, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(_maybeTypeAnnotation(module, code, index), ({ parsed: returnType, index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -2022,15 +2023,12 @@ const _getsToInvocationsAndAccesses = (subject: Expression, gets: (InvocationArg
 const _oneGetToInvocationOrAccess = (subject: Expression, get: InvocationArgs|Omit<PropertyAccessor, 'subject'>): Invocation|PropertyAccessor => {
     if (get.kind === "invocation-args") {
         return {
+            ...get,
+            startIndex: subject.startIndex,
+
             kind: "invocation",
             subject,
-            typeArgs: get.typeArgs,
-            args: get.exprs,
             bubbles: false,
-            module: get.module,
-            code: get.code,
-            startIndex: subject.startIndex,
-            endIndex: get.endIndex
         }
     } else {
         return {
@@ -2040,16 +2038,19 @@ const _oneGetToInvocationOrAccess = (subject: Expression, get: InvocationArgs|Om
     }
 }
     
-type InvocationArgs = SourceInfo & { kind: "invocation-args", exprs: Expression[], typeArgs: TypeExpression[] }
+type InvocationArgs = SourceInfo & { kind: "invocation-args", args: readonly Expression[], spreadArg: Spread|undefined, typeArgs: TypeExpression[] }
 
 const _invocationArgs: ParseFunction<InvocationArgs> = (module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, _typeArgs), ({ parsed: typeArgs, index: indexAfterTypeArgs }) =>
-    given(consume(code, indexAfterTypeArgs ?? startIndex, "("), index => 
-    given(parseSeries(module, code, index, expression, ","), ({ parsed: exprs, index }) =>
+    given(parseOptional(module, code, startIndex, _typeArgs), ({ parsed: typeArgs, index }) =>
+    given(consume(code, index, "("), index => 
+    given(parseSeries(module, code, index, expression, ","), ({ parsed: args, index }) =>
+    given(parseOptional(module, code, index, spread), ({ parsed: spreadArg, index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
         parsed: {
             kind: "invocation-args",
-            exprs,
+            args,
+            spreadArg,
             typeArgs: typeArgs ?? [],
             module,
             code,
@@ -2057,7 +2058,7 @@ const _invocationArgs: ParseFunction<InvocationArgs> = (module, code, startIndex
             endIndex: index
         },
         index
-    })))))
+    })))))))
 
 const _typeArgs: ParseFunction<TypeExpression[]> = (module, code, startIndex) =>
     given(consume(code, startIndex, "<"), index =>
@@ -2065,7 +2066,6 @@ const _typeArgs: ParseFunction<TypeExpression[]> = (module, code, startIndex) =>
     given(parseSeries(module, code, index, typeExpression, ','), ({ parsed: typeArgs, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, ">"), index => ({ parsed: typeArgs, index }))))))
-
 
 const localIdentifier: ParseFunction<LocalIdentifier> = (module, code, startIndex) => 
     given(identifierSegment(code, startIndex), ({ segment: name, index }) => ({
@@ -2518,8 +2518,8 @@ const TYPE_PARSER = new TieredParser<TypeExpression>([
     [ maybeType ],
     [ boundGenericType ],
     [ arrayType ],
-    [ primitiveType, funcType, procType, 
-        literalType, recordType, objectType, parenthesizedType, 
+    [ primitiveType, parenthesizedType, funcType, procType, 
+        literalType, recordType, objectType, 
         tupleType, unknownType ],
     [ namedType ]
 ])

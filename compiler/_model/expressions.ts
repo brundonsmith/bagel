@@ -120,6 +120,7 @@ export type Invocation = SourceInfo & {
     readonly kind: "invocation",
     readonly subject: Expression,
     readonly args: readonly Expression[],
+    readonly spreadArg: Spread|undefined,
     readonly typeArgs: readonly TypeExpression[],
     readonly bubbles: boolean,
     readonly awaited?: boolean, // only used when this is a statement in a proc!
