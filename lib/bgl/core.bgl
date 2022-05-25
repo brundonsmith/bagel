@@ -16,6 +16,19 @@ export js func iter<T>(x: const T[]): Iterator<T> => {#
     return ___iter(x)
 #}
 
+export js func computedFn<
+    TArgs extends const unknown[],
+    TReturn extends unknown
+>(fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => {#
+    return ___computedFn(fn)
+#}
+
+export js func action<
+    TArgs extends const unknown[]
+>(pr: (...args: TArgs) { }): (...args: TArgs) { } => {#
+    return ___action(pr)
+#}
+
 export func assert(condition: boolean, message: string): Error<string>? =>
     if condition {
         nil
