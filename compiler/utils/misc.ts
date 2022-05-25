@@ -203,7 +203,7 @@ export function buildFilePath(module: string): string {
 }
 
 export function pathIsInProject(module: string): boolean {
-    return !targetIsScript && isWithin(target, module)
+    return (!targetIsScript && isWithin(target, module)) || module === target
 }
 
 export function transpileJsPath(module: string): string {
