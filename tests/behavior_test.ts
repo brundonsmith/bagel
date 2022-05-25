@@ -62,7 +62,15 @@ Deno.test({
                 output(counter);
             }
 
-            proc action runTest() {
+            // copied from core.bgl
+            js func action<
+                TArgs extends const unknown[]
+            >(pr: (...args: TArgs) { }): (...args: TArgs) { } => {#
+                return ___action(pr)
+            #}
+        
+            @action
+            proc runTest() {
                 counter = counter + 1;
                 counter = counter + 1;
                 counter = counter + 1;

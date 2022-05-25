@@ -62,8 +62,6 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                 exported(ast.exported) + 
                 (ast.value.isAsync ? 'async ' : '') +
                 (ast.kind === 'func-declaration' ? 'func ' : 'proc ') +
-                (ast.kind === 'func-declaration' && ast.memo ? 'memo ' : '') +
-                (ast.kind === 'proc-declaration' && ast.action ? 'action ' : '') +
                 ast.name.name
 
             const subjectType = ast.value.type.kind === 'generic-type' ? ast.value.type.inner : ast.value.type

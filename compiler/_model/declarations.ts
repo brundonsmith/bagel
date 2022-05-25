@@ -45,7 +45,6 @@ export type TypeDeclaration = SourceInfo & Exported & {
 
 export type ProcDeclaration = SourceInfo & Exported & {
     readonly kind: "proc-declaration",
-    readonly action: boolean,
     readonly name: PlainIdentifier,
     readonly value: Proc|JsProc,
     readonly platforms: readonly Platform[],
@@ -54,7 +53,6 @@ export type ProcDeclaration = SourceInfo & Exported & {
 
 export type FuncDeclaration = SourceInfo & Exported & {
     readonly kind: "func-declaration",
-    readonly memo: boolean,
     readonly name: PlainIdentifier,
     readonly value: Func|JsFunc,
     readonly platforms: readonly Platform[],

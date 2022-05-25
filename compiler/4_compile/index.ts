@@ -437,8 +437,7 @@ const NIL = `undefined`;
 
 
 const compileProcDeclaration = (excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', decl: ProcDeclaration): string => {
-    const baseProc = compileOne(excludeTypes, module, destination, decl.value)
-    let proc = decl.action ? `${INT}action(${baseProc})` : baseProc
+    let proc = compileOne(excludeTypes, module, destination, decl.value)
     
     for (let i = decl.decorators.length - 1; i >= 0; i--) {
         const dec = decl.decorators[i]
@@ -448,8 +447,7 @@ const compileProcDeclaration = (excludeTypes: boolean, module: ModuleName, desti
     return exported(decl.exported) + `const ${decl.name.name} = ` + proc;
 }
 const compileFuncDeclaration = (excludeTypes: boolean, module: ModuleName, destination: 'build-dir'|'adjacent', decl: FuncDeclaration): string => {
-    const baseFunc = compileOne(excludeTypes, module, destination, decl.value)
-    let func = decl.memo ? `${INT}computedFn(${baseFunc})` : baseFunc
+    let func = compileOne(excludeTypes, module, destination, decl.value)
 
     for (let i = decl.decorators.length - 1; i >= 0; i--) {
         const dec = decl.decorators[i]

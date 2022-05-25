@@ -27,8 +27,11 @@ Deno.test({
   name: "Func declaration with memo",
   fn() {
     testCompile(
-      `func memo uid() => '12345'`,
-      `const uid = ___computedFn(() => ("12345"));`,
+      `
+      @memo
+      func uid() => '12345'
+      `,
+      `const uid = memo(() => ("12345"));`,
     );
   },
 });

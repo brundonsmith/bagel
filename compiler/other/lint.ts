@@ -120,7 +120,6 @@ const RULES = {
                 if (value.kind === 'func') {
                     const f: FuncDeclaration = {
                         kind: 'func-declaration',
-                        memo: false,
                         exported: exported != null,
                         decorators: [],
                         name,
@@ -132,7 +131,6 @@ const RULES = {
                 } else {
                     const p: ProcDeclaration = {
                         kind: 'proc-declaration',
-                        action: false,
                         exported: exported != null,
                         decorators: [],
                         name,

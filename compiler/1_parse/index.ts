@@ -822,7 +822,6 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
     given(parseOptional(module, code, index, parseJsOrPlatform), ({ parsed: platform, index }) =>
     given(consume(code, index, "proc"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
-    given(parseKeyword(code, index, 'action'), ({ parsed: action, index }) =>
     given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(_procHeader(isAsync)(module, code, index), ({ parsed: type, index }) => 
@@ -841,7 +840,6 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
                 parsed: {
                     kind: 'proc-declaration',
                     name,
-                    action,
                     value: {
                         kind: "js-proc",
                         type,
@@ -867,7 +865,6 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
             parsed: {
                 kind: 'proc-declaration',
                 name,
-                action,
                 value: {
                     kind: "proc",
                     type,
@@ -887,7 +884,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
                 endIndex: index
             },
             index,
-        })))))))))))))
+        }))))))))))))
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startIndex) => 
     given(parseSeries(module, code, startIndex, decorator), ({ parsed: decorators, index }) =>
@@ -896,7 +893,6 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
     given(parseOptional(module, code, index, parseJsOrPlatform), ({ parsed: platform, index }) =>
     given(consume(code, index, "func"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
-    given(parseKeyword(code, index, 'memo'), ({ parsed: memo, index }) =>
     given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(_funcHeader(module, code, index), ({ parsed: type, index }) => 
@@ -915,7 +911,6 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
                 parsed: {
                     kind: "func-declaration",
                     name,
-                    memo,
                     value: {
                         kind: "js-func",
                         type,
@@ -941,7 +936,6 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
             parsed: {
                 kind: "func-declaration",
                 name,
-                memo,
                 value: {
                     kind: "func",
                     type,
@@ -961,7 +955,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
                 endIndex: index,
             },
             index,
-        })))))))))))))
+        }))))))))))))
     
 const decorator: ParseFunction<Decorator> = (module, code, startIndex) =>
     given(consume(code, startIndex, '@'), index =>

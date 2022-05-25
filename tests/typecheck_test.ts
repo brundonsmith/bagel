@@ -3198,7 +3198,7 @@ Deno.test({
     const b = foo(1, 2)
     const c = foo(1, 2, 3)
 
-    func hof(fn: (num: number) => nil) => nil
+    func hof(fn: (num: number) => number?) => nil
 
     const x = hof(foo)
     `,
