@@ -6,19 +6,21 @@ export type TodoItem = {
 
 export func makeTodoItem(): TodoItem => { text: '', done: false }
 
-export func memo renderTodoItem(item: TodoItem) =>
+@memo()
+export func renderTodoItem(item: TodoItem) =>
     <div>
         <input value={item.text} onChange={itemChangeHandler(item)}></input>
         <input type={'checkbox'} checked={item.done} onChange={itemDoneChangeHandler(item)}></input>
     </div>
 
-
-func memo itemChangeHandler(item: TodoItem) =>
+@memo()
+func itemChangeHandler(item: TodoItem) =>
     (e: { target: { value: string } }) {
         item.text = e.target.value;
     }
 
-func memo itemDoneChangeHandler(item: TodoItem) =>
+@memo()
+func itemDoneChangeHandler(item: TodoItem) =>
     (e: { target: { checked: boolean }}) {
         item.done = e.target.checked;
     }

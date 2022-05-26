@@ -1,7 +1,8 @@
 
 from '../../lib/wrappers/core' import { logp }
 
-export func memo fibonacci(n: number): number =>
+@memo()
+export func fibonacci(n: number): number =>
     if (n <= 1) {
         n
     } else {

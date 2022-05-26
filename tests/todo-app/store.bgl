@@ -8,7 +8,7 @@ export proc addItem() {
 }
 
 export proc clearDone() {
-    items = iter(items)
+    items = items.iter()
         .filter((item: TodoItem) => !item.done)
         .collectArray();
 }

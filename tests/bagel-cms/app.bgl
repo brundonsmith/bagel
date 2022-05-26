@@ -3,7 +3,8 @@ import './app.css' as styles
 
 from './store.bgl' import { EntityDescriptor, Entity }
 
-export func memo renderApp(entityTypes: EntityDescriptor[], entitiesByType: {[string]: Entity[]}) =>
+@memo()
+export func renderApp(entityTypes: EntityDescriptor[], entitiesByType: {[string]: Entity[]}) =>
     <div className='app'>
         <style __dangerouslySetInnerHTML={{ __html: styles }} />
         
