@@ -28,10 +28,10 @@ Deno.test({
   fn() {
     testCompile(
       `
-      @memo
+      @memo({ maxItems: 12 })
       func uid() => '12345'
       `,
-      `const uid = memo(() => ("12345"));`,
+      `const uid = memo({maxItems: 12})(() => ("12345"));`,
     );
   },
 });

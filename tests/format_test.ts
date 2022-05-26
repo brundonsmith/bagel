@@ -8,7 +8,7 @@ import { ModuleName } from "../compiler/_model/common.ts";
 const BAGEL_SNIPPETS = [
     `func uid() => '12345'`,
     `const fn = a => a`,
-    `@memo
+    `@memo({ maxItems: 12 })
     func uid() => '12345'`,
     `const x = a < b`,
     `func uid(n: number) => 
@@ -296,7 +296,7 @@ const BAGEL_SNIPPETS = [
       `
         let count: number = 0
   
-        @memo
+        @memo({ maxItems: 12 })
         func render() =>
             <div>
                 <button onClick={decrement}>{'-'}</button>
