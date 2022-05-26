@@ -16,12 +16,14 @@ export js func iter<T>(x: const T[]): Iterator<T> => {#
     return ___iter(x)
 #}
 
-export js func memo<
+export type MemoOptions = const {
+    maxItems?: number
+}
+
+export func memo<
     TArgs extends const unknown[],
     TReturn extends unknown
->(fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => {#
-    return ___computedFn(fn)
-#}
+>(options?: MemoOptions) => (fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => js# ___computedFn(fn, options) #js
 
 export js func action<
     TArgs extends const unknown[]

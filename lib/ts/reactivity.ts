@@ -137,7 +137,13 @@ export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESU
     }
 }
 
-export function computedFn<F extends Function>(fn: F, options: {  } = {}): F {
+type MemoOptions = {
+    maxItems?: number
+}
+
+export function computedFn<F extends Function>(fn: F, options: MemoOptions = {}): F {
+    // TODO: Respond to options
+    
     const computed = ((...args: any[]) => {
         observe(fn, COMPUTED_RESULT)
 
