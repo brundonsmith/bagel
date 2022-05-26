@@ -1,10 +1,8 @@
 
 MVP
 - Destructuring arguments
-- Customization of memo caching behavior
 - parallel await
 - debugging utils (functional logging, etc)
-- Regex
 - implement more platform APIs
 - configuration
 - implement web server integration
