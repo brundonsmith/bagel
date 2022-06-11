@@ -1,5 +1,6 @@
 import { Block, Debug, PlainIdentifier, SourceInfo } from "./ast.ts";
 import { ExactStringLiteral, Expression, Func, Invocation, JavascriptEscape, JsFunc, JsProc, LocalIdentifier, Proc } from "./expressions.ts";
+import { Autorun } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
 
 export type Declaration =
@@ -12,7 +13,7 @@ export type Declaration =
     | ValueDeclaration
     | DeriveDeclaration
     | RemoteDeclaration
-    | AutorunDeclaration
+    | Autorun
     | TestExprDeclaration
     | TestBlockDeclaration
     | Debug
@@ -46,7 +47,7 @@ export type TypeDeclaration = SourceInfo & Exported & {
 export type ProcDeclaration = SourceInfo & Exported & {
     readonly kind: "proc-declaration",
     readonly name: PlainIdentifier,
-    readonly value: Proc|JsProc,
+    readonly value: Proc | JsProc,
     readonly platforms: readonly Platform[],
     readonly decorators: readonly Decorator[],
 }
@@ -54,7 +55,7 @@ export type ProcDeclaration = SourceInfo & Exported & {
 export type FuncDeclaration = SourceInfo & Exported & {
     readonly kind: "func-declaration",
     readonly name: PlainIdentifier,
-    readonly value: Func|JsFunc,
+    readonly value: Func | JsFunc,
     readonly platforms: readonly Platform[],
     readonly decorators: readonly Decorator[],
 }
@@ -62,10 +63,10 @@ export type FuncDeclaration = SourceInfo & Exported & {
 export type ValueDeclaration = SourceInfo & {
     readonly kind: "value-declaration",
     readonly name: PlainIdentifier,
-    readonly type: TypeExpression|undefined,
+    readonly type: TypeExpression | undefined,
     readonly value: Expression,
     readonly isConst: boolean,
-    readonly exported: undefined|'export'|'expose',
+    readonly exported: undefined | 'export' | 'expose',
     readonly platforms: readonly Platform[],
 }
 
@@ -81,20 +82,15 @@ export type Platform = "node" | "deno" | "browser"
 export type DeriveDeclaration = SourceInfo & Exported & {
     readonly kind: "derive-declaration",
     readonly name: PlainIdentifier,
-    readonly type: TypeExpression|undefined,
+    readonly type: TypeExpression | undefined,
     readonly expr: Expression,
 }
 
 export type RemoteDeclaration = SourceInfo & Exported & {
     readonly kind: "remote-declaration",
     readonly name: PlainIdentifier,
-    readonly type: TypeExpression|undefined,
+    readonly type: TypeExpression | undefined,
     readonly expr: Expression,
-}
-
-export type AutorunDeclaration = SourceInfo & {
-    readonly kind: "autorun-declaration",
-    readonly effect: Block
 }
 
 export type TestExprDeclaration = SourceInfo & {

@@ -3,9 +3,9 @@ import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo, Destructure, NameAndType } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { AutorunDeclaration, ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator } from "../_model/declarations.ts";
+import { ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration, ALL_REG_EXP_FLAGS, RegularExpression, RegularExpressionFlag } from "../_model/expressions.ts";
-import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement } from "../_model/statements.ts";
+import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement, Autorun } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { setParents } from "../utils/ast.ts";
@@ -236,7 +236,7 @@ const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     ?? funcDeclaration(module, code, startIndex)
     ?? valueDeclaration(module, code, startIndex)
     ?? deriveOrRemoteDelcaration(module, code, startIndex)
-    ?? autorunDeclaration(module, code, startIndex)
+    ?? autorun(module, code, startIndex)
     ?? testExprDeclaration(module, code, startIndex)
     ?? testBlockDeclaration(module, code, startIndex)
     ?? javascriptEscape(module, code, startIndex)
@@ -1075,20 +1075,30 @@ const _maybeTypeAnnotation: ParseFunction<TypeExpression|undefined> = (module, c
     }
 }
 
-const autorunDeclaration: ParseFunction<AutorunDeclaration> = (module, code, startIndex) =>
+const autorun: ParseFunction<Autorun> = (module, code, startIndex) =>
     given(consume(code, startIndex, "autorun"), index =>
-    given(consumeWhitespaceRequired(code, index), index =>
-    expec(parseBlock(module, code, index), err(code, index, "Effect block"), ({ parsed: effect, index }) => ({
+    given(consumeWhitespace(code, index), index =>
+    expec(parseBlock(module, code, index), err(code, index, "Effect block"), ({ parsed: effect, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(parseExact("forever")(module, code, index) ?? _untilClause(module, code, index), err(code, index, '"forever", or "until" clause'), ({ parsed: until, index }) => ({
         parsed: {
-            kind: "autorun-declaration",
+            kind: "autorun",
             effect,
+            until: until === 'forever' ? undefined : until,
             module,
             code,
             startIndex,
             endIndex: index,
         },
         index,
-    }))))
+    }))))))
+
+const _untilClause: ParseFunction<Expression> = (module, code, startIndex) =>
+    given(consume(code, startIndex, "until"), index =>
+    given(consumeWhitespace(code, index), index =>
+    given(consume(code, index, "=>"), index =>
+    given(consumeWhitespace(code, index), index =>
+    expression(module, code, index)))))
 
 const testExprDeclaration: ParseFunction<TestExprDeclaration> = (module, code, startIndex) =>
     given(consume(code, startIndex, 'test'), index =>
@@ -1194,6 +1204,7 @@ const statement: ParseFunction<Statement> = (module, code, startIndex) =>
     ?? whileLoop(module, code, startIndex)
     ?? assignment(module, code, startIndex)
     ?? procCall(module, code, startIndex)
+    ?? autorun(module, code, startIndex)
 
 const declarationStatement: ParseFunction<DeclarationStatement> = (module, code, startIndex) => 
     given(parseExact("const")(module, code, startIndex) ?? parseExact("let")(module, code, startIndex), ({ parsed: kind, index }) =>

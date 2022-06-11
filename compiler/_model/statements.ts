@@ -1,7 +1,7 @@
-import { SourceInfo,PlainIdentifier,Block, Destructure, NameAndType } from "./ast.ts";
+import { SourceInfo, PlainIdentifier, Block, Destructure, NameAndType } from "./ast.ts";
 import { Expression, Invocation, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions.ts";
 
-export type Statement = 
+export type Statement =
     | JavascriptEscape
     | DeclarationStatement
     | IfElseStatement
@@ -11,6 +11,7 @@ export type Statement =
     | Invocation
     | TryCatch
     | ThrowStatement
+    | Autorun
 
 export type DeclarationStatement = SourceInfo & {
     readonly kind: "declaration-statement",
@@ -62,4 +63,10 @@ export type TryCatch = SourceInfo & {
 export type ThrowStatement = SourceInfo & {
     readonly kind: "throw-statement",
     readonly errorExpression: Expression,
+}
+
+export type Autorun = SourceInfo & {
+    readonly kind: "autorun",
+    readonly effect: Block,
+    readonly until: Expression | undefined
 }

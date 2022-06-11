@@ -11,7 +11,7 @@ Deno.test({
 
         autorun(() => {
             outcomes.push(observe(obj, 'count'))
-        })
+        }, undefined)
 
         obj.count++; invalidate(obj, 'count')
         obj.count++; invalidate(obj, 'count')
@@ -51,7 +51,7 @@ Deno.test({
 
         autorun(() => {
             outcomes.push(doubledDoubledCount())
-        })
+        }, undefined)
 
         obj.count++; invalidate(obj, 'count')
         obj.count++; invalidate(obj, 'count')
@@ -76,7 +76,7 @@ Deno.test({
 
         autorun(() => {
             outcomes.push(observe(obj, 'count'))
-        })
+        }, undefined)
 
         increment()
 
@@ -93,7 +93,7 @@ Deno.test({
 
         autorun(() => {
             outcomes.push(observe(obj, 'count'))
-        })
+        }, undefined)
 
         runInAction(() => {
             obj.count++; invalidate(obj, 'count')

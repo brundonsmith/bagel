@@ -226,8 +226,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return `${f(ast.start)}..${f(ast.end)}`
         case "spread":
             return `...${f(ast.expr)}`
-        case "autorun-declaration":
-            return `autorun ${f(ast.effect)}`
+        case "autorun":
+            return `autorun ${f(ast.effect)}\n${currentIndentation}${ast.until == null ? 'forever' : `until => ${fIndent(ast.until)}`}`
         case "case":
             return `${f(ast.condition)} {${br}${nextIndentation}${fIndent(ast.outcome)}${br}${currentIndentation}}`
         case "case-block":

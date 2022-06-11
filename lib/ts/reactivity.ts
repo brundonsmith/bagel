@@ -185,7 +185,7 @@ export function computedFn<F extends Function>(fn: F, options: MemoOptions = {})
     return computed
 }
 
-export function autorun(fn: Reaction) {
+export function autorun(fn: Reaction, until: (() => boolean) | undefined) {
     function effect() {
         const newObservablesToReactions: typeof observablesToReactions = []
 
@@ -206,10 +206,16 @@ export function autorun(fn: Reaction) {
 
     effect()
 
-    return () => {
+    const unsubscribe = () => {
         // unsubscribe
         observablesToReactions = observablesToReactions.filter(r => r.effect !== effect)
     }
+
+    if (until != null) {
+        when(until).then(unsubscribe)
+    }
+
+    return unsubscribe
 }
 
 export function when(fn: () => boolean): Promise<void> {
@@ -226,7 +232,7 @@ export function when(fn: () => boolean): Promise<void> {
 
         Object.defineProperty(effect, 'name', { value: 'when(' + fn.name + ')', writable: false });
 
-        const unsubscribe = autorun(effect)
+        const unsubscribe = autorun(effect, undefined)
     })
 }
 

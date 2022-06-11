@@ -14,6 +14,7 @@ Deno.test({
             autorun {
                 output(counter);
             }
+            forever
 
             proc runTest() {
                 counter = counter + 1;
@@ -35,11 +36,11 @@ Deno.test({
             autorun {
                 // should be ignored in reactions!
                 output(counterHolder.other);
-            }
+            } forever
     
             autorun {
                 output(counterHolder.prop);
-            }
+            } forever
     
             proc runTest() {
                 counterHolder.prop = counterHolder.prop + 1;
@@ -47,6 +48,27 @@ Deno.test({
                 counterHolder.prop = counterHolder.prop + 1;
             }`,
             ['stuff', 0, 1, 2, 3],
+        );
+    },
+});
+
+Deno.test({
+    name: "Simple autorun with until",
+    fn() {
+        testSideEffects(
+            `
+            let counter = 0
+
+            proc runTest() {
+                autorun {
+                    output(counter);
+                } until => counter > 1
+
+                counter = counter + 1;
+                counter = counter + 1;
+                counter = counter + 1;
+            }`,
+            [0, 1, 2, 3],
         );
     },
 });
@@ -60,7 +82,7 @@ Deno.test({
 
             autorun {
                 output(counter);
-            }
+            } forever
 
             // copied from core.bgl
             js func action<

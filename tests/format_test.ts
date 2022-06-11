@@ -396,7 +396,17 @@ const BAGEL_SNIPPETS = [
       `
       const taggedStr = html'
         <h1>hello world!</h1>
-      '`
+      '`,
+      `
+      autorun {
+        log(foo);
+      }
+      forever
+
+      autorun {
+        log(foo);
+      }
+      until => foo.length > 10`
 ]
 
 for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {

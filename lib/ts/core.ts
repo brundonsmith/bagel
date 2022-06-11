@@ -425,7 +425,7 @@ export class Remote<T> {
                         this.loading = false; invalidate(this, 'loading');
                     }
                 })
-        })
+        }, undefined)
     }
 
     public value: T|undefined;

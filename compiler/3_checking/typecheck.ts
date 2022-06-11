@@ -72,7 +72,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             case "derive-declaration":
                             case "remote-declaration":
                                 return [decl.name]
-                            case "autorun-declaration":
+                            case "autorun":
                             case "test-expr-declaration":
                             case "test-block-declaration":
                             case "debug":
@@ -122,6 +122,7 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             case "javascript-escape":
                             case "try-catch":
                             case "throw-statement":
+                            case "autorun":
                                 return []
                             default:
                                 // @ts-expect-error: exhaustiveness
@@ -796,12 +797,16 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                     }
                 }
             } break;
+            case "autorun": {
+                if (current.until != null) {
+                    expect(reportError, BOOLEAN_TYPE, current.until)
+                }
+            } break;
             case "decorator":
             case "proc-type":
             case "func-type":
             case "name-and-type":
             case "destructure":
-            case "autorun-declaration":
             case "if-else-expression":
             case "if-else-statement":
             case "while-loop":
