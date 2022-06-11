@@ -191,6 +191,17 @@ const RULES = {
         },
         autofix: undefined
     },
+    'autorunDeclarationsOnly': {
+        message: () => 'Autoruns should only be written as top-level declarations; they shouldn\'t be created in procs',
+        match: (ast: AST) => {
+            if (ast.kind === 'autorun' && ast.parent?.kind === 'block') {
+                return ast
+            }
+        },
+        autofix: undefined
+    },
+    // TODO: Lint against derivations, remotes, and autoruns that don't actually reference any observable values
+
     // 'pureFunctions': {
     //     message: (ast: AST) => `Function declarations should not reference global state (referencing '${format(ast)}'). Convert "let" to "const" if the value is never mutated, or consider passing state in as an explicit function argument.`,
     //     match: (ast: AST) => {
@@ -290,6 +301,7 @@ const DEFAULT_SEVERITY: { readonly [rule in LintRuleName]: LintRuleSeverity } = 
     'redundantConditional': 'error',
     'stringNumberConditional': 'warning',
     'explicitBooleansOnly': 'off',
+    'autorunDeclarationsOnly': 'off',
     // 'pureFunctions': 'error',
     // 'unnecessary-nil-coalescing': 'warning'
 }
