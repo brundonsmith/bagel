@@ -23,5 +23,12 @@ export js func count<T>(iter: Iterator<T>): number =>                           
 export js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
 export js func concat<T>(iter: Iterator<T>, other: Iterator<T>): Iterator<T> =>         {# return iter.concat(other) #}
 export js func zip<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<[T?, R?]> =>   {# return iter.zip(other) #}
+export js func indexed<T>(iter: Iterator<T>): Iterator<[T, number]> =>                  {# return iter.indexed() #}
+
+// TODO: Infer new iterator type after filter()
+
+export func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? =>
+    iter.takeWhile(el => !fn(el)).first()
+
 export js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
 export js func collectObject<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} =>  {# return iter.collectObject() #}

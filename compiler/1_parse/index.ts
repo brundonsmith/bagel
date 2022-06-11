@@ -178,7 +178,7 @@ const BGL_PRELUDE_DATA = [
     { module: LIB_LOCATION + '/objects.bgl' as ModuleName, imports: [ 'keys', 'values', 'entries' ] },
     { module: LIB_LOCATION + '/numbers.bgl' as ModuleName, imports: [ 'parseNumber', 'stringifyNumber', 'abs', 'pow', 'sqrt', 'ceil', 'floor', 'sin', 'cos', 'tan' ] },
     { module: LIB_LOCATION + '/booleans.bgl' as ModuleName, imports: [ 'parseBoolean', 'stringifyBoolean' ] },
-    { module: LIB_LOCATION + '/iterators.bgl' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'collectArray', 'collectObject' ] },
+    { module: LIB_LOCATION + '/iterators.bgl' as ModuleName, imports: [ 'map', 'filter', 'slice', 'sorted', 'every', 'some', 'count', 'concat', 'zip', 'indexed', 'collectArray', 'collectObject' ] },
     { module: LIB_LOCATION + '/plans.bgl' as ModuleName, imports: [ 'timeout' ] },
     { module: LIB_LOCATION + '/json.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSON' ] },
 ] as const
