@@ -62,7 +62,7 @@ Deno.test({
             proc runTest() {
                 autorun {
                     output(counter);
-                } until => counter > 1
+                } until => counter > 1;
 
                 counter = counter + 1;
                 counter = counter + 1;

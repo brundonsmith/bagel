@@ -236,7 +236,7 @@ const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     ?? funcDeclaration(module, code, startIndex)
     ?? valueDeclaration(module, code, startIndex)
     ?? deriveOrRemoteDelcaration(module, code, startIndex)
-    ?? autorun(module, code, startIndex)
+    ?? autorun(false)(module, code, startIndex)
     ?? testExprDeclaration(module, code, startIndex)
     ?? testBlockDeclaration(module, code, startIndex)
     ?? javascriptEscape(module, code, startIndex)
@@ -1075,12 +1075,14 @@ const _maybeTypeAnnotation: ParseFunction<TypeExpression|undefined> = (module, c
     }
 }
 
-const autorun: ParseFunction<Autorun> = (module, code, startIndex) =>
+const autorun = (withSemicolon: boolean): ParseFunction<Autorun> => (module, code, startIndex) =>
     given(consume(code, startIndex, "autorun"), index =>
     given(consumeWhitespace(code, index), index =>
     expec(parseBlock(module, code, index), err(code, index, "Effect block"), ({ parsed: effect, index }) =>
     given(consumeWhitespace(code, index), index =>
-    expec(parseExact("forever")(module, code, index) ?? _untilClause(module, code, index), err(code, index, '"forever", or "until" clause'), ({ parsed: until, index }) => ({
+    expec(parseExact("forever")(module, code, index) ?? _untilClause(module, code, index), err(code, index, '"forever", or "until" clause'), ({ parsed: until, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(withSemicolon ? consume(code, index, ";") : consumeWhitespace(code, index), err(code, index, '";"'), index => ({
         parsed: {
             kind: "autorun",
             effect,
@@ -1091,7 +1093,7 @@ const autorun: ParseFunction<Autorun> = (module, code, startIndex) =>
             endIndex: index,
         },
         index,
-    }))))))
+    }))))))))
 
 const _untilClause: ParseFunction<Expression> = (module, code, startIndex) =>
     given(consume(code, startIndex, "until"), index =>
@@ -1204,7 +1206,7 @@ const statement: ParseFunction<Statement> = (module, code, startIndex) =>
     ?? whileLoop(module, code, startIndex)
     ?? assignment(module, code, startIndex)
     ?? procCall(module, code, startIndex)
-    ?? autorun(module, code, startIndex)
+    ?? autorun(true)(module, code, startIndex)
 
 const declarationStatement: ParseFunction<DeclarationStatement> = (module, code, startIndex) => 
     given(parseExact("const")(module, code, startIndex) ?? parseExact("let")(module, code, startIndex), ({ parsed: kind, index }) =>
