@@ -203,7 +203,7 @@ export function buildFilePath(module: string): string {
 }
 
 export function pathIsInProject(module: string): boolean {
-    return (!targetIsScript && isWithin(target, module)) || module === target
+    return (!targetIsScript && isWithin(targetDir, module)) || module === target
 }
 
 export function transpileJsPath(module: string): string {
@@ -217,8 +217,8 @@ export function transpileJsPath(module: string): string {
 export function pathRelativeToProject(module: string): string {
     return (
         pathIsInProject(module) 
-            ? path.relative(target, module)
-            : path.relative(target, cachedFilePath(module))
+            ? path.relative(targetDir, module)
+            : path.relative(targetDir, cachedFilePath(module))
     )
 }
 
@@ -257,19 +257,19 @@ function parseArgs(args: readonly string[]) {
 }
 
 export const { command, target, flags } = parseArgs(Deno.args)
-export const targetIsScript = Deno.statSync(target).isFile
-export const cacheDir = targetIsScript ? globalCacheDir : path.resolve(target, 'bagel_modules')
-export const buildDir = targetIsScript ? globalBuildDir : path.resolve(target, 'bagel_out')
+const targetStat = Deno.statSync(target)
+export const targetDir = targetStat.isDirectory ? target : path.dirname(target)
+export const targetIsScript = targetStat.isFile
+export const cacheDir = targetIsScript ? globalCacheDir : path.resolve(targetDir, 'bagel_modules')
+export const buildDir = targetIsScript ? globalBuildDir : path.resolve(targetDir, 'bagel_out')
 export const cliPlatforms = [
     flags.deno ? 'deno' : undefined,
     flags.node ? 'node' : undefined,
 ].filter(exists) as Platform[]
 
 export const entry: ModuleName|undefined = (() => {
-    const info = Deno.statSync(target)
-
     const entryPath = (
-        info.isDirectory
+        targetStat.isDirectory
             ? path.resolve(target, 'index.bgl')
             : target
     )
