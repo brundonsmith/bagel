@@ -4,7 +4,6 @@ export type AST = unknown
 
 export nominal type Module({
     ...SourceInfo,
-    hasMain: boolean,
     // declarations: Declaration[],
 })
 

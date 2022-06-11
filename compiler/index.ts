@@ -36,7 +36,11 @@ async function main() {
             modules[entry] = { source: undefined, loading: false }; invalidate(modules, entry)
 
             autorun(async () => {
-                if (done()) {
+                if (done()) {       
+                    if (!parsed(entry)?.ast.declarations.some(decl => decl.kind === 'proc-declaration' && decl.name.name === 'main')) {
+                        fail(`Entry module doesn't have a proc named "main". Entry module is:\n${pad('')}${entry}`)
+                    }
+
                     printProblems(allProblems(), flags.watch)
 
                     if (!hasProblems()) {

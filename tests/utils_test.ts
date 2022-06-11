@@ -72,7 +72,6 @@ Deno.test({
     fn() {
         const obj = {
             "kind": "module",
-            "hasMain": false,
             "declarations": [
                 {
                     "kind": "type-declaration",

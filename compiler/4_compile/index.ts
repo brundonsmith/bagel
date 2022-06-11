@@ -7,7 +7,7 @@ import { path } from "../deps.ts";
 import { format } from "../other/format.ts";
 import { canonicalModuleName, getModuleByName } from "../store.ts";
 import { getName } from "../utils/ast.ts";
-import { buildFilePath, exists, given, transpileJsPath } from "../utils/misc.ts";
+import { buildFilePath, entry, exists, given, transpileJsPath } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
@@ -63,7 +63,8 @@ function compileInner(module: Module, modulePath: ModuleName, destination: 'buil
     const runtimeCode = module.declarations
         .filter(decl => decl.kind !== 'test-expr-declaration' && decl.kind !== 'test-block-declaration')
         .map(decl => compileOne(excludeTypes, modulePath, destination, decl) + ';')
-        .join("\n\n") + (module.hasMain ? "\nsetTimeout(main, 0);\n" : "");
+        .join("\n\n") +
+        (modulePath === entry && module.declarations.some(decl => decl.kind === 'proc-declaration' && decl.name.name === 'main') ? "\nsetTimeout(main, 0);\n" : "");
 
     if (includeTests) {
         return runtimeCode + `\n export const tests = {

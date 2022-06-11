@@ -101,7 +101,6 @@ function moduleWithDeclarations(declarations: Declaration[]): Module {
     return {
         kind: "module",
         moduleType: "text",
-        hasMain: false,
         declarations,
         ...AST_NOISE
     }
@@ -213,7 +212,6 @@ function parseInner(module: ModuleName, code: string, reportError: ReportError):
     const moduleAst: Module = {
         kind: "module",
         moduleType: "bgl",
-        hasMain: declarations.some(decl => decl.kind === "proc-declaration" && decl.name.name === "main"),
         declarations,
         module,
         code,
