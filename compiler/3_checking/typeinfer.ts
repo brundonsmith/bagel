@@ -819,7 +819,7 @@ export function bindInvocationGenericArgs(invocation: Invocation): TypeExpressio
                             args: [
                                 ...funcOrProcType.args.args.map((arg, index) => ({
                                     ...arg,
-                                    type: inferType(invocation.args[index])
+                                    type: given(invocation.args[index], inferType)
                                 })),
                                 ...(
                                     spreadArgType?.kind === 'tuple-type' ? spreadArgType.members.map((type, index) => {
