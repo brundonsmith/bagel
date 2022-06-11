@@ -185,6 +185,10 @@ export class Iter<T> {
         return new Iter(zip(this[INNER_ITER], other[INNER_ITER] ?? other))
     }
 
+    indexed(): Iter<[T, number]> {
+        return new Iter(indexed(this[INNER_ITER]))
+    }
+
     collectArray(): T[] {
         const inner = this.inner
 
@@ -352,6 +356,19 @@ function* zip<T, R>(iter1: RawIter<T>, iter2: RawIter<R>): Generator<[T|null|und
     }
 }
 
+function* indexed<T>(iter: RawIter<T>): Generator<[T, number]> {
+    const inner = typeof iter === 'function' ? iter() : iter 
+
+    if (inner[Symbol.iterator]) {
+        observe(inner, WHOLE_OBJECT)
+    }
+
+    let index = 0;
+    for (const el of inner) {
+        yield [el, index];
+        index++
+    }
+}
 
 // Plans
 export type Plan<T> = () => Promise<T>
