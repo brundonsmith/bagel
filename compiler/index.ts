@@ -477,13 +477,13 @@ function addImportedModules(module: ModuleName) {
 autorun(async function loadSource() {
     for (const [_module, data] of Object.entries(observe(modules, WHOLE_OBJECT))) {
         const module = _module as ModuleName
+        const isRemote = pathIsRemote(module)
+        const cachePath = cachedFilePath(module)
+        const isCachable = isRemote || !pathIsInProject(module)
 
         if (observe(data, 'source') == null && !observe(data, 'loading')) {
             data.loading = true; invalidate(data, 'loading')
             
-            const cachePath = cachedFilePath(module)
-            const isCachable = pathIsRemote(module) || !pathIsInProject(module)
-
             async function setAndCache(source: string) {
                 if (isCachable) {
                     try {
@@ -499,7 +499,7 @@ autorun(async function loadSource() {
             }
 
             async function loadModule() {
-                if (pathIsRemote(module)) {
+                if (isRemote) {
                     await fetch(module)
                         .then(async res => {
                             if (res.status === 200) {
@@ -528,7 +528,7 @@ autorun(async function loadSource() {
                 }
             }
 
-            if (await fs.exists(cachePath)) {
+            if (isRemote && await fs.exists(cachePath)) {
                 Deno.readTextFile(cachePath)
                     .then(setAndCache)
                     .catch(loadModule)
