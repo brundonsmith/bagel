@@ -7,7 +7,7 @@ import { path } from "../deps.ts";
 import { format } from "../other/format.ts";
 import { canonicalModuleName, getModuleByName } from "../store.ts";
 import { getName } from "../utils/ast.ts";
-import { buildDir, buildFilePath, exists, transpileJsPath } from "../utils/misc.ts";
+import { buildFilePath, exists, given, transpileJsPath } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
@@ -135,27 +135,42 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'bui
             return compileProcDeclaration(excludeTypes, module, destination, ast)
         case "func-declaration":
             return compileFuncDeclaration(excludeTypes, module, destination, ast)
-        case "value-declaration": {
-            const prefix = exported(ast.exported)
-
-            if (!ast.isConst) {
-                const type = !excludeTypes && ast.type ? `: { value: ${c(ast.type)} }` : ''
-                return prefix + `const ${ast.name.name}${type} = { value: ${c(ast.value)} }`
-            } else {
-                const type = maybeTypeAnnotation(excludeTypes, module, destination, ast.type)
-                return prefix + `const ${ast.name.name}${type} = ${c(ast.value)}`;
-            }
-        }
+        case "value-declaration":
         case "declaration-statement":
         case "inline-declaration": {
-            const keyword = (
-                ast.kind === 'declaration-statement' && !ast.isConst
-                    ? 'let'
-                    : 'const'
-            )
-            const value = c(ast.value)
+            const prefix = ast.kind === 'value-declaration' ? exported(ast.exported) : ''
 
-            return `${keyword} ${c(ast.destination)} = ${ast.awaited ? awaited(value) : value}` + (ast.kind === 'inline-declaration' ? ';' : '')
+            const destination = (
+                ast.kind === 'value-declaration'
+                    ? ast.name.name
+                    : c(ast.destination)
+            )
+            
+            const typeAst = (
+                ast.kind === 'value-declaration' ? ast.type :
+                ast.destination.kind === 'name-and-type' ? ast.destination.type :
+                undefined
+            )
+            const type = (
+                given(typeAst, type =>
+                    ast.kind === 'inline-declaration' || ast.isConst
+                        ? c(type)
+                        : `{ value: ${c(type)} }`)
+            )
+
+            const value = (
+                ast.kind === 'inline-declaration' || ast.isConst
+                    ? c(ast.value)
+                    : `{ value: ${c(ast.value)} }`
+            )
+
+            const semicolon = (
+                ast.kind === 'inline-declaration'
+                    ? ';'
+                    : ''
+            )
+
+            return prefix + `const ${destination}${!excludeTypes && type ? ': ' + type : ''} = ${ast.kind !== 'value-declaration' && ast.awaited ? awaited(value) : value}${semicolon}`
         }
         case "name-and-type":
             return ast.name.name + maybeTypeAnnotation(excludeTypes, module, destination, ast.type)
@@ -184,7 +199,7 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'bui
             if (ast.target.kind === 'local-identifier') {
                 const binding = resolve(ast.target.name, ast.target)
 
-                if (binding?.owner.kind === 'value-declaration' && !binding.owner.isConst) {
+                if ((binding?.owner.kind === 'value-declaration' || binding?.owner.kind === 'declaration-statement') && !binding.owner.isConst) {
                     return `${ast.target.name}.value = ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
                 } else {
                     return `${ast.target.name} = ${value}`
@@ -296,7 +311,7 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'bui
         case "local-identifier": {
             const binding = resolve(ast.name, ast)
 
-            if (binding?.owner.kind === 'value-declaration' && !binding.owner.isConst) {
+            if ((binding?.owner.kind === 'value-declaration' || binding?.owner.kind === 'declaration-statement') && !binding.owner.isConst) {
                 return `${INT}observe(${ast.name}, 'value')`
             } else if (binding?.owner.kind === 'derive-declaration') {
                 return `${ast.name}()`

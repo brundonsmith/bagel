@@ -57,12 +57,13 @@ Deno.test({
     fn() {
         testSideEffects(
             `
-            let counter = 0
-
             proc runTest() {
+                let counter = 0;
+
                 autorun {
                     output(counter);
-                } until => counter > 1;
+                }
+                until => counter > 1;
 
                 counter = counter + 1;
                 counter = counter + 1;

@@ -284,12 +284,12 @@ Deno.test({
       }`,
       `
       const doStuff = (items: ___Iter<number>): void => {
-        let count = 0;
+        const count = { value: 0 };
 
         for (const item of items.inner) {
         };
 
-        log(count);
+        log(___observe(count, 'value'));
       };`,
     );
   },
@@ -321,23 +321,23 @@ Deno.test({
       }`,
       `
       const doStuff = (items: ___Iter<number>): void => {
-        let count = 0;
+        const count = { value: 0 };
     
         for (const item of items.inner) {
             if ((___observe(item, 'foo') != null && (___observe(item, 'foo') as unknown) !== false && (___observe(item, 'foo') as any).kind !== ___ERROR_SYM)) {
-              count = (count + 1);
+                count.value = (___observe(count, 'value') + 1); ___invalidate(count, 'value');
             };
             
-            if ((count > 12)) {
+            if ((___observe(count, 'value') > 12)) { 
                 log(items);
-            } else if ((count !== 10)) {
+            } else if ((___observe(count, 'value') !== 10)) {
                 log("not 10!");
             } else {
                 log(undefined);
             };
         };
     
-        log(count);
+        log(___observe(count, 'value'));
       };`,
     );
   },
@@ -488,8 +488,8 @@ Deno.test({
     const push = <T>(arr: T[], el: T): void => { };
 
     export const bar = (): void => {
-      let foo = [1, 2, 3];
-      push(foo, 4);
+      const foo = { value: [1, 2, 3] };
+      push(___observe(foo, 'value'), 4);
     };`)
   }
 })
