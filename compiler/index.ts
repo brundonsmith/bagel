@@ -116,7 +116,7 @@ async function main() {
                         }
                     }
                 }
-            })
+            }, undefined)
         }
     } else if (command === 'transpile' || command === 'check' || command === 'test' || command === 'format' || command === 'autofix' || command === 'clean') {
         if (!(await fs.exists(target))) {
@@ -168,7 +168,7 @@ async function main() {
                                 )
                             }
                         }
-                    })
+                    }, undefined)
                 } else if (command === 'format') {
                     observe(modules, WHOLE_OBJECT)
 
@@ -537,7 +537,7 @@ autorun(async function loadSource() {
             }
         }
     }
-})
+}, undefined)
 
 
 await main();
