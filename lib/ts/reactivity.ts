@@ -192,6 +192,16 @@ export function autorun(fn: Reaction, until: (() => boolean) | undefined) {
         // run the reaction and collect all new mappings
         const previous = reportObservableAccessed
         reportObservableAccessed = obs => newObservablesToReactions.push({ ...obs, effect })
+        
+        if (until != null) {
+            const finished = until()
+            if (finished) {
+                unsubscribe()
+                return
+            }
+        }
+
+
         fn()
         reportObservableAccessed = previous
 
@@ -209,10 +219,6 @@ export function autorun(fn: Reaction, until: (() => boolean) | undefined) {
     const unsubscribe = () => {
         // unsubscribe
         observablesToReactions = observablesToReactions.filter(r => r.effect !== effect)
-    }
-
-    if (until != null) {
-        when(until).then(unsubscribe)
     }
 
     return unsubscribe

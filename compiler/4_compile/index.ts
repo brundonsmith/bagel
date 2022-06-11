@@ -177,7 +177,7 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'bui
                 () => ${c(ast.expr)}
             )`
         }
-        case "autorun": return `${INT}autorun(() => ${c(ast.effect)}, ${ast.until ? '() => ' + c(ast.until) : 'undefined'})`;
+        case "autorun": return `${INT}autorun(() => ${c(ast.effect)}, ${ast.until ? '() => ' + fixTruthinessIfNeeded(excludeTypes, module, destination, ast.until) : 'undefined'})`;
         case "assignment": {
             const value = c(ast.value)
 

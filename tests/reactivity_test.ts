@@ -22,6 +22,25 @@ Deno.test({
 })
 
 Deno.test({
+    name: 'autorun() with until',
+    fn() {
+        const outcomes: number[] = []
+
+        const obj = { count: 0 }
+
+        autorun(() => {
+            outcomes.push(observe(obj, 'count'))
+        }, () => observe(obj, 'count') > 1)
+
+        obj.count++; invalidate(obj, 'count')
+        obj.count++; invalidate(obj, 'count')
+        obj.count++; invalidate(obj, 'count')
+
+        assertEquals(outcomes, [0, 1])
+    }
+})
+
+Deno.test({
     name: 'when()',
     async fn() {
         const obj = { count: 0 }
