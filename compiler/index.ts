@@ -36,14 +36,14 @@ async function main() {
             modules[entry] = { source: undefined, loading: false }; invalidate(modules, entry)
 
             autorun(async () => {
-                if (done()) {       
-                    if (!parsed(entry)?.ast.declarations.some(decl => decl.kind === 'proc-declaration' && decl.name.name === 'main')) {
-                        fail(`Entry module doesn't have a proc named "main". Entry module is:\n${pad('')}${entry}`)
-                    }
-
+                if (done()) {  
                     printProblems(allProblems(), flags.watch)
-
+ 
                     if (!hasProblems()) {
+                        if (!parsed(entry)?.ast.declarations.some(decl => decl.kind === 'proc-declaration' && decl.name.name === 'main')) {
+                            fail(`Entry module doesn't have a proc named "main". Entry module is:\n${pad('')}${entry}`)
+                        }
+    
                         await Promise.all([...Object.keys(modules)].map(async _module => {
                             const module = _module as ModuleName
                             const jsPath = buildFilePath(module)
