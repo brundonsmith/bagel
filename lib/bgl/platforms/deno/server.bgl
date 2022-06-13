@@ -1,0 +1,92 @@
+js#
+import { Server as ___Server } from 'https://deno.land/std@v0.139.0/http/server.ts';
+#js
+
+type RequestCache =
+  | 'default'
+  | 'force-cache'
+  | 'no-cache'
+  | 'no-store'
+  | 'only-if-cached'
+  | 'reload'
+type RequestCredentials = 'include' | 'omit' | 'same-origin'
+type RequestMode = 'cors' | 'navigate' | 'no-cors' | 'same-origin'
+type RequestRedirect = 'error' | 'follow' | 'manual'
+type ReferrerPolicy =
+  | ''
+  | 'no-referrer'
+  | 'no-referrer-when-downgrade'
+  | 'origin'
+  | 'origin-when-cross-origin'
+  | 'same-origin'
+  | 'strict-origin'
+  | 'strict-origin-when-cross-origin'
+  | 'unsafe-url'
+type RequestDestination =
+  | ''
+  | 'audio'
+  | 'audioworklet'
+  | 'document'
+  | 'embed'
+  | 'font'
+  | 'image'
+  | 'manifest'
+  | 'object'
+  | 'paintworklet'
+  | 'report'
+  | 'script'
+  | 'sharedworker'
+  | 'style'
+  | 'track'
+  | 'video'
+  | 'worker'
+  | 'xslt'
+type Headers = {[string]: string}
+
+export type Request = const {
+    cache: RequestCache,
+    credentials: RequestCredentials,
+    destination: RequestDestination,
+    headers: Headers,
+    integrity: string,
+    isHistoryNavigation: boolean,
+    isReloadNavigation: boolean,
+    keepalive: boolean,
+    method: string,
+    mode: RequestMode,
+    redirect: RequestRedirect,
+    referrer: string,
+    referrerPolicy: ReferrerPolicy,
+    url: string,
+    body: string,
+}
+
+export type Response = {
+    headers?: Headers,
+    status?: number,
+    statusText?: string,
+    body?: string,
+}
+
+export type SendResponse = (res: Response) {}
+
+export async deno proc serve(port: number, handler: async (req: Request, sendResponse: SendResponse) {}) {#
+    return () => {
+        const s = new ___Server({
+            handler: req => new Promise(resolve => {
+                handler(
+                  {...req,
+                      body: req.body?.toString(),
+                      headers: Object.fromEntries(req.headers.entries()),
+                  },
+                  res => {
+                    const { body, ...init } = res
+                    resolve(new Response(body, init))
+                  }
+                )
+            })
+        })
+
+        return s.serve(Deno.listen({ port }))
+    }
+#}
