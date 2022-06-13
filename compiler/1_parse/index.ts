@@ -1255,6 +1255,7 @@ const assignment: ParseFunction<Assignment> = (module, code, startIndex) =>
 
 const procCall: ParseFunction<Invocation> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'await'), ({ parsed: awaited, index }) =>
+    given(parseKeyword(code, index, 'detach'), ({ parsed: detached, index }) =>
     given(invocationAccessorChain(module, code, index), ({ parsed, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseOptional(module, code, index, parseExact("?")), ({ parsed: bubbles, index: indexAfterQuestionMark }) =>
@@ -1264,10 +1265,10 @@ const procCall: ParseFunction<Invocation> = (module, code, startIndex) =>
             parsed: {
                 ...parsed,
                 bubbles: bubbles != null,
-                awaited
+                awaitedOrDetached: awaited ? 'await' : detached ? 'detach' : undefined,
             },
             index
-        } : undefined))))))
+        } : undefined)))))))
     
 
 const ifElseStatement: ParseFunction<IfElseStatement> = (module, code, startIndex) =>

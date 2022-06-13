@@ -123,7 +123,7 @@ export type Invocation = SourceInfo & {
     readonly spreadArg: Spread|undefined,
     readonly typeArgs: readonly TypeExpression[],
     readonly bubbles: boolean,
-    readonly awaited?: boolean, // only used when this is a statement in a proc!
+    readonly awaitedOrDetached?: 'await'|'detach'|undefined, // only used when this is a statement in a proc!
 }
 
 export type PropertyAccessor = SourceInfo & {

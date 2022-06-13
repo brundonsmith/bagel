@@ -179,7 +179,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "while-loop":
             return `while ${f(ast.condition)} ${f(ast.body)}`
         case "invocation":
-            return (ast.awaited ? 'await ' : '') + `${f(ast.subject)}${maybeTypeArgs(options, indent, parent, ast.typeArgs)}(${[...ast.args, ast.spreadArg].filter(exists).map(f).join(', ')})` + (parent?.kind === 'block' ? ';' : '')
+            return `${ast.awaitedOrDetached ? ast.awaitedOrDetached + ' ' : ''}${f(ast.subject)}${maybeTypeArgs(options, indent, parent, ast.typeArgs)}(${[...ast.args, ast.spreadArg].filter(exists).map(f).join(', ')})` + (parent?.kind === 'block' ? ';' : '')
         case "property-accessor": {
             const operator = (
                 ast.optional ? '?.' :

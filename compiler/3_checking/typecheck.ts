@@ -322,15 +322,6 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 }
             } break;
             case "invocation": {
-                if (current.awaited) {
-                    const nearestFuncOrProc = getNearestFuncOrProc(current)
-
-                    if (!nearestFuncOrProc == null) {
-                        reportError(miscError(current, `Can only await within an async proc`))
-                    } else if (!nearestFuncOrProc?.isAsync) {
-                        reportError(miscError(current, `Proc must be async to contain await`))
-                    }
-                }
 
                 // Creation of nominal values looks like/parses as function 
                 // invocation, but needs to be treated differently
@@ -379,9 +370,31 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                 } else {
                     const invoked = subjectType.kind === 'generic-type' ? subjectType.inner as FuncType|ProcType : subjectType
         
-                    // check that if this is a statement, the call subject is a procedure
-                    if (parent?.kind === 'block' && invoked.kind === 'func-type') {
-                        reportError(miscError(invocation.subject, `Only procedures can be called as statements, not functions`))
+                    // if this is a statement
+                    if (parent?.kind === 'block') {
+
+                        // check that the call subject is a procedure
+                        if (invoked.kind === 'func-type') {
+                            reportError(miscError(invocation.subject, `Only procedures can be called as statements, not functions`))
+                        } else {
+                            const nearestFuncOrProc = getNearestFuncOrProc(current)
+    
+                            if (current.awaitedOrDetached) {
+                                if (nearestFuncOrProc == null) {
+                                    reportError(miscError(current, `Can only ${current.awaitedOrDetached} within an async proc`))
+                                } else if (!nearestFuncOrProc?.isAsync) {
+                                    reportError(miscError(current, `Proc must be async to contain ${current.awaitedOrDetached}`))
+                                }
+
+                                if (!invoked.isAsync) {
+                                    reportError(miscError(current, `Can only ${current.awaitedOrDetached} async procs`))
+                                }
+                            } else {
+                                if (invoked.isAsync) {
+                                    reportError(miscError(current, `Must await or detach calls to async procs`))
+                                }
+                            }
+                        }
                     }
 
                     {

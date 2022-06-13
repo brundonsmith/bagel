@@ -256,9 +256,9 @@ function compileOne(excludeTypes: boolean, module: ModuleName, destination: 'bui
 
             const baseInvocation = `${c(invocation.subject)}${typeArgs}(${args})`
             const compiledInvocation = (
-                ast.awaited
-                    ? awaited(baseInvocation)
-                    : baseInvocation
+                ast.awaitedOrDetached === 'await' ? awaited(baseInvocation) :
+                ast.awaitedOrDetached === 'detach' ? detached(baseInvocation) :
+                baseInvocation
             )
 
             if (subjectType.kind === 'proc-type' && subjectType.throws) {
@@ -537,5 +537,8 @@ const truthify = (excludeTypes: boolean, module: ModuleName, destination: 'build
 
 const awaited = (plan: string) =>
     `await (${plan})()`
+
+const detached = (plan: string) =>
+    plan + '()'
 
 // TODO: const nominal types (generalized const wrapper for any given type?)

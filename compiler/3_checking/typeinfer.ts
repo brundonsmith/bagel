@@ -1460,40 +1460,6 @@ export function throws(block: Block): TypeExpression[] {
     return errorTypes
 }
 
-function isAsync(block: Block): boolean {
-    for (const statement of block.statements) {
-        switch (statement.kind) {
-            case 'invocation': {
-                return statement.awaited === true
-                // const procType = inferType(statement.subject)
-
-                // if (procType.kind === 'proc-type' && procType.isAsync) {
-                //     return true
-                // }
-            }
-            case 'for-loop':
-            case 'while-loop':
-                if (isAsync(statement.body)) return true
-                break;
-            case 'try-catch':
-                if (isAsync(statement.tryBlock) || isAsync(statement.catchBlock)) return true
-                break;
-            case 'if-else-statement':
-                for (const { outcome } of statement.cases) {
-                    if (isAsync(outcome)) return true
-                }
-                if (statement.defaultCase && isAsync(statement.defaultCase)) {
-                    return true
-                }
-                break;
-            case 'declaration-statement':
-                return statement.awaited;
-        }
-    }
-
-    return false;
-}
-
 const identifierToExactString = (ident: PlainIdentifier): ExactStringLiteral => ({
     kind: 'exact-string-literal',
     value: ident.name,
