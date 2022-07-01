@@ -1,18 +1,19 @@
 
 MVP
+- configuration
+- +=, ++, etc
+
+- Bagel tests
+    - Mocking system
 - Destructuring arguments
 - parallel await
 - debugging utils (functional logging, etc)
 - implement more platform APIs
-- configuration
 - implement web server integration
-- Bagel tests
-    - Mocking system
 - autoruns only allowed in index.bgl?
     - maybe also in files that completely declare their "let" dependencies?
     - only in project directory?
       - This. TODO: forbid autoruns found in non-local modules.
-- Only auto-run main() proc in the actual entry file
 
 Design tasks:
 - Dates
