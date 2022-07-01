@@ -380,10 +380,12 @@ export function typecheck(reportError: ReportError, ast: Module): void {
                             const nearestFuncOrProc = getNearestFuncOrProc(current)
     
                             if (current.awaitedOrDetached) {
-                                if (nearestFuncOrProc == null) {
-                                    reportError(miscError(current, `Can only ${current.awaitedOrDetached} within an async proc`))
-                                } else if (!nearestFuncOrProc?.isAsync) {
-                                    reportError(miscError(current, `Proc must be async to contain ${current.awaitedOrDetached}`))
+                                if (current.awaitedOrDetached === 'await') {
+                                    if (nearestFuncOrProc == null) {
+                                        reportError(miscError(current, `Can only await within an async proc`))
+                                    } else if (!nearestFuncOrProc?.isAsync) {
+                                        reportError(miscError(current, `Proc must be async to contain await`))
+                                    }
                                 }
 
                                 if (!invoked.isAsync) {
