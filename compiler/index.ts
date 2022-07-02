@@ -8,7 +8,7 @@ import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, p
 import { esOrNone, sOrNone } from "./utils/misc.ts";
 import { ALL_PLATFORMS, Platform } from "./_model/declarations.ts";
 import { loadAllModules,allProblems,hasProblems,formatted,autofixed,compiled } from "./store.ts";
-import { ERROR_SYM } from "../lib/ts/core.ts";
+import { ERROR_SYM } from "https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts";
 
 async function run() {
     switch (command) {
