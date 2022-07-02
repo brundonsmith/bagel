@@ -4,10 +4,8 @@ import { ExactStringLiteral, LocalIdentifier } from "./_model/expressions.ts";
 import { TypeExpression } from "./_model/type-expressions.ts";
 import { Colors } from "./deps.ts";
 import { deepEquals, given } from "./utils/misc.ts";
-import { ModuleName } from "./_model/common.ts";
+import { Context, ModuleName } from "./_model/common.ts";
 import { LintProblem } from "./other/lint.ts";
-import { format } from "./other/format.ts";
-import { SOURCE_INFO_PROPERTIES } from "./utils/ast.ts";
 
 export type BagelError =
     | BagelSyntaxError
@@ -140,7 +138,7 @@ export function cannotFindExport(ast: ImportItem, importDeclaration: ImportDecla
     return { kind: "bagel-cannot-find-export-error", ast, importDeclaration }
 }
 
-export function prettyProblem(modulePath: ModuleName, error: BagelError|LintProblem): string {
+export function prettyProblem(ctx: Pick<Context, "allModules" | "canonicalModuleName">, modulePath: ModuleName, error: BagelError|LintProblem): string {
     let output = "";
 
     const code = (
@@ -168,7 +166,7 @@ export function prettyProblem(modulePath: ModuleName, error: BagelError|LintProb
     )
     const message = (
         error.kind === "bagel-syntax-error" ? error.message : 
-        error.kind === 'lint-problem' ? error.rule.message(error.ast) + ` [linter rule '${error.name}']` :
+        error.kind === 'lint-problem' ? error.rule.message(ctx, error.ast) + ` [linter rule '${error.name}']` :
         errorMessage(error)
     )
     const severity = (

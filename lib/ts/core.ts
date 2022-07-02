@@ -1,5 +1,5 @@
 
-import { autorun, invalidate, observe, WHOLE_OBJECT } from "./reactivity.ts";
+import { observe, WHOLE_OBJECT, Plan } from "./reactivity.ts";
 
 // Custom reactivity
 export {
@@ -8,7 +8,12 @@ export {
     autorun,
     computedFn,
     action,
-    WHOLE_OBJECT
+    WHOLE_OBJECT,
+    Remote
+} from './reactivity.ts'
+
+export type {
+    Plan,
 } from './reactivity.ts'
 
 
@@ -371,8 +376,6 @@ function* indexed<T>(iter: RawIter<T>): Generator<[T, number]> {
 }
 
 // Plans
-export type Plan<T> = () => Promise<T>
-
 export function concurrent<P extends unknown[], R>(fn: (...params: P) => R, ...params: P): Plan<R> {
     return () => asWorker(fn)(...params)
 }
@@ -398,38 +401,6 @@ function asWorker<P extends unknown[], R>(fn: (...params: P) => R): (...params: 
 
         worker.postMessage(JSON.stringify(params))
     })
-}
-
-export class Remote<T> {
-
-    constructor (
-        fetcher: () => Plan<T>
-    ) {
-        let latestRequestId: string|undefined;
-
-        autorun(() => {
-            const thisRequestId = latestRequestId = String(Math.random())
-            
-            this.loading = true; invalidate(this, 'loading');
-            
-            fetcher()()
-                .then(res => {
-                    if (thisRequestId === latestRequestId) {
-                        this.value = res; invalidate(this, 'value');
-                        this.loading = false; invalidate(this, 'loading');
-                    }
-                })
-                .catch(() => {
-                    if (thisRequestId === latestRequestId) {
-                        // TODO
-                        this.loading = false; invalidate(this, 'loading');
-                    }
-                })
-        }, undefined)
-    }
-
-    public value: T|undefined;
-    public loading = false;
 }
 
 

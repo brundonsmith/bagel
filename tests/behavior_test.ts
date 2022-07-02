@@ -1,8 +1,8 @@
 import { parse } from "../compiler/1_parse/index.ts";
 import { compile, IMPORTED_ITEMS, INT } from "../compiler/4_compile/index.ts";
-import { BagelError, prettyProblem } from "../compiler/errors.ts";
+import { prettyProblem } from "../compiler/errors.ts";
 import { Module } from "../compiler/_model/ast.ts";
-import { ModuleName } from "../compiler/_model/common.ts";
+import { AllModules, DEFAULT_CONFIG, ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
     name: "Simple autorun",
@@ -158,21 +158,27 @@ Deno.test({
 async function testSideEffects(bgl: string, expected: any[]) {
     const moduleName = "<test>.bgl" as ModuleName;
 
-    const { ast, errors } = parse(moduleName, bgl, true) as { ast: Module, errors: BagelError[] };
-    const compiled = compile(moduleName, ast, 'build-dir', true, false, true);
-    if (errors.length > 0) {
+    const parseResult = parse(moduleName, bgl);
+    const { noPreludeAst: ast, errors } = parseResult ?? {}
+
+    const allModules: AllModules = new Map()
+    allModules.set(moduleName, parseResult)
+    const ctx = { allModules, config: DEFAULT_CONFIG, moduleName, excludeTypes: true, transpilePath: (m: string) => m + '.ts', canonicalModuleName: (_: ModuleName, m: string) => m as ModuleName }
+    
+    const compiled = compile(ctx, ast as Module, true);
+    if (errors && errors.length > 0) {
         throw `\n${bgl}\nFailed to parse:\n` +
-        errors.map((err) => prettyProblem(moduleName, err)).join("\n");
+        errors.map((err) => prettyProblem(ctx, moduleName, err)).join("\n");
     }
 
     const outputs: any[] = [];
     // deno-lint-ignore no-unused-vars
     const output = (output: any) => outputs.push(output); // Referenced by eval()
+    const core = await import("../lib/ts/core.ts"); // Referenced by eval()
 
     await eval(
-        `(async function() {
-            const { ${IMPORTED_ITEMS.map((s) => `${s}: ${INT}${s}`).join(", ")
-        } } = await import("../lib/ts/core.ts");
+        `(function() {
+            const { ${IMPORTED_ITEMS.map((s) => `${s}: ${INT}${s}`).join(", ")} } = core;
             ` + compiled + `
             runTest();
         })();`

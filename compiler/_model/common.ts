@@ -1,15 +1,38 @@
 import { ForLoop, TryCatch, DeclarationStatement } from "./statements.ts";
 import { GenericParamType, TypeExpression } from "./type-expressions.ts";
-import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, TypeDeclaration, ImportItem } from "./declarations.ts";
+import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, TypeDeclaration, ImportItem, ALL_PLATFORMS, Platform } from "./declarations.ts";
 import { Expression, Func, InlineDeclaration, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
-import { AST, PlainIdentifier } from "./ast.ts";
+import { AST, Module, PlainIdentifier } from "./ast.ts";
+import { LintRuleName,LintRuleSeverity,DEFAULT_SEVERITY } from "../other/lint.ts";
 
 const MODULE_NAME = Symbol('MODULE_NAME')
 export type ModuleName = NominalType<string, typeof MODULE_NAME>
 
+export type AllModules = Map<ModuleName, { ast: Module, noPreludeAst: Module, errors: readonly BagelError[] } | undefined>
+
 export type ReportError = (error: BagelError) => void
+
+export type Context = {
+    allModules: AllModules,
+    sendError: ReportError,
+    config: BagelConfig,
+    encounteredNames?: readonly string[],
+    visited?: readonly AST[],
+    canonicalModuleName: (importerModule: ModuleName, importPath: string) => ModuleName
+}
+
+// config
+export type BagelConfig = {
+    readonly platforms: readonly Platform[] | undefined,
+    readonly lintRules: {readonly [key in LintRuleName]: LintRuleSeverity} | undefined
+}
+
+export const DEFAULT_CONFIG: BagelConfig = {
+    platforms: [...ALL_PLATFORMS],
+    lintRules: DEFAULT_SEVERITY
+}
 
 export type Binding = {
     readonly identifier: PlainIdentifier

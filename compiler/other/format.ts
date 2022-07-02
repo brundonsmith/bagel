@@ -1,11 +1,7 @@
 
-import { computedFn, observe } from "../../lib/ts/reactivity.ts";
-import { parsed } from "../1_parse/index.ts";
-import { modules } from "../store.ts";
 import { getName } from "../utils/ast.ts";
 import { exists, given } from "../utils/misc.ts";
 import { AST, PlainIdentifier } from '../_model/ast.ts'
-import { ModuleName } from "../_model/common.ts";
 import { ExactStringLiteral } from "../_model/expressions.ts";
 import { FuncType, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
@@ -18,21 +14,6 @@ export const DEFAULT_OPTIONS: FormatOptions = {
     spaces: 4,
     lineBreaks: true
 }
-
-export const formatted = computedFn(function formatted (moduleName: ModuleName): string {
-    const ast = parsed(moduleName)?.ast
-
-    if (ast?.moduleType === 'bgl') {
-        return (
-            format(
-                ast,
-                DEFAULT_OPTIONS
-            )
-        )
-    } else {
-        return observe(observe(modules, moduleName), 'source') ?? ''
-    }
-})
 
 export function format(ast: AST, options?: Partial<FormatOptions>): string {
     return formatInner({ ...DEFAULT_OPTIONS, ...options }, 0, undefined)(ast)

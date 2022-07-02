@@ -1,59 +1,91 @@
-import { parsed } from "./1_parse/index.ts";
-import { typeerrors } from "./3_checking/typecheck.ts";
-import { path } from "./deps.ts";
+import { parse } from "./1_parse/index.ts";
+import { typecheck } from "./3_checking/typecheck.ts";
 import { BagelError, errorsEquivalent, isError } from "./errors.ts";
-import { cliPlatforms, entry, pathIsInProject, pathIsRemote } from "./utils/misc.ts";
-import { ModuleName } from "./_model/common.ts";
-import { lint, LintProblem } from "./other/lint.ts";
-import { Platform, ValueDeclaration } from "./_model/declarations.ts";
-import { PlainIdentifier } from "./_model/ast.ts";
-import { ExactStringLiteral, Expression, ObjectEntry } from "./_model/expressions.ts";
-import { getName } from "./utils/ast.ts";
-import { computedFn, observe, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
+import { AllModules, Context, ModuleName } from "./_model/common.ts";
+import { autofix, lint, LintProblem } from "./other/lint.ts";
+import { ImportAllDeclaration, ImportDeclaration } from "./_model/declarations.ts";
+import { computedFn } from "../lib/ts/reactivity.ts";
+import { cacheDir, devMode, diskModulePath, entry, pad, pathIsInProject } from "./utils/cli.ts";
+import { Module } from "./_model/ast.ts";
+import { compile, CompileContext } from "./4_compile/index.ts";
+import { format,DEFAULT_OPTIONS } from "./other/format.ts";
+import { fs,Colors } from "./deps.ts";
+import { canonicalModuleName, pathIsRemote } from "./utils/misc.ts";
 
-type ModuleData = {
-    source: string|undefined,
-    loading: boolean,
-}
-export const modules: Record<ModuleName, ModuleData> = {}
+const loadModuleSource = async (module: ModuleName): Promise<string | undefined> => {
+    if (pathIsRemote(module)) {
+        if(devMode) console.log(Colors.cyan('Info ') + `Loading remote module ${module}`)
 
-export const done = computedFn(function done () {
-    if (Object.keys(observe(modules, WHOLE_OBJECT)).length === 0) {
-        return false
-    }
+        try {
+            const cachePath = diskModulePath(module)
+            const cached = await Deno.readTextFile(cachePath).catch(() => undefined)
 
-    for (const _module in observe(modules, WHOLE_OBJECT)) {
-        const module = _module as ModuleName
-        const data = observe(modules, module)
+            if (cached != null) {
+                if(devMode) console.log(Colors.cyan('Info ') + `Loaded from cache ${module}`)
+                return cached
+            } else {
+                if(devMode) console.log(Colors.cyan('Info ') + `Failed to load from cache, fetching remotely ${module}`)
+                const res = await fetch(module)
+                
+                if (res.status === 200) {
+                    console.log(Colors.green(pad('Downloaded')) + module)
+                    const source = await res.text()
 
-        if (observe(data, 'source') == null) {
-            return false
+                    void cache(module, source)
+
+                    return source
+                } else {
+                    const cachePath = diskModulePath(module)
+
+                    if (await fs.exists(cachePath)) {
+                        await Deno.remove(cachePath)
+                    }
+                }
+            }
+        } catch {
+            console.error(Colors.red(pad('Error')) + `couldn't load remote module '${module}'`)
         }
+    } else {
+        const source = await Deno.readTextFile(module)
+
+        if (!pathIsInProject(module)) {
+            void cache(module, source)
+        }
+
+        return source
     }
+}
 
-    return true
-})
+async function cache(module: ModuleName, source: string) {
+    try {
+        await fs.ensureDir(cacheDir)
 
-export const allProblems = computedFn(function allProblems (excludePrelude?: boolean) {
-    observe(modules, WHOLE_OBJECT)
+        const cachePath = diskModulePath(module)
+        await Deno.writeTextFile(cachePath, source)
 
+        if(devMode) console.log(Colors.cyan('Info ') + `Cached module ${module}`)
+        if(devMode) console.log(Colors.cyan('Info ') + `...at ${cachePath}`)
+    } catch {
+        console.warn(Colors.yellow(pad('Warning')) + `failed writing cache of module ${module}`)
+    }
+}
+
+export const allProblems = computedFn(function allProblems (ctx: Pick<Context, "allModules" | "config">) {
+    const { allModules, config } = ctx
     const allProblems = new Map<ModuleName, (BagelError|LintProblem)[]>()
     
-    for (const module in modules) {
-        allProblems.set(module as ModuleName, [])
+    for (const [module, _] of allModules) {
+        allProblems.set(module, [])
     }
 
-    for (const _module in modules) {
-        const module = _module as ModuleName
-
-        const parseResult = parsed(module, excludePrelude)
+    for (const [module, parseResult] of allModules) {
         if (parseResult) {
             // console.log(withoutSourceInfo(parsed.ast))
             const { ast, errors: parseErrors } = parseResult
-            const typecheckErrors = typeerrors(ast)
+            const typecheckErrors = typeerrors(ctx, ast)
             const lintProblems = (
                 pathIsInProject(module)
-                    ? lint(getConfig(), parseResult.ast)
+                    ? lint(ctx, parseResult.ast)
                     : []
             )
 
@@ -67,8 +99,8 @@ export const allProblems = computedFn(function allProblems (excludePrelude?: boo
     return allProblems
 })
 
-export const hasProblems = computedFn(function hasProblems () {
-    const problems = allProblems()
+export const hasProblems = computedFn(function hasProblems (ctx: Pick<Context, "allModules" | "config">) {
+    const problems = allProblems(ctx)
 
     for (const moduleProblems of problems.values()) {
         if (moduleProblems.length > 0) {
@@ -79,65 +111,93 @@ export const hasProblems = computedFn(function hasProblems () {
     return false
 })
 
-export const getModuleByName = computedFn(function getModuleByName (importer: ModuleName, imported: string) {
-    const importedModuleName = canonicalModuleName(importer, imported)
+export const typeerrors = computedFn(function typeerrors (ctx: Pick<Context, "allModules" | "config">, ast: Module): BagelError[] {
+    const errors: BagelError[] = []
+    const sendError = (err: BagelError) => errors.push(err)
 
-    return parsed(importedModuleName)?.ast
+    typecheck(
+        { ...ctx, sendError, entry, canonicalModuleName },
+        ast
+    )
+    return errors
 })
 
-export type BagelConfig = {
-    platforms: Platform[]|undefined,
-    lintRules: {[key: string]: string}|undefined
-}
+export const compiled = computedFn(function compiled(ctx: CompileContext): string {
+    const { allModules, moduleName } = ctx
 
-export const getConfig = computedFn(function getConfig (): BagelConfig|undefined {
-    if (!entry) return undefined
+    const ast = allModules.get(moduleName)?.ast
 
-    const res = parsed(entry)
-    const configDecl = res?.ast.declarations.find(decl =>
-        decl.kind === 'value-declaration' && decl.isConst && decl.name.name === 'config') as ValueDeclaration|undefined
+    if (!ast) {
+        return ''
+    }
 
-    // TODO: Eventually we want to actually evaluate the const, not
-    // just walk its AST
-    if (configDecl?.value.kind === 'object-literal') {
-        let platforms: Platform[]|undefined
-        let lintRules: {[key: string]: string}|undefined
-        
-        {
-            const platformsExpr = (configDecl.value.entries.find(e =>
-                Array.isArray(e) && (e[0] as PlainIdentifier).name === 'platforms') as any)?.[1] as Expression|undefined
-            
-            platforms = platformsExpr?.kind === 'array-literal' ?
-                platformsExpr.entries.filter(e => e.kind === 'exact-string-literal').map(e => (e as ExactStringLiteral).value as Platform)
-            : undefined
-        }
-        
-        {
-            const lintRulesExpr = (configDecl.value.entries.find(e =>
-                Array.isArray(e) && (e[0] as PlainIdentifier).name === 'lintRules') as any)?.[1] as Expression|undefined
-            
-            lintRules = lintRulesExpr?.kind === 'object-literal' ?
-                Object.fromEntries(lintRulesExpr.entries
-                    .filter((e): e is ObjectEntry => e.kind === 'object-entry' && e.value.kind === 'exact-string-literal')
-                    .map(e => [
-                        getName(e.key as PlainIdentifier | ExactStringLiteral),
-                        (e.value as ExactStringLiteral).value,
-                    ]))
-            : undefined
-        }
-        
-        return {
-            platforms: cliPlatforms.length > 0 ? cliPlatforms : platforms,
-            lintRules
-        }
+    return compile(ctx, ast)
+})
+
+export const formatted = computedFn(function formatted (allModules: AllModules, moduleName: ModuleName): string | undefined {
+    const ast = allModules.get(moduleName)?.ast
+
+    if (ast?.moduleType === 'bgl') {
+        return (
+            format(
+                ast,
+                DEFAULT_OPTIONS
+            )
+        )
     }
 })
 
-export function canonicalModuleName(importerModule: ModuleName, importPath: string): ModuleName {
-    if (pathIsRemote(importPath)) {
-        return importPath as ModuleName
-    } else {
-        const moduleDir = path.dirname(importerModule);
-        return path.resolve(moduleDir, importPath) as ModuleName
+export const autofixed = computedFn(function autofixed (allModules: AllModules, moduleName: ModuleName): string {
+    const ast = allModules.get(moduleName)?.ast
+
+    if (!ast) {
+        return ''
     }
+    
+    return (
+        format(
+            autofix(ast),
+            DEFAULT_OPTIONS
+        )
+    )
+})
+
+export const loadAllModules = async (entries: readonly ModuleName[]): Promise<AllModules> => {
+    let frontier = new Set<ModuleName>(entries)
+    const modules = new Map<ModuleName, ReturnType<typeof parse>>()
+
+    while (frontier.size > 0) {
+        const newFrontier = new Set<ModuleName>()
+
+        for (const module of frontier) {
+            if (!modules.has(module)) {
+                const source = await loadModuleSource(module)
+
+                if (source == null) {
+                    modules.set(module, undefined)
+                } else {
+                    const parsed = parse(module, source)
+                    modules.set(module, parsed)
+
+                    if (parsed?.ast != null) {
+                        const importedModules = (
+                            parsed.ast.declarations
+                                .filter((decl): decl is ImportDeclaration|ImportAllDeclaration => decl.kind === 'import-declaration' || decl.kind === 'import-all-declaration')
+                                .map(decl => canonicalModuleName(module, decl.path.value))
+                        )
+
+                        for (const moduleName of importedModules) {
+                            if (!modules.has(moduleName) && !frontier.has(moduleName)) {
+                                newFrontier.add(moduleName)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        frontier = newFrontier
+    }
+
+    return modules
 }

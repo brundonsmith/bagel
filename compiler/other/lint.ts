@@ -1,24 +1,22 @@
-import { computedFn } from "../../lib/ts/reactivity.ts";
-import { parsed } from "../1_parse/index.ts";
-import { resolve } from "../3_checking/resolve.ts";
 import { resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
 import { inferType } from "../3_checking/typeinfer.ts";
-import { BagelConfig } from "../store.ts";
-import { findAncestor, iterateParseTree, mapParseTree } from "../utils/ast.ts";
+import { iterateParseTree, mapParseTree } from "../utils/ast.ts";
 import { AST } from "../_model/ast.ts";
-import { ModuleName } from "../_model/common.ts";
+import { Context } from "../_model/common.ts";
 import { FuncDeclaration, ProcDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 import { Expression, Func, Proc } from "../_model/expressions.ts";
 import { BOOLEAN_TYPE, FALSY, NUMBER_TYPE, STRING_TYPE, TypeExpression } from "../_model/type-expressions.ts";
-import { format,DEFAULT_OPTIONS } from "./format.ts";
+import { format } from "./format.ts";
 
-export function lint(config: BagelConfig|undefined, ast: AST): LintProblem[] {
+export function lint(ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: AST): LintProblem[] {
+    const { config } = ctx
+    
     const problems: LintProblem[] = []
     const rules = (Object.entries(RULES) as [LintRuleName, LintRule][]).filter(rule => (config?.lintRules?.[rule[0]] ?? DEFAULT_SEVERITY[rule[0]]) !== 'off')
 
     for (const { current } of iterateParseTree(ast)) {
         for (const [name, rule] of rules) {
-            const problemNode = rule.match(current)
+            const problemNode = rule.match(ctx, current)
 
             if (problemNode) {
                 problems.push({
@@ -34,21 +32,6 @@ export function lint(config: BagelConfig|undefined, ast: AST): LintProblem[] {
 
     return problems
 }
-
-export const autofixed = computedFn(function autofixed (moduleName: ModuleName): string {
-    const ast = parsed(moduleName)?.ast
-
-    if (!ast) {
-        return ''
-    }
-    
-    return (
-        format(
-            autofix(ast),
-            DEFAULT_OPTIONS
-        )
-    )
-})
 
 export function autofix(ast: AST): AST {
     const rules = Object.values(RULES)
@@ -67,12 +50,13 @@ export function autofix(ast: AST): AST {
 }
 
 type LintRule = {
-    readonly message: (ast: AST) => string,
-    readonly match: (ast: AST) => AST|undefined,
+    readonly message: (ctx: Pick<Context, "allModules" | "canonicalModuleName">, ast: AST) => string,
+    readonly match: (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: AST) => AST|undefined,
     readonly autofix: ((ast: AST) => AST) | undefined,
 }
 
-export type LintRuleSeverity = 'error'|'warning'|'info'|'off'
+export const ALL_LINT_RULE_SEVERITIES = ['error', 'warning', 'info', 'off'] as const
+export type LintRuleSeverity = typeof ALL_LINT_RULE_SEVERITIES[number]
 
 export type LintProblem = {
     readonly kind: 'lint-problem',
@@ -85,7 +69,7 @@ export type LintProblem = {
 const RULES = {
     'unnecessaryParens': {
         message: () => "Parenthesis aren't needed around this expression",
-        match: (ast: AST) => {
+        match: (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: AST) => {
             if ((ast.kind === 'case' || ast.kind === 'case-block') && ast.condition.kind === 'parenthesized-expression') {
                 return ast.condition
             }
@@ -102,13 +86,13 @@ const RULES = {
         }
     },
     'funcOrProcAsValue': {
-        message: (ast: AST) => {
+        message: (ctx: Pick<Context, "allModules" | "canonicalModuleName">, ast: AST) => {
             const decl = ast as ValueDeclaration
             const val = decl.value as Proc|Func
 
             return `Top-level const ${val.kind === 'func' ? 'functions' : 'procedures'} should be ${val.kind} declarations, not ${decl.isConst ? 'const' : 'let'} declarations`
         },
-        match: (ast: AST) => {
+        match: (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: AST) => {
             if (ast.kind === 'value-declaration' && ast.isConst && (ast.value.kind === 'proc' || ast.value.kind === 'func')) {
                 return ast
             }
@@ -146,16 +130,16 @@ const RULES = {
         }
     },
     'redundantConditional': {
-        message: (ast: AST) => {
-            const condType = resolveType(inferType(ast as Expression))
-            const always = isAlways(ast as Expression)
+        message: (ctx: Pick<Context, "allModules" | "canonicalModuleName">, ast: AST) => {
+            const condType = resolveType(ctx, inferType(ctx, ast as Expression))
+            const always = isAlways(ctx, ast as Expression)
             return `This condition is redundant, because it can only ever be ${String(always)} (type: '${format(condType)}')`
         },
-        match: (ast: AST) => {
+        match: (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: AST) => {
             const condition = conditionFrom(ast)
 
             if (condition) {
-                const always = isAlways(condition)
+                const always = isAlways(ctx, condition)
                 if (always != null) {
                     return condition
                 }
@@ -164,13 +148,13 @@ const RULES = {
         autofix: undefined
     },
     'stringNumberConditional': {
-        message: (ast: AST) => `Condition has type '${format(inferType(ast as Expression))}'. Beware using string or numbers in conditionals; in Bagel all strings and numbers are truthy!`,
-        match: (ast: AST) => {
+        message: (ctx: Pick<Context, "allModules" | "canonicalModuleName">, ast: AST) => `Condition has type '${format(inferType(ctx, ast as Expression))}'. Beware using string or numbers in conditionals; in Bagel all strings and numbers are truthy!`,
+        match: (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: AST) => {
             const condition = conditionFrom(ast)
 
             if (condition) {
-                const conditionType = inferType(condition)
-                if (!subsumationIssues(conditionType, STRING_TYPE) || !subsumationIssues(conditionType, NUMBER_TYPE)) {
+                const conditionType = inferType(ctx, condition)
+                if (!subsumationIssues(ctx, conditionType, STRING_TYPE) || !subsumationIssues(ctx, conditionType, NUMBER_TYPE)) {
                     return condition
                 }
             }
@@ -178,13 +162,14 @@ const RULES = {
         autofix: undefined
     },
     'explicitBooleansOnly': {
-        message: (ast: AST) => `Should only use explicit boolean expressions in conditionals; this expression is of type '${format(inferType(ast as Expression))}'`,
-        match: (ast: AST) => {
+        message: (ctx: Pick<Context, "allModules" | "canonicalModuleName">, ast: AST) =>
+            `Should only use explicit boolean expressions in conditionals; this expression is of type '${format(inferType(ctx, ast as Expression))}'`,
+        match: (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: AST) => {
             const condition = conditionFrom(ast)
 
             if (condition) {
-                const conditionType = inferType(condition)
-                if (subsumationIssues(BOOLEAN_TYPE, conditionType)) {
+                const conditionType = inferType(ctx, condition)
+                if (subsumationIssues(ctx, BOOLEAN_TYPE, conditionType)) {
                     return condition
                 }
             }
@@ -193,7 +178,7 @@ const RULES = {
     },
     'autorunDeclarationsOnly': {
         message: () => 'Autoruns should only be written as top-level declarations; they shouldn\'t be created in procs',
-        match: (ast: AST) => {
+        match: (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: AST) => {
             if (ast.kind === 'autorun' && ast.parent?.kind === 'block') {
                 return ast
             }
@@ -203,8 +188,8 @@ const RULES = {
     // TODO: Lint against derivations, remotes, and autoruns that don't actually reference any observable values
 
     // 'pureFunctions': {
-    //     message: (ast: AST) => `Function declarations should not reference global state (referencing '${format(ast)}'). Convert "let" to "const" if the value is never mutated, or consider passing state in as an explicit function argument.`,
-    //     match: (ast: AST) => {
+    //     message: (ctx: Pick<Context, "allModules" | "canonicalModuleName">, ast: AST) => `Function declarations should not reference global state (referencing '${format(ast)}'). Convert "let" to "const" if the value is never mutated, or consider passing state in as an explicit function argument.`,
+    //     match: (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: AST) => {
             
     //         // local identifier, inside a func declaration
     //         if (ast.kind === 'local-identifier' && findAncestor(ast, a => a.kind === 'func-declaration') != null) {
@@ -222,7 +207,7 @@ const RULES = {
     // },
     // 'unnecessary-nil-coalescing': {
     //     message: "Nil-coalescing operator is redundant because the left operand will never be nil",
-    //     match: (ast: AST) => {
+    //     match: (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: AST) => {
     //         if (ast.kind === 'binary-operator') {
 
     //         }
@@ -256,14 +241,14 @@ function conditionFrom(ast: AST): Expression|undefined {
     }
 }
 
-function isAlways(condition: Expression): boolean|undefined {
-    const condType = resolveType(inferType(condition))
+function isAlways(ctx: Pick<Context, "allModules" | "canonicalModuleName">, condition: Expression): boolean|undefined {
+    const condType = resolveType(ctx, inferType(ctx, condition))
 
-    if (!subsumationIssues(FALSY, condType)) {
+    if (!subsumationIssues(ctx, FALSY, condType)) {
         return false
     }
 
-    if (!overlaps(FALSY, condType)) {
+    if (!overlaps(ctx, FALSY, condType)) {
         return true
     }
 
@@ -273,18 +258,18 @@ function isAlways(condition: Expression): boolean|undefined {
 /**
  * Determine whether or not two types have any overlap at all
  */
- function overlaps(a: TypeExpression, b: TypeExpression): boolean {
-    const resolvedA = resolveType(a)
-    const resolvedB = resolveType(b)
+ function overlaps(ctx: Pick<Context, "allModules" | "encounteredNames" | "canonicalModuleName">, a: TypeExpression, b: TypeExpression): boolean {
+    const resolvedA = resolveType(ctx, a)
+    const resolvedB = resolveType(ctx, b)
 
-    if (!subsumationIssues(resolvedA, resolvedB) || !subsumationIssues(resolvedB, resolvedA)) {
+    if (!subsumationIssues(ctx, resolvedA, resolvedB) || !subsumationIssues(ctx, resolvedB, resolvedA)) {
         return true
     } else if (resolvedA.kind === 'union-type' && resolvedB.kind === 'union-type') {
-        return resolvedA.members.some(memberA => resolvedB.members.some(memberB => overlaps(memberA, memberB)))
+        return resolvedA.members.some(memberA => resolvedB.members.some(memberB => overlaps(ctx, memberA, memberB)))
     } else if (resolvedA.kind === 'union-type') {
-        return resolvedA.members.some(memberA => overlaps(memberA, resolvedB))
+        return resolvedA.members.some(memberA => overlaps(ctx, memberA, resolvedB))
     } else if (resolvedB.kind === 'union-type') {
-        return resolvedB.members.some(memberB => overlaps(memberB, resolvedA))
+        return resolvedB.members.some(memberB => overlaps(ctx, memberB, resolvedA))
     }
 
     return false
@@ -295,7 +280,7 @@ function isAlways(condition: Expression): boolean|undefined {
 
 export type LintRuleName = keyof typeof RULES
 
-const DEFAULT_SEVERITY: { readonly [rule in LintRuleName]: LintRuleSeverity } = {
+export const DEFAULT_SEVERITY: { readonly [rule in LintRuleName]: LintRuleSeverity } = {
     'unnecessaryParens': 'warning',
     'funcOrProcAsValue': 'warning',
     'redundantConditional': 'error',

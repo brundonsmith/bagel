@@ -1,17 +1,12 @@
+from '../../lib/bgl/platforms/deno/server.bgl' import { serve, Request, SendResponse }
 
-proc foo(n: number) {
-    if n < 10 {
-        log('all good!');
-    } else {
-        throw Error('it errored!');
-    }
+export const config: BagelConfig = {
+    platforms: ['node']
 }
 
-proc main() {
-    try {
-        foo(15);
-        log('passed');
-    } catch e {
-        log(e);
-    }
+export async proc main() {
+    await serve(8080, async (req: Request, sendResponse: SendResponse) {
+        log('Got a request!');
+        sendResponse({ body: 'Hello world!' });
+    });
 }

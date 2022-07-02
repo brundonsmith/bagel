@@ -1,10 +1,8 @@
-import { parsed } from "../compiler/1_parse/index.ts";
-import { typeerrors } from "../compiler/3_checking/typecheck.ts";
-import { prettyProblem } from "../compiler/errors.ts";
-import { lint } from "../compiler/other/lint.ts";
-import { allProblems, canonicalModuleName, modules } from "../compiler/store.ts";
-import { ModuleName } from "../compiler/_model/common.ts";
-import { invalidate, runInAction, WHOLE_OBJECT } from "../lib/ts/reactivity.ts";
+import { parse } from "../compiler/1_parse/index.ts";
+import { typecheck } from "../compiler/3_checking/typecheck.ts";
+import { BagelError, prettyProblem } from "../compiler/errors.ts";
+import { lint, LintProblem } from "../compiler/other/lint.ts";
+import { AllModules, DEFAULT_CONFIG, ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
   name: "Basic constant",
@@ -3366,57 +3364,65 @@ Deno.test({
 //     this.setSource(moduleName, v)
 // }
 
+const canonicalModuleName = (_: ModuleName, m: string) => m as ModuleName
+
 function testTypecheck(source: string, shouldFail: boolean): void {
   const moduleName = "<test>.bgl" as ModuleName
-
-  runInAction(() => {
-    invalidate(modules, WHOLE_OBJECT)
-    for (const module in modules) {
-      delete modules[module as ModuleName]
-    }
-
-    modules[moduleName] = { source, loading: false }
-  })
-
-  const parseResult = parsed(moduleName, true)
+  const parseResult = parse(moduleName, source)
+  
+  const allModules: AllModules = new Map()
+  allModules.set(moduleName, parseResult)
+  const ctx = { allModules, config: DEFAULT_CONFIG, canonicalModuleName }
 
   if (parseResult) {
     const errors = [
       ...parseResult.errors,
-      ...lint(undefined, parseResult.ast).filter(e => e.severity === 'error'),
-      ...typeerrors(parseResult.ast)
+      ...lint(ctx, parseResult.noPreludeAst).filter(e => e.severity === 'error'),
     ]
+    const sendError = (e: BagelError|LintProblem) => {
+      errors.push(e)
+    }
+    typecheck({ ...ctx, entry: '' as ModuleName, sendError }, parseResult.noPreludeAst)
 
     if (!errors) throw Error('Bwahhhh!')
   
     if (!shouldFail && errors.length > 0) {
-      throw `\n${source}\n\nType check should have succeeded but failed with errors\n` +
-        errors.map(err => prettyProblem(moduleName, err)).join("\n")
+      console.log(`\n${source}\n\nType check should have succeeded but failed with errors\n` +
+        errors.map(err => prettyProblem(ctx, moduleName, err)).join("\n"))
+      throw Error()
     } else if (shouldFail && errors.length === 0) {
-      throw `\n${source}\n\nType check should have failed but succeeded`
+      console.log(`\n${source}\n\nType check should have failed but succeeded`)
+      throw Error()
     }
   }
 }
 
 function testMultiModuleTypecheck(testModules: {[key: string]: string}, shouldFail: boolean): void {
+  const allModules: AllModules = new Map()
 
-  runInAction(() => {
-    invalidate(modules, WHOLE_OBJECT)
-    for (const module in modules) {
-      delete modules[module as ModuleName]
+  for (const [module, code] of Object.entries(testModules)) {
+    const mn = module as ModuleName
+    allModules.set(mn, parse(mn, code))
+  }
+
+  const ctx = { allModules, config: DEFAULT_CONFIG, canonicalModuleName }
+
+  const errors: (BagelError|LintProblem)[] = []
+
+  for (const parseResult of allModules.values()) {
+    if (parseResult) {
+      errors.push(...parseResult.errors)
+      errors.push(...lint(ctx, parseResult.noPreludeAst).filter(e => e.severity === 'error'))
+      typecheck({ ...ctx, entry: '' as ModuleName, sendError: e => errors.push(e) }, parseResult.noPreludeAst)
     }
-
-    for (const [module, source] of Object.entries(testModules)) {
-      modules[canonicalModuleName(module as ModuleName, module)] = { source, loading: false }
-    }
-  })
-
-  const errors = [...allProblems(true).values()].flat()?.filter(e => e.kind !== 'lint-problem' || e.severity === 'error')
+  }
 
   if (!shouldFail && errors.length > 0) {
-    throw `Type check should have succeeded but failed with errors\n\n` +
-    errors.map(err => prettyProblem(err.ast?.module ?? '<test>' as ModuleName, err)).join("\n")
+    console.log(`Type check should have succeeded but failed with errors\n\n` +
+      errors.map(err => prettyProblem(ctx, err.ast?.module ?? '<test>' as ModuleName, err)).join("\n"))
+    throw Error()
   } else if (shouldFail && errors.length === 0) {
-    throw `Type check should have failed but succeeded`
+    console.log(`Type check should have failed but succeeded`)
+    throw Error()
   }
 }

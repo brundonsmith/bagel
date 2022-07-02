@@ -1,7 +1,7 @@
 import { parse } from "../compiler/1_parse/index.ts";
 import { compile } from "../compiler/4_compile/index.ts";
 import { prettyProblem } from "../compiler/errors.ts";
-import { ModuleName } from "../compiler/_model/common.ts";
+import { AllModules, DEFAULT_CONFIG, ModuleName } from "../compiler/_model/common.ts";
 
 Deno.test({
   name: "Simple func declaration",
@@ -827,16 +827,20 @@ Deno.test({
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>.bgl' as ModuleName
 
-  const parseResult = parse(moduleName, code, true)
+  const parseResult = parse(moduleName, code)
 
+  const allModules: AllModules = new Map()
+  allModules.set(moduleName, parseResult)
+  const ctx = { allModules, config: DEFAULT_CONFIG, moduleName, transpilePath: (m: string) => m + '.ts', canonicalModuleName: (_: ModuleName, m: string) => m as ModuleName }
+  
   if (parseResult) {
-    const { ast, errors } = parseResult
+    const { noPreludeAst: ast, errors } = parseResult
 
-    const compiled = compile(moduleName, ast, 'build-dir', true)
+    const compiled = compile(ctx, ast, true)
   
     if (errors.length > 0) {
       throw `\n${code}\nFailed to parse:\n` +
-        errors.map(err => prettyProblem(moduleName, err)).join("\n")
+        errors.map(err => prettyProblem(ctx, moduleName, err)).join("\n")
     }
     
     if (normalize(compiled) !== normalize(exp)) {

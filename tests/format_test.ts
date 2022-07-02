@@ -416,12 +416,12 @@ for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
   Deno.test({
       name: moduleName,
       fn() {
-          const { ast, errors } = parse(moduleName, code, true) ?? {}
+          const { noPreludeAst: ast, errors } = parse(moduleName, code) ?? {}
 
           if (ast && errors && errors.length === 0) {
               const formatted = format(ast, DEFAULT_OPTIONS)
 
-              const reParsed = parse(moduleName, formatted, true)?.ast as Module
+              const reParsed = parse(moduleName, formatted)?.noPreludeAst as Module
 
               stripSourceInfo(ast)
               stripSourceInfo(reParsed)

@@ -12,65 +12,35 @@ import { setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
 import { path } from '../deps.ts';
 import { AST_NOISE } from "../3_checking/typeinfer.ts";
-import { modules } from "../store.ts";
-import { computedFn, observe } from "../../lib/ts/reactivity.ts";
 
-// TODO: Array and tuple types for function type arguments
-
-export const parsed = (moduleName: ModuleName, excludePrelude?: boolean) => {
-    const source = observe(observe(modules, moduleName), 'source')
-
-    if (source != null) {
-        return parse(moduleName, source, excludePrelude)
-    }
-}
-
-export const parse = computedFn(function parse (moduleName: ModuleName, code: string, excludePrelude?: boolean): { ast: Module, errors: readonly BagelError[] } | undefined {
+export const parse = (moduleName: ModuleName, code: string): { ast: Module, noPreludeAst: Module, errors: readonly BagelError[] } | undefined => {
     const fileType = path.extname(moduleName)
 
     if (fileType === '.bgl') {
         const errors: BagelError[] = []
+
         const ast = parseInner(
             moduleName,  
-            code + (!excludePrelude ? preludeFor(moduleName) : ''),
-            err => errors.push(err)
+            code + preludeFor(moduleName),
+            err => {}
         )
 
-        return { ast, errors }
+        const noPreludeAst = parseInner(
+            moduleName,  
+            code,
+            err => errors.push(err)
+        )
+        
+        return {
+            ast,
+            noPreludeAst,
+            errors
+        }
     } else if (fileType === '.json') {
         try {
             const contents = JSON.parse(code)
 
-            return {
-                ast: moduleWithDeclarations([
-                    {
-                        kind: "value-declaration",
-                        name: {
-                            kind: "plain-identifier",
-                            name: JSON_AND_PLAINTEXT_EXPORT_NAME,
-                            ...AST_NOISE
-                        },
-                        type: undefined,
-                        isConst: true,
-                        exported: "export",
-                        value: jsonToAST(contents),
-                        platforms: ALL_PLATFORMS,
-                        ...AST_NOISE
-                    }
-                ]),
-                errors: []
-            }
-        } catch (e) {
-            return {
-                ast: moduleWithDeclarations([]),
-                errors: [
-                    { kind: "bagel-syntax-error", message: `Failed to parse JSON file '${moduleName}': ` + e.message, ast: undefined, code: undefined, index: undefined, stack: undefined }
-                ]
-            }
-        }
-    } else {
-        return {
-            ast: moduleWithDeclarations([
+            const ast = moduleWithDeclarations([
                 {
                     kind: "value-declaration",
                     name: {
@@ -81,19 +51,57 @@ export const parse = computedFn(function parse (moduleName: ModuleName, code: st
                     type: undefined,
                     isConst: true,
                     exported: "export",
-                    value: {
-                        kind: "exact-string-literal",
-                        value: code,
-                        ...AST_NOISE
-                    },
+                    value: jsonToAST(contents),
                     platforms: ALL_PLATFORMS,
                     ...AST_NOISE
                 }
-            ]),
+            ])
+
+            return {
+                ast,
+                noPreludeAst: ast,
+                errors: []
+            }
+        } catch (e) {
+            const ast = moduleWithDeclarations([])
+
+            return {
+                ast,
+                noPreludeAst: ast,
+                errors: [
+                    { kind: "bagel-syntax-error", message: `Failed to parse JSON file '${moduleName}': ` + e.message, ast: undefined, code: undefined, index: undefined, stack: undefined }
+                ]
+            }
+        }
+    } else {
+        const ast = moduleWithDeclarations([
+            {
+                kind: "value-declaration",
+                name: {
+                    kind: "plain-identifier",
+                    name: JSON_AND_PLAINTEXT_EXPORT_NAME,
+                    ...AST_NOISE
+                },
+                type: undefined,
+                isConst: true,
+                exported: "export",
+                value: {
+                    kind: "exact-string-literal",
+                    value: code,
+                    ...AST_NOISE
+                },
+                platforms: ALL_PLATFORMS,
+                ...AST_NOISE
+            }
+        ])
+
+        return {
+            ast,
+            noPreludeAst: ast,
             errors: []
         }
     }
-})
+}
 
 export const JSON_AND_PLAINTEXT_EXPORT_NAME = "CONTENTS"
 
@@ -182,7 +190,7 @@ const BGL_PRELUDE_DATA = [
     { module: LIB_LOCATION + '/json.bgl' as ModuleName, imports: [ 'parseJson', 'stringifyJson', 'JSON' ] },
 ] as const
 
-function parseInner(module: ModuleName, code: string, reportError: ReportError): Module {
+function parseInner(module: ModuleName, code: string, sendError: ReportError): Module {
     let index = 0;
 
     const declarations: Declaration[] = [];
@@ -197,9 +205,9 @@ function parseInner(module: ModuleName, code: string, reportError: ReportError):
     }
 
     if (isError(result)) {
-        reportError(result);
+        sendError(result);
     } else if (index < code.length) {
-        reportError({
+        sendError({
             kind: "bagel-syntax-error",
             ast: undefined,
             code,
@@ -218,7 +226,7 @@ function parseInner(module: ModuleName, code: string, reportError: ReportError):
         startIndex: 0,
         endIndex: index
     };
-
+    
     setParents(moduleAst)
 
     return moduleAst

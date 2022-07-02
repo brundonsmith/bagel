@@ -1,15 +1,14 @@
 import { computedFn } from "../../lib/ts/reactivity.ts";
-import { getModuleByName } from "../store.ts";
 import { AST } from "../_model/ast.ts";
-import { Binding, ModuleName } from "../_model/common.ts";
+import { Binding, Context, ModuleName } from "../_model/common.ts";
 import { ImportItem,ValueDeclaration,FuncDeclaration,ProcDeclaration,TypeDeclaration,DeriveDeclaration,RemoteDeclaration,ImportDeclaration } from "../_model/declarations.ts";
 
-export const resolve = computedFn(function resolve (name: string, from: AST, resolveImports?: boolean): Binding|undefined {
+export const resolve = computedFn(function resolve (ctx: Pick<Context, 'allModules'|'canonicalModuleName'>, name: string, from: AST, resolveImports?: boolean): Binding|undefined {
     let resolved = resolveInner(name, from, from)
 
     if (resolveImports) {
         while (resolved?.owner.kind === 'import-item') {
-            const imported = resolveImport(resolved.owner)
+            const imported = resolveImport(ctx, resolved.owner)
 
             if (!imported) return resolved
 
@@ -205,9 +204,11 @@ const resolveInner = (name: string, from: AST, originator: AST): Binding|undefin
     return resolveInner(name, parent, originator)
 }
 
-export function resolveImport(importItem: ImportItem) {
+export function resolveImport(ctx: Pick<Context, 'allModules'|'canonicalModuleName'>, importItem: ImportItem) {
+    const { allModules, canonicalModuleName } = ctx
     const importDeclaration = (importItem.parent as ImportDeclaration)
-    const otherModule = getModuleByName(importItem.module as ModuleName, importDeclaration.path.value)
+    const otherModuleName = canonicalModuleName(importItem.module as ModuleName, importDeclaration.path.value)
+    const otherModule = allModules.get(otherModuleName)?.ast
 
     return otherModule?.declarations.find(other =>
         (other.kind === 'value-declaration' ||
