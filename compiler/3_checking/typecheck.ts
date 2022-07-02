@@ -834,7 +834,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                         sendError(miscError(decorator, `Decorators must be functions, but ${format(decorator.decorator)} is a ${format(type)}`))
                     } else if (subsumationIssues(ctx, requiredDecoratorType, type)) {
                         const funcOrProc = current.kind === 'proc-declaration' ? 'proc' : 'func'
-                        sendError(miscError(decorator, `${format(decorator.decorator)} can't be used as a decorator for ${funcOrProc} of type ${format(declType)}`))
+                        sendError(miscError(decorator, `${format(decorator.decorator)}, of type ${format(type)}, can't be used as a decorator for ${funcOrProc} of type ${format(declType)}`))
                     }
                 }
             } break;
