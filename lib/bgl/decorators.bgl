@@ -1,0 +1,30 @@
+
+js#
+let ___traceDepth = 0;
+const ___traceColors = [
+    'rgb(250, 211, 1)',
+    'rgb(202, 105, 198)',
+    'rgb(24, 148, 236)'
+]
+#js
+
+export js func trace<
+    TArgs extends const unknown[],
+    TReturn extends unknown
+>(fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => {#
+    const name = fn.name ? fn.name.replace(/^___/, '') : '<function>'
+
+    return (...args) => {
+        const color = ___traceColors[___traceDepth % ___traceColors.length]
+        const indent = new Array(___traceDepth).fill(' ').join('')
+        console.log(`%c${indent}> ${name}(${args.map(a => String(a)).join(', ')})`, `color: ${color}`)
+        ___traceDepth++
+
+        const res = fn(...args)
+
+        ___traceDepth--
+        console.log(`%c${indent}< ${name}: ${String(res)}`, `color: ${color}`)
+
+        return res
+    }
+#}

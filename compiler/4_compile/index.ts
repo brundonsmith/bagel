@@ -446,7 +446,7 @@ const NIL = `undefined`;
 
 
 const compileProcDeclaration = (ctx: CompileContext, decl: ProcDeclaration): string => {
-    let proc = compileOne(ctx, decl.value)
+    let proc = compileProc(ctx, decl.value, decl.name.name)
     
     for (let i = decl.decorators.length - 1; i >= 0; i--) {
         const dec = decl.decorators[i]
@@ -456,7 +456,7 @@ const compileProcDeclaration = (ctx: CompileContext, decl: ProcDeclaration): str
     return exported(decl.exported) + `const ${decl.name.name} = ` + proc;
 }
 const compileFuncDeclaration = (ctx: CompileContext, decl: FuncDeclaration): string => {
-    let func = compileOne(ctx, decl.value)
+    let func = compileFunc(ctx, decl.value, decl.name.name)
 
     for (let i = decl.decorators.length - 1; i >= 0; i--) {
         const dec = decl.decorators[i]
@@ -466,13 +466,15 @@ const compileFuncDeclaration = (ctx: CompileContext, decl: FuncDeclaration): str
     return exported(decl.exported) + `const ${decl.name.name} = ` + func;
 }
 
-function compileProc(ctx: CompileContext, proc: Proc|JsProc): string {
+function compileProc(ctx: CompileContext, proc: Proc|JsProc, name?: string): string {
+    const nameStr = name ? INT + name : ''
     const signature = compileProcOrFunctionSignature(ctx, proc.type)
-    return (proc.kind === 'proc' && proc.isAsync ? 'async ' : '') + signature + ` => ${proc.kind === 'js-proc' ? `{${proc.body}}` : compileOne(ctx, proc.body)}`;
+    return (proc.kind === 'proc' && proc.isAsync ? 'async ' : '') + 'function ' + nameStr + signature + `${proc.kind === 'js-proc' ? `{${proc.body}}` : compileOne(ctx, proc.body)}`;
 }
-const compileFunc = (ctx: CompileContext, func: Func|JsFunc): string => {
+const compileFunc = (ctx: CompileContext, func: Func|JsFunc, name?: string): string => {
+    const nameStr = name ? INT + name : ''
     const signature = compileProcOrFunctionSignature(ctx, func.type)
-    return signature + ' => ' + (func.kind === 'js-func' ? `{${func.body}}` : `(${compileOne(ctx, func.body)})`)
+    return 'function ' + nameStr + signature + ' { ' + (func.kind === 'js-func' ? func.body : `return ${compileOne(ctx, func.body)}`) + ' }'
 }
 
 const compileProcOrFunctionSignature = (ctx: CompileContext, subject: ProcType|GenericProcType|FuncType|GenericFuncType): string => {
