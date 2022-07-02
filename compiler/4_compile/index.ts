@@ -1,4 +1,3 @@
-import { observe } from "../../lib/ts/reactivity.ts";
 import { resolve } from "../3_checking/resolve.ts";
 import { resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
 import { elementTagToObject, inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
@@ -55,7 +54,7 @@ function compileInner(ctx: CompileContext, module: Module): string {
         .join("\n\n");
 
     if (includeTests) {
-        return runtimeCode + `\n export const tests = {
+        return runtimeCode + `\n export const ___tests = {
             testExprs: [${
                 module.declarations
                     .filter((decl): decl is TestExprDeclaration => decl.kind === "test-expr-declaration")

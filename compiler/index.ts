@@ -5,9 +5,10 @@ import { BagelError, prettyProblem } from "./errors.ts";
 import { AllModules, Context, DEFAULT_CONFIG, ModuleName } from "./_model/common.ts";
 import { ALL_LINT_RULE_SEVERITIES, DEFAULT_SEVERITY, LintProblem, LintRuleName, LintRuleSeverity } from "./other/lint.ts";
 import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, pad, devMode, allEntries, canonicalModuleName } from "./utils/cli.ts";
-import { sOrNone } from "./utils/misc.ts";
+import { esOrNone, sOrNone } from "./utils/misc.ts";
 import { ALL_PLATFORMS, Platform } from "./_model/declarations.ts";
 import { loadAllModules,allProblems,hasProblems,formatted,autofixed,compiled } from "./store.ts";
+import { ERROR_SYM } from "../lib/ts/core.ts";
 
 async function run() {
     switch (command) {
@@ -86,7 +87,7 @@ async function run() {
         case 'autofix': {
             const allModules = await loadAllModules(allEntries)
 
-            if (command === 'transpile' || command === 'check') {
+            if (command === 'transpile' || command === 'check' || command === 'test') {
                 await transpileAll(allModules)
                 const config = await loadConfig()
                 
@@ -94,9 +95,13 @@ async function run() {
 
                 printProblems(ctx, allProblems(ctx), flags.watch)
 
-                if (command === 'transpile' && !hasProblems(ctx)) {     
-                    const localModules = [...allModules.keys() ?? []].filter(module => pathIsInProject(module)).length
-                    console.log(Colors.green(pad('Transpiled')) + `${localModules} Bagel file${sOrNone(localModules)}`)
+                if (!hasProblems(ctx)) {    
+                    if (command === 'transpile') { 
+                        const localModules = [...allModules.keys() ?? []].filter(module => pathIsInProject(module)).length
+                        console.log(Colors.green(pad('Transpiled')) + `${localModules} Bagel file${sOrNone(localModules)}`)
+                    } else if (command === 'test') {
+                        await test()
+                    }
                 }
 
                 if (!flags.watch) {
@@ -137,7 +142,7 @@ async function run() {
 async function transpileAll(allModules: AllModules) {
     for (const moduleName of allModules.keys() ?? []) {
         const jsPath = transpilePath(moduleName)
-        const js = compiled({ allModules, moduleName, transpilePath, canonicalModuleName })
+        const js = compiled({ allModules, moduleName, transpilePath, canonicalModuleName, includeTests: true })
         
         if (js) {
             await fs.ensureDir(path.dirname(jsPath))
@@ -304,65 +309,68 @@ function windowsPathToModulePath(str: string) {
     return str.replaceAll('\\', '/').replace(/^C:/, '/').replace(/^file:\/\/\//i, '')
 }
 
+type Tests = {
+    readonly testExprs: readonly ({ name: string, expr: unknown })[],
+    readonly testBlocks: readonly ({ name: string, block: () => unknown })[]
+}
 
-// async function test() {
-//     const thisModulePath = windowsPathToModulePath(path.dirname(import.meta.url))
+async function test() {
+    let totalModules = 0
+    let modulesWithFailures = 0
+    let totalSuccesses = 0
+    let totalFailures = 0
+    let totalTests = 0
 
-//     const filesToTest = await all(fs.walk(Deno.cwd(), {
-//         // match: given(filePattern, pattern => [ new RegExp(pattern) ]),
-//         exts: ['.bgl']
-//     }))
+    for (const moduleName of allEntries) {
+        totalModules++
 
-//     const allTests: { [key: string]: { name: string, passed: boolean }[] } = {}
+        try {
+            const transpiled = await import(transpilePath(moduleName))
+            const tests = transpiled.___tests as Tests | undefined
 
-//     for (const file of filesToTest) {
-//         if (file.isFile) {
-//             const moduleDir = windowsPathToModulePath(path.dirname(file.path))
-//             const moduleName = path.basename(file.path)
-//             const modulePath = windowsPathToModulePath(path.relative(thisModulePath, moduleDir)) + '/' + moduleName
+            if (tests) {
+                console.log('\nIn ' + moduleName)
+                let failed = false
 
-//             const { tests } = await import(modulePath + '.ts')
-            
-//             if (tests.testExprs.length > 0 || tests.testBlocks.length > 0) {
-//                 allTests[modulePath] = []
-//             }
+                function runTest(name: string, err: any) {
+                    totalTests++
+                    let label: string
+                    let details = ''
 
-//             for (const test of tests.testExprs) {
-//                 if (test.expr === false) {
-//                     allTests[modulePath].push({ name: test.name, passed: false })
-//                 } else {
-//                     allTests[modulePath].push({ name: test.name, passed: true })
-//                 }
-//             }
+                    if (err == null || err.kind !== ERROR_SYM) {
+                        totalSuccesses++
+                        label = Colors.green('[Passed]')
+                    } else {
+                        failed = true
+                        totalFailures++
+                        label = Colors.red('[Failed]')
+                        details = err.value ? ' - ' + err.value : ''
+                    }
+                    
+                    console.log(`    ${label} ${name}${details}`)
+                }
 
-//             for (const test of tests.testBlocks) {
-//                 try {
-//                     test.block()
-//                     allTests[modulePath].push({ name: test.name, passed: true })
-//                 } catch {
-//                     allTests[modulePath].push({ name: test.name, passed: false })
-//                 }
-//             }
-//         }
-//     }
+                for (const test of tests.testExprs) {
+                    runTest(test.name, test.expr)
+                }
 
-//     const totalModules = Object.keys(allTests).length
-//     const modulesWithFailures = Object.keys(allTests).filter(module => allTests[module].some(m => !m.passed)).length
-//     const totalSuccesses = Object.keys(allTests).map(module => allTests[module].filter(m => m.passed)).flat().length
-//     const totalFailures = Object.keys(allTests).map(module => allTests[module].filter(m => !m.passed)).flat().length
-//     const totalTests = totalSuccesses + totalFailures
+                for (const test of tests.testBlocks) {
+                    runTest(test.name, test.block())
+                }
 
-//     for (const module of Object.keys(allTests)) {
-//         console.log('\nIn ' + module)
-//         for (const test of allTests[module]) {
-//             const label = test.passed ? Colors.green('[Passed]') : Colors.red('[Failed]')
-//             console.log(`    ${label} ${test.name}`)
-//         }
-//     }
+                if (failed) {
+                    modulesWithFailures++
+                }
+            }
+        } catch (e) {
+            if(devMode) console.log(Colors.cyan('Info ') + `Error encountered while trying to run tests for module ${moduleName}:`)
+            if(devMode) console.error(e)
+        }
+    }
 
-//     console.log(`\nFound ${totalTests} test${sOrNone(totalTests)} across ${totalModules} module${sOrNone(totalModules)}; ${Colors.green(String(totalSuccesses) + ' success' + esOrNone(totalSuccesses))}, ${Colors.red(String(totalFailures) + ' failure' + sOrNone(totalFailures))}`)
-//     Deno.exit(modulesWithFailures > 0 ? 1 : 0)
-// }
+    console.log(`\nFound ${totalTests} test${sOrNone(totalTests)} across ${totalModules} module${sOrNone(totalModules)}; ${Colors.green(String(totalSuccesses) + ' success' + esOrNone(totalSuccesses))}, ${Colors.red(String(totalFailures) + ' failure' + sOrNone(totalFailures))}`)
+    Deno.exit(modulesWithFailures > 0 ? 1 : 0)
+}
 
 // testInWorker(file.path)
 //     .then(failed => {

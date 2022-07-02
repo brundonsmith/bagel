@@ -220,7 +220,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "test-expr-declaration":
             return `test expr ${f(ast.name)} => ${f(ast.expr)}`
         case "test-block-declaration":
-            return `test block ${f(ast.name)} ${f(ast.block)}`
+            return `test block ${f(ast.name)} => ${f(ast.block)}`
         case "debug":
             return `!debug[${f(ast.inner)}]`
         case "inline-const-group":

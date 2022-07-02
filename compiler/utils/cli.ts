@@ -69,19 +69,21 @@ export const targetDir = targetStat.isDirectory ? target : path.dirname(target)
 export const targetIsScript = targetStat.isFile
 
 export const entry = (() => {
-    if (command === 'run' || command === 'build') {
-        const entryPath = (
+    const entry = (
+        command === 'run' || command === 'build' ? (
             targetStat.isDirectory
-                ? path.resolve(target, 'index.bgl')
-                : target
-        )
+                ? path.resolve(target, 'index.bgl') as ModuleName
+                : target as ModuleName
+        ) :
+        targetStat.isFile ? target as ModuleName :
+        undefined
+    )
 
-        if (!fs.existsSync(entryPath) || path.extname(entryPath) !== '.bgl') {
-            fail(`Couldn't find entry '${target}'`)
-        }
-
-        return entryPath as ModuleName
+    if (entry != null && (!fs.existsSync(entry) || path.extname(entry) !== '.bgl')) {
+        fail(`Couldn't find entry '${entry}'`)
     }
+
+    return entry
 })()
 
 export const allEntries = (

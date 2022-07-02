@@ -31,7 +31,7 @@ export js func action<
     return ___action(pr)
 #}
 
-export func assert(condition: boolean, message: string): Error<string>? =>
+export func assert(condition: boolean, message?: string): Error<string?>? =>
     if condition {
         nil
     } else {

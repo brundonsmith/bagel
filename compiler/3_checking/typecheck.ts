@@ -282,8 +282,12 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 }
             } break;
             case "test-expr-declaration": {
-                // make sure test value is a boolean
-                expect(ctx, BOOLEAN_TYPE, current.expr)
+                // make sure test value might be an error
+                const exprType = inferType(ctx, current.expr)
+
+                if (subsumationIssues(ctx, exprType, ERROR_OF_ANY)) {
+                    sendError(miscError(current.expr, `Test is redundant; this expression won't ever be an Error`))
+                }
             } break;
             case "func":
             case "proc": {
@@ -666,11 +670,14 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 expect(ctx, ITERATOR_OF_ANY, current.iterator, 
                     (_, val) => `Expected iterator after "of" in for loop; found '${msgFormat(val)}'`)
                 break;
+            case "test-block-declaration":
             case "try-catch": {
-                const thrown = throws(ctx, current.tryBlock)
+                const block = current.kind === 'try-catch' ? current.tryBlock : current.block
+                const thrown = throws(ctx, block)
 
                 if (thrown.length === 0) {
-                    sendError(miscError(current.tryBlock, `try/catch is redundant; no errors can be thrown in this block`))
+                    const blockName = current.kind === 'try-catch' ? 'Try/catch' : 'Test'
+                    sendError(miscError(block, `${blockName} is redundant; no errors can be thrown in this block`))
                 }
             } break;
             case "throw-statement":
@@ -847,7 +854,6 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "negation-operator":
             case "js-proc":
             case "js-func":
-            case "test-block-declaration":
             case "attribute":
             case "case":
             case "switch-case":

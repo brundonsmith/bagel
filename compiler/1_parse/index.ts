@@ -179,7 +179,7 @@ function preludeFor(module: ModuleName) {
 const LIB_LOCATION = 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl'
 
 const BGL_PRELUDE_DATA = [
-    { module: LIB_LOCATION + '/core.bgl' as ModuleName, imports: [ 'log', 'logf', 'iter', 'memo', 'action', 'UnknownObject', 'BagelConfig', 'Element' ] },
+    { module: LIB_LOCATION + '/core.bgl' as ModuleName, imports: [ 'log', 'logf', 'iter', 'memo', 'action', 'UnknownObject', 'BagelConfig', 'Element', 'assert' ] },
     { module: LIB_LOCATION + '/arrays.bgl' as ModuleName, imports: [ 'push', 'unshift', 'pop', 'shift', 'splice' ] },
     { module: LIB_LOCATION + '/strings.bgl' as ModuleName, imports: [ 'includes', 'indexOf', 'replace', 'split', 'startsWith', 'substring', 'toLowerCase', 'toUpperCase', 'trim' ] },
     { module: LIB_LOCATION + '/objects.bgl' as ModuleName, imports: [ 'keys', 'values', 'entries' ] },
@@ -1137,6 +1137,8 @@ const testBlockDeclaration: ParseFunction<TestBlockDeclaration> = (module, code,
     given(consumeWhitespace(code, index), index => 
     expec(exactStringLiteral(module, code, index), err(code, index, 'Test name'), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, '=>'), err(code, index, '"=>"'), index =>
+    given(consumeWhitespace(code, index), index =>
     expec(parseBlock(module, code, index), err(code, index, 'Test block'), ({ parsed: block, index }) => ({
         parsed: {
             kind: 'test-block-declaration',
@@ -1148,7 +1150,7 @@ const testBlockDeclaration: ParseFunction<TestBlockDeclaration> = (module, code,
             endIndex: index
         },
         index
-    }))))))))
+    }))))))))))
 
 const proc: ParseFunction<Proc> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'async'), ({ parsed: isAsync, index }) =>
