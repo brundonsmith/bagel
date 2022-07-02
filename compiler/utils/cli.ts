@@ -232,13 +232,13 @@ function cleanCache() {
     let numCachedFiles = 0;
     for (const file of Deno.readDirSync(cacheDir)) {
         numCachedFiles++
-        Deno.removeSync(path.resolve(cacheDir, file.name))
+        Deno.removeSync(path.resolve(cacheDir, file.name), { recursive: true })
     }
 
     let numBuiltFiles = 0;
     for (const file of Deno.readDirSync(buildDir)) {
         numBuiltFiles++
-        Deno.removeSync(path.resolve(buildDir, file.name))
+        Deno.removeSync(path.resolve(buildDir, file.name), { recursive: true })
     }
 
     console.log(Colors.yellow(pad('Cleaned')) + 'Bagel cache (' + numCachedFiles + ' cached modules, ' + numBuiltFiles + ' built modules)')
