@@ -473,6 +473,28 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Assignment ops",
+  fn() {
+    testCompile(`
+    proc foo() {
+      let n = 0;
+      n *= 2;
+
+      let s = 'foo';
+      s += ' other';
+    }`,
+    `
+    const foo = (): void => { 
+      const n = { value: 0 };
+      n.value *= 2; ___invalidate(n, 'value');
+      
+      const s = { value: "foo" };
+      s.value += " other"; ___invalidate(s, 'value');
+    };`)
+  }
+})
+
+Deno.test({
   name: "Method proc call",
   fn() {
     testCompile(`
@@ -839,15 +861,17 @@ function testCompile(code: string, exp: string) {
     const compiled = compile(ctx, ast, true)
   
     if (errors.length > 0) {
-      throw `\n${code}\nFailed to parse:\n` +
-        errors.map(err => prettyProblem(ctx, moduleName, err)).join("\n")
+      console.log(`\n${code}\nFailed to parse:\n` +
+        errors.map(err => prettyProblem(ctx, moduleName, err)).join("\n"))
+      throw Error()
     }
     
     if (normalize(compiled) !== normalize(exp)) {
-      throw `Compiler output did not match expected:
+      console.log(`Compiler output did not match expected:
   bagel:\n${code}
   expected:\n${exp}
-  received:\n${compiled}`;
+  received:\n${compiled}`)
+      throw Error()
     }
   }
 }

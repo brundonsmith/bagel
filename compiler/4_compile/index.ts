@@ -188,14 +188,15 @@ function compileOne(ctx: CompileContext, ast: AST): string {
         case "autorun": return `${INT}autorun(() => ${c(ast.effect)}, ${ast.until ? '() => ' + fixTruthinessIfNeeded(ctx, ast.until) : 'undefined'})`;
         case "assignment": {
             const value = c(ast.value)
+            const op = ast.operator?.op ?? ''
 
             if (ast.target.kind === 'local-identifier') {
                 const binding = resolve(ctx, ast.target.name, ast.target)
 
                 if ((binding?.owner.kind === 'value-declaration' || binding?.owner.kind === 'declaration-statement') && !binding.owner.isConst) {
-                    return `${ast.target.name}.value = ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
+                    return `${ast.target.name}.value ${op}= ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
                 } else {
-                    return `${ast.target.name} = ${value}`
+                    return `${ast.target.name} ${op}= ${value}`
                 }
             } else {
                 const property = (
@@ -206,7 +207,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
 
                 const propertyExpr = propertyAsExpression(ctx, ast.target.property)
 
-                return `${c(ast.target.subject)}${property} = ${value}; ${INT}invalidate(${c(ast.target.subject)}, ${propertyExpr})`
+                return `${c(ast.target.subject)}${property} ${op}= ${value}; ${INT}invalidate(${c(ast.target.subject)}, ${propertyExpr})`
             }
         }
         case "if-else-statement": return 'if ' + ast.cases

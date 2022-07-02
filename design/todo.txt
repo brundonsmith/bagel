@@ -1,8 +1,3 @@
-
-MVP
-- configuration
-- +=, ++, etc
-
 - Bagel tests
     - Mocking system
 - Destructuring arguments
@@ -19,7 +14,6 @@ Design tasks:
 - Dates
 
 Things to stew on:
-- Arbitrary-eval of bagel code from within compiler
 - Mocking
 - JS escape syntax (delimiters)
 
@@ -29,7 +23,6 @@ Chores
 - sourcemaps
 
 Ideas
-- Decorators?
 - "impure" keyword for functions?
 - specific-length array and string types?
 - numeric types with range information?

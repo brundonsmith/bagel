@@ -74,6 +74,8 @@ const BAGEL_SNIPPETS = [
             for item of items {
                 if item.foo {
                     count = count + 1;
+
+                    count += 2;
                 }
 
                 if count > 12 {
@@ -427,10 +429,12 @@ for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {
               stripSourceInfo(reParsed)
 
               if (!deepEquals(ast, reParsed)) {
-                  throw `Reformatted AST did not match original:\noriginal:\n${code}\nformatted:\n${formatted}`
+                  console.log(`Reformatted AST did not match original:\noriginal:\n${code}\nformatted:\n${formatted}`)
+                  throw Error()
               }
           } else {
-              throw `Failed to parse:\n${code}`
+              console.log(`Failed to parse:\n${code}`)
+              throw Error()
           }
       }
   })

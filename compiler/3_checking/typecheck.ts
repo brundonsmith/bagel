@@ -631,7 +631,30 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 }
 
                 const targetType = inferType(ctx, current.target);
-                expect(ctx, targetType, current.value)
+
+                if (current.operator) {
+                    // +=, -=, etc
+                    const leftType = targetType
+                    const rightType = inferType(ctx, current.value)
+                    const types = BINARY_OPERATOR_TYPES[current.operator.op]?.find(({ left, right }) =>
+                        !subsumationIssues(ctx, left, leftType) && 
+                        !subsumationIssues(ctx, right, rightType))
+
+                    if (types == null) {
+                        // check that both sides of operator can be handled by it
+                        sendError(miscError(current.operator, `Operator '${current.operator.op}' cannot be applied to types '${msgFormat(leftType)}' and '${msgFormat(rightType)}'`));
+                    } else {
+                        // check that resulting value is assignable to target
+                        const issues = subsumationIssues(ctx, targetType, types.output)
+
+                        if (issues) {
+                            sendError(assignmentError(current, targetType, types.output, issues));
+                        }
+                    }
+                } else {
+                    // normal assignment
+                    expect(ctx, targetType, current.value)
+                }
             } break;
             case "range":
                 expect(ctx, NUMBER_TYPE, current.start, 

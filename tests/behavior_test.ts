@@ -167,8 +167,9 @@ async function testSideEffects(bgl: string, expected: any[]) {
     
     const compiled = compile(ctx, ast as Module, true);
     if (errors && errors.length > 0) {
-        throw `\n${bgl}\nFailed to parse:\n` +
-        errors.map((err) => prettyProblem(ctx, moduleName, err)).join("\n");
+        console.log(`\n${bgl}\nFailed to parse:\n` +
+        errors.map((err) => prettyProblem(ctx, moduleName, err)).join("\n"))
+        throw Error()
     }
 
     const outputs: any[] = [];
@@ -188,9 +189,10 @@ async function testSideEffects(bgl: string, expected: any[]) {
         expected.length !== outputs.length ||
         !expected.every((x, i) => x === outputs[i])
     ) {
-        throw `Side-effects did not match expected:
+        console.log(`Side-effects did not match expected:
   bagel:\n${bgl}
   expected:\n${expected.join("\n")}
-  received:\n${outputs.join("\n")}`;
+  received:\n${outputs.join("\n")}`)
+        throw Error()
     }
 }

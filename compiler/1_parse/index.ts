@@ -1242,6 +1242,7 @@ const declarationStatement: ParseFunction<DeclarationStatement> = (module, code,
 const assignment: ParseFunction<Assignment> = (module, code, startIndex) =>
     given(invocationAccessorChain(module, code, startIndex) ?? indexer(module, code, startIndex) ?? localIdentifier(module, code, startIndex), ({ parsed: target, index }) =>
     given(consumeWhitespace(code, index), index =>
+    given(parseOptional(module, code, index, (module, code, index) => _binaryOperatorSymbol(5)(module, code, index) ?? _binaryOperatorSymbol(6)(module, code, index)), ({ parsed: operator, index }) =>
     given(consume(code, index, "="), index =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, "Assignment value"), ({ parsed: value, index }) => 
@@ -1252,6 +1253,7 @@ const assignment: ParseFunction<Assignment> = (module, code, startIndex) =>
                 kind: "assignment",
                 target,
                 value,
+                operator,
                 module,
                 code,
                 startIndex,
@@ -1259,7 +1261,7 @@ const assignment: ParseFunction<Assignment> = (module, code, startIndex) =>
             },
             index,
         } : undefined
-    )))))))
+    ))))))))
 
 const procCall: ParseFunction<Invocation> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'await'), ({ parsed: awaited, index }) =>

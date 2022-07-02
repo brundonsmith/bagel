@@ -1339,6 +1339,51 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Assignment ops pass",
+  fn() {
+    testTypecheck(`
+    proc foo() {
+      let n = 0;
+
+      n += 1;
+      n -= 2;
+      n *= 3;
+      n /= 4;
+
+      let s = 'foo';
+      s += ' other';
+      s += 12;
+    }
+    `, false)
+  }
+})
+
+Deno.test({
+  name: "Assignment ops fail 1",
+  fn() {
+    testTypecheck(`
+    proc foo() {
+      let n = 0;
+
+      n += '1';
+    }
+    `, true)
+  }
+})
+
+Deno.test({
+  name: "Assignment ops fail 2",
+  fn() {
+    testTypecheck(`
+    proc foo() {
+      let s = 'foo';
+      s -= 12;
+    }
+    `, true)
+  }
+})
+
+Deno.test({
   name: "Negation",
   fn() {
     testTypecheck(`

@@ -1,5 +1,5 @@
 import { SourceInfo, PlainIdentifier, Block, Destructure, NameAndType } from "./ast.ts";
-import { Expression, Invocation, JavascriptEscape, LocalIdentifier, PropertyAccessor } from "./expressions.ts";
+import { Expression, Invocation, JavascriptEscape, LocalIdentifier, Operator, PropertyAccessor } from "./expressions.ts";
 
 export type Statement =
     | JavascriptEscape
@@ -50,6 +50,7 @@ export type Assignment = SourceInfo & {
     readonly kind: "assignment",
     readonly target: LocalIdentifier | PropertyAccessor,
     readonly value: Expression,
+    readonly operator: Operator | undefined
 }
 
 export type TryCatch = SourceInfo & {

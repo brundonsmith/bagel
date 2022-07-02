@@ -154,7 +154,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "local-identifier":
             return ast.name
         case "assignment":
-            return `${f(ast.target)} = ${f(ast.value)};`
+            return `${f(ast.target)} ${ast.operator?.op ?? ''}= ${f(ast.value)};`
         case "for-loop":
             return `for ${ast.itemIdentifier.name} of ${f(ast.iterator)} ${f(ast.body)}`
         case "while-loop":
