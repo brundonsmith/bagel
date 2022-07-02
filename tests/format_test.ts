@@ -408,7 +408,13 @@ const BAGEL_SNIPPETS = [
       autorun {
         log(foo);
       }
-      until => foo.length > 10`
+      until => foo.length > 10`,
+      `
+      test expr 'Two plus two equals four' => assert(2 + 2 == 3)
+
+      test block 'Do thing!' => {
+          throw Error('Foo');
+      }`
 ]
 
 for (let i = 0; i < BAGEL_SNIPPETS.length; i++) {

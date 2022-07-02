@@ -846,6 +846,25 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Tests",
+  fn() {
+    testCompile(`
+    test expr 'Two plus two equals four' => assert(2 + 2 == 3)
+
+    test block 'Do thing!' => {
+        throw Error('Foo');
+    }`,
+    `
+    export const ___tests = {
+      testExprs: [{ name: 'Two plus two equals four', expr: assert(((2 + 2) === 3)) }],
+      testBlocks: [{ name: 'Do thing!', block: () => { 
+        return { kind: ___ERROR_SYM, value: "Foo" };;
+      } }]
+    }`)
+  }
+})
+
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>.bgl' as ModuleName
 
@@ -853,7 +872,7 @@ function testCompile(code: string, exp: string) {
 
   const allModules: AllModules = new Map()
   allModules.set(moduleName, parseResult)
-  const ctx = { allModules, config: DEFAULT_CONFIG, moduleName, transpilePath: (m: string) => m + '.ts', canonicalModuleName: (_: ModuleName, m: string) => m as ModuleName }
+  const ctx = { allModules, config: DEFAULT_CONFIG, moduleName, includeTests: true, transpilePath: (m: string) => m + '.ts', canonicalModuleName: (_: ModuleName, m: string) => m as ModuleName }
   
   if (parseResult) {
     const { noPreludeAst: ast, errors } = parseResult

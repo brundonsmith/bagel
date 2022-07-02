@@ -3387,6 +3387,52 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Tests pass",
+  fn() {
+    testTypecheck(`
+    func assert(condition: boolean, message?: string): Error<string?>? =>
+      if condition {
+        nil
+      } else {
+        Error(message)
+      }
+
+    test expr 'Two plus two equals four' => assert(2 + 2 == 3)
+
+    test block 'Do thing!' => {
+        throw Error('Foo');
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Tests fail 1",
+  fn() {
+    testTypecheck(`
+    func assert(condition: boolean, message?: string): Error<string?>? =>
+      if condition {
+        nil
+      } else {
+        Error(message)
+      }
+
+    test expr 'Two plus two equals four' => 2 + 2 == 3`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Tests fail 2",
+  fn() {
+    testTypecheck(`
+    test block 'Do thing!' => {
+    }`,
+    true)
+  }
+})
+
 // Deno.test({
 //   name: "Complex function type inference pass",
 //   fn() {

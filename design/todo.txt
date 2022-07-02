@@ -1,5 +1,6 @@
 - Bagel tests
     - Mocking system
+    - "type tests"
 - Destructuring arguments
 - parallel await
 - debugging utils (functional logging, etc)

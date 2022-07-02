@@ -53,7 +53,7 @@ function compileInner(ctx: CompileContext, module: Module): string {
         .map(decl => compileOne(ctx, decl) + ';')
         .join("\n\n");
 
-    if (includeTests) {
+    if (includeTests && module.declarations.some(decl => decl.kind === 'test-expr-declaration' || decl.kind === 'test-block-declaration')) {
         return runtimeCode + `\n export const ___tests = {
             testExprs: [${
                 module.declarations
