@@ -182,7 +182,7 @@ function uniqueFileName(module: string) {
 }
 
 export function transpilePath(module: string): string {
-    if (mode === 'anonymous' && pathIsInProject(module)) {
+    if (command === 'transpile' && pathIsInProject(module)) {
         return module + '.ts'
     } else if (mode === 'script') {
         return path.resolve(buildDir, uniqueFileName(module)) + '.ts'
