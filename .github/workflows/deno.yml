@@ -38,4 +38,4 @@ jobs:
         run: DEV_MODE=test deno test -A --unstable
 
       - name: Check lib/bgl
-        run: XDG_CACHE_HOME=$(pwd) ; compiler/run.sh check lib/bgl
+        run: XDG_CACHE_HOME=$(pwd) compiler/run.sh check lib/bgl
