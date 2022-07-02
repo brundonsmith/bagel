@@ -1,7 +1,7 @@
 import { path, fs, Colors } from "../deps.ts";
 import { ModuleName } from "../_model/common.ts";
 import { Platform } from "../_model/declarations.ts";
-import { exists, pathIsRemote } from "./misc.ts";
+import { exists } from "./misc.ts";
 
 export const POSSIBLE_COMMANDS = ['new', 'init', 'build', 'run', 'transpile', 'check', 
 'test', 'format', 'autofix', 'clean'] as const
@@ -69,17 +69,19 @@ export const targetDir = targetStat.isDirectory ? target : path.dirname(target)
 export const targetIsScript = targetStat.isFile
 
 export const entry = (() => {
-    const entryPath = (
-        targetStat.isDirectory
-            ? path.resolve(target, 'index.bgl')
-            : target
-    )
+    if (command === 'run' || command === 'build') {
+        const entryPath = (
+            targetStat.isDirectory
+                ? path.resolve(target, 'index.bgl')
+                : target
+        )
 
-    if (!fs.existsSync(entryPath) || path.extname(entryPath) !== '.bgl') {
-        fail(`Couldn't find entry '${target}'`)
+        if (!fs.existsSync(entryPath) || path.extname(entryPath) !== '.bgl') {
+            fail(`Couldn't find entry '${target}'`)
+        }
+
+        return entryPath as ModuleName
     }
-
-    return entryPath as ModuleName
 })()
 
 export const allEntries = (

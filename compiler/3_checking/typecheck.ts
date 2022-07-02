@@ -15,7 +15,7 @@ const msgFormat = (ast: AST) => format(ast, { ...DEFAULT_OPTIONS, lineBreaks: fa
 /**
  * Walk an entire AST and report all issues that we find
  */
-export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'canonicalModuleName'> & { entry: ModuleName }, ast: Module): void {
+export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'canonicalModuleName'> & { entry: ModuleName | undefined }, ast: Module): void {
     const { allModules, sendError, config, entry, canonicalModuleName } = ctx
 
     if (ast.module === entry) {

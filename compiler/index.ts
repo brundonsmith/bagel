@@ -4,7 +4,7 @@ import { BagelError, prettyProblem } from "./errors.ts";
 
 import { AllModules, Context, DEFAULT_CONFIG, ModuleName } from "./_model/common.ts";
 import { ALL_LINT_RULE_SEVERITIES, DEFAULT_SEVERITY, LintProblem, LintRuleName, LintRuleSeverity } from "./other/lint.ts";
-import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, pad, devMode, allEntries } from "./utils/cli.ts";
+import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, pad, devMode, allEntries, canonicalModuleName } from "./utils/cli.ts";
 import { sOrNone } from "./utils/misc.ts";
 import { ALL_PLATFORMS, Platform } from "./_model/declarations.ts";
 import { loadAllModules,allProblems,hasProblems,formatted,autofixed,compiled } from "./store.ts";
@@ -17,7 +17,7 @@ async function run() {
             await transpileAll(allModules)
             const config = await loadConfig()
 
-            const ctx = { allModules, config }
+            const ctx = { allModules, config, canonicalModuleName }
 
             printProblems(ctx, allProblems(ctx), flags.watch)
             
@@ -90,7 +90,7 @@ async function run() {
                 await transpileAll(allModules)
                 const config = await loadConfig()
                 
-                const ctx = { allModules, config }
+                const ctx = { allModules, config, canonicalModuleName }
 
                 printProblems(ctx, allProblems(ctx), flags.watch)
 
@@ -137,7 +137,7 @@ async function run() {
 async function transpileAll(allModules: AllModules) {
     for (const moduleName of allModules.keys() ?? []) {
         const jsPath = transpilePath(moduleName)
-        const js = compiled({ allModules, moduleName, transpilePath })
+        const js = compiled({ allModules, moduleName, transpilePath, canonicalModuleName })
         
         if (js) {
             await fs.ensureDir(path.dirname(jsPath))
@@ -159,6 +159,8 @@ const bundleEntryPath = (moduleName: ModuleName) => {
 }
 
 async function loadConfig() {
+    if (entry == null) return DEFAULT_CONFIG;
+
     try {
         const entryModule = await import(transpilePath(entry))
 
@@ -217,7 +219,7 @@ proc main() {
 }
 `
 
-function printProblems (ctx: Pick<Context, "allModules">, problems: Map<ModuleName, (BagelError|LintProblem)[]>, clearConsole: boolean) {
+function printProblems (ctx: Pick<Context, "allModules"|"canonicalModuleName">, problems: Map<ModuleName, (BagelError|LintProblem)[]>, clearConsole: boolean) {
     const { allModules } = ctx
 
     if (clearConsole) {
@@ -247,6 +249,7 @@ function printProblems (ctx: Pick<Context, "allModules">, problems: Map<ModuleNa
 }
 
 const bundleOutput = async () => {
+    if (entry == null) return;
 
     // const result = await Deno.emit(windowsPathToModulePath(bagelFileToTsFile(entryFile)), {
     //     bundle: "classic",
