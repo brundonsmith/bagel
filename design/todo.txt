@@ -1,3 +1,9 @@
+Final checklist for alpha:
+- basic docs
+- nontrivial test-project
+- get time sorted out
+
+- Overwrite import paths in the config
 - Bagel tests
     - Mocking system
     - "type tests"
@@ -10,9 +16,6 @@
     - maybe also in files that completely declare their "let" dependencies?
     - only in project directory?
       - This. TODO: forbid autoruns found in non-local modules.
-
-Design tasks:
-- Dates
 
 Things to stew on:
 - Mocking
@@ -31,8 +34,8 @@ Ideas
 - lint against shadowing?
 - "generator" iterator?
 - some sort of previewing of constant values, and/or "explain" CLI for declarations
-- Overwrite import paths in the config
 - `if (cond) a else b` instead of `if cond { a } else { b }`?
+- "context" 
 
 Cleanup tasks:
 - Generalize const wrapper-type
