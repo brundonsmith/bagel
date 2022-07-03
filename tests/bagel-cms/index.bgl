@@ -1,11 +1,12 @@
-from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/html.bgl' import { render }
+from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/integrations/preact.bgl' import { render }
 
 from './app.bgl' import { renderApp }
 import './store.bgl' as store
 
 autorun {
-    // render(renderApp(store.items, store.addItem, store.clearDone));
-}
+    log('rendered!');
+    render(renderApp(store.entityTypes, store.entitiesByType));
+} forever
 
 export const config: BagelConfig = {
 
@@ -14,4 +15,8 @@ export const config: BagelConfig = {
 
     // You can override individual rules here, or leave empty for the default linter behavior
     lintRules: { },
+}
+
+proc main() {
+
 }

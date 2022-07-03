@@ -1,31 +1,74 @@
 
 import './app.css' as styles
 
-from './store.bgl' import { EntityDescriptor, Entity }
+from './store.bgl' import { selectedEntity, EntityDescriptor, FieldDescriptor, Entity }
 
-@memo()
+from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/decorators.bgl' import { trace }
+
+// @memo<[EntityDescriptor[], {[string]: Entity[]}], Element>()
 export func renderApp(entityTypes: EntityDescriptor[], entitiesByType: {[string]: Entity[]}) =>
     <div className='app'>
         <style __dangerouslySetInnerHTML={{ __html: styles }} />
         
-        <ul>
-            {entityTypes
-                .iter()
-                .map((t: EntityDescriptor): Element =>
-                    <li>
-                        {t.id}
+        {
+            if selectedEntity == nil {
+                <ul>
+                    {entityTypes
+                        .iter()
+                        .map((t: EntityDescriptor): Element =>
+                            <li>
+                                {t.id}
 
-                        <ul>
-                            {entitiesByType[t.id] &&
-                                entitiesByType[t.id]
-                                    .iter<Entity>()
-                                    .map<Entity, Element>((e: Entity) =>
-                                        <li>
-                                            {e.id}
-                                        </li>)
-                                    .collectArray<Element>()}
-                        </ul>
-                    </li>)
-                .collectArray()}
-        </ul>
+                                <ul>
+                                    {entitiesByType[t.id] &&
+                                        entitiesByType[t.id]
+                                            .iter<Entity>()
+                                            .map<Entity, Element>((e: Entity) =>
+                                                <li onClick={() { selectedEntity = e; }}>
+                                                    {e.id}
+                                                </li>)
+                                            .collectArray<Element>()}
+                                </ul>
+                            </li>)
+                        .collectArray()}
+                </ul>
+            } else {
+                renderEntityForm(entityTypes, selectedEntity)
+            }
+        }
     </div>
+
+@trace
+func renderEntityForm(entityTypes: EntityDescriptor[], entity: Entity) =>
+    const entityType: EntityDescriptor? = entityTypes.iter().find<EntityDescriptor>((type: EntityDescriptor) => type.id == entity.type),
+
+    if entityType == nil {
+        <div>
+            {'unknown entity type ' + entity.type}
+        </div>
+    } else {
+        <form>
+            <button onClick={() { selectedEntity = nil; }}>
+                {'<- Back'}
+            </button>
+
+            {entityType.fields.iter<FieldDescriptor>().map((field: FieldDescriptor) =>
+                const value = entity.fieldValues[field.name],
+
+                switch(field.kind) {
+                    case 'text-short':
+                        <input
+                            type='text'
+                            placeholder={field.name}
+                            value={value} />,
+                    case 'boolean':
+                        <input
+                            type='checkbox'
+                            checked={value} />,
+                    case 'text-long':
+                        <textarea placeholder={field.name}>
+                            {value}
+                        </textarea>,
+                }).collectArray()}
+        </form>
+    }

@@ -4,13 +4,14 @@ export type EntityDescriptor = {
     fields: FieldDescriptor[],
 }
 
-type FieldDescriptor = {
+export type FieldDescriptor = {
     name: string,
     kind: 'text-short'|'text-long'|'boolean'
 }
 
 export type Entity = {
     id: string,
+    type: string,
     fieldValues: {
         [string]: string|boolean
     }
@@ -31,6 +32,7 @@ export let entitiesByType: {[string]: Entity[]} = {
     blogPost: [
         {
             id: 'first-blog-post',
+            type: 'blogPost',
             fieldValues: {
                 title: 'First Post',
                 published: true,
@@ -39,5 +41,7 @@ export let entitiesByType: {[string]: Entity[]} = {
         }
     ]
 }
+
+export let selectedEntity: Entity? = nil
 
 // TODO: More detailed error messages for nested type-problems
