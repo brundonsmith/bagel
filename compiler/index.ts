@@ -38,33 +38,33 @@ async function run() {
 
                     const platforms = config.platforms
                     
-                    if (flags.node || (platforms?.includes('node') && !platforms?.includes('deno'))) {
-                        console.log(Colors.green('Running (node) ') + bundlePath)
-                        await Deno.run({ cmd: nodeCommand }).status()
-                        Deno.exit(0)
-                    } else if (flags.deno || (!platforms?.includes('node') && platforms?.includes('deno'))) {
+                    if (flags.deno || (!platforms?.includes('node') && platforms?.includes('deno'))) {
                         console.log(Colors.green('Running (deno) ') + bundlePath)
                         await Deno.run({ cmd: denoCommand }).status()
                         Deno.exit(0)
-                    } else if (nodePath) {
-                        console.log(Colors.green('Running (' + nodePath + ')     ') + bundlePath)
+                    } else if (flags.node || (platforms?.includes('node') && !platforms?.includes('deno'))) {
+                        console.log(Colors.green('Running (node) ') + bundlePath)
                         await Deno.run({ cmd: nodeCommand }).status()
                         Deno.exit(0)
                     } else if (denoPath) {
                         console.log(Colors.green('Running (' + denoPath + ')     ') + bundlePath)
                         await Deno.run({ cmd: denoCommand }).status()
                         Deno.exit(0)
+                    } else if (nodePath) {
+                        console.log(Colors.green('Running (' + nodePath + ')     ') + bundlePath)
+                        await Deno.run({ cmd: nodeCommand }).status()
+                        Deno.exit(0)
                     } else {
                         try {
-                            await Deno.run({ cmd: ["node", "-v"], stdout: 'piped' }).status()
-                            console.log(Colors.green('Running (node) ') + bundlePath)
-                            await Deno.run({ cmd: nodeCommand }).status()
+                            await Deno.run({ cmd: ["deno", "--version"], stdout: 'piped' }).status()
+                            console.log(Colors.green('Running (deno) ') + bundlePath)
+                            await Deno.run({ cmd: denoCommand }).status()
                             Deno.exit(0)
                         } catch {
                             try {
-                                await Deno.run({ cmd: ["deno", "--version"], stdout: 'piped' }).status()
-                                console.log(Colors.green('Running (deno) ') + bundlePath)
-                                await Deno.run({ cmd: denoCommand }).status()
+                                await Deno.run({ cmd: ["node", "-v"], stdout: 'piped' }).status()
+                                console.log(Colors.green('Running (node) ') + bundlePath)
+                                await Deno.run({ cmd: nodeCommand }).status()
                                 Deno.exit(0)
                             } catch {
                             }
