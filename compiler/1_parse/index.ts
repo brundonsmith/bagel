@@ -2314,12 +2314,17 @@ const stringLiteral: ParseFunction<StringLiteral|ExactStringLiteral> = (module, 
 
     if (code[index] === "'") {
         index++;
-        let currentSegmentStart = index;
+        let currentSegment = '';
 
-        while (index < code.length && code[index] !== "'") {
-            if (code[index] === "$" && code[index+1] === "{") {
-                if (index - currentSegmentStart > 0) {
-                    segments.push(code.substring(currentSegmentStart, index));
+        let escapeNext = false
+
+        while (index < code.length && (escapeNext || code[index] !== "'")) {            
+            if (!escapeNext && code[index] === "$" && code[index+1] === "{") {
+                escapeNext = false
+
+                if (currentSegment.length > 0) {
+                    segments.push(currentSegment);
+                    currentSegment = '';
                 }
                 index += 2;
 
@@ -2334,13 +2339,19 @@ const stringLiteral: ParseFunction<StringLiteral|ExactStringLiteral> = (module, 
 
                     const closeBraceResult = consume(code, index, "}");
                     if (closeBraceResult == null) {
+                        // unclosed insertion
                         return err(code, index, '"}"');
                     } else {
+                        // finished insertion, begin next string segment
                         index = closeBraceResult;
-                        currentSegmentStart = index;
                     }
                 }
+            } else if (!escapeNext && code[index] === '\\') {
+                escapeNext = true
+                index++
             } else {
+                escapeNext = false
+                currentSegment += code[index]
                 index++;
             }
         }
@@ -2348,7 +2359,7 @@ const stringLiteral: ParseFunction<StringLiteral|ExactStringLiteral> = (module, 
         if (index > code.length) {
             return err(code, index, '"\'"');
         } else {
-            segments.push(code.substring(currentSegmentStart, index));
+            segments.push(currentSegment);
 
             if (segments.length === 1 && typeof segments[0] === 'string' && tag == null) {
                 return {

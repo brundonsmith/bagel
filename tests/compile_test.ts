@@ -864,6 +864,24 @@ Deno.test({
   }
 })
 
+Deno.test({
+  name: "Strings",
+  fn() {
+    testCompile(`
+    const a = 'Hello world \${12}'
+    const b = 'it\\'s me!'
+    const c = '\\\\foobar'
+    const d = 'num: \\\${12}'
+    const e = ''`,
+    `
+    const a = \`Hello world \${12}\`;
+    const b = "it's me!";
+    const c = "\\\\foobar";
+    const d = "num: \${12}";
+    const e = "";`)
+  }
+})
+
 function testCompile(code: string, exp: string) {
   const moduleName = '<test>.bgl' as ModuleName
 

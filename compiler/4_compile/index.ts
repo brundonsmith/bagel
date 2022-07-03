@@ -347,7 +347,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
         case "array-literal":   return `[${ast.entries.map(c).join(", ")}]`;
         case "string-literal":  return `\`${ast.segments.map(segment =>
                                             typeof segment === "string"
-                                                ? segment
+                                                ? segment.replaceAll("'", "\\'").replaceAll('$', '\\$').replaceAll('\\', '\\\\')
                                                 : '${' + c(segment) + '}').join("")}\``;
         case "spread": return `...${c(ast.expr)}`;
         case "exact-string-literal":
