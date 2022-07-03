@@ -621,7 +621,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "assignment": {
 
                 // if assigning directly to variable, make sure it isn't a constant
-                const resolved = current.target.kind === "local-identifier" ? resolve(ctx, current.target.name, current.target) : undefined
+                const resolved = current.target.kind === "local-identifier" ? resolve(ctx, current.target.name, current.target, true) : undefined
                 if (current.target.kind === "local-identifier" && resolved != null && getBindingMutability(resolved, current.target) !== "assignable") {
                     sendError(miscError(current.target, `Cannot assign to '${current.target.name}' because it's constant`));
                 }
@@ -634,7 +634,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     }
                 }
 
-                const targetType = inferType(ctx, current.target);
+                const targetType = inferType(ctx, current.target, true);
 
                 if (current.operator) {
                     // +=, -=, etc
