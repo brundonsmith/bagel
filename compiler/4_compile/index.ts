@@ -275,12 +275,15 @@ function compileOne(ctx: CompileContext, ast: AST): string {
                 return truthify(ctx, ast.left, ast.op.op, ast.right)
             }
 
-            if (ast.op.op === '==') {
-                return `(${c(ast.left)} === ${c(ast.right)})`;
-            }
+            if (ast.op.op === '==' || ast.op.op === '!=') {
+                const leftType = inferType(ctx, ast.left)
+                const rightType = inferType(ctx, ast.right)
 
-            if (ast.op.op === '!=') {
-                return `(${c(ast.left)} !== ${c(ast.right)})`;
+                if (!subsumationIssues(ctx, NIL_TYPE, leftType) || !subsumationIssues(ctx, NIL_TYPE, rightType)) {
+                    return `(${c(ast.left)} ${ast.op.op} ${c(ast.right)})`; // special case for nil-comparisons because of null/undefined
+                } else {
+                    return `(${c(ast.left)} ${ast.op.op}= ${c(ast.right)})`;
+                }
             }
 
             return `(${c(ast.left)} ${ast.op.op} ${c(ast.right)})`;
