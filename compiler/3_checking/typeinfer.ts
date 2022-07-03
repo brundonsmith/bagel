@@ -1051,6 +1051,8 @@ function conditionToRefinement(condition: Expression, conditionIsTrue: boolean):
     if (condition.kind === "binary-operator") {
 
         if (condition.op.op === '!=') {
+            
+            // TODO: Make this work for more than just nil
             const targetExpression = 
                 condition.right.kind === 'nil-literal' ? condition.left :
                 condition.left.kind === "nil-literal" ? condition.right :
@@ -1063,7 +1065,16 @@ function conditionToRefinement(condition: Expression, conditionIsTrue: boolean):
 
         if (condition.op.op === '==') {
             // TODO: Somehow assert that both of these types are the same... combine their refinements? intersection? etc
-            // TODO: Translate this more general logic to the '!=' case too
+            
+            // TODO: Make this work for more than just nil
+            const targetExpression = 
+                condition.right.kind === 'nil-literal' ? condition.left :
+                condition.left.kind === "nil-literal" ? condition.right :
+                undefined;
+
+            if (targetExpression != null) {
+                return { kind: !conditionIsTrue ? "subtraction" : "narrowing", type: NIL_TYPE, targetExpression }
+            }
         }
     }
 
