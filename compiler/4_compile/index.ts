@@ -441,6 +441,7 @@ function blockContents(ctx: CompileContext, block: Block) {
 }
 
 export const INT = `___`;
+export const INT_FN = INT + 'fn_'
 
 const NIL = `undefined`;
 
@@ -467,12 +468,12 @@ const compileFuncDeclaration = (ctx: CompileContext, decl: FuncDeclaration): str
 }
 
 function compileProc(ctx: CompileContext, proc: Proc|JsProc, name?: string): string {
-    const nameStr = name ? INT + name : ''
+    const nameStr = name ? INT_FN + name : ''
     const signature = compileProcOrFunctionSignature(ctx, proc.type)
     return (proc.kind === 'proc' && proc.isAsync ? 'async ' : '') + 'function ' + nameStr + signature + `${proc.kind === 'js-proc' ? `{${proc.body}}` : compileOne(ctx, proc.body)}`;
 }
 const compileFunc = (ctx: CompileContext, func: Func|JsFunc, name?: string): string => {
-    const nameStr = name ? INT + name : ''
+    const nameStr = name ? INT_FN + name : ''
     const signature = compileProcOrFunctionSignature(ctx, func.type)
     return 'function ' + nameStr + signature + ' { ' + (func.kind === 'js-func' ? func.body : `return ${compileOne(ctx, func.body)}`) + ' }'
 }

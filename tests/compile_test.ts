@@ -8,7 +8,7 @@ Deno.test({
   fn() {
     testCompile(
       `func uid() => '12345'`,
-      `const uid = () => ("12345");`,
+      `const uid = function ___fn_uid() { return "12345" };`,
     );
   },
 });
@@ -18,7 +18,7 @@ Deno.test({
   fn() {
     testCompile(
       `const fn = a => a`,
-      `const fn = (a) => (a);`,
+      `const fn = function (a) { return a };`,
     );
   },
 });
@@ -31,7 +31,7 @@ Deno.test({
       @memo({ maxItems: 12 })
       func uid() => '12345'
       `,
-      `const uid = memo({maxItems: 12})(() => ("12345"));`,
+      `const uid = memo({maxItems: 12})(function ___fn_uid() { return "12345" });`,
     );
   },
 });
@@ -54,11 +54,11 @@ Deno.test({
         const double = 2 * n,
         const ten = 5 * double,
         ten`,
-      `const uid = (n: number) => ((() => {
+      `const uid = function ___fn_uid(n: number) { return (() => {
         const double = (2 * n);
         const ten = (5 * double);
         return ten;
-      })());`,
+      })() };`,
     );
   },
 });
@@ -147,7 +147,7 @@ Deno.test({
             } else {
                 3
             }`,
-      `const merge = () => (((___observe(arr1, 'length') <= 0) ? 2 : 3));`,
+      `const merge = function ___fn_merge() { return ((___observe(arr1, 'length') <= 0) ? 2 : 3) };`,
     );
   },
 });
@@ -164,13 +164,11 @@ Deno.test({
             } else {
               4
             }`,
-      `const merge = () =>
-        (((___observe(arr1, 'length') <= 0) ?
-          2
-        : (___observe(arr1, 'length') <= 1) ?
-          3
-        :
-          4));`,
+      `const merge = function ___fn_merge() {
+        return
+          ((___observe(arr1, 'length') <= 0) ? 2 : 
+          (___observe(arr1, 'length') <= 1) ? 3 :
+          4) };`,
     );
   },
 });
@@ -180,7 +178,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc foo() { }`,
-      `const foo = (): void => { };`,
+      `const foo = function ___fn_foo(): void{ };`,
     );
   },
 });
@@ -198,12 +196,12 @@ Deno.test({
                 log('other');
               }
             }`,
-      `const foo = (): void => {
-        if (true) {
+      `const foo = function ___fn_foo(): void{ 
+        if (true) { 
           log("true");
-        } else if (false) {
+        } else if (false) { 
           log("false");
-        } else {
+        } else { 
           log("other");
         };
       };`,
@@ -244,7 +242,7 @@ Deno.test({
   fn() {
     testCompile(
       `func uid(arr, i) => arr[i]`,
-      `const uid = (arr, i) => (___observe(arr, i));`,
+      `const uid = function ___fn_uid(arr, i) { return ___observe(arr, i) };`,
     );
   },
 });
@@ -264,7 +262,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc doStuff(a) { }`,
-      `const doStuff = (a): void => { };`,
+      `const doStuff = function ___fn_doStuff(a): void{ };`,
     );
   },
 });
@@ -283,7 +281,7 @@ Deno.test({
         log(count);
       }`,
       `
-      const doStuff = (items: ___Iter<number>): void => {
+      const doStuff = function ___fn_doStuff(items: ___Iter<number>): void{ 
         const count = { value: 0 };
 
         for (const item of items.inner) {
@@ -320,23 +318,23 @@ Deno.test({
         log(count);
       }`,
       `
-      const doStuff = (items: ___Iter<number>): void => {
+      const doStuff = function ___fn_doStuff(items: ___Iter<number>): void{ 
         const count = { value: 0 };
-    
-        for (const item of items.inner) {
-            if ((___observe(item, 'foo') != null && (___observe(item, 'foo') as unknown) !== false && (___observe(item, 'foo') as any).kind !== ___ERROR_SYM)) {
-                count.value = (___observe(count, 'value') + 1); ___invalidate(count, 'value');
-            };
-            
-            if ((___observe(count, 'value') > 12)) { 
-                log(items);
-            } else if ((___observe(count, 'value') !== 10)) {
-                log("not 10!");
-            } else {
-                log(undefined);
-            };
+
+        for (const item of items.inner) { 
+          if ((___observe(item, 'foo') != null && (___observe(item, 'foo') as unknown) !== false && (___observe(item, 'foo') as any).kind !== ___ERROR_SYM)) { 
+            count.value = (___observe(count, 'value') + 1); ___invalidate(count, 'value');
+          };
+
+          if ((___observe(count, 'value') > 12)) { 
+            log(items);
+          } else if ((___observe(count, 'value') !== 10)) { 
+            log("not 10!");
+          } else { 
+            log(undefined);
+          };
         };
-    
+
         log(___observe(count, 'value'));
       };`,
     );
@@ -368,7 +366,7 @@ Deno.test({
   fn() {
     testCompile(
       `func foo(a: string, b: number): number => 0`,
-      `const foo = (a: string, b: number): number => (0);`,
+      `const foo = function ___fn_foo(a: string, b: number): number { return 0 };`,
     );
   },
 });
@@ -378,7 +376,7 @@ Deno.test({
   fn() {
     testCompile(
       `proc bar(a: string[], b: { foo: number }) { }`,
-      `const bar = (a: string[], b: {foo: number}): void => { };`,
+      `const bar = function ___fn_bar(a: string[], b: {foo: number}): void{ };`,
     );
   },
 });
@@ -418,9 +416,9 @@ Deno.test({
   fn() {
     testCompile(
       `func foo() => 13 // foo bar comment
-            const a = 12`,
-      `const foo = () => (13);
-            const a = 12;`,
+       const a = 12`,
+      `const foo = function ___fn_foo() { return 13 };
+       const a = 12;`,
     );
   },
 });
@@ -431,9 +429,9 @@ Deno.test({
     testCompile(
       `func foo() => 13 /* foo bar comment
             moar comment*/
-            const a = 12`,
-      `const foo = () => (13);
-            const a = 12;`,
+       const a = 12`,
+      `const foo = function ___fn_foo() { return 13 };
+       const a = 12;`,
     );
   },
 });
@@ -465,8 +463,8 @@ Deno.test({
       setLocalStorage(key, value);
     }`,
     `
-    export const setItem = (key: string, value: string): void => {
-      _localStorage[key] = value; ___invalidate(_localStorage, key);        
+    export const setItem = function ___fn_setItem(key: string, value: string): void{ 
+      _localStorage[key] = value; ___invalidate(_localStorage, key);
       setLocalStorage(key, value);
     };`)
   }
@@ -484,10 +482,10 @@ Deno.test({
       s += ' other';
     }`,
     `
-    const foo = (): void => { 
+    const foo = function ___fn_foo(): void{ 
       const n = { value: 0 };
       n.value *= 2; ___invalidate(n, 'value');
-      
+
       const s = { value: "foo" };
       s.value += " other"; ___invalidate(s, 'value');
     };`)
@@ -507,9 +505,10 @@ Deno.test({
       foo.push(4);
     }`,
     `
-    const push = <T>(arr: T[], el: T): void => { };
-
-    export const bar = (): void => {
+    const push = function ___fn_push<T>(arr: T[], el: T): void{ 
+    };
+   
+    export const bar = function ___fn_bar(): void{ 
       const foo = { value: [1, 2, 3] };
       push(___observe(foo, 'value'), 4);
     };`)
@@ -525,7 +524,7 @@ Deno.test({
     #}
     `,
     `
-    const foo = (a: number, b: string): string => {
+    const foo = function ___fn_foo(a: number, b: string): string { 
       return a + b;
     };
     `)
@@ -541,7 +540,7 @@ Deno.test({
     #}
     `,
     `
-    const foo = (a: {foo: number}, b: number): void => {
+    const foo = function ___fn_foo(a: {foo: number}, b: number): void{
       a.foo = b;
     };
     `)
@@ -558,9 +557,9 @@ Deno.test({
       }
     }`,
     `
-    const foo = (): void => { 
-      while (true) { 
-        log("stuff");
+    const foo = function ___fn_foo(): void{
+      while (true) {
+          log("stuff");
       };
     };`)
   }
@@ -629,9 +628,9 @@ Deno.test({
     `
     const name = { value: "Brandon" };
     const foo: () => string = ___computedFn(
-      () => \`Hello \${___observe(name, 'value')}\`
-    );
-    const logFoo = (): void => { 
+                    () => \`Hello \${___observe(name, 'value')}\`
+                );
+    const logFoo = function ___fn_logFoo(): void{ 
       log(foo());
     };
     `)
@@ -662,10 +661,10 @@ Deno.test({
       n && n + 1
     `,
     `
-    const foo = (n: number|null|undefined) =>
-      (((n != null && (n as unknown) !== false && (n as any).kind !== ___ERROR_SYM)
+    const foo = function ___fn_foo(n: number|null|undefined) { return
+      ((n != null && (n as unknown) !== false && (n as any).kind !== ___ERROR_SYM)
         ? (n + 1)
-        : n));
+        : n) };
     `)
   }
 })
@@ -692,7 +691,7 @@ Deno.test({
     }
     `,
     `
-    const doStuff = async (plan: ___Plan<string>): Promise<void> => { 
+    const doStuff = async function ___fn_doStuff(plan: ___Plan<string>): Promise<void>{ 
       const str = await (plan)();
       log(str);
     };
@@ -711,10 +710,10 @@ Deno.test({
     )
     `,
     `
-    const getStuff = (plan: ___Plan<string>) => ((() => (async () => {
+    const getStuff = function ___fn_getStuff(plan: ___Plan<string>) { return (() => (async () => {
       const str = await (plan)();
       return str;
-    })()));
+    })()) };
     `)
   }
 })
@@ -765,10 +764,10 @@ Deno.test({
       a
     `,
     `
-    const foo = (obj: {a: string, b: number}) => ((() => {
+    const foo = function ___fn_foo(obj: {a: string, b: number}) { return (() => {
       const { a } = obj;
       return a;
-    })());
+    })() };
     `)
   }
 })
@@ -821,14 +820,14 @@ Deno.test({
     }
     `,
     `
-    const myDecorator1 = (fn: (n: number) => number): (n: number) => number => (fn);
-    const myDecorator2 = (fn: (n: number) => number): (n: number) => number => (fn);
+    const myDecorator1 = function ___fn_myDecorator1(fn: (n: number) => number): (n: number) => number { return fn };
+    const myDecorator2 = function ___fn_myDecorator2(fn: (n: number) => number): (n: number) => number { return fn };
 
-    const foo = myDecorator1(myDecorator2((n: number): number => (n)));
+    const foo = myDecorator1(myDecorator2(function ___fn_foo(n: number): number { return n }));
 
-    const myProcDecorator = (p: () => void): () => void => (p);
+    const myProcDecorator = function ___fn_myProcDecorator(p: () => void): () => void { return p };
 
-    const bar = myProcDecorator((): void => { 
+    const bar = myProcDecorator(function ___fn_bar(): void{
     });
     `)
   }
