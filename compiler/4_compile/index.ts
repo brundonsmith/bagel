@@ -9,7 +9,7 @@ import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { Context, ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func, JsFunc, JsProc } from "../_model/expressions.ts";
-import { FuncType, GenericFuncType, GenericProcType, ProcType, TRUTHINESS_SAFE_TYPES, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { FuncType, GenericFuncType, GenericProcType, NIL_TYPE, ProcType, TRUTHINESS_SAFE_TYPES, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 export type CompileContext =  Pick<Context, "allModules"|"canonicalModuleName"> & { moduleName: ModuleName, transpilePath: (module: string) => string, includeTests?: boolean, excludeTypes?: boolean }
 
@@ -132,17 +132,12 @@ function compileOne(ctx: CompileContext, ast: AST): string {
         case "inline-declaration": {
             const prefix = ast.kind === 'value-declaration' ? exported(ast.exported) : ''
 
-            const destination = (
-                ast.kind === 'value-declaration'
-                    ? ast.name.name
-                    : c(ast.destination)
-            )
-            
             const typeAst = (
                 ast.kind === 'value-declaration' ? ast.type :
                 ast.destination.kind === 'name-and-type' ? ast.destination.type :
                 undefined
             )
+
             const type = (
                 given(typeAst, type =>
                     ast.kind === 'inline-declaration' || ast.isConst
@@ -150,6 +145,12 @@ function compileOne(ctx: CompileContext, ast: AST): string {
                         : `{ value: ${c(type)} }`)
             )
 
+            const destination = (
+                ast.kind === 'value-declaration'
+                    ? ast.name.name + (!excludeTypes && type != null ? ': ' + type : '')
+                    : c(ast.destination)
+            )
+            
             const value = (
                 ast.kind === 'inline-declaration' || ast.isConst
                     ? c(ast.value)
@@ -162,7 +163,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
                     : ''
             )
 
-            return prefix + `const ${destination}${!excludeTypes && type ? ': ' + type : ''} = ${ast.kind !== 'value-declaration' && ast.awaited ? awaited(value) : value}${semicolon}`
+            return prefix + `const ${destination} = ${ast.kind !== 'value-declaration' && ast.awaited ? awaited(value) : value}${semicolon}`
         }
         case "name-and-type":
             return ast.name.name + maybeTypeAnnotation(ctx, ast.type)

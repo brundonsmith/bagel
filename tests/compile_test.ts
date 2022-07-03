@@ -773,6 +773,23 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Inline const",
+  fn() {
+    testCompile(`
+    const a: number = (
+      const b: number = 12,
+
+      b * 2
+    )`,
+    `
+    const a: number = ((() => {
+      const b: number = 12;
+      return (b * 2);
+    })());`)
+  }
+})
+
+Deno.test({
   name: "Types",
   fn() {
     testCompile(`
