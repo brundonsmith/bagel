@@ -190,7 +190,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
             const op = ast.operator?.op ?? ''
 
             if (ast.target.kind === 'local-identifier') {
-                const binding = resolve(ctx, ast.target.name, ast.target)
+                const binding = resolve(ctx, ast.target.name, ast.target, true)
 
                 if ((binding?.owner.kind === 'value-declaration' || binding?.owner.kind === 'declaration-statement') && !binding.owner.isConst) {
                     return `${ast.target.name}.value ${op}= ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
@@ -305,7 +305,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
         case "debug": return c(ast.inner);
         case "plain-identifier": return ast.name;
         case "local-identifier": {
-            const binding = resolve(ctx, ast.name, ast)
+            const binding = resolve(ctx, ast.name, ast, true)
 
             if ((binding?.owner.kind === 'value-declaration' || binding?.owner.kind === 'declaration-statement') && !binding.owner.isConst) {
                 return `${INT}observe(${ast.name}, 'value')`
