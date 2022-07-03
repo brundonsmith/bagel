@@ -164,7 +164,7 @@ fs.ensureDirSync(cacheDir)
 fs.ensureDirSync(buildDir)
 
 export const bundlePath = (
-    mode === 'project-dir' ? targetDir + '.bundle.js' :
+    mode === 'project-dir' ? path.resolve(buildDir, path.basename(targetDir) + '.bundle.js') :
     entry ? path.resolve(buildDir, uniqueFileName(entry) + '.bundle.js') :
     ''
 )
