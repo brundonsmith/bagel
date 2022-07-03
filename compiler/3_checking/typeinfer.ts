@@ -15,11 +15,12 @@ import { CaseBlock } from "../_model/statements.ts";
 export function inferType(
     ctx: Pick<Context, 'allModules'|'visited'|'canonicalModuleName'>,
     ast: Expression,
+    skipRefinement?: boolean,
 ): TypeExpression {
     const baseType = inferTypeInner(ctx, ast)
 
     let refinedType = baseType
-    {
+    if (!skipRefinement) {
         const refinements = resolveRefinements(ast)
 
         for (const refinement of refinements ?? []) {
