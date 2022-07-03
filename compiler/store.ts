@@ -81,16 +81,21 @@ export const allProblems = computedFn(function allProblems (ctx: Pick<Context, "
         if (parseResult) {
             // console.log(withoutSourceInfo(parsed.ast))
             const { ast, errors: parseErrors } = parseResult
-            const typecheckErrors = typeerrors(ctx, ast)
-            const lintProblems = (
-                pathIsInProject(module)
-                    ? lint(ctx, parseResult.ast)
-                    : []
-            )
 
-            for (const err of [...parseErrors, ...typecheckErrors, ...lintProblems].filter((err, index, arr) => !isError(err) || arr.findIndex(other => isError(other) && errorsEquivalent(err, other)) === index)) {
-                const errorModule = err.ast?.module ?? module;
-                (allProblems.get(errorModule) as (BagelError|LintProblem)[]).push(err)
+            if (parseErrors.length > 0) {
+                (allProblems.get(module) as (BagelError|LintProblem)[]).push(...parseErrors)
+            } else {
+                const typecheckErrors = typeerrors(ctx, ast)
+                const lintProblems = (
+                    pathIsInProject(module)
+                        ? lint(ctx, parseResult.ast)
+                        : []
+                )
+                
+                for (const err of [...typecheckErrors, ...lintProblems].filter((err, index, arr) => !isError(err) || arr.findIndex(other => isError(other) && errorsEquivalent(err, other)) === index)) {
+                    const errorModule = err.ast?.module ?? module;
+                    (allProblems.get(errorModule) as (BagelError|LintProblem)[]).push(err)
+                }
             }
         }
     }
