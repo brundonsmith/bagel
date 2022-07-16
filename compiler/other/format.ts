@@ -292,7 +292,9 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
 
             return ast.inner.kind === 'any-type' ? typeName : `${typeName}<${f(ast.inner)}>`
         }
-        case "unknown-type": return "unknown";
+        case "unknown-type":
+        case "poisoned-type":
+            return "unknown";
         case "any-type": return "<any>";
         case "parenthesized-type": return `(${f(ast.inner)})`;
         case "typeof-type": return `typeof ${f(ast.expr)}`;

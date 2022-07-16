@@ -1,6 +1,6 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
 import { BinaryOp, Case, ElementTag, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry, ObjectLiteral } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, SpreadArgs, Args } from "../_model/type-expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, SpreadArgs, Args, POISONED_TYPE } from "../_model/type-expressions.ts";
 import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
@@ -136,8 +136,10 @@ const inferTypeInner = computedFn(function inferTypeInner(
         case "binary-operator": {
             const leftType = inferType(ctx, ast.left)
             const rightType = inferType(ctx, ast.right)
-            
-            if (ast.op.op === '??') {
+
+            if (leftType.kind === "poisoned-type" || rightType.kind === "poisoned-type") {
+                return POISONED_TYPE
+            } else if (ast.op.op === '??') {
                 return {
                     kind: "union-type",
                     members: [
@@ -361,7 +363,7 @@ const inferTypeInner = computedFn(function inferTypeInner(
             if (binding) {
                 return getBindingType(ctx, ast, binding)
             } else {
-                return UNKNOWN_TYPE
+                return POISONED_TYPE
             }
         }
         case "element-tag": {

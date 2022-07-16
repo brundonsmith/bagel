@@ -30,6 +30,7 @@ export type TypeExpression =
     | ValueofType
     | ElementofType
     | UnknownType
+    | PoisonedType
     | AnyType
     | RegularExpressionType
     | PropertyType
@@ -236,6 +237,10 @@ export type UnknownType = SourceInfo & NoMutability & {
     readonly kind: "unknown-type",
 }
 
+export type PoisonedType = SourceInfo & NoMutability & {
+    readonly kind: "poisoned-type",
+}
+
 // Internal use only!
 export type AnyType = SourceInfo & NoMutability & {
     readonly kind: "any-type",
@@ -329,6 +334,15 @@ export const NIL_TYPE: NilType = {
 }
 export const UNKNOWN_TYPE: UnknownType = {
     kind: "unknown-type",
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
+export const POISONED_TYPE: PoisonedType = {
+    kind: "poisoned-type",
     mutability: undefined,
     parent: undefined,
     module: undefined,

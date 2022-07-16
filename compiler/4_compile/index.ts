@@ -394,7 +394,9 @@ function compileOne(ctx: CompileContext, ast: AST): string {
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;
         case "nil-type": return `(null | undefined)`;
-        case "unknown-type": return `unknown`;
+        case "unknown-type":
+        case "poisoned-type":
+            return `unknown`;
         case "parenthesized-type": return `(${c(ast.inner)})`
         case "instance-of": return `${INT}instanceOf(${c(ast.expr)}, ${compileRuntimeType(resolveType(ctx, ast.type))})`
         case "as-cast": return `${c(ast.inner)} as ${c(ast.type)}`

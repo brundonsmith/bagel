@@ -887,6 +887,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "remote-type":
             case "parenthesized-type":
             case "unknown-type":
+            case "poisoned-type":
             case "any-type":
             case "property-type":
             case "javascript-escape-type":
@@ -938,6 +939,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
     if (
         resolvedValue.kind === "javascript-escape-type" || 
         resolvedValue.kind === "any-type" || 
+        resolvedValue.kind === "poisoned-type" ||
         resolvedDestination.kind === "any-type" || 
         resolvedDestination.kind === "unknown-type"
     ) {
