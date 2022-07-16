@@ -388,13 +388,13 @@ const genericType: ParseFunction<GenericType> = (module, code, startIndex) =>
     })))
 
 const arrayType: ParseFunction<ArrayType> = (module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'const'), ({ parsed: constant, index }) =>
+    given(parseKeyword(code, startIndex, 'readonly'), ({ parsed: readonly, index }) =>
     given(TYPE_PARSER.parseBeneath(module, code, index, arrayType), ({ parsed: element, index }) =>
     given(consume(code, index, "[]"), index => ({
         parsed: {
             kind: "array-type",
             element,
-            mutability: constant ? "readonly" : "mutable",
+            mutability: readonly ? "readonly" : "mutable",
             module,
             code,
             startIndex,
@@ -461,7 +461,7 @@ const namedType: ParseFunction<NamedType|RegularExpressionType> = (module, code,
     }))
 
 const objectType: ParseFunction<ObjectType> = (module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'const'), ({ parsed: constant, index }) =>
+    given(parseKeyword(code, startIndex, 'readonly'), ({ parsed: readonly, index }) =>
     given(consume(code, index, "{"), index =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, _typeSpreadOrEntry, ","), ({ parsed: entries, index }) =>
@@ -472,7 +472,7 @@ const objectType: ParseFunction<ObjectType> = (module, code, startIndex) =>
             spreads: entries.filter((e): e is NamedType => e.kind === "named-type"),
             entries: entries.filter((e): e is Attribute => e.kind === "attribute"),
             module,
-            mutability: constant ? "readonly" : "mutable",
+            mutability: readonly ? "readonly" : "mutable",
             code,
             startIndex,
             endIndex: index,
@@ -513,7 +513,7 @@ const attribute: ParseFunction<Attribute> = (module, code, startIndex) =>
     })))))))
 
 const recordType: ParseFunction<RecordType> = (module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'const'), ({ parsed: constant, index }) =>
+    given(parseKeyword(code, startIndex, 'readonly'), ({ parsed: readonly, index }) =>
     given(consume(code, index, "{"), index =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "["), index =>
@@ -530,7 +530,7 @@ const recordType: ParseFunction<RecordType> = (module, code, startIndex) =>
             kind: "record-type",
             keyType,
             valueType,
-            mutability: constant ? "readonly" : "mutable",
+            mutability: readonly ? "readonly" : "mutable",
             module,
             code,
             startIndex,
@@ -540,14 +540,14 @@ const recordType: ParseFunction<RecordType> = (module, code, startIndex) =>
     }))))))))))))))
 
 const tupleType: ParseFunction<TupleType> = (module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'const'), ({ parsed: constant, index }) =>
+    given(parseKeyword(code, startIndex, 'readonly'), ({ parsed: readonly, index }) =>
     given(consume(code, index, "["), index =>
     given(parseSeries(module, code, index, typeExpression, ","), ({ parsed: members, index }) =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index => ({
         parsed: {
             kind: "tuple-type",
             members,
-            mutability: constant ? "readonly" : "mutable",
+            mutability: readonly ? "readonly" : "mutable",
             module,
             code,
             startIndex,

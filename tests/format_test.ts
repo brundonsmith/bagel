@@ -329,10 +329,10 @@ const BAGEL_SNIPPETS = [
       proc foo(param: { foo: string }) {
         param.foo = 'stuff';
       }`, `
-      proc foo(param: const { foo: string }) {
+      proc foo(param: readonly { foo: string }) {
         param.foo = 'stuff';
       }`, `
-      proc foo(param: const { foo: { bar: string } }) {
+      proc foo(param: readonly { foo: { bar: string } }) {
         param.foo.bar = 'stuff';
       }`, `
       const obj = { foo: 'bar' }
@@ -344,7 +344,7 @@ const BAGEL_SNIPPETS = [
       const obj = { foo: 'bar' }
   
       proc foo(param: { foo: string }) {
-        let alias = obj as const { foo: string };
+        let alias = obj as readonly { foo: string };
         alias = { foo: 'other' };
       }`, `
       proc foo(param: { foo: string }) {

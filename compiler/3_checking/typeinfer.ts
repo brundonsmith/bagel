@@ -534,7 +534,7 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
             const valueType = resolveType(ctx, inferType(ctx, decl.value))
             const mutability: MutabilityKind = given(valueType.mutability, mutability =>
                 decl.isConst || (decl.exported === 'expose' && decl.module !== module)
-                    ? 'immutable'
+                    ? 'constant'
                     : mutability
             )
 
@@ -569,7 +569,7 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
 
             const mutability: MutabilityKind = given(valueType.mutability, mutability =>
                 decl.kind === 'declaration-statement' && decl.isConst
-                    ? 'immutable'
+                    ? 'constant'
                     : mutability
             )
 
@@ -684,7 +684,7 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
                     kind: 'object-type',
                     spreads: [],
                     entries: [],
-                    mutability: 'immutable',
+                    mutability: 'constant',
                     parent,
                     ...AST_NOISE
                 }

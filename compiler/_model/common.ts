@@ -54,11 +54,11 @@ export type Binding = {
         | TryCatch
 }
 
-export function getBindingMutability(binding: Binding, from: AST): "immutable"|"readonly"|"mutable"|"assignable" {
+export function getBindingMutability(binding: Binding, from: AST): 'constant'|"readonly"|"mutable"|"assignable" {
     switch (binding.owner.kind) {
         case 'value-declaration':
             return binding.owner.isConst || (binding.owner.exported === 'expose' && binding.owner.module !== from.module)
-                ? 'immutable'
+                ? 'constant'
                 : 'assignable'
         case 'func':
         case 'proc':
@@ -74,9 +74,9 @@ export function getBindingMutability(binding: Binding, from: AST): "immutable"|"
         case 'type-declaration':
         case 'generic-param-type':
         case 'try-catch':
-            return 'immutable'
+            return 'constant'
         case 'declaration-statement':
-            return !binding.owner.isConst ? 'assignable' : 'immutable'
+            return !binding.owner.isConst ? 'assignable' : 'constant'
         default:
             // @ts-expect-error: exhaustiveness
             throw Error('Unreachable!' + binding.owner.kind)

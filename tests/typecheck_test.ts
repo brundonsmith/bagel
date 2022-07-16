@@ -544,10 +544,10 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      js func iter<T>(x: const T[]): Iterator<T> => {# #}
+      js func iter<T>(x: readonly T[]): Iterator<T> => {# #}
       js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> => {# #}
 
-      func foo(arr: const number[]): Iterator<string> => arr.iter().map((n: number) => 'foo' + n)`
+      func foo(arr: readonly number[]): Iterator<string> => arr.iter().map((n: number) => 'foo' + n)`
     , false)
   }
 })
@@ -557,10 +557,10 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      js func iter<T>(x: const T[]): Iterator<T> => {# #}
+      js func iter<T>(x: readonly T[]): Iterator<T> => {# #}
       js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> => {# #}
 
-      func foo(arr: const number[]): Iterator<number> => arr.iter().map((n: number) => 'foo' + n)`
+      func foo(arr: readonly number[]): Iterator<number> => arr.iter().map((n: number) => 'foo' + n)`
     , true)
   }
 })
@@ -1474,7 +1474,7 @@ Deno.test({
   name: "Immutability test 4",
   fn() {
     testTypecheck(`
-    proc foo(param: const { foo: string }) {
+    proc foo(param: readonly { foo: string }) {
       param.foo = 'stuff';
     }`,
     true)
@@ -1485,7 +1485,7 @@ Deno.test({
   name: "Immutability test 5",
   fn() {
     testTypecheck(`
-    proc foo(param: const { foo: { bar: string } }) {
+    proc foo(param: readonly { foo: { bar: string } }) {
       param.foo.bar = 'stuff';
     }`,
     true)
@@ -1513,7 +1513,7 @@ Deno.test({
     const obj = { foo: 'bar' }
 
     proc foo(param: { foo: string }) {
-      let alias = obj as const { foo: string };
+      let alias = obj as readonly { foo: string };
       alias = { foo: 'other' };
     }`,
     false)
@@ -1903,11 +1903,11 @@ Deno.test({
   name: "Record type pass",
   fn() {
     testTypecheck(`
-    type Foo = const {[string]: boolean}
+    type Foo = readonly {[string]: boolean}
     const a: Foo = { foo: true, bar: false }
     const b: Foo = {}
     
-    func f(val: Foo): const {[string]: boolean|string} => val`,
+    func f(val: Foo): readonly {[string]: boolean|string} => val`,
     false)
   }
 })
@@ -1936,12 +1936,12 @@ Deno.test({
   name: "Array type pass",
   fn() {
     testTypecheck(`
-    type Foo = const (number|string)[]
+    type Foo = readonly (number|string)[]
     const a: Foo = [1, 'two', 3]
     const b: Foo = [1, 2, 3]
     const c: Foo = []
     
-    func f(val: Foo): const (number|string|boolean)[] => val
+    func f(val: Foo): readonly (number|string|boolean)[] => val
     `,
     false)
   }
@@ -1973,10 +1973,10 @@ Deno.test({
   name: "Tuple type pass",
   fn() {
     testTypecheck(`
-    type Foo = const [string, number, boolean]
+    type Foo = readonly [string, number, boolean]
     const a: Foo = ['stuff', 12, true]
     
-    func f(val: Foo): const [string, number, boolean|number] => val`,
+    func f(val: Foo): readonly [string, number, boolean|number] => val`,
     false)
   }
 })
@@ -3057,7 +3057,7 @@ Deno.test({
       str
     }
     
-    const other: const {
+    const other: readonly {
       str: string
     } = obj`,
     false)
@@ -3074,7 +3074,7 @@ Deno.test({
       str
     }
     
-    const other: const {
+    const other: readonly {
       str: number
     } = obj`,
     true)

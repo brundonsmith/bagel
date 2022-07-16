@@ -269,14 +269,14 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                 return `${args} => ${f(ast.returnType ?? UNKNOWN_TYPE)}`;
             }
         }
-        case "object-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `{${
+        case "object-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `{${
             ast.spreads.map(s => br + nextIndentation + '...' + fIndent(s)).concat(
             ast.entries.map(e => br + nextIndentation + fIndent(e)))
                 .join(',')}${br}${currentIndentation}}`;
         case "attribute": return  `${f(ast.name)}: ${f(ast.type)}`
-        case "record-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
-        case "array-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `${f(ast.element)}[]`; // TODO: Add parens if union type (and also keyof, etc?)
-        case "tuple-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'const ' : '') + `[${ast.members.map(f).join(", ")}]`;
+        case "record-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
+        case "array-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `${f(ast.element)}[]`; // TODO: Add parens if union type (and also keyof, etc?)
+        case "tuple-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `[${ast.members.map(f).join(", ")}]`;
         case "string-type": return `string`;
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;

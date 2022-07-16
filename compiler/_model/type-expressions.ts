@@ -252,7 +252,7 @@ export type JavascriptEscapeType = SourceInfo & NoMutability & {
     readonly kind: "javascript-escape-type",
 }
 
-export type Mutability = { readonly mutability: "immutable"|"readonly"|"mutable"|"literal" }
+export type Mutability = { readonly mutability: 'constant'|"readonly"|"mutable"|"literal" }
 export type NoMutability = { readonly mutability: undefined }
 
 export const STRING_TYPE: StringType = {
@@ -372,7 +372,7 @@ export const RECORD_OF_ANY: RecordType = {
     kind: "record-type",
     keyType: ANY_TYPE,
     valueType: ANY_TYPE,
-    mutability: "immutable",
+    mutability: 'constant',
     parent: undefined,
     module: undefined,
     code: undefined,
@@ -382,7 +382,7 @@ export const RECORD_OF_ANY: RecordType = {
 export const ARRAY_OF_ANY: ArrayType = {
     kind: "array-type",
     element: ANY_TYPE,
-    mutability: "immutable",
+    mutability: 'constant',
     parent: undefined,
     module: undefined,
     code: undefined,

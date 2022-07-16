@@ -87,7 +87,7 @@ Deno.test({
 
             // copied from core.bgl
             js func action<
-                TArgs extends const unknown[]
+                TArgs extends readonly unknown[]
             >(pr: (...args: TArgs) { }): (...args: TArgs) { } => {#
                 return ___action(pr)
             #}

@@ -1406,7 +1406,7 @@ export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'
                 const mutability = (
                     property?.type?.mutability == null ? undefined :
                     property.type.mutability === "mutable" && subjectType.mutability === "mutable" && !property.forceReadonly ? "mutable" :
-                    subjectType.mutability === "immutable" ? "immutable" :
+                    subjectType.mutability === 'constant' ? 'constant' :
                     "readonly"
                 )
     
