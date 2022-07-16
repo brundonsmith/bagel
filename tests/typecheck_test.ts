@@ -3398,7 +3398,7 @@ Deno.test({
         Error(message)
       }
 
-    test expr 'Two plus two equals four' => assert(2 + 2 == 3)
+    test expr 'Two plus two equals four' => assert(2 + 2 == 3 as number)
 
     test block 'Do thing!' => {
         throw Error('Foo');
@@ -3418,7 +3418,7 @@ Deno.test({
         Error(message)
       }
 
-    test expr 'Two plus two equals four' => 2 + 2 == 3`,
+    test expr 'Two plus two equals four' => 2 + 2 == 3 as number`,
     true)
   }
 })
@@ -3429,6 +3429,50 @@ Deno.test({
     testTypecheck(`
     test block 'Do thing!' => {
     }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Number type addition pass",
+  fn() {
+    testTypecheck(`
+    const a = 1
+    const b = 2
+    const c: 3 = a + b`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Number type addition fail",
+  fn() {
+    testTypecheck(`
+    const a = 1
+    const b = 1
+    const c: 3 = a + b`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "String type addition pass",
+  fn() {
+    testTypecheck(`
+    const a = 'a'
+    const b = 'b'
+    const c: 'ab' = a + b`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "String type addition fail",
+  fn() {
+    testTypecheck(`
+    const a = 'a'
+    const b = 'a'
+    const c: 'ab' = a + b`,
     true)
   }
 })

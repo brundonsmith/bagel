@@ -163,6 +163,28 @@ const inferTypeInner = computedFn(function inferTypeInner(
                     ],
                     mutability: undefined, parent, module, code, startIndex, endIndex
                 }
+            } else if (
+                (ast.op.op === '+' || ast.op.op === '-' || ast.op.op === '*' || ast.op.op === '/') &&
+                leftType.kind === 'literal-type' && 
+                rightType.kind === 'literal-type'
+            ) {
+                if (
+                    ast.op.op === '+' &&
+                    (leftType.value.kind === 'exact-string-literal' || leftType.value.kind === 'number-literal') &&
+                    (rightType.value.kind === 'exact-string-literal' || rightType.value.kind === 'number-literal')
+                ) {
+                    // @ts-ignore "Operator '+' cannot be applied to types 'string | number' and 'string | number'." ???
+                    return literalType(leftType.value.value + rightType.value.value)
+                } else if (leftType.value.kind === 'number-literal' && rightType.value.kind === 'number-literal') {
+                    switch (ast.op.op) {
+                        case '-': return literalType(leftType.value.value - rightType.value.value)
+                        case '*': return literalType(leftType.value.value * rightType.value.value)
+                        case '/': return literalType(leftType.value.value / rightType.value.value)
+                        default: UNKNOWN_TYPE
+                    }
+                } else {
+                    return UNKNOWN_TYPE
+                }
             } else {
                 const types = BINARY_OPERATOR_TYPES[ast.op.op]?.find(({ left, right }) =>
                     !subsumationIssues(ctx, left, leftType) && 
