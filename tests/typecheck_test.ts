@@ -1171,7 +1171,10 @@ Deno.test({
       }
       
       func fn(obj: Obj): number|nil =>
-        obj.foo?.bar`,
+        obj.foo?.bar
+        
+      func foo(tupleArr: ([number | nil, number | nil] | nil)[]): number? =>
+        tupleArr[0]?.[1]`,
       false,
     );
   },
