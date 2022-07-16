@@ -212,7 +212,7 @@ function parseInner(module: ModuleName, code: string, sendError: ReportError): M
             ast: undefined,
             code,
             index,
-            message: `Failed to parse entire file`,
+            message: `Failed to parse entire module`,
             stack: undefined,
         });
     }
@@ -276,6 +276,7 @@ const importDeclaration: ParseFunction<ImportDeclaration> = (module, code, start
     expec(consume(code, index, "import"), err(code, index, '"import"'), index =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "{"), err(code, index, '"{"'), index =>
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, importItem, ","), ({ parsed: imports, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
@@ -289,7 +290,7 @@ const importDeclaration: ParseFunction<ImportDeclaration> = (module, code, start
             endIndex: index,
         },
         index
-    })))))))))))
+    }))))))))))))
 
 const importItem: ParseFunction<ImportItem> = (module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
@@ -543,7 +544,9 @@ const recordType: ParseFunction<RecordType> = (module, code, startIndex) =>
 const tupleType: ParseFunction<TupleType> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'readonly'), ({ parsed: readonly, index }) =>
     given(consume(code, index, "["), index =>
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, typeExpression, ","), ({ parsed: members, index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index => ({
         parsed: {
             kind: "tuple-type",
@@ -555,7 +558,7 @@ const tupleType: ParseFunction<TupleType> = (module, code, startIndex) =>
             endIndex: index,
         },
         index,
-    })))))
+    })))))))
 
 const primitiveType: ParseFunction<PrimitiveType> = (module, code, startIndex) =>
     given(consume(code, startIndex, "string"), index => ({
@@ -824,6 +827,7 @@ const unknownType: ParseFunction<UnknownType> = (module, code, startIndex) =>
 
 const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startIndex) =>
     given(parseSeries(module, code, startIndex, decorator), ({ parsed: decorators, index }) =>
+    given(consumeWhitespace(code, index), index =>
     given(parseKeyword(code, index, 'export'), ({ parsed: exported, index }) =>
     given(parseKeyword(code, index, 'async'), ({ parsed: isAsync, index }) =>
     given(parseOptional(module, code, index, parseJsOrPlatform), ({ parsed: platform, index }) =>
@@ -891,10 +895,11 @@ const procDeclaration: ParseFunction<ProcDeclaration> = (module, code, startInde
                 endIndex: index
             },
             index,
-        }))))))))))))
+        })))))))))))))
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startIndex) => 
     given(parseSeries(module, code, startIndex, decorator), ({ parsed: decorators, index }) =>
+    given(consumeWhitespace(code, index), index =>
     given(parseKeyword(code, index, 'export'), ({ parsed: exported, index }) =>
     given(parseKeyword(code, index, 'async'), ({ parsed: isAsync, index }) =>
     given(parseOptional(module, code, index, parseJsOrPlatform), ({ parsed: platform, index }) =>
@@ -962,7 +967,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = (module, code, startInde
                 endIndex: index,
             },
             index,
-        }))))))))))))
+        })))))))))))))
     
 const decorator: ParseFunction<Decorator> = (module, code, startIndex) =>
     given(consume(code, startIndex, '@'), index =>
@@ -1307,11 +1312,13 @@ const procCall: ParseFunction<Invocation> = (module, code, startIndex) =>
 
 const ifElseStatement: ParseFunction<IfElseStatement> = (module, code, startIndex) =>
     given(consume(code, startIndex, "if"), index =>
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, _conditionAndOutcomeBlock, 'else if', { trailingDelimiter: "forbidden" }), ({ parsed: cases, index }) => {
         const elseResult = 
+            given(consumeWhitespace(code, index), index =>
             given(consume(code, index, "else"), index => 
             given(consumeWhitespace(code, index), index =>
-            expec(parseBlock(module, code, index), err(code, index, 'Else block'), result => result)));
+            expec(parseBlock(module, code, index), err(code, index, 'Else block'), result => result))));
 
         if (isError(elseResult)) {
             return elseResult
@@ -1341,7 +1348,7 @@ const ifElseStatement: ParseFunction<IfElseStatement> = (module, code, startInde
                 index: elseResult.index,
             }
         }
-    }))
+    })))
 
 const _conditionAndOutcomeBlock: ParseFunction<CaseBlock> = (module, code, startIndex) =>
     given(expression(module, code, startIndex), ({ parsed: condition, index }) =>
@@ -1631,21 +1638,21 @@ const arg: ParseFunction<Arg> = (module, code, startIndex) =>
 
 const inlineConstGroup: ParseFunction<InlineConstGroup> = (module, code, startIndex) =>
     given(parseSeries(module, code, startIndex, inlineDeclaration), ({ parsed: declarations, index }) =>
-    declarations.length > 0 ?
-        given(consumeWhitespace(code, index), index => 
-        expec(expression(module, code, index), err(code, index, "Expression"), ({ parsed: inner, index }) => ({
-            parsed: {
-                kind: "inline-const-group",
-                declarations,
-                inner,
-                module,
-                code,
-                startIndex,
-                endIndex: index
-            },
-            index
-        })))
-    : undefined)
+        declarations.length > 0 ?
+            given(consumeWhitespace(code, index), index =>
+            expec(expression(module, code, index), err(code, index, "Expression"), ({ parsed: inner, index }) => ({
+                parsed: {
+                    kind: "inline-const-group",
+                    declarations,
+                    inner,
+                    module,
+                    code,
+                    startIndex,
+                    endIndex: index
+                },
+                index
+            })))
+        : undefined)
 
 const inlineDeclaration: ParseFunction<InlineDeclaration> = (module, code, startIndex) =>
     given(consume(code, startIndex, 'const'), index =>
@@ -1871,6 +1878,7 @@ const _indexerExpression: ParseFunction<Omit<PropertyAccessor, 'subject'>> = (mo
 
 const ifElseExpression: ParseFunction<IfElseExpression> = (module, code, startIndex) =>
     given(consume(code, startIndex, "if"), index =>
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, _case, 'else if', { trailingDelimiter: "forbidden" }), ({ parsed: cases, index }) => {
         const elseResultResult = 
             given(consumeWhitespace(code, index), index =>
@@ -1910,7 +1918,7 @@ const ifElseExpression: ParseFunction<IfElseExpression> = (module, code, startIn
                 index: elseResultResult.index,
             }
         }
-    }))
+    })))
 
 const _case: ParseFunction<Case> = (module, code, startIndex) =>
     given(expression(module, code, startIndex), ({ parsed: condition, index }) =>
@@ -2026,13 +2034,14 @@ const parenthesized: ParseFunction<ParenthesizedExpression> = (module, code, sta
 
 const invocationAccessorChain: ParseFunction<Invocation|PropertyAccessor> = (module, code, startIndex) =>
     given(EXPRESSION_PARSER.parseBeneath(module, code, startIndex, invocationAccessorChain), ({ parsed: subject, index }) =>
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries<InvocationArgs|Omit<PropertyAccessor, 'subject'>>(module, code, index, (module, code, index) => 
         _invocationArgs(module, code, index) ?? _indexerExpression(module, code, index) ?? _dotPropertyAccess(module, code, index)),
     ({ parsed: gets, index }) => 
         gets.length > 0 ? {
             parsed: _getsToInvocationsAndAccesses(subject, gets),
             index
-        } : undefined))
+        } : undefined)))
 
 const _dotPropertyAccess: ParseFunction<Omit<PropertyAccessor, 'subject'>> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, parseExact("?")), ({ parsed: question, index }) =>
@@ -2083,7 +2092,9 @@ type InvocationArgs = SourceInfo & { kind: "invocation-args", args: readonly Exp
 const _invocationArgs: ParseFunction<InvocationArgs> = (module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, _typeArgs), ({ parsed: typeArgs, index }) =>
     given(consume(code, index, "("), index => 
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, expression, ","), ({ parsed: args, index }) =>
+    given(consumeWhitespace(code, index), index =>
     given(parseOptional(module, code, index, spread), ({ parsed: spreadArg, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ")"), err(code, index, '")"'), index => ({
@@ -2098,7 +2109,7 @@ const _invocationArgs: ParseFunction<InvocationArgs> = (module, code, startIndex
             endIndex: index
         },
         index
-    })))))))
+    })))))))))
 
 const _typeArgs: ParseFunction<TypeExpression[]> = (module, code, startIndex) =>
     given(consume(code, startIndex, "<"), index =>
@@ -2155,7 +2166,9 @@ export const elementTag: ParseFunction<ElementTag> = (module, code, startIndex) 
         } else {
             return (
                 expec(consume(code, index, ">"), err(code, index, '">"'), index => 
+                given(consumeWhitespace(code, index), index =>
                 given(parseSeries(module, code, index, (module, code, index) => elementTag(module, code, index) ?? _elementEmbeddedExpression(module, code, index)), ({ parsed: children, index }) =>
+                given(consumeWhitespace(code, index), index =>
                 expec(consume(code, index, "</"), err(code, index, 'Closing tag'), index => 
                 expec(plainIdentifier(module, code, index), err(code, index, "Closing tag name"), ({ parsed: closingTagName, index }) =>
                 // TODO: Check that closing tag matches opening tag
@@ -2171,7 +2184,7 @@ export const elementTag: ParseFunction<ElementTag> = (module, code, startIndex) 
                         endIndex: index,
                     },
                     index,
-                }))))))
+                }))))))))
             )
         }
     })))))
@@ -2213,7 +2226,9 @@ const error: ParseFunction<ErrorExpression> = (module, code, startIndex) =>
 
 export const objectLiteral: ParseFunction<ObjectLiteral> = (module, code, startIndex) =>
     given(consume(code, startIndex, "{"), index =>
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, _spreadOrEntry, ","), ({ parsed: entries, index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "}"), err(code, index, '"}"'), index => ({
         parsed: {
             kind: "object-literal",
@@ -2224,7 +2239,7 @@ export const objectLiteral: ParseFunction<ObjectLiteral> = (module, code, startI
             endIndex: index,
         },
         index,
-    }))))
+    }))))))
 
 const _spreadOrEntry: ParseFunction<ObjectLiteral['entries'][number]> = (module, code, startIndex) =>
     spread(module, code, startIndex)
@@ -2257,7 +2272,9 @@ const objectEntry = (module: ModuleName, code: string, startIndex: number): Pars
 
 const arrayLiteral: ParseFunction<ArrayLiteral> = (module, code, startIndex) =>
     given(consume(code, startIndex, "["), index =>
+    given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, _expressionOrSpread, ","), ({ parsed: entries, index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "]"), err(code, index, '"]"'), index => ({
         parsed: {
             kind: "array-literal",
@@ -2268,7 +2285,7 @@ const arrayLiteral: ParseFunction<ArrayLiteral> = (module, code, startIndex) =>
             endIndex: index,
         },
         index,
-    }))))
+    }))))))
 
 const _expressionOrSpread: ParseFunction<Expression|Spread> = (module, code, startIndex) =>
     spread(module, code, startIndex)

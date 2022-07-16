@@ -86,38 +86,41 @@ export type ParseResult<T> = { parsed: T, index: number };
 export function parseSeries<T, D extends AST>(module: ModuleName, code: string, index: number, itemParseFn: ParseFunction<T>, delimiter:  ParseFunction<D>,        options?: Partial<SeriesOptions>):      ParseResult<(T|D)[]>|BagelError;
 export function parseSeries<T>(module: ModuleName, code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string, options?: Partial<SeriesOptions>):      ParseResult<T[]>|BagelError;
 export function parseSeries<T, D extends AST>(module: ModuleName, code: string, index: number, itemParseFn: ParseFunction<T>, delimiter?: string|ParseFunction<D>, options:  Partial<SeriesOptions> = {}): ParseResult<(T|D)[]>|BagelError {
+    const startIndex = index
     const delimiterFn: ParseFunction<D|undefined>|undefined = (
         typeof delimiter === "function" ? delimiter : 
         typeof delimiter === "string" ? ((_module, code, index) => given(consume(code, index, delimiter), index => ({ parsed: undefined, index })))
         : undefined
     )
-    const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], index: index };
+    const EMPTY_RESULT: Readonly<ParseResult<T[]>> = { parsed: [], index };
 
     const { leadingDelimiter, trailingDelimiter, whitespace } = { ...DEFAULT_SERIES_OPTIONS, ...options };
     const parsed: (T|D)[] = [];
 
     if (delimiterFn != null && (leadingDelimiter === "required" || leadingDelimiter === "optional")) {
-        const res = delimiterFn(module, code, index);
+        const delimiterResult = delimiterFn(module, code, index);
 
-        if (isError(res)) {
-            return res
+        if (isError(delimiterResult)) {
+            return delimiterResult
         }
-
-        if (leadingDelimiter === "required" && res == null) {
-            return EMPTY_RESULT;
-        } else if (res != null) {
-            index = res.index;
-            if (res.parsed) {
-                parsed.push(res.parsed)
+        if (delimiterResult != null) {
+            index = delimiterResult.index;
+            if (delimiterResult.parsed) {
+                parsed.push(delimiterResult.parsed)
+            }
+        } else {
+            if (leadingDelimiter === "required") {
+                return EMPTY_RESULT;
             }
         }
     }
 
+    const foundLeadingDelimiter = index > startIndex
+
     let foundDelimiter = false;
 
-    if (whitespace === "optional") index = consumeWhitespace(code, index);
+    let itemResult = itemParseFn(module, code, foundLeadingDelimiter && whitespace === "optional" ? consumeWhitespace(code, index) : index);
 
-    let itemResult = itemParseFn(module, code, index);
     while (itemResult != null) {
         if (isError(itemResult)) {
             return itemResult;
@@ -129,30 +132,26 @@ export function parseSeries<T, D extends AST>(module: ModuleName, code: string, 
         foundDelimiter = false;
         itemResult = undefined;
 
-        if (whitespace === "optional") index = consumeWhitespace(code, index);
-
         if (delimiterFn != null) {
-            const res = delimiterFn(module, code, index)
+            const delimiterResult = delimiterFn(module, code, whitespace === "optional" ? consumeWhitespace(code, index) : index)
 
-            if (isError(res)) {
-                return res
+            if (isError(delimiterResult)) {
+                return delimiterResult
             }
 
-            if (res != null) {
-                foundDelimiter = true;
-                index = res.index;
-                if (res.parsed) {
-                    parsed.push(res.parsed)
+            if (delimiterResult != null) {
+                index = delimiterResult.index;
+                if (delimiterResult.parsed) {
+                    parsed.push(delimiterResult.parsed)
                 }
-                if (whitespace === "optional") index = consumeWhitespace(code, index);
                 
-                itemResult = itemParseFn(module, code, index);
+                foundDelimiter = true;
+
+                itemResult = itemParseFn(module, code, whitespace === "optional" ? consumeWhitespace(code, index) : index);
             }
         } else {
-            itemResult = itemParseFn(module, code, index);
+            itemResult = itemParseFn(module, code, whitespace === "optional" ? consumeWhitespace(code, index) : index);
         }
-
-        if (whitespace === "optional") index = consumeWhitespace(code, index);
     }
 
     // element undefined but found delimiter means trailing delimiter
@@ -162,7 +161,7 @@ export function parseSeries<T, D extends AST>(module: ModuleName, code: string, 
         return EMPTY_RESULT;
     }
 
-    return { parsed, index: index };
+    return { parsed, index };
 }
 
 type SeriesOptions = {
