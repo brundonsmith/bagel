@@ -901,6 +901,53 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Comparison refinement pass",
+  fn() {
+    testTypecheck(
+      `
+      func foo(x: 'a' | 'b'): 'a' | nil =>
+        if x == 'a' {
+          x
+        } else {
+          nil
+        }
+
+      func bar(x: 'a' | 'b'): 'a' | nil =>
+        if x != 'b' {
+          x
+        } else {
+          nil
+        }
+
+      func blah(x: 'a' | 'b'): 'a' | nil =>
+        if x == 'b' {
+          nil
+        } else {
+          x
+        }
+
+      func stuff(x: 'a' | 'b'): 'a' | nil =>
+        if x != 'a' {
+          nil
+        } else {
+          x
+        }`
+    , false)
+  }
+})
+
+Deno.test({
+  name: "Comparison refinement fail",
+  fn() {
+    testTypecheck(
+      `
+      func foo(x: 'a' | 'b'): 'a' | nil =>
+        x`
+    , true)
+  }
+})
+
+Deno.test({
   name: "Complex narrowing",
   fn() {
     testTypecheck(`

@@ -22,7 +22,7 @@ export function inferType(
 
     let refinedType = baseType
     if (!skipRefinement) {
-        const refinements = resolveRefinements(ast)
+        const refinements = resolveRefinements(ctx, ast)
 
         for (const refinement of refinements ?? []) {
             if (expressionsEqual(refinement.targetExpression, ast)) {
@@ -998,7 +998,7 @@ function narrow(ctx: Pick<Context, "allModules" | "encounteredNames"|"canonicalM
 /**
  * Given some expression, find all Refinements that modify its type in some way
  */
-function resolveRefinements(expr: Expression): Refinement[] {
+function resolveRefinements(ctx: Pick<Context, "allModules" | "visited" | "canonicalModuleName">, expr: Expression): Refinement[] {
     const refinements: Refinement[] = []
 
     let current: AST = expr
@@ -1017,14 +1017,14 @@ function resolveRefinements(expr: Expression): Refinement[] {
                 const condition = cases[i]?.condition
 
                 // conditions for all past clauses are false
-                const refinement = conditionToRefinement(condition, false)
+                const refinement = conditionToRefinement(ctx, condition, false)
                 if (refinement) {
                     refinements.push(refinement)
                 }
             }
             
             // condition for current clause is true
-            const refinement = conditionToRefinement(parent.condition, true)
+            const refinement = conditionToRefinement(ctx, parent.condition, true)
             if (refinement) {
                 refinements.push(refinement)
             }
@@ -1032,7 +1032,7 @@ function resolveRefinements(expr: Expression): Refinement[] {
             for (const { condition } of parent.cases) {
 
                 // conditions for all past clauses are false
-                const refinement = conditionToRefinement(condition, false)
+                const refinement = conditionToRefinement(ctx, condition, false)
                 if (refinement) {
                     refinements.push(refinement)
                 }
@@ -1049,12 +1049,12 @@ function resolveRefinements(expr: Expression): Refinement[] {
             }
         } else if (parent.kind === 'binary-operator' && current === parent.right) {
             if (parent.op.op === '&&') {
-                const refinement = conditionToRefinement(parent.left, true)
+                const refinement = conditionToRefinement(ctx, parent.left, true)
                 if (refinement) {
                     refinements.push(refinement)
                 }
             } else if (parent.op.op === '||') {
-                const refinement = conditionToRefinement(parent.left, false)
+                const refinement = conditionToRefinement(ctx, parent.left, false)
                 if (refinement) {
                     refinements.push(refinement)
                 }
@@ -1069,33 +1069,33 @@ function resolveRefinements(expr: Expression): Refinement[] {
     return refinements
 }
 
-function conditionToRefinement(condition: Expression, conditionIsTrue: boolean): Refinement|undefined {
+function conditionToRefinement(ctx: Pick<Context, "allModules" | "visited" | "canonicalModuleName">, condition: Expression, conditionIsTrue: boolean): Refinement|undefined {
     if (condition.kind === "binary-operator") {
 
-        if (condition.op.op === '!=') {
-            
-            // TODO: Make this work for more than just nil
-            const targetExpression = 
-                condition.right.kind === 'nil-literal' ? condition.left :
-                condition.left.kind === "nil-literal" ? condition.right :
+        if (condition.op.op === '==' || condition.op.op === '!=') {
+            const leftType = inferType(ctx, condition.left)
+            const rightType = inferType(ctx, condition.right)
+
+            const refinementKind =
+                (condition.op.op === '==') === conditionIsTrue
+                    ? "narrowing"
+                    : "subtraction";
+
+            const refinement = 
+                rightType.kind === 'nil-type' || rightType.kind === 'literal-type' ? {
+                    kind: refinementKind,
+                    targetExpression: condition.left,
+                    type: rightType
+                } as const :
+                leftType.kind === 'nil-type' || leftType.kind === 'literal-type' ? {
+                    kind: refinementKind,
+                    targetExpression: condition.right,
+                    type: leftType
+                } as const :
                 undefined;
 
-            if (targetExpression != null) {
-                return { kind: conditionIsTrue ? "subtraction" : "narrowing", type: NIL_TYPE, targetExpression }
-            }
-        }
-
-        if (condition.op.op === '==') {
-            // TODO: Somehow assert that both of these types are the same... combine their refinements? intersection? etc
-            
-            // TODO: Make this work for more than just nil
-            const targetExpression = 
-                condition.right.kind === 'nil-literal' ? condition.left :
-                condition.left.kind === "nil-literal" ? condition.right :
-                undefined;
-
-            if (targetExpression != null) {
-                return { kind: !conditionIsTrue ? "subtraction" : "narrowing", type: NIL_TYPE, targetExpression }
+            if (refinement != null) {
+                return refinement
             }
         }
     }
