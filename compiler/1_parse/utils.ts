@@ -1,10 +1,10 @@
+import { memo } from "../../lib/ts/reactivity.ts";
 import { INT } from "../4_compile/index.ts";
 import { BagelError, isError, syntaxError } from "../errors.ts";
-import { memoize2, memoize3 } from "../utils/misc.ts";
 import { AST, PlainIdentifier } from "../_model/ast.ts";
 import { ModuleName } from "../_model/common.ts";
 
-export const consume = memoize3((code: string, index: number, segment: string): number|undefined => {
+export const consume = memo((code: string, index: number, segment: string): number|undefined => {
     for (let i = 0; i < segment.length; i++) {
         if (code[index + i] !== segment[i]) {
             return undefined;
@@ -14,7 +14,7 @@ export const consume = memoize3((code: string, index: number, segment: string): 
     return index + segment.length;
 })
 
-export const consumeWhitespace = memoize2((code: string, index: number): number => {
+export const consumeWhitespace = memo((code: string, index: number): number => {
     let currentIndex = index;
     let inComment: 'no'|'line'|'block' = 'no';
 
@@ -223,7 +223,7 @@ export function expec<T, R>(val: T|BagelError|undefined, err: BagelError, fn: (v
 
 export type ParseFunction<T> = (module: ModuleName, code: string, index: number) => ParseResult<T> | BagelError | undefined;
 
-export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize3((module, code, startIndex) => 
+export const plainIdentifier: ParseFunction<PlainIdentifier> = memo((module, code, startIndex) => 
     given(identifierSegment(code, startIndex), ({ segment: name, index }) => 
         name.startsWith(INT)
             ? syntaxError(code, index, `Identifiers can't start with '${INT}'`)
@@ -239,7 +239,7 @@ export const plainIdentifier: ParseFunction<PlainIdentifier> = memoize3((module,
                 index,
             }))
 
-export const identifierSegment = memoize2((code: string, index: number): { segment: string, index: number} | undefined => {
+export const identifierSegment = memo((code: string, index: number): { segment: string, index: number} | undefined => {
     const startIndex = index;
 
     while (isSymbolic(code[index], index - startIndex === 0)) {

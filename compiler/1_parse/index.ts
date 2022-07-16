@@ -1,6 +1,5 @@
 import { log, stripSourceInfo } from "../utils/debugging.ts";
 import { BagelError, isError, syntaxError } from "../errors.ts";
-import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo, Destructure, NameAndType } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
 import { ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator, TestTypeDeclaration } from "../_model/declarations.ts";
@@ -371,7 +370,7 @@ const _nominalTypeDeclaration: ParseFunction<TypeDeclaration> = memo((module, co
     })))))))))
 
 
-const typeExpression: ParseFunction<TypeExpression> =  memoize3((module, code, startIndex) =>
+const typeExpression: ParseFunction<TypeExpression> =  memo((module, code, startIndex) =>
     TYPE_PARSER.parseStartingFromTier(0)(module, code, startIndex))
 
 const genericType: ParseFunction<GenericType> = memo((module, code, startIndex) =>
@@ -1471,7 +1470,7 @@ const throwStatement: ParseFunction<ThrowStatement> = memo((module, code, startI
         index
     })))))))
 
-const expression: ParseFunction<Expression> = memoize3((module, code, startIndex) =>
+const expression: ParseFunction<Expression> = memo((module, code, startIndex) =>
     EXPRESSION_PARSER.parseStartingFromTier(0)(module, code, startIndex))
 
 const func: ParseFunction<Func> = memo((module, code, startIndex) =>
@@ -1716,7 +1715,7 @@ const destructure: ParseFunction<Destructure> = memo((module, code, startIndex) 
 
 
 
-const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => memoize3((module, code, startIndex) => 
+const binaryOperator = memo((tier: number): ParseFunction<BinaryOperator> => memo((module, code, startIndex) => 
     given(parseSeries(module, code, startIndex, 
         EXPRESSION_PARSER.beneath(binaryOperator(tier)), 
         _binaryOperatorSymbol(tier), 
@@ -1730,7 +1729,7 @@ const binaryOperator = memoize((tier: number): ParseFunction<BinaryOperator> => 
         : undefined
     )))
 
-const _binaryOperatorSymbol = memoize((tier: number): ParseFunction<Operator> => memo((module, code, startIndex) => {
+const _binaryOperatorSymbol = memo((tier: number): ParseFunction<Operator> => memo((module, code, startIndex) => {
     for (const op of BINARY_OPS[tier]) {
         const endIndex = startIndex + op.length
         
@@ -1825,7 +1824,7 @@ const asCast: ParseFunction<AsCast> = memo((module, code, startIndex) =>
     })))))))
 
 
-const negationOperator: ParseFunction<NegationOperator> = memoize3((module, code, startIndex) => 
+const negationOperator: ParseFunction<NegationOperator> = memo((module, code, startIndex) => 
     given(consume(code, startIndex, "!"), index =>
     expec(EXPRESSION_PARSER.beneath(negationOperator)(module, code, index), err(code, index, "Boolean expression"), ({ parsed: base, index }) => ({
         parsed: {
