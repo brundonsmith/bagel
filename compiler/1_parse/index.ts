@@ -2521,7 +2521,6 @@ const debug: ParseFunction<Debug> = (module, code, startIndex) =>
 const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ debug, javascriptEscape, elementTag ],
     [ func, proc ],
-    [ asCast, instanceOf ],
     [ binaryOperator(0) ],
     [ binaryOperator(1) ],
     [ binaryOperator(2) ],
@@ -2529,6 +2528,7 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
     [ binaryOperator(4) ],
     [ binaryOperator(5) ],
     [ binaryOperator(6) ],
+    [ asCast, instanceOf ],
     [ negationOperator ],
     [ indexer ],
     [ error ],
