@@ -7,15 +7,16 @@ export const POSSIBLE_COMMANDS = ['new', 'init', 'build', 'run', 'transpile', 'c
 'test', 'format', 'autofix', 'clean'] as const
 type Command = typeof POSSIBLE_COMMANDS[number]
 
-export const { command, target, flags } = (() => {
-    const args = Deno.args
-
-    const flags = args.filter(arg => arg.startsWith('--'))
-    const nonFlags = args.filter(arg => !arg.startsWith('--'))
+export const { command, target, testFilter, flags } = (() => {
+    const flags = Deno.args.filter(arg => arg.startsWith('--'))
+    const nonFlags = Deno.args.filter(arg => !arg.startsWith('--'))
 
     const command = nonFlags[0]
+
     const target = path.resolve(Deno.cwd(), nonFlags[1] || '.')
     const targetExists = fs.existsSync(target)
+
+    const testFilter = nonFlags[2]
 
 
     if (!(POSSIBLE_COMMANDS as readonly string[]).includes(command)) {
@@ -35,6 +36,7 @@ export const { command, target, flags } = (() => {
     return {
         command: command as Command,
         target,
+        testFilter,
         flags: {
             watch: flags.includes('--watch'),
             clean: flags.includes('--clean'),

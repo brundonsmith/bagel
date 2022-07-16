@@ -4,7 +4,7 @@ import { BagelError, prettyProblem } from "./errors.ts";
 
 import { AllModules, Context, DEFAULT_CONFIG, ModuleName } from "./_model/common.ts";
 import { ALL_LINT_RULE_SEVERITIES, DEFAULT_SEVERITY, LintProblem, LintRuleName, LintRuleSeverity } from "./other/lint.ts";
-import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, pad, devMode, allEntries, canonicalModuleName } from "./utils/cli.ts";
+import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, pad, devMode, allEntries, canonicalModuleName, testFilter } from "./utils/cli.ts";
 import { esOrNone, sOrNone } from "./utils/misc.ts";
 import { ALL_PLATFORMS, Platform } from "./_model/declarations.ts";
 import { loadAllModules,allProblems,hasProblems,formatted,autofixed,compiled } from "./store.ts";
@@ -319,6 +319,7 @@ type Tests = {
     readonly testBlocks: readonly ({ name: string, block: () => unknown })[]
 }
 
+// TODO: Don't run tests in modules outside of the local project or specified directory or file
 async function test() {
     let totalModules = 0
     let modulesWithFailures = 0
@@ -338,21 +339,23 @@ async function test() {
                 let failed = false
 
                 function runTest(name: string, err: any) {
-                    totalTests++
-                    let label: string
-                    let details = ''
+                    if (!testFilter || name.includes(testFilter)) {
+                        totalTests++
+                        let label: string
+                        let details = ''
 
-                    if (err == null || err.kind !== ERROR_SYM) {
-                        totalSuccesses++
-                        label = Colors.green('[Passed]')
-                    } else {
-                        failed = true
-                        totalFailures++
-                        label = Colors.red('[Failed]')
-                        details = err.value ? ' - ' + err.value : ''
+                        if (err == null || err.kind !== ERROR_SYM) {
+                            totalSuccesses++
+                            label = Colors.green('[Passed]')
+                        } else {
+                            failed = true
+                            totalFailures++
+                            label = Colors.red('[Failed]')
+                            details = err.value ? ' - ' + err.value : ''
+                        }
+                        
+                        console.log(`    ${label} ${name}${details}`)
                     }
-                    
-                    console.log(`    ${label} ${name}${details}`)
                 }
 
                 for (const test of tests.testExprs) {
@@ -373,7 +376,7 @@ async function test() {
         }
     }
 
-    console.log(`\nFound ${totalTests} test${sOrNone(totalTests)} across ${totalModules} module${sOrNone(totalModules)}; ${Colors.green(String(totalSuccesses) + ' success' + esOrNone(totalSuccesses))}, ${Colors.red(String(totalFailures) + ' failure' + sOrNone(totalFailures))}`)
+    console.log(`\nFound ${totalTests} test${sOrNone(totalTests)} across ${totalModules} module${sOrNone(totalModules)}${testFilter ? ` matching filter "${testFilter}"` : ''}; ${Colors.green(String(totalSuccesses) + ' success' + esOrNone(totalSuccesses))}, ${Colors.red(String(totalFailures) + ' failure' + sOrNone(totalFailures))}`)
     Deno.exit(modulesWithFailures > 0 ? 1 : 0)
 }
 
