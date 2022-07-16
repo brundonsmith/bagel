@@ -11,6 +11,11 @@ import { loadAllModules,allProblems,hasProblems,formatted,autofixed,compiled } f
 import { ERROR_SYM } from "https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts";
 
 async function run() {
+    const start = Date.now()
+    window.addEventListener("unload", () => {
+        console.log(`Took ${((Date.now() - start) / 1000).toFixed(2)}s`);
+    });
+
     switch (command) {
         case 'build':
         case 'run': {

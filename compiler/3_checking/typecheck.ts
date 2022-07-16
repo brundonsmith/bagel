@@ -954,7 +954,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
         // constants can't be assigned to mutable slots
         return [
             baseErrorMessage,
-            `Value with constant type '${msgFormat(value)}' can't be assigned to slot with mutable type '${msgFormat(destination)}'`
+            `Value with ${resolvedValue.mutability} type '${msgFormat(value)}' isn't compatible with ${resolvedDestination.mutability} type '${msgFormat(destination)}'`
         ];
     } else if (resolvedValue.kind === "unknown-type") {
         return [baseErrorMessage];
