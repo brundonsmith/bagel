@@ -4,13 +4,14 @@ import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, Generi
 import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
-import { AST, Block, PlainIdentifier } from "../_model/ast.ts";
+import { AST, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
 import { areSame, expressionsEqual, getName, literalType, mapParseTree, maybeOf, tupleOf, typesEqual, unionOf } from "../utils/ast.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
 import { computedFn } from "../../lib/ts/reactivity.ts";
 import { CaseBlock } from "../_model/statements.ts";
+import { format } from "../other/format.ts";
 
 export function inferType(
     ctx: Pick<Context, 'allModules'|'visited'|'canonicalModuleName'>,
@@ -519,7 +520,7 @@ const inferTypeInner = computedFn(function inferTypeInner(
     }
 })
 
-function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModuleName">, importedFrom: LocalIdentifier, binding: Binding): TypeExpression {
+function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModuleName">, importedFrom: Pick<SourceInfo, 'parent' | 'module'>, binding: Binding): TypeExpression {
     const { allModules, canonicalModuleName } = ctx
     const { parent, module, ..._rest } = importedFrom
 
@@ -696,13 +697,11 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
                 return {
                     kind: 'object-type',
                     spreads: [],
-                    entries: exportedDeclarations.map(decl => {
-                        const declaredType = decl.kind === 'value-declaration' ? decl.type : decl.value.type
-
+                    entries: exportedDeclarations.map(otherDecl => {
                         return attribute(
-                            decl.name.name, 
-                            declaredType ?? inferType(ctx, decl.value),
-                            decl.kind !== 'value-declaration' || decl.isConst || decl.exported === 'expose'
+                            otherDecl.name.name, 
+                            getBindingType(ctx, decl, { identifier: otherDecl.name, owner: otherDecl }),
+                            false
                         )
                     }),
                     mutability: 'mutable',
