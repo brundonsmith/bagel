@@ -50,6 +50,55 @@
 export const WHOLE_OBJECT = Symbol('WHOLE_OBJECT')
 const COMPUTED_RESULT = Symbol('COMPUTED_RESULT')
 
+class NMap<TValue> {
+    private map = new Map<any, any>()
+
+    get(keys: unknown[]): TValue | undefined {
+        let current = { rest: this.map, value: undefined as TValue | undefined }
+
+        for (let i = 0; i < keys.length; i++) {
+            if (current == null) {
+                return undefined
+            }
+
+            current = current.rest.get(keys[i])
+        }
+
+        return current?.value
+    }
+
+    set(keys: unknown[], value: TValue) {
+        let current = { rest: this.map, value: undefined as unknown }
+
+        for (let i = 0; i < keys.length; i++) {
+            let next = current.rest.get(keys[i])
+
+            if (next == null) {
+                next = { rest: new Map() }
+                current.rest.set(keys[i], next)
+            }
+
+            current = next
+        }
+
+        current.value = value
+    }
+
+    entries() {
+        function* nmapEntries(argsSoFar: unknown[], current: { rest: Map<any, any>, value?: TValue }): Generator<[unknown[], TValue]> {
+            if (Object.hasOwn(current, 'value')) {
+                yield [argsSoFar, current.value as TValue]
+            }
+
+            for (const [arg, obj] of current.rest.entries()) {
+                yield* nmapEntries([...argsSoFar, arg], obj)
+            }
+        }
+
+        return nmapEntries([], { rest: this.map })
+    }
+}
+
 type Reaction = () => void | Promise<void>
 type Observable = { obj: WeakRef<object>, prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT }
 
@@ -59,12 +108,10 @@ let trigger: { readonly obj: object, readonly prop: string|number|typeof COMPUTE
 let observablesToReactions: Array<
     Observable & { effect: Reaction }
 > = []
-const memoCache: Array<{
-    fn: Function,
-    args: unknown[],
+const memoCache = new NMap<{
     observables: Observable[]
     cached: unknown | typeof EMPTY_CACHE
-}> = []
+}>()
 const EMPTY_CACHE = Symbol('EMPTY_CACHE')
 
 // @ts-ignore
@@ -104,7 +151,7 @@ export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESU
     if (topOfAction) trigger = { obj, prop }
 
     // invalidate cached function results that observed this obj/prop
-    for (const entry of memoCache) {
+    for (const [args, entry] of memoCache.entries()) {
         const entryIsInvalidated =
             entry.observables.some(observable => 
                 observable.obj.deref() === obj && (prop === WHOLE_OBJECT || observable.prop === WHOLE_OBJECT || prop === observable.prop))
@@ -113,7 +160,8 @@ export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESU
             const alreadyInvalidated = entry.cached === EMPTY_CACHE
             entry.cached = EMPTY_CACHE
             if (!alreadyInvalidated) {
-                invalidate(entry.fn, COMPUTED_RESULT)
+                const fn = args[0] as object
+                invalidate(fn, COMPUTED_RESULT)
             }
         }
     }
@@ -143,13 +191,12 @@ type MemoOptions = {
 
 export function computedFn<F extends Function>(fn: F, options: MemoOptions = {}): F {
     // TODO: Respond to options
-    
+
     const computed = ((...args: any[]) => {
         observe(fn, COMPUTED_RESULT)
 
         // see if we have a cache entry for this function already
-        const cacheEntry = memoCache.find(cacheEntry =>
-            cacheEntry.fn === fn && args.every((_, index) => args[index] === cacheEntry.args[index]))
+        const cacheEntry = memoCache.get([fn, ...args])
 
         // if we have a valid cache entry, just return it
         if (cacheEntry && cacheEntry.cached !== EMPTY_CACHE) {
@@ -165,9 +212,7 @@ export function computedFn<F extends Function>(fn: F, options: MemoOptions = {})
 
             // cache the result alongside the observables
             if (!cacheEntry) {
-                memoCache.push({
-                    fn,
-                    args,
+                memoCache.set([fn, ...args], {
                     observables,
                     cached: result
                 })
