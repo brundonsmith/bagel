@@ -11,6 +11,8 @@ export js func join(iter: Iterator<string>, delimiter: string): string => {#
     return iter.array().join(delimiter)
 #}
 
+test expr 'find()' => assert([2, 4, 6, 8].iter<number>().find((n: number) => n > 5) == 6)
+
 export js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> =>            {# return iter.map(fn) #}
 export js func reduce<T, R>(iter: Iterator<T>, init: R, fn: (acc: R, el: T) => R): R => {# return iter.reduce(init, fn) #}
 export js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>     {# return iter.filter(fn) #}
@@ -28,7 +30,7 @@ export js func indexed<T>(iter: Iterator<T>): Iterator<[T, number]> =>          
 // TODO: Infer new iterator type after filter()
 
 export func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? =>
-    iter.takeWhile(el => !fn(el)).first()
+    iter.filter<T>(fn).first<T>()
 
 export js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
 export js func collectObject<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} =>  {# return iter.collectObject() #}

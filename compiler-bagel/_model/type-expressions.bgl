@@ -234,7 +234,7 @@ export nominal type JavascriptEscapeType(const {
     mutability: nil,
 })
 
-export type Mutability = { mutability: 'immutable'|'readonly'|'mutable' }
+export type Mutability = { mutability: 'constant'|'readonly'|'mutable' }
 
 export const STRING_TYPE = StringType({
     mutability: nil,
@@ -295,7 +295,7 @@ export const JAVASCRIPT_ESCAPE_TYPE = JavascriptEscapeType({
 export const OBJECT_OF_ANY = RecordType({
     keyType: ANY_TYPE,
     valueType: ANY_TYPE,
-    mutability: 'immutable',
+    mutability: 'constant',
     parent: nil,
     module: nil,
     code: nil,
@@ -304,7 +304,7 @@ export const OBJECT_OF_ANY = RecordType({
 })
 export const ARRAY_OF_ANY = ArrayType({
     element: ANY_TYPE,
-    mutability: 'immutable',
+    mutability: 'constant',
     parent: nil,
     module: nil,
     code: nil,
@@ -352,7 +352,7 @@ export const ELEMENT_TAG_CHILD_TYPE = UnionType({
             startIndex: nil,
             endIndex: nil,
             mutability: nil,
-        }), mutability: 'immutable', parent: nil, module: nil, code: nil, startIndex: nil, endIndex: nil})
+        }), mutability: 'constant', parent: nil, module: nil, code: nil, startIndex: nil, endIndex: nil})
     ],
     mutability: nil,
     parent: nil,

@@ -29,11 +29,11 @@ export nominal type ModuleName(string)
 
 // export nominal type TypeBinding(TypeExpression)
 
-// export func getBindingMutability(binding: ValueBinding, from: AST): 'immutable'|'readonly'|'mutable'|'assignable' =>
+// export func getBindingMutability(binding: ValueBinding, from: AST): 'constant'|'readonly'|'mutable'|'assignable' =>
 //     if binding.owner instanceof ValueDeclaration {
 //         const owner = binding.owner.value,
 //         if owner.isConst || (owner.exported === 'expose' && owner.module !== from.value.module) {
-//             'immutable'
+//             'constant'
 //         } else {
 //             'assignable'
 //         }

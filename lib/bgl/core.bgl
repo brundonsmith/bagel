@@ -23,7 +23,7 @@ export type MemoOptions = readonly {
 export func memo<
     TArgs extends readonly unknown[],
     TReturn extends unknown
->(options?: MemoOptions) => (fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => js# ___computedFn(fn, options) #js
+>(options?: MemoOptions) => (fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => js# ___memo(fn, options) #js
 
 export js func action<
     TArgs extends readonly unknown[]
