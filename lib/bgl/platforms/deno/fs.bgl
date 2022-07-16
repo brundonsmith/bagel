@@ -29,7 +29,7 @@ export async deno func stat(path: string): Plan<FileInfo> => {#
     return () => Deno.stat(path)
 #}
 
-export type DirEntry = const {
+export type DirEntry = readonly {
     name: string,
     isFile: boolean,
     isDirectory: boolean,
@@ -38,7 +38,7 @@ export type DirEntry = const {
 
 type Date = unknown // TODO
 
-export type FileInfo = const {
+export type FileInfo = readonly {
     /** True if this is info for a regular file. Mutually exclusive to
      * `FileInfo.isDirectory` and `FileInfo.isSymlink`. */
     isFile: boolean,

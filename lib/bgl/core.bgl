@@ -12,21 +12,21 @@ export js func logf<T>(x: T): T => {#
    return x;
 #}
 
-export js func iter<T>(x: const T[]): Iterator<T> => {#
+export js func iter<T>(x: readonly T[]): Iterator<T> => {#
     return ___iter(x)
 #}
 
-export type MemoOptions = const {
+export type MemoOptions = readonly {
     maxItems?: number
 }
 
 export func memo<
-    TArgs extends const unknown[],
+    TArgs extends readonly unknown[],
     TReturn extends unknown
 >(options?: MemoOptions) => (fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => js# ___computedFn(fn, options) #js
 
 export js func action<
-    TArgs extends const unknown[]
+    TArgs extends readonly unknown[]
 >(pr: (...args: TArgs) { }): (...args: TArgs) { } => {#
     return ___action(pr)
 #}
@@ -38,7 +38,7 @@ export func assert(condition: boolean, message?: string): Error<string?>? =>
         Error(message)
     }
 
-export type UnknownObject = {[string]: unknown} | (const {[string]: unknown})
+export type UnknownObject = {[string]: unknown} | (readonly {[string]: unknown})
 
 type LintRuleName =
     | 'unnecessaryParens'

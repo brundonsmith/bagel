@@ -3,14 +3,14 @@ import ___express from 'https://cdn.skypack.dev/express@4.17.3'
 import ___cookieParser from 'https://cdn.skypack.dev/cookie-parser@1.4.6'
 #js
 
-export type MediaType = const {
+export type MediaType = readonly {
     value: string,
     quality: number,
     type: string,
     subtype: string,
 }
 
-export type Request = const {
+export type Request = readonly {
     baseUrl: string,
     url: string,
     originalUrl: string,
@@ -40,7 +40,7 @@ export type Request = const {
     params: {[string]: string},
 }
 
-export type CookieOptions = const {
+export type CookieOptions = readonly {
     maxAge?: number,
     signed?: boolean,
     // expires?: Date,
@@ -52,7 +52,7 @@ export type CookieOptions = const {
     sameSite?: boolean | 'lax' | 'strict' | 'none',
 }
 
-export type Response = const {
+export type Response = readonly {
     status: (code: number) { },
     sendStatus: (code: number) { },
     links: (links: {[string]: string}) { },
@@ -84,13 +84,13 @@ export type Application = {
     put: (path: string, handler: RequestHandler) { },
     delete: (path: string, handler: RequestHandler) { },
 
-    use: (paths: const string[], handler: RequestHandler) { },
+    use: (paths: readonly string[], handler: RequestHandler) { },
 
     listen: (port?: number, cb?: () {}) { },
 }
 
 export js func express(requestBodyType?: 'text'|'json'|'urlencoded'): Application => {#
-    const app = ___express()
+    readonly app = ___express()
 
     // automatically apply body and cookie parsers
     app.use(___express[requestBodyType ?? 'text']())

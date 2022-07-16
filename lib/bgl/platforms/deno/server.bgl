@@ -43,7 +43,7 @@ type RequestDestination =
   | 'xslt'
 type Headers = {[string]: string}
 
-export type Request = const {
+export type Request = readonly {
     cache: RequestCache,
     credentials: RequestCredentials,
     destination: RequestDestination,

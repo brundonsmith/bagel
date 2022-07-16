@@ -21,7 +21,7 @@ export type Application = {
     put: (path: string, handler: RequestHandler) { },
     delete: (path: string, handler: RequestHandler) { },
 
-    use: (paths: const string[], handler: RequestHandler) { },
+    use: (paths: readonly string[], handler: RequestHandler) { },
 
     listen: (port?: number) { },
 }

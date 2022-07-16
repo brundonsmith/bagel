@@ -9,7 +9,7 @@ const ___traceColors = [
 #js
 
 export js func trace<
-    TArgs extends const unknown[],
+    TArgs extends readonly unknown[],
     TReturn extends unknown
 >(fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => {#
     const name = fn.name ? fn.name.replace(/^___fn_/, '') : '<function>'

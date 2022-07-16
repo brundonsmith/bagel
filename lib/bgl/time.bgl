@@ -1,10 +1,10 @@
 
 js#
-import { Temporal } from '@js-temporal/polyfill'
+import { Temporal as ___Temporal } from '@js-temporal/polyfill'
 #js
 
 
-export type Instant = const {
+export type Instant = readonly {
     epoch: number,
     millisecond: number,
     second: number,
@@ -16,7 +16,7 @@ let _now: number = js# Date.now() #js
 
 export js func now(): Instant => {#
     startUpdatingTimeIfNeeded();
-    return Temporal.Now.Instant();
+    return ___Temporal.Now.Instant();
 #}
 
 proc updateTime() {
