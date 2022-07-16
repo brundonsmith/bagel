@@ -1009,7 +1009,8 @@ function resolveRefinements(ctx: Pick<Context, "allModules" | "visited" | "canon
 
     // traverse upwards through the AST, looking for nodes that refine the type 
     // of the current expression
-    while (parent != null) {
+    // TODO: for closures, we can carve out some cases where the value does not depend on a reference to a mutable object. but this might get complicated!
+    while (parent != null && parent.kind !== 'func' && parent.kind !== 'proc') {
         if ((parent.kind === 'case' || parent.kind === 'case-block') && 
             (grandparent?.kind === 'if-else-expression' || grandparent?.kind === 'if-else-statement') &&  // we know this, but TS doesn't
             current === parent.outcome) {

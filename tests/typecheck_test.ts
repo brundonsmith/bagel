@@ -948,6 +948,28 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Refinement trap-door fail",
+  fn() {
+    testTypecheck(
+    `
+    func foo(x: { prop: number|string }): ((n: number) => number) =>
+      if x.prop instanceof number {
+        (n: number) => n * x.prop
+      } else {
+        (n: number) => n + 2
+      }
+
+    proc bar() {
+      let obj: { prop: number|string } = { prop: 14 };
+      const cb = foo(obj);
+      obj.prop = 'foo';
+      const x = cb(1);
+    }`
+    , true)
+  }
+})
+
+Deno.test({
   name: "Complex narrowing",
   fn() {
     testTypecheck(`
