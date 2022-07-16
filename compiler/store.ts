@@ -173,8 +173,8 @@ export const loadAllModules = async (entries: readonly ModuleName[]): Promise<Al
     while (frontier.size > 0) {
         const newFrontier = new Set<ModuleName>()
 
-        for (const module of frontier) {
-            if (!modules.has(module)) {
+        await Promise.all([...frontier]
+            .map(async module => {
                 const source = await loadModuleSource(module)
 
                 if (source == null) {
@@ -197,8 +197,7 @@ export const loadAllModules = async (entries: readonly ModuleName[]): Promise<Al
                         }
                     }
                 }
-            }
-        }
+            }))
 
         frontier = newFrontier
     }
