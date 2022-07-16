@@ -221,6 +221,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return `test expr ${f(ast.name)} => ${f(ast.expr)}`
         case "test-block-declaration":
             return `test block ${f(ast.name)} => ${f(ast.block)}`
+        case "test-type-declaration":
+            return `test type ${f(ast.name)} => ${f(ast.destinationType)}: ${f(ast.valueType)}`
         case "debug":
             return `!debug[${f(ast.inner)}]`
         case "inline-const-group":

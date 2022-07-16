@@ -16,6 +16,7 @@ export type Declaration =
     | Autorun
     | TestExprDeclaration
     | TestBlockDeclaration
+    | TestTypeDeclaration
     | Debug
 
 type Exported = { readonly exported: boolean }
@@ -103,4 +104,11 @@ export type TestBlockDeclaration = SourceInfo & {
     readonly kind: "test-block-declaration",
     readonly name: ExactStringLiteral,
     readonly block: Block,
+}
+
+export type TestTypeDeclaration = SourceInfo & {
+    readonly kind: "test-type-declaration",
+    readonly name: ExactStringLiteral,
+    readonly destinationType: TypeExpression,
+    readonly valueType: TypeExpression,
 }

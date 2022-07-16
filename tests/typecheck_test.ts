@@ -3449,7 +3449,10 @@ Deno.test({
 
     test block 'Do thing!' => {
         throw Error('Foo');
-    }`,
+    }
+
+    const x = { foo: 'lkdfghsdfg' }
+    test type 'Assignable!' => readonly { foo: string }: typeof x`,
     false)
   }
 })
@@ -3476,6 +3479,17 @@ Deno.test({
     testTypecheck(`
     test block 'Do thing!' => {
     }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Tests fail 3",
+  fn() {
+    testTypecheck(`
+    const x = { foo: 'lkdfghsdfg' }
+    test type 'Assignable!' => readonly { foo: number }: typeof x
+    `,
     true)
   }
 })

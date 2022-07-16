@@ -68,6 +68,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                             case "autorun":
                             case "test-expr-declaration":
                             case "test-block-declaration":
+                            case "test-type-declaration":
                             case "debug":
                             case "javascript-escape":
                                 return []
@@ -679,6 +680,11 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     const blockName = current.kind === 'try-catch' ? 'Try/catch' : 'Test'
                     sendError(miscError(block, `${blockName} is redundant; no errors can be thrown in this block`))
                 }
+            } break;
+            case "test-type-declaration": {
+                given(subsumationIssues(ctx, current.destinationType, current.valueType), issues => {
+                    sendError(assignmentError(current.valueType, current.destinationType, current.valueType, issues));
+                })
             } break;
             case "throw-statement":
                 expect(ctx, ERROR_OF_ANY, current.errorExpression,

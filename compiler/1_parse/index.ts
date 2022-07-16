@@ -3,7 +3,7 @@ import { BagelError, isError, syntaxError } from "../errors.ts";
 import { memoize, memoize3 } from "../utils/misc.ts";
 import { Module, Debug, Block, PlainIdentifier, SourceInfo, Destructure, NameAndType } from "../_model/ast.ts";
 import { ModuleName,ReportError } from "../_model/common.ts";
-import { ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator } from "../_model/declarations.ts";
+import { ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator, TestTypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration, ALL_REG_EXP_FLAGS, RegularExpression, RegularExpressionFlag } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement, Autorun } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType } from "../_model/type-expressions.ts";
@@ -22,7 +22,7 @@ export const parse = (moduleName: ModuleName, code: string): { ast: Module, noPr
         const ast = parseInner(
             moduleName,  
             code + preludeFor(moduleName),
-            err => {}
+            () => {}
         )
 
         const noPreludeAst = parseInner(
@@ -245,6 +245,7 @@ const declaration: ParseFunction<Declaration> = (module, code, startIndex) =>
     ?? autorun(false)(module, code, startIndex)
     ?? testExprDeclaration(module, code, startIndex)
     ?? testBlockDeclaration(module, code, startIndex)
+    ?? testTypeDeclaration(module, code, startIndex)
     ?? javascriptEscape(module, code, startIndex)
 
 const importAllDeclaration: ParseFunction<ImportAllDeclaration> = (module, code, startIndex) =>
@@ -1109,13 +1110,7 @@ const _untilClause: ParseFunction<Expression> = (module, code, startIndex) =>
     expression(module, code, index)))))
 
 const testExprDeclaration: ParseFunction<TestExprDeclaration> = (module, code, startIndex) =>
-    given(consume(code, startIndex, 'test'), index =>
-    given(consumeWhitespaceRequired(code, index), index =>
-    given(consume(code, index, 'expr'), index =>
-    given(consumeWhitespace(code, index), index => 
-    expec(exactStringLiteral(module, code, index), err(code, index, 'Test name'), ({ parsed: name, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, '=>'), err(code, index, '"=>"'), index =>
+    given(_testDeclFront(module, code, startIndex, 'expr'), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Test expression'), ({ parsed: expr, index }) => ({
         parsed: {
@@ -1128,16 +1123,10 @@ const testExprDeclaration: ParseFunction<TestExprDeclaration> = (module, code, s
             endIndex: index
         },
         index
-    }))))))))))
+    }))))
 
 const testBlockDeclaration: ParseFunction<TestBlockDeclaration> = (module, code, startIndex) => 
-    given(consume(code, startIndex, 'test'), index =>
-    given(consumeWhitespaceRequired(code, index), index =>
-    given(consume(code, index, 'block'), index =>
-    given(consumeWhitespace(code, index), index => 
-    expec(exactStringLiteral(module, code, index), err(code, index, 'Test name'), ({ parsed: name, index }) =>
-    given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, '=>'), err(code, index, '"=>"'), index =>
+    given(_testDeclFront(module, code, startIndex, 'block'), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(parseBlock(module, code, index), err(code, index, 'Test block'), ({ parsed: block, index }) => ({
         parsed: {
@@ -1150,7 +1139,40 @@ const testBlockDeclaration: ParseFunction<TestBlockDeclaration> = (module, code,
             endIndex: index
         },
         index
-    }))))))))))
+    }))))
+
+const testTypeDeclaration: ParseFunction<TestTypeDeclaration> = (module, code, startIndex) => 
+    given(_testDeclFront(module, code, startIndex, 'type'), ({ parsed: name, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(typeExpression(module, code, index), err(code, index, 'Destination type'), ({ parsed: destinationType, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, ':'), err(code, index, '":"'), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(typeExpression(module, code, index), err(code, index, 'Value type'), ({ parsed: valueType, index }) => ({
+        parsed: {
+            kind: 'test-type-declaration',
+            name,
+            destinationType,
+            valueType,
+            module,
+            code,
+            startIndex,
+            endIndex: index
+        },
+        index
+    }))))))))
+
+const _testDeclFront = (module: ModuleName, code: string, startIndex: number, keyword: string) =>
+    given(consume(code, startIndex, 'test'), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    given(consume(code, index, keyword), index =>
+    given(consumeWhitespace(code, index), index => 
+    expec(exactStringLiteral(module, code, index), err(code, index, 'Test name'), ({ parsed: name, index }) =>
+    given(consumeWhitespace(code, index), index =>
+    expec(consume(code, index, '=>'), err(code, index, '"=>"'), index => ({
+        parsed: name,
+        index
+    }))))))))
 
 const proc: ParseFunction<Proc> = (module, code, startIndex) =>
     given(parseKeyword(code, startIndex, 'async'), ({ parsed: isAsync, index }) =>

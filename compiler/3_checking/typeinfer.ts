@@ -1,5 +1,5 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
-import { BinaryOp, Case, ElementTag, ExactStringLiteral, Expression, Invocation, isExpression, LocalIdentifier, ObjectEntry, ObjectLiteral } from "../_model/expressions.ts";
+import { BinaryOp, Case, ElementTag, ExactStringLiteral, Expression, Invocation, isExpression, ObjectEntry, ObjectLiteral } from "../_model/expressions.ts";
 import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, SpreadArgs, Args, POISONED_TYPE } from "../_model/type-expressions.ts";
 import { exists, given } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
@@ -183,7 +183,7 @@ const inferTypeInner = computedFn(function inferTypeInner(
                         case '-': return literalType(leftType.value.value - rightType.value.value)
                         case '*': return literalType(leftType.value.value * rightType.value.value)
                         case '/': return literalType(leftType.value.value / rightType.value.value)
-                        default: UNKNOWN_TYPE
+                        default: return UNKNOWN_TYPE
                     }
                 } else {
                     return UNKNOWN_TYPE
