@@ -253,40 +253,44 @@ const inferTypeInner = memo(function inferTypeInner(
 
                 const nillable = subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
 
+                const effectiveSubjectType = ast.optional && nillable
+                    ? resolveType(ctx, subtract(ctx, subjectType, NIL_TYPE))
+                    : subjectType
+
+                const subjectProperties = propertiesOf(ctx, effectiveSubjectType)
+
                 const indexIsNumber = !subsumationIssues(ctx, NUMBER_TYPE, indexType)
-                const subjectProperties = ast.optional && nillable
-                    ? propertiesOf(ctx, subtract(ctx, subjectType, NIL_TYPE))
-                    : propertiesOf(ctx, subjectType)
+                
                 
                 if (subjectProperties && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
                     const key = indexType.value.value;
                     const valueType = subjectProperties.find(entry => getName(entry.name) === key)?.type;
 
                     return valueType ?? UNKNOWN_TYPE;
-                } else if (subjectType.kind === "record-type") {
-                    if (subsumationIssues(ctx, subjectType.keyType, indexType)) {
+                } else if (effectiveSubjectType.kind === "record-type") {
+                    if (subsumationIssues(ctx, effectiveSubjectType.keyType, indexType)) {
                         return UNKNOWN_TYPE;
                     } else {
-                        return maybeOf(subjectType.valueType)
+                        return maybeOf(effectiveSubjectType.valueType)
                     }
-                } else if (subjectType.kind === "array-type" && indexIsNumber) {
-                    return maybeOf(subjectType.element)
-                } else if (subjectType.kind === "tuple-type" && indexIsNumber) {
+                } else if (effectiveSubjectType.kind === "array-type" && indexIsNumber) {
+                    return maybeOf(effectiveSubjectType.element)
+                } else if (effectiveSubjectType.kind === "tuple-type" && indexIsNumber) {
                     if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
-                        return subjectType.members[indexType.value.value] ?? NIL_TYPE
+                        return effectiveSubjectType.members[indexType.value.value] ?? NIL_TYPE
                     } else {
                         return {
                             kind: "union-type",
-                            members: [ ...subjectType.members, NIL_TYPE ],
+                            members: [ ...effectiveSubjectType.members, NIL_TYPE ],
                             parent,
                             ...TYPE_AST_NOISE
                         }
                     }
-                } else if (subjectType.kind === 'string-type' && indexIsNumber) {
+                } else if (effectiveSubjectType.kind === 'string-type' && indexIsNumber) {
                     return maybeOf(STRING_TYPE)
-                } else if (subjectType.kind === 'literal-type' && subjectType.value.kind === 'exact-string-literal' && indexIsNumber) {
+                } else if (effectiveSubjectType.kind === 'literal-type' && effectiveSubjectType.value.kind === 'exact-string-literal' && indexIsNumber) {
                     if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
-                        const char = subjectType.value.value[indexType.value.value]
+                        const char = effectiveSubjectType.value.value[indexType.value.value]
 
                         if (char) {
                             return literalType(char)

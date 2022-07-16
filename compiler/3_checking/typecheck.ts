@@ -1,10 +1,10 @@
 import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType, STRING_TYPE } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws, argsBounds, AST_NOISE, TYPE_AST_NOISE } from "./typeinfer.ts";
 import { Context, getBindingMutability, ModuleName } from "../_model/common.ts";
-import { ancestors, elementOf, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, within } from "../utils/ast.ts";
+import { ancestors, elementOf, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, unionOf, within } from "../utils/ast.ts";
 import { DEFAULT_OPTIONS, format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, Func, InlineConstGroup, Proc } from "../_model/expressions.ts";
 import { resolve, resolveImport } from "./resolve.ts";
@@ -486,16 +486,18 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                         sendError(miscError(current.property, `Can't access properties on '${format(subjectType)}' without an optional-chaining operator (".?"), because it is potentially nil`))
                     }
 
-                    const subjectProperties = current.optional && nillable
-                        ? propertiesOf(ctx, subtract(ctx, subjectType, NIL_TYPE))
-                        : propertiesOf(ctx, subjectType)
+                    const effectiveSubjectType = current.optional && nillable
+                        ? resolveType(ctx, subtract(ctx, subjectType, NIL_TYPE))
+                        : subjectType
+
+                    const subjectProperties = propertiesOf(ctx, effectiveSubjectType)
 
 
                     if (property.kind === 'plain-identifier') {
                         const { name } = property
 
-                        if (subjectType.kind === 'record-type') {
-                            if (subsumationIssues(ctx, subjectType.keyType, literalType(name))) {
+                        if (effectiveSubjectType.kind === 'record-type') {
+                            if (subsumationIssues(ctx, effectiveSubjectType.keyType, literalType(name))) {
                                 sendError(miscError(current.subject, `Property '${name}' will never be found on object with type '${msgFormat(subjectType)}'`))
                             }
                         } else {
@@ -515,15 +517,22 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                             if (valueType == null) {
                                 sendError(miscError(property, `Property '${key}' doesn't exist on type '${msgFormat(subjectType)}'`));
                             }
-                        } else if (subjectType.kind === "record-type") {
-                            expect(ctx, subjectType.keyType, property,
+                        } else if (effectiveSubjectType.kind === "record-type") {
+                            expect(ctx, effectiveSubjectType.keyType, property,
                                 (_, val) => `Expression of type '${msgFormat(val)}' can't be used to index type '${msgFormat(subjectType)}'`)
-                        } else if (subjectType.kind === "array-type" || subjectType.kind === "string-type" || subjectType.kind === "tuple-type" || (subjectType.kind === 'literal-type' && subjectType.value.kind === 'exact-string-literal')) {
+                        } else if (
+                            !subsumationIssues(ctx,
+                                unionOf([
+                                    ARRAY_OF_ANY,
+                                    STRING_TYPE,
+                                ]),
+                                effectiveSubjectType)
+                        ) {
                             expect(ctx, NUMBER_TYPE, property,
                                 (_, val) => `Expression of type '${msgFormat(val)}' can't be used to index type '${msgFormat(subjectType)}'`)
     
-                            if (subjectType.kind === "tuple-type" || (subjectType.kind === 'literal-type' && subjectType.value.kind === 'exact-string-literal')) {
-                                const max = subjectType.kind === 'tuple-type' ? subjectType.members.length : (subjectType.value as ExactStringLiteral).value.length
+                            if (effectiveSubjectType.kind === "tuple-type" || (effectiveSubjectType.kind === 'literal-type' && effectiveSubjectType.value.kind === 'exact-string-literal')) {
+                                const max = effectiveSubjectType.kind === 'tuple-type' ? effectiveSubjectType.members.length : (effectiveSubjectType.value as ExactStringLiteral).value.length
     
                                 if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal' && (indexType.value.value < 0 || indexType.value.value >= max)) {
                                     sendError(miscError(property, `Index ${indexType.value.value} is out of range on type '${msgFormat(subjectType)}'`));
@@ -556,8 +565,6 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 const binding = resolve(ctx, current.name.name, current, true)
 
                 if (!binding) {
-                    // @ts-ignore
-                    if (current.name.name === 'BagelConfig') console.log(current.parent?.parent?.declarations.map(decl => decl.kind))
                     sendError(cannotFindName(current, current.name.name))
                 } else {
                     if (binding.owner?.kind !== 'type-declaration' && binding.owner?.kind !== 'generic-param-type') {
