@@ -1,6 +1,6 @@
 import { assertEquals } from "https://deno.land/std@0.136.0/testing/asserts.ts";
 
-import { observe, invalidate, autorun, when, computedFn, action, runInAction } from '../lib/ts/reactivity.ts'
+import { observe, invalidate, autorun, when, memo, action, runInAction } from '../lib/ts/reactivity.ts'
 
 Deno.test({
     name: 'autorun()',
@@ -59,14 +59,14 @@ Deno.test({
 })
 
 Deno.test({
-    name: 'computedFn()',
+    name: 'memo()',
     async fn() {
         const outcomes: number[] = []
 
         const obj = { count: 0 }
 
-        const doubledCount = computedFn(() => observe(obj, 'count') * 2)
-        const doubledDoubledCount = computedFn(() => doubledCount() * 2)
+        const doubledCount = memo(() => observe(obj, 'count') * 2)
+        const doubledDoubledCount = memo(() => doubledCount() * 2)
 
         autorun(() => {
             outcomes.push(doubledDoubledCount())

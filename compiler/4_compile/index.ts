@@ -25,7 +25,7 @@ export const compile = (ctx: CompileContext, ast: Module, excludeJsPrelude?: boo
 
 export const IMPORTED_ITEMS = [
     // reactivity
-    'observe', 'invalidate', 'computedFn', 'autorun', 'action', 'WHOLE_OBJECT', 
+    'observe', 'invalidate', 'memo', 'autorun', 'action', 'WHOLE_OBJECT', 
 
     // used in compiler output
     'range', 'Iter', 'Plan', 'Error', 'ERROR_SYM', 'Remote',
@@ -177,7 +177,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
             return `${l} ${entries.join(', ')} ${r}`
         }
         case "derive-declaration": 
-            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `: () => ${c(ast.type)}` : ``} = ${INT}computedFn(
+            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `: () => ${c(ast.type)}` : ``} = ${INT}memo(
                 () => ${c(ast.expr)}
             )`
         case "remote-declaration": {

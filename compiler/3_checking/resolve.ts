@@ -1,9 +1,9 @@
-import { computedFn } from "../../lib/ts/reactivity.ts";
+import { memo } from "../../lib/ts/reactivity.ts";
 import { AST } from "../_model/ast.ts";
 import { Binding, Context, ModuleName } from "../_model/common.ts";
 import { ImportItem,ValueDeclaration,FuncDeclaration,ProcDeclaration,TypeDeclaration,DeriveDeclaration,RemoteDeclaration,ImportDeclaration } from "../_model/declarations.ts";
 
-export const resolve = computedFn(function resolve (ctx: Pick<Context, 'allModules'|'canonicalModuleName'>, name: string, from: AST, resolveImports?: boolean): Binding|undefined {
+export const resolve = memo(function resolve (ctx: Pick<Context, 'allModules'|'canonicalModuleName'>, name: string, from: AST, resolveImports?: boolean): Binding|undefined {
     let resolved = resolveInner(name, from, from)
 
     if (resolveImports) {

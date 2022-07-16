@@ -627,7 +627,7 @@ Deno.test({
     `,
     `
     const name = { value: "Brandon" };
-    const foo: () => string = ___computedFn(
+    const foo: () => string = ___memo(
                     () => \`Hello \${___observe(name, 'value')}\`
                 );
     const logFoo = function ___fn_logFoo(): void{ 

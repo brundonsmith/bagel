@@ -12,7 +12,7 @@ import { setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
 import { path } from '../deps.ts';
 import { AST_NOISE } from "../3_checking/typeinfer.ts";
-import { computedFn as memo } from "../../lib/ts/reactivity.ts";
+import { memo } from "../../lib/ts/reactivity.ts";
 
 export const parse = (moduleName: ModuleName, code: string): { ast: Module, noPreludeAst: Module, errors: readonly BagelError[] } | undefined => {
     const fileType = path.extname(moduleName)

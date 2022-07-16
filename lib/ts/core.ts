@@ -6,7 +6,7 @@ export {
     observe,
     invalidate,
     autorun,
-    computedFn,
+    memo,
     action,
     WHOLE_OBJECT,
     Remote

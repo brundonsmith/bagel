@@ -189,7 +189,7 @@ type MemoOptions = {
     maxItems?: number
 }
 
-export function computedFn<F extends Function>(fn: F, options: MemoOptions = {}): F {
+export function memo<F extends Function>(fn: F, options: MemoOptions = {}): F {
     // TODO: Respond to options
 
     const computed = ((...args: any[]) => {

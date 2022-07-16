@@ -9,7 +9,7 @@ import { areSame, expressionsEqual, getName, literalType, mapParseTree, maybeOf,
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
-import { computedFn } from "../../lib/ts/reactivity.ts";
+import { memo } from "../../lib/ts/reactivity.ts";
 import { CaseBlock } from "../_model/statements.ts";
 import { format } from "../other/format.ts";
 
@@ -41,7 +41,7 @@ export function inferType(
     return refinedType
 }
 
-const inferTypeInner = computedFn(function inferTypeInner(
+const inferTypeInner = memo(function inferTypeInner(
     ctx: Pick<Context, 'allModules'|'visited'|'canonicalModuleName'>,
     ast: Expression,
 ): TypeExpression {
@@ -1115,7 +1115,7 @@ function conditionToRefinement(ctx: Pick<Context, "allModules" | "visited" | "ca
     return { kind: conditionIsTrue ? "subtraction" : "narrowing", type: FALSY, targetExpression: condition }
 }
 
-export const propertiesOf = computedFn(function propertiesOf (
+export const propertiesOf = memo(function propertiesOf (
     ctx: Pick<Context, "allModules" | "encounteredNames"|"canonicalModuleName">,
     type: TypeExpression
 ): readonly Attribute[] | undefined {
@@ -1513,7 +1513,7 @@ const identifierToExactString = (ident: PlainIdentifier): ExactStringLiteral => 
     endIndex: ident.endIndex,
 })
 
-export const elementTagToObject = computedFn((tag: ElementTag): ObjectLiteral => {
+export const elementTagToObject = memo((tag: ElementTag): ObjectLiteral => {
     const { parent, module, code, startIndex, endIndex } = tag
 
     return {

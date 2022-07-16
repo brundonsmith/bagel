@@ -4,7 +4,7 @@ import { BagelError, errorsEquivalent, isError } from "./errors.ts";
 import { AllModules, Context, ModuleName } from "./_model/common.ts";
 import { autofix, lint, LintProblem } from "./other/lint.ts";
 import { ImportAllDeclaration, ImportDeclaration } from "./_model/declarations.ts";
-import { computedFn } from "../lib/ts/reactivity.ts";
+import { memo } from "../lib/ts/reactivity.ts";
 import { cacheDir, devMode, diskModulePath, entry, pad, pathIsInProject, pathIsRemote, canonicalModuleName } from "./utils/cli.ts";
 import { Module } from "./_model/ast.ts";
 import { compile, CompileContext } from "./4_compile/index.ts";
@@ -69,7 +69,7 @@ async function cache(module: ModuleName, source: string) {
     }
 }
 
-export const allProblems = computedFn(function allProblems (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">) {
+export const allProblems = memo(function allProblems (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">) {
     const { allModules } = ctx
     const allProblems = new Map<ModuleName, (BagelError|LintProblem)[]>()
     
@@ -103,7 +103,7 @@ export const allProblems = computedFn(function allProblems (ctx: Pick<Context, "
     return allProblems
 })
 
-export const hasProblems = computedFn(function hasProblems (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">) {
+export const hasProblems = memo(function hasProblems (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">) {
     const problems = allProblems(ctx)
 
     for (const moduleProblems of problems.values()) {
@@ -115,7 +115,7 @@ export const hasProblems = computedFn(function hasProblems (ctx: Pick<Context, "
     return false
 })
 
-export const typeerrors = computedFn(function typeerrors (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: Module): BagelError[] {
+export const typeerrors = memo(function typeerrors (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: Module): BagelError[] {
     const errors: BagelError[] = []
     const sendError = (err: BagelError) => errors.push(err)
 
@@ -126,7 +126,7 @@ export const typeerrors = computedFn(function typeerrors (ctx: Pick<Context, "al
     return errors
 })
 
-export const compiled = computedFn(function compiled(ctx: CompileContext): string {
+export const compiled = memo(function compiled(ctx: CompileContext): string {
     const { allModules, moduleName } = ctx
 
     const ast = allModules.get(moduleName)?.ast
@@ -138,7 +138,7 @@ export const compiled = computedFn(function compiled(ctx: CompileContext): strin
     return compile(ctx, ast)
 })
 
-export const formatted = computedFn(function formatted (allModules: AllModules, moduleName: ModuleName): string | undefined {
+export const formatted = memo(function formatted (allModules: AllModules, moduleName: ModuleName): string | undefined {
     const ast = allModules.get(moduleName)?.ast
 
     if (ast?.moduleType === 'bgl') {
@@ -151,7 +151,7 @@ export const formatted = computedFn(function formatted (allModules: AllModules, 
     }
 })
 
-export const autofixed = computedFn(function autofixed (allModules: AllModules, moduleName: ModuleName): string {
+export const autofixed = memo(function autofixed (allModules: AllModules, moduleName: ModuleName): string {
     const ast = allModules.get(moduleName)?.ast
 
     if (!ast) {
