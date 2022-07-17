@@ -1311,9 +1311,9 @@ function fitTemplate(
 
     if (parameterized.kind === "array-type" && reified.kind === "array-type") {
         return fitTemplate(ctx, parameterized.element, reified.element);
-    }
-
-    if (parameterized.kind === "tuple-type" && reified.kind === "tuple-type" && parameterized.members.length === reified.members.length) {
+    } else if (parameterized.kind === "array-type" && reified.kind === "tuple-type") {
+        return fitTemplate(ctx, parameterized.element, unionOf(reified.members))
+    } else if (parameterized.kind === "tuple-type" && reified.kind === "tuple-type" && parameterized.members.length === reified.members.length) {
         const all = new Map<string, TypeExpression>()
 
         for (let i = 0; i < parameterized.members.length; i++) {
@@ -1325,9 +1325,7 @@ function fitTemplate(
         }
 
         return all
-    }
-
-    if (parameterized.kind === "object-type" && reified.kind === "object-type") {
+    } else if (parameterized.kind === "object-type" && reified.kind === "object-type") {
         const all = new Map<string, TypeExpression>()
 
         for (const entry of parameterized.entries) {
@@ -1343,15 +1341,13 @@ function fitTemplate(
         }
 
         return all
-    }
-
-    if ((parameterized.kind === "iterator-type" && reified.kind === "iterator-type") 
-     || (parameterized.kind === "plan-type" && reified.kind === "plan-type") 
-     || (parameterized.kind === "remote-type" && reified.kind === "remote-type")) {
+    } else if (
+        (parameterized.kind === "iterator-type" && reified.kind === "iterator-type") ||
+        (parameterized.kind === "plan-type" && reified.kind === "plan-type") ||
+        (parameterized.kind === "remote-type" && reified.kind === "remote-type")
+    ) {
         return fitTemplate(ctx, parameterized.inner, reified.inner);
-    }
-
-    if (parameterized.kind === "union-type") {
+    } else if (parameterized.kind === "union-type") {
         if (reified.kind === "union-type") {
             const parameterizedMembers = [...parameterized.members];
             const reifiedMembers = [...reified.members];
