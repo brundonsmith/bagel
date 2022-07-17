@@ -123,7 +123,7 @@ export function setParents(ast: AST) {
     }
 }
 
-export function unionOf(members: TypeExpression[]): UnionType {
+export function unionOf(members: readonly TypeExpression[]): UnionType {
     const { parent, module, code, startIndex } = members[0]
 
     return {
