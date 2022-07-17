@@ -566,6 +566,29 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Iterator generic param inference pass",
+  fn() {
+    testTypecheck(
+      `
+      // copied from lib/bgl
+      export js func iter<T>(x: readonly T[]): Iterator<T> => {#
+        return ___iter(x)
+      #}
+      export js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>     {# return iter.filter(fn) #}
+      export js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
+
+      const i: Iterator<number> = [1, 2, 3].iter()
+      const foo: number? = i.filter((n: number) => n > 2).first()
+
+      export func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? =>
+        iter.filter(fn).first()
+      `
+      , false
+    )
+  }
+})
+
+Deno.test({
   name: "Complex generic",
   fn() {
     testTypecheck(

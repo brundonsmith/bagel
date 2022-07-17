@@ -13,12 +13,18 @@ export js func join(iter: Iterator<string>, delimiter: string): string => {#
 
 test expr 'count()' => assert([2, 4, 6, 8].iter<number>().count() == 4)
 test expr 'concat()' => assert(
-    const arr = concat([2, 4].iter<number>(), [6, 8].iter<number>()).collectArray(),
-    arr[0] == 2 && arr[1] == 4 && arr[2] == 6 && arr[3] == 8
+    const arr = concat<number>([2, 4].iter(), [6, 8].iter()).collectArray(),
+    arr[0] == 2 &&
+    arr[1] == 4 &&
+    arr[2] == 6 &&
+    arr[3] == 8
 )
 test expr 'zip()' => assert(
-    const arr = zip<number, number>([1, 2].iter<number>(), [3, 4].iter<number>()).collectArray(),
-    arr[0]?.[0] == 1 && arr[0]?.[1] == 3 && arr[1]?.[0] == 2 && arr[1]?.[1] == 4
+    const arr = zip([1, 2].iter(), [3, 4].iter()).collectArray(),
+    arr[0]?.[0] == 1 &&
+    arr[0]?.[1] == 3 &&
+    arr[1]?.[0] == 2 &&
+    arr[1]?.[1] == 4
 )
 test expr 'find()' => assert([2, 4, 6, 8].iter<number>().find((n: number) => n > 5) == 6)
 
@@ -39,7 +45,7 @@ export js func indexed<T>(iter: Iterator<T>): Iterator<[T, number]> =>          
 // TODO: Infer new iterator type after filter()
 
 export func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? =>
-    iter.filter<T>(fn).first<T>()
+    iter.filter(fn).first()
 
 export js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
 export js func collectObject<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} =>  {# return iter.collectObject() #}
