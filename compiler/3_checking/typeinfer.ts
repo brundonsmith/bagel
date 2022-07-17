@@ -1232,10 +1232,12 @@ export const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
  * them. Used to infer generic args when not supplied.
  */
 function fitTemplate(
-    ctx: Pick<Context, "allModules"|"canonicalModuleName">,
+    ctx: Pick<Context, "allModules"|"canonicalModuleName"> & { descendant?: boolean },
     parameterized: TypeExpression, 
     reified: TypeExpression, 
 ): ReadonlyMap<string, TypeExpression>|undefined {
+    const { descendant } = ctx
+    ctx = { ...ctx, descendant: true }
 
     function isGenericParam(type: TypeExpression): type is NamedType {
         if (type.kind === 'named-type') {
@@ -1278,7 +1280,7 @@ function fitTemplate(
             matchGroups.push(fitTemplate(ctx, parameterizedArgs.type, reifiedArgsType))
         }
 
-        if (parameterized.kind === 'func-type' && reified.kind === 'func-type' &&
+        if (descendant && parameterized.kind === 'func-type' && reified.kind === 'func-type' &&
             parameterized.returnType && reified.returnType) {
             matchGroups.push(
                 fitTemplate(ctx, parameterized.returnType, reified.returnType)
@@ -1292,15 +1294,13 @@ function fitTemplate(
 
             for (const map of matchGroups as ReadonlyMap<string, TypeExpression>[]) {
                 for (const [key, value] of map.entries()) {
-                    if (!isGenericParam(value)) {
-                        const existing = matches.get(key)
-                        if (existing) {
-                            if (subsumationIssues(ctx, existing, value)) {
-                                return undefined
-                            }
-                        } else {
-                            matches.set(key, value);
+                    const existing = matches.get(key)
+                    if (existing) {
+                        if (subsumationIssues(ctx, existing, value)) {
+                            return undefined
                         }
+                    } else {
+                        matches.set(key, value);
                     }
                 }
             }
