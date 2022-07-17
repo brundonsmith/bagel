@@ -1262,22 +1262,20 @@ function fitTemplate(
         const matchGroups: (ReadonlyMap<string, TypeExpression> | undefined)[] = []
         
         if (parameterizedArgs.kind === 'args') {
-            matchGroups.push(...(
-                reifiedArgs.kind === 'args'
-                    ? parameterizedArgs.args.map((arg, index) =>
+            if (reifiedArgs.kind === 'args') {
+                matchGroups.push(
+                    ...parameterizedArgs.args.map((arg, index) =>
                         fitTemplate(ctx, arg.type ?? UNKNOWN_TYPE, reifiedArgs.args[index].type ?? UNKNOWN_TYPE))
-                    : [
-                        fitTemplate(ctx, unionOf(parameterizedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE)), reifiedArgs.type)
-                    ]
-            ))
+                )
+            } else {
+                matchGroups.push(fitTemplate(ctx, unionOf(parameterizedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE)), reifiedArgs.type))
+            }
         } else {
-            const reifiedArgsType = (
-                reifiedArgs.kind === 'args'
-                    ? tupleOf(reifiedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE), 'readonly')
-                    : reifiedArgs.type
-            )
-
-            matchGroups.push(fitTemplate(ctx, parameterizedArgs.type, reifiedArgsType))
+            if (reifiedArgs.kind === 'args') {
+                matchGroups.push(fitTemplate(ctx, parameterizedArgs.type, tupleOf(reifiedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE), 'readonly')))
+            } else {
+                matchGroups.push(fitTemplate(ctx, parameterizedArgs.type, reifiedArgs.type))
+            }
         }
 
         if (descendant && parameterized.kind === 'func-type' && reified.kind === 'func-type' &&

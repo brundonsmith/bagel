@@ -11,9 +11,9 @@ export js func join(iter: Iterator<string>, delimiter: string): string => {#
     return iter.array().join(delimiter)
 #}
 
-test expr 'count()' => assert([2, 4, 6, 8].iter<number>().count() == 4)
+test expr 'count()' => assert([2, 4, 6, 8].iter().count() == 4)
 test expr 'concat()' => assert(
-    const arr = concat<number>([2, 4].iter(), [6, 8].iter()).collectArray(),
+    const arr = concat([2, 4].iter(), [6, 8].iter()).collectArray(),
     arr[0] == 2 &&
     arr[1] == 4 &&
     arr[2] == 6 &&
@@ -26,7 +26,7 @@ test expr 'zip()' => assert(
     arr[1]?.[0] == 2 &&
     arr[1]?.[1] == 4
 )
-test expr 'find()' => assert([2, 4, 6, 8].iter<number>().find((n: number) => n > 5) == 6)
+test expr 'find()' => assert([2, 4, 6, 8].iter().find<number>((n: number) => n > 5) == 6)
 
 export js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> =>            {# return iter.map(fn) #}
 export js func reduce<T, R>(iter: Iterator<T>, init: R, fn: (acc: R, el: T) => R): R => {# return iter.reduce(init, fn) #}
@@ -38,7 +38,7 @@ export js func every<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean =>  
 export js func some<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean =>           {# return iter.some(fn) #}
 export js func count<T>(iter: Iterator<T>): number =>                                   {# return iter.count() #}
 export js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
-export js func concat<T>(iter: Iterator<T>, other: Iterator<T>): Iterator<T> =>         {# return iter.concat(other) #}
+export js func concat<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<T|R> =>     {# return iter.concat(other) #}
 export js func zip<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<[T?, R?]> =>   {# return iter.zip(other) #}
 export js func indexed<T>(iter: Iterator<T>): Iterator<[T, number]> =>                  {# return iter.indexed() #}
 

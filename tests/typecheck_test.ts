@@ -576,12 +576,16 @@ Deno.test({
       #}
       export js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>     {# return iter.filter(fn) #}
       export js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
+      export js func concat<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<T|R> =>         {# return iter.concat(other) #}
+      export js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
 
       const i: Iterator<number> = [1, 2, 3].iter()
       const foo: number? = i.filter((n: number) => n > 2).first()
 
-      export func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? =>
+      func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? =>
         iter.filter(fn).first()
+
+      const x: number[] = concat([2, 4].iter(), [6, 8].iter()).collectArray()
       `
       , false
     )
