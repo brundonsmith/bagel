@@ -198,8 +198,8 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 const declaredType = (
                     current.kind === 'value-declaration' ?
                         given(current.type, t =>
-                            current.isConst && t.mutability != null ? 
-                                { ...t, mutability: 'constant' : undefined } as TypeExpression
+                            current.isConst && t.mutability != null
+                            ? { ...t, mutability: 'constant' } as TypeExpression
                             : t) :
                     current.destination.kind === 'name-and-type' ? (
                         current.awaited
