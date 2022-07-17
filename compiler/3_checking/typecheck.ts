@@ -196,7 +196,11 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "declaration-statement":
             case "inline-declaration": {
                 const declaredType = (
-                    current.kind === 'value-declaration' ? current.type :
+                    current.kind === 'value-declaration' ?
+                        given(current.type, t =>
+                            current.isConst && t.mutability != null ? 
+                                { ...t, mutability: 'constant' : undefined } as TypeExpression
+                            : t) :
                     current.destination.kind === 'name-and-type' ? (
                         current.awaited
                             ? given(current.destination.type, planOf)
