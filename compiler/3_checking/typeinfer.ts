@@ -1294,7 +1294,11 @@ function fitTemplate(
                 for (const [key, value] of map.entries()) {
                     const existing = matches.get(key)
                     if (existing) {
-                        if (subsumationIssues(ctx, existing, value)) {
+                        if (!subsumationIssues(ctx, existing, value)) {
+                            // do nothing
+                        } else if (!subsumationIssues(ctx, value, existing)) {
+                            matches.set(key, value);
+                        } else {
                             return undefined
                         }
                     } else {
