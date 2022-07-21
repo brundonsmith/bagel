@@ -4,8 +4,8 @@ import { BagelError, prettyProblem } from "./errors.ts";
 
 import { AllModules, Context, DEFAULT_CONFIG, ModuleName } from "./_model/common.ts";
 import { ALL_LINT_RULE_SEVERITIES, DEFAULT_SEVERITY, LintProblem, LintRuleName, LintRuleSeverity } from "./other/lint.ts";
-import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, pad, devMode, allEntries, canonicalModuleName, testFilter } from "./utils/cli.ts";
-import { esOrNone, sOrNone } from "./utils/misc.ts";
+import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, pad, allEntries, canonicalModuleName, testFilter } from "./utils/cli.ts";
+import { esOrNone, sOrNone, devMode } from "./utils/misc.ts";
 import { ALL_PLATFORMS, Platform } from "./_model/declarations.ts";
 import { loadAllModules,allProblems,hasProblems,formatted,autofixed,compiled } from "./store.ts";
 import { ERROR_SYM } from "https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts";

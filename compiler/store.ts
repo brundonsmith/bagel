@@ -5,11 +5,51 @@ import { AllModules, Context, ModuleName } from "./_model/common.ts";
 import { autofix, lint, LintProblem } from "./other/lint.ts";
 import { ImportAllDeclaration, ImportDeclaration } from "./_model/declarations.ts";
 import { memo } from "../lib/ts/reactivity.ts";
-import { cacheDir, devMode, diskModulePath, entry, pad, pathIsInProject, pathIsRemote, canonicalModuleName } from "./utils/cli.ts";
+import { cacheDir, diskModulePath, entry, pad, pathIsInProject, pathIsRemote, canonicalModuleName } from "./utils/cli.ts";
 import { Module } from "./_model/ast.ts";
 import { compile, CompileContext } from "./4_compile/index.ts";
 import { format,DEFAULT_OPTIONS } from "./other/format.ts";
 import { fs,Colors } from "./deps.ts";
+import { devMode } from "./utils/misc.ts";
+
+export const loadAllModules = async (entries: readonly ModuleName[]): Promise<AllModules> => {
+    let frontier = new Set<ModuleName>(entries)
+    const modules = new Map<ModuleName, ReturnType<typeof parse>>()
+
+    while (frontier.size > 0) {
+        const newFrontier = new Set<ModuleName>()
+
+        await Promise.all([...frontier]
+            .map(async module => {
+                const source = await loadModuleSource(module)
+
+                if (source == null) {
+                    modules.set(module, undefined)
+                } else {
+                    const parsed = parse(module, source)
+                    modules.set(module, parsed)
+
+                    if (parsed?.ast != null) {
+                        const importedModules = (
+                            parsed.ast.declarations
+                                .filter((decl): decl is ImportDeclaration|ImportAllDeclaration => decl.kind === 'import-declaration' || decl.kind === 'import-all-declaration')
+                                .map(decl => canonicalModuleName(module, decl.path.value))
+                        )
+
+                        for (const moduleName of importedModules) {
+                            if (!modules.has(moduleName) && !frontier.has(moduleName)) {
+                                newFrontier.add(moduleName)
+                            }
+                        }
+                    }
+                }
+            }))
+
+        frontier = newFrontier
+    }
+
+    return modules
+}
 
 const loadModuleSource = async (module: ModuleName): Promise<string | undefined> => {
     if (pathIsRemote(module)) {
@@ -115,7 +155,7 @@ export const hasProblems = memo(function hasProblems (ctx: Pick<Context, "allMod
     return false
 })
 
-export const typeerrors = memo(function typeerrors (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: Module): BagelError[] {
+const typeerrors = memo(function typeerrors (ctx: Pick<Context, "allModules" | "config" | "canonicalModuleName">, ast: Module): BagelError[] {
     const errors: BagelError[] = []
     const sendError = (err: BagelError) => errors.push(err)
 
@@ -128,14 +168,13 @@ export const typeerrors = memo(function typeerrors (ctx: Pick<Context, "allModul
 
 export const compiled = memo(function compiled(ctx: CompileContext): string {
     const { allModules, moduleName } = ctx
-
     const ast = allModules.get(moduleName)?.ast
 
-    if (!ast) {
-        return ''
+    if (ast) {
+        return compile(ctx, ast)
     }
 
-    return compile(ctx, ast)
+    return ''
 })
 
 export const formatted = memo(function formatted (allModules: AllModules, moduleName: ModuleName): string | undefined {
@@ -153,54 +192,15 @@ export const formatted = memo(function formatted (allModules: AllModules, module
 
 export const autofixed = memo(function autofixed (allModules: AllModules, moduleName: ModuleName): string {
     const ast = allModules.get(moduleName)?.ast
-
-    if (!ast) {
-        return ''
-    }
     
-    return (
-        format(
-            autofix(ast),
-            DEFAULT_OPTIONS
+    if (ast?.moduleType === 'bgl') {
+        return (
+            format(
+                autofix(ast),
+                DEFAULT_OPTIONS
+            )
         )
-    )
-})
-
-export const loadAllModules = async (entries: readonly ModuleName[]): Promise<AllModules> => {
-    let frontier = new Set<ModuleName>(entries)
-    const modules = new Map<ModuleName, ReturnType<typeof parse>>()
-
-    while (frontier.size > 0) {
-        const newFrontier = new Set<ModuleName>()
-
-        await Promise.all([...frontier]
-            .map(async module => {
-                const source = await loadModuleSource(module)
-
-                if (source == null) {
-                    modules.set(module, undefined)
-                } else {
-                    const parsed = parse(module, source)
-                    modules.set(module, parsed)
-
-                    if (parsed?.ast != null) {
-                        const importedModules = (
-                            parsed.ast.declarations
-                                .filter((decl): decl is ImportDeclaration|ImportAllDeclaration => decl.kind === 'import-declaration' || decl.kind === 'import-all-declaration')
-                                .map(decl => canonicalModuleName(module, decl.path.value))
-                        )
-
-                        for (const moduleName of importedModules) {
-                            if (!modules.has(moduleName) && !frontier.has(moduleName)) {
-                                newFrontier.add(moduleName)
-                            }
-                        }
-                    }
-                }
-            }))
-
-        frontier = newFrontier
     }
 
-    return modules
-}
+    return ''
+})

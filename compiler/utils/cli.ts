@@ -228,8 +228,6 @@ export function isWithin(dir: string, other: string) {
     return !relative.startsWith('../') && relative !== '..'
 }
 
-export const devMode = true
-
 function cleanCache() {
     let numCachedFiles = 0;
     for (const file of Deno.readDirSync(cacheDir)) {

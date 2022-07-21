@@ -1,7 +1,8 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
 import { BinaryOp, Case, ElementTag, ExactStringLiteral, Expression, Invocation, isExpression, ObjectEntry, ObjectLiteral } from "../_model/expressions.ts";
 import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, SpreadArgs, Args, POISONED_TYPE } from "../_model/type-expressions.ts";
-import { exists, given } from "../utils/misc.ts";
+import { exists, given, devMode } from "../utils/misc.ts";
+import { log } from '../utils/debugging.ts'
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
@@ -12,6 +13,7 @@ import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
 import { memo } from "../../lib/ts/reactivity.ts";
 import { CaseBlock } from "../_model/statements.ts";
 import { format } from "../other/format.ts";
+import { Colors } from "../deps.ts";
 
 export function inferType(
     ctx: Pick<Context, 'allModules'|'visited'|'canonicalModuleName'>,
@@ -51,6 +53,8 @@ const inferTypeInner = memo(function inferTypeInner(
     // assert(() => !previouslyVisited.includes(ast))
 
     if (visited?.includes(ast)) {
+        if (devMode) console.log(Colors.red(`Encountered inference cycle and aborted type inference for ${format(ast, { lineBreaks: false })}`))
+        if (devMode) console.log([...visited, ast].map(n => '  ' + format(n, { lineBreaks: false })).join('\n'))
         return UNKNOWN_TYPE
     }
 
