@@ -1,6 +1,6 @@
 
 import { getName } from "../utils/ast.ts";
-import { exists, given } from "../utils/misc.ts";
+import { exists, given, spaces } from "../utils/misc.ts";
 import { AST, PlainIdentifier } from '../_model/ast.ts'
 import { ExactStringLiteral } from "../_model/expressions.ts";
 import { FuncType, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
@@ -354,13 +354,5 @@ function indentation(options: FormatOptions, indent: number) {
         return ''
     }
 
-    let str = ''
-
-    for (let i = 0; i < indent; i++) {
-        for (let j = 0; j < options.spaces; j++) {
-            str += ' '
-        }
-    }
-
-    return str
+    return spaces(indent * options.spaces)
 }

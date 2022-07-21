@@ -90,3 +90,13 @@ const NOMINAL_FLAG = Symbol('NOMINAL_FLAG')
 export type NominalType<T, S extends symbol> = T & { [NOMINAL_FLAG]: S }
 
 export const devMode = true
+
+export function spaces(spaces: number) {
+    let str = ''
+
+    for (let j = 0; j < spaces; j++) {
+        str += ' '
+    }
+
+    return str
+}

@@ -3,7 +3,7 @@ import { ImportDeclaration,ImportItem } from "./_model/declarations.ts";
 import { ExactStringLiteral, LocalIdentifier } from "./_model/expressions.ts";
 import { TypeExpression } from "./_model/type-expressions.ts";
 import { Colors } from "./deps.ts";
-import { deepEquals, given } from "./utils/misc.ts";
+import { deepEquals, given, spaces } from "./utils/misc.ts";
 import { Context, ModuleName } from "./_model/common.ts";
 import { LintProblem } from "./other/lint.ts";
 
@@ -159,7 +159,7 @@ export function prettyProblem(ctx: Pick<Context, "allModules" | "canonicalModule
         undefined
     )
     const endIndex = (
-        error.kind === 'bagel-syntax-error' ? undefined : 
+        error.kind === 'bagel-syntax-error' ? code?.length : 
         error.ast?.kind !== "module" ? error.ast?.endIndex : 
         error.kind === 'lint-problem' ? error.ast.endIndex : 
         undefined
@@ -180,19 +180,23 @@ export function prettyProblem(ctx: Pick<Context, "allModules" | "canonicalModule
         Colors.red
     )
 
+    // /Users/me/foo.bgl
     let infoLine = Colors.cyan(modulePath)
     
-    const { line, column } = 
+    const { line: startLine, column: startColumn } = 
         given(code, code => 
         given(startIndex, startIndex => 
             lineAndColumn(code, startIndex))) ?? {}
-    if (line != null && column != null) {
+
+    // :29:62
+    if (startLine != null && startColumn != null) {
         infoLine += Colors.white(":") 
-            + Colors.yellow(String(line)) 
+            + Colors.yellow(String(startLine)) 
             + Colors.white(":") 
-            + Colors.yellow(String(column))
+            + Colors.yellow(String(startColumn))
     }
 
+    // - error Operator '>' cannot be applied to types 'string' and 'number'
     infoLine += Colors.white(" - ")
         + color(severity)
         + Colors.white(" " + message)
@@ -200,27 +204,59 @@ export function prettyProblem(ctx: Pick<Context, "allModules" | "canonicalModule
     output += infoLine + "\n"
 
     // print the problematic line of code, with the issue underlined
-    if (code != null && startIndex != null && line != null) {
-        const lineContent = getLineContents(code, line);
+    if (code != null && startIndex != null && endIndex != null) {
+        output += '\n'
 
-        if (lineContent) {
-            const padding = '  '
+        const totalLines = [...code].filter(ch => ch === '\n').length + 1
+        const maxLineDigits = String(totalLines).length
 
-            output += Colors.bgWhite(Colors.black(String(line))) + padding + lineContent.content + "\n"
+        let lineNumber = 1
+        let previousLineStart = 0
+        let currentLineStart = 0
+        for (let i = 0; i <= code.length && currentLineStart < endIndex; i++) {
+            if (code[i] === '\n' || i === code.length) {
+                if (i > startIndex) {
+                    if (currentLineStart < startIndex && lineNumber > 1) { // first problem-line
+                        output += numberAndPadding(lineNumber - 1, maxLineDigits) + code.substring(previousLineStart, currentLineStart - 1) + '\n'
+                    }
 
-            const digitsInLineNum = String(line).length + (atEndOfLine ? 1 : 0)
-            const underlineSpacing = padding + new Array(digitsInLineNum + startIndex - lineContent.startIndex).fill(' ').join('')
+                    output += numberAndPadding(lineNumber, maxLineDigits)
+                    
+                    if (currentLineStart < startIndex) { // left end is white
+                        output += code.substring(currentLineStart, startIndex)
+                    }
 
-            if (endIndex != null) {
-                const underline = new Array(endIndex - startIndex).fill('~').join('')
-                output += color(underlineSpacing + underline) + "\n"
-            } else {
-                output += color(underlineSpacing + "^") + "\n"
+                    // problem segment
+                    output += color(code.substring(Math.max(currentLineStart, startIndex), Math.min(i, endIndex)))
+
+                    if (endIndex <= i) { // right end is white
+                        if (error.kind === 'bagel-syntax-error') output += Colors.red('_')
+
+                        output += code.substring(endIndex, i)
+                        
+                        currentLineStart = i + 1
+                        i++
+                        while (i < code.length && code[i] !== '\n') i++;
+
+                        output += '\n' + numberAndPadding(lineNumber + 1, maxLineDigits) + code.substring(currentLineStart, i)
+                    }
+                    
+                    output += '\n'
+                }
+
+                lineNumber++
+                previousLineStart = currentLineStart
+                currentLineStart = i + 1
             }
         }
     }
 
     return output
+}
+
+function numberAndPadding(line: number, maxWidth: number) {
+    const padding = spaces(maxWidth - String(line).length) + '  '
+    return Colors.bgWhite(Colors.black(String(line))) + padding    
 }
 
 function lineAndColumn(code: string, index: number): { line: number, column: number } {
@@ -236,25 +272,4 @@ function lineAndColumn(code: string, index: number): { line: number, column: num
     }
 
     return { line, column };
-}
-
-function getLineContents(code: string, line: number) {
-    let currentLine = 1;
-    let startIndex;
-    for (startIndex = 0; startIndex < code.length && currentLine < line; startIndex++) {
-        if (code[startIndex] === "\n") {
-            currentLine++;
-        }
-    }
-
-    if (currentLine === line) {
-        for (let endIndex = startIndex; endIndex < code.length; endIndex++) {
-            if (code[endIndex] === "\n") {
-                return { startIndex: startIndex, content: code.substring(startIndex, endIndex) }
-            }
-        }
-        return { startIndex: startIndex, content: code.substring(startIndex, code.length) }
-    }
-
-    return undefined
 }

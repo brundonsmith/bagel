@@ -251,6 +251,7 @@ function printProblems (ctx: Pick<Context, "allModules"|"canonicalModuleName">, 
 
             for (const err of errs) {
                 console.log(prettyProblem(ctx, module, err))
+                console.log()
             }
         }
 
