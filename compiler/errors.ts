@@ -86,15 +86,7 @@ export function errorMessage(error: BagelError): string {
         case "bagel-syntax-error":
             return error.message
         case "bagel-assignable-to-error":
-            return error.issues.map((issue, index) => {
-                const indentation = new Array(index).fill(' ').join('')
-
-                return (
-                    typeof issue === 'string'
-                        ? indentation + issue
-                        : issue.map(issue => indentation + issue).join('\n')
-                )
-            }).join('\n');
+            return serializeIssues(error.issues);
         case "bagel-cannot-find-name-error":
             return `Cannot find name "${error.name}"`;
         case "bagel-already-declared-error":
@@ -106,6 +98,18 @@ export function errorMessage(error: BagelError): string {
         case "bagel-cannot-find-export-error":
             return `Module "${error.importDeclaration.path.value}" has no export named ${error.ast.name.name}`
     }
+}
+
+export function serializeIssues(issues: (string | string[])[]) {
+    return issues.map((issue, index) => {
+        const indentation = spaces(index)
+
+        return (
+            typeof issue === 'string'
+                ? indentation + issue
+                : issue.map(issue => indentation + issue).join('\n')
+        )
+    }).join('\n');
 }
 
 export function syntaxError(code: string, index: number, message: string): BagelSyntaxError {
