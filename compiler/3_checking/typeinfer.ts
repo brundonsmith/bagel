@@ -1243,6 +1243,8 @@ function fitTemplate(
     const { descendant } = ctx
     ctx = { ...ctx, descendant: true }
 
+    reified = resolveType(ctx, reified)
+
     function isGenericParam(type: TypeExpression): type is NamedType {
         if (type.kind === 'named-type') {
             const binding = resolve(ctx, type.name.name, type)
