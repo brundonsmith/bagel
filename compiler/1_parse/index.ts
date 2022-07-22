@@ -1343,7 +1343,7 @@ const ifElseStatement: ParseFunction<IfElseStatement> = memo((module, code, star
                     module,
                     code,
                     startIndex,
-                    endIndex: index,
+                    endIndex: elseResult.index,
                 },
                 index: elseResult.index,
             }
@@ -1913,7 +1913,7 @@ const ifElseExpression: ParseFunction<IfElseExpression> = memo((module, code, st
                     module,
                     code,
                     startIndex,
-                    endIndex: index,
+                    endIndex: elseResultResult.index,
                 },
                 index: elseResultResult.index,
             }
