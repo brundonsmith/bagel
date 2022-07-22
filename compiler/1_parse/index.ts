@@ -1436,7 +1436,7 @@ const tryCatch: ParseFunction<TryCatch> = memo((module, code, startIndex) =>
     expec(parseBlock(module, code, index), err(code, index, 'Try-block'), ({ parsed: tryBlock, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, "catch"), err(code, index, '"catch"'), index =>
-    given(consumeWhitespace(code, index), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
     expec(plainIdentifier(module, code, index), err(code, index, 'Identifier'), ({ parsed: errIdentifier, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(parseBlock(module, code, index), err(code, index, 'Catch-block'), ({ parsed: catchBlock, index }) => ({
