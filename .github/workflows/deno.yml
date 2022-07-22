@@ -42,3 +42,7 @@ jobs:
 
       - name: Test lib/bgl
         run: XDG_CACHE_HOME=$(pwd) compiler/run.sh test lib/bgl
+
+      - name: Check tests/bagel-cms/index.bgl
+        run: XDG_CACHE_HOME=$(pwd) compiler/run.sh check tests/bagel-cms/index.bgl
+
