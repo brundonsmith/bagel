@@ -593,24 +593,33 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                             sendError(miscError(current, `Const declarations cannot be initialized from mutable state (referencing '${msgFormat(current)}')`))
                         }
 
-                        const declarations = (
-                            binding.kind === 'value-declaration' ?     (binding.parent as Module).declarations :
-                            binding.kind === 'declaration-statement' ? (binding.parent as Block).statements :
-                            binding.kind === 'inline-declaration' ?    (binding.parent as InlineConstGroup).declarations :
-                            undefined
-                        )
+                        if (within(current, binding.value)) {
+                            // value referenced in its own initialization
+                            sendError(miscError(current, `Can't reference "${current.name}" in its own initialization`))
+                        } else {
+                            // check correct order of declarations
+                            let child: AST = current
+                            for (const ancestor of ancestors(current)) {
+                                const declarations = (
+                                    ancestor.kind === 'module' || ancestor.kind === 'inline-const-group' ? ancestor.declarations :
+                                    ancestor.kind === 'block' ? ancestor.statements :
+                                    undefined
+                                ) as unknown[] | undefined
 
-                        if (declarations) {
-                            if (within(current, binding.value)) {
-                                sendError(miscError(current, `Can't reference "${current.name}" in its own initialization`))
-                            } else {
-                                const decl = [...ancestors(current)].find(a => a.kind === binding.kind)
+                                if (declarations) {
+                                    const identIndex = declarations.indexOf(child)
+                                    const declarationIndex = declarations.indexOf(binding)
 
-                                if (decl) {
-                                    if ((declarations as unknown[]).indexOf(binding) > (declarations as unknown[]).indexOf(decl)) {
-                                        sendError(miscError(current, `Can't reference "${current.name}" before initialization`))
+                                    if (identIndex > -1 && declarationIndex > -1) {
+                                        if (declarationIndex > identIndex) {
+                                            sendError(miscError(current, `Can't reference "${current.name}" before initialization`))
+                                        }
+
+                                        break;
                                     }
                                 }
+
+                                child = ancestor
                             }
                         }
                     } else if (binding.kind === 'type-declaration') {
@@ -1363,6 +1372,7 @@ export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'
         }
         case "bound-generic-type": {
             const resolvedGeneric = resolveType(ctx, type.generic)
+            console.log('resolvedGeneric: ' + format(resolvedGeneric, { lineBreaks: false }))
 
             if (resolvedGeneric.kind !== 'generic-type') {
                 return UNKNOWN_TYPE
