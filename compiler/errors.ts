@@ -207,41 +207,52 @@ export function prettyProblem(ctx: Pick<Context, "allModules" | "canonicalModule
     if (code != null && startIndex != null && endIndex != null) {
         output += '\n'
 
+        const lines: string[] = []
+
         const totalLines = [...code].filter(ch => ch === '\n').length + 1
         const maxLineDigits = String(totalLines).length
 
         let lineNumber = 1
+        let firstLine: number|undefined
         let previousLineStart = 0
         let currentLineStart = 0
         for (let i = 0; i <= code.length && currentLineStart < endIndex; i++) {
             if (code[i] === '\n' || i === code.length) {
                 if (i > startIndex) {
-                    if (currentLineStart < startIndex && lineNumber > 1) { // first problem-line
-                        output += numberAndPadding(lineNumber - 1, maxLineDigits) + code.substring(previousLineStart, currentLineStart - 1) + '\n'
+                    if (firstLine == null) {
+                        firstLine = lineNumber
                     }
 
-                    output += numberAndPadding(lineNumber, maxLineDigits)
+                    let newLine = ''
+
+                    if (currentLineStart < startIndex && lineNumber > 1) { // first problem-line
+                        lines.push(code.substring(previousLineStart, currentLineStart - 1))
+                    }
+
+                    // newLine += numberAndPadding(lineNumber, maxLineDigits)
                     
                     if (currentLineStart < startIndex) { // left end is white
-                        output += code.substring(currentLineStart, startIndex)
+                        newLine += code.substring(currentLineStart, startIndex)
                     }
 
                     // problem segment
-                    output += color(code.substring(Math.max(currentLineStart, startIndex), Math.min(i, endIndex)))
+                    newLine += color(code.substring(Math.max(currentLineStart, startIndex), Math.min(i, endIndex)))
 
                     if (endIndex <= i) { // right end is white
-                        if (error.kind === 'bagel-syntax-error') output += Colors.red('_')
+                        if (error.kind === 'bagel-syntax-error') newLine += Colors.red('_')
 
-                        output += code.substring(endIndex, i)
+                        newLine += code.substring(endIndex, i)
+                    }
+
+                    lines.push(newLine)
                         
+                    if (endIndex <= i) {
                         currentLineStart = i + 1
                         i++
                         while (i < code.length && code[i] !== '\n') i++;
 
-                        output += '\n' + numberAndPadding(lineNumber + 1, maxLineDigits) + code.substring(currentLineStart, i)
+                        lines.push(code.substring(currentLineStart, i))
                     }
-                    
-                    output += '\n'
                 }
 
                 lineNumber++
@@ -249,6 +260,15 @@ export function prettyProblem(ctx: Pick<Context, "allModules" | "canonicalModule
                 currentLineStart = i + 1
             }
         }
+
+        const minIndentation = lines
+            .map(line => line.length - line.trimStart().length)
+            .reduce((min, current) => Math.min(min, current), Number.MAX_SAFE_INTEGER)
+
+        output += lines.map((line, index) => {
+            const lineNum = (firstLine ?? 0) + index
+            return numberAndPadding(lineNum, maxLineDigits) + line.substring(minIndentation) + '\n'
+        }).join('')
     }
 
     return output
