@@ -11,7 +11,7 @@ import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/decl
 import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
 import { memo } from "../../lib/ts/reactivity.ts";
-import { CaseBlock } from "../_model/statements.ts";
+import { IfElseStatement } from "../_model/statements.ts";
 import { format } from "../other/format.ts";
 import { Colors } from "../deps.ts";
 
