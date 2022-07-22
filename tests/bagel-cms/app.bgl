@@ -5,7 +5,7 @@ from './store.bgl' import { selectedEntity, EntityDescriptor, FieldDescriptor, E
 
 from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/decorators.bgl' import { trace }
 
-// @memo<[EntityDescriptor[], {[string]: Entity[]}], Element>()
+@memo()
 export func renderApp(entityTypes: EntityDescriptor[], entitiesByType: {[string]: Entity[]}) =>
     <div className='app'>
         <style __dangerouslySetInnerHTML={{ __html: styles }} />
@@ -38,7 +38,7 @@ export func renderApp(entityTypes: EntityDescriptor[], entitiesByType: {[string]
         }
     </div>
 
-// @trace
+@memo()
 func renderEntityForm(entityTypes: EntityDescriptor[], entity: Entity) =>
     const entityType = entityTypes.iter().find((type: EntityDescriptor) => type.id == entity.type),
 
