@@ -136,7 +136,7 @@ export function unionOf(members: readonly TypeExpression[]): UnionType {
 }
 
 export function tupleOf(members: TypeExpression[], mutability?: 'constant'|"readonly"|"mutable"|"literal"): TupleType {
-    const { parent, module, code, startIndex } = members[0]
+    const { parent, module, code, startIndex } = members[0] ?? {}
     const memberMutability = members.map(m => m.mutability).filter((el, index, arr) => arr.indexOf(el) === index)
 
     return {
