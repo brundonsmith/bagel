@@ -975,6 +975,23 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Refinement trap-door pass",
+  fn() {
+    testTypecheck(
+    `
+    func foo(x: { prop: number }): ((n: number) => number) =>
+      (n: number) => n * x.prop
+
+    proc bar() {
+      let obj: { prop: number } = { prop: 14 };
+      const cb = foo(obj);
+      const x = cb(1);
+    }`
+    , false)
+  }
+})
+
+Deno.test({
   name: "Refinement trap-door fail",
   fn() {
     testTypecheck(
