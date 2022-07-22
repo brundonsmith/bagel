@@ -52,23 +52,25 @@ func renderEntityForm(entityTypes: EntityDescriptor[], entity: Entity) =>
                 {'<- Back'}
             </button>
 
-            {entityType.fields.iter().map((field: FieldDescriptor) =>
-                const value = entity.fieldValues[field.name],
+            {entityType.fields.iter()
+                .map((field: FieldDescriptor) =>
+                    const value = entity.fieldValues[field.name],
 
-                switch(field.kind) {
-                    case 'text-short':
-                        <input
-                            type='text'
-                            placeholder={field.name}
-                            value={value} />,
-                    case 'boolean':
-                        <input
-                            type='checkbox'
-                            checked={value} />,
-                    case 'text-long':
-                        <textarea placeholder={field.name}>
-                            {value}
-                        </textarea>,
-                }).collectArray()}
+                    switch(field.kind) {
+                        case 'text-short':
+                            <input
+                                type='text'
+                                placeholder={field.name}
+                                value={value} />,
+                        case 'boolean':
+                            <input
+                                type='checkbox'
+                                checked={value} />,
+                        case 'text-long':
+                            <textarea placeholder={field.name}>
+                                {value}
+                            </textarea>,
+                    })
+                .collectArray()}
         </form>
     }

@@ -455,8 +455,7 @@ const NIL = `undefined`;
 const compileProcDeclaration = (ctx: CompileContext, decl: ProcDeclaration): string => {
     let proc = compileProc(ctx, decl.value, decl.name.name)
     
-    for (let i = decl.decorators.length - 1; i >= 0; i--) {
-        const dec = decl.decorators[i]
+    for (const dec of decl.decorators) {
         proc = compileOne(ctx, dec.decorator) + `(${proc})`
     }
     
@@ -465,8 +464,7 @@ const compileProcDeclaration = (ctx: CompileContext, decl: ProcDeclaration): str
 const compileFuncDeclaration = (ctx: CompileContext, decl: FuncDeclaration): string => {
     let func = compileFunc(ctx, decl.value, decl.name.name)
 
-    for (let i = decl.decorators.length - 1; i >= 0; i--) {
-        const dec = decl.decorators[i]
+    for (const dec of decl.decorators) {
         func = compileOne(ctx, dec.decorator) + `(${func})`
     }
     

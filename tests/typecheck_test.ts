@@ -3397,16 +3397,25 @@ Deno.test({
     testTypecheck(`
     func myDecorator1(fn: (n: number) => number): (n: number) => number => fn
     func myDecorator2(fn: (n: number) => number): (n: number) => number => fn
+    func myGenericDecorator<
+        TArgs extends readonly unknown[],
+        TReturn
+    >(fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => fn
     
     @myDecorator1
     @myDecorator2
     func foo(n: number): number => n
 
+    @myGenericDecorator
+    func foo2(n: number) => n
+
     func myProcDecorator(p: () {}): () {} => p
 
     @myProcDecorator
     proc bar() {
-    }`,
+      
+    }
+    `,
     false)
   }
 })

@@ -846,7 +846,7 @@ export function bindInvocationGenericArgs(ctx: Pick<Context, "allModules"|"visit
             const funcOrProcType = subjectType.inner
 
             const spreadArgType = given(invocation.spreadArg, spread => inferType(ctx, spread.expr))
-            const invocationSubjectType: FuncType|ProcType = {
+            const invocationSubjectType = {
                 ...funcOrProcType,
                 args: (
                     funcOrProcType.args.kind === 'args'

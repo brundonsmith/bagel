@@ -2,11 +2,11 @@ import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
 import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType, STRING_TYPE } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws, argsBounds, AST_NOISE, TYPE_AST_NOISE } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, invocationFromMethodCall, BINARY_OPERATOR_TYPES, throws, argsBounds, AST_NOISE } from "./typeinfer.ts";
 import { Context, getBindingMutability, ModuleName } from "../_model/common.ts";
 import { ancestors, elementOf, findAncestor, getName, iterateParseTree, literalType, maybeOf, planOf, typesEqual, unionOf, within } from "../utils/ast.ts";
 import { DEFAULT_OPTIONS, format } from "../other/format.ts";
-import { ExactStringLiteral, Expression, Func, InlineConstGroup, Proc } from "../_model/expressions.ts";
+import { ExactStringLiteral, Expression, Func, Proc } from "../_model/expressions.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { ImportDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 
@@ -820,47 +820,29 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 break;
             case "proc-declaration":
             case "func-declaration": {
-                const declType = inferType(ctx, current.value)
-
-                const requiredDecoratorType: FuncType = {
-                    kind: 'func-type',
-                    args: {
-                        kind: 'args',
-                        args: [{
-                            kind: 'arg',
-                            name: {
-                                kind: 'plain-identifier',
-                                name: '',
-                                ...AST_NOISE
-                            },
-                            type: declType,
-                            optional: false,
-                            ...AST_NOISE
-                        }],
-                        ...AST_NOISE
-                    },
-                    returnType: declType,
-                    ...TYPE_AST_NOISE
-                }
+                const baseDeclType = inferType(ctx, current.value)
 
                 for (const decorator of current.decorators) {
-                    const type = bindInvocationGenericArgs(ctx, {
-                        kind: 'invocation',
-                        subject: decorator.decorator,
-                        args: [
-                            current.value
-                        ],
-                        typeArgs: [],
-                        spreadArg: undefined,
-                        bubbles: false,
-                        ...AST_NOISE
-                    }) ?? inferType(ctx, decorator.decorator)
-
-                    if (type.kind !== 'func-type' && (type.kind !== 'generic-type' || type.inner.kind !== 'func-type')) {
-                        sendError(miscError(decorator, `Decorators must be functions, but ${format(decorator.decorator)} is a ${format(type)}`))
-                    } else if (subsumationIssues(ctx, requiredDecoratorType, type)) {
-                        const funcOrProc = current.kind === 'proc-declaration' ? 'proc' : 'func'
-                        sendError(miscError(decorator, `${format(decorator.decorator)}, of type ${format(type)}, can't be used as a decorator for ${funcOrProc} of type ${format(declType)}`))
+                    const decoratorType = inferType(ctx, decorator.decorator)
+                    
+                    if (decoratorType.kind !== 'func-type' && (decoratorType.kind !== 'generic-type' || decoratorType.inner.kind !== 'func-type')) {
+                        sendError(miscError(decorator, `Decorators must be functions, but ${format(decorator.decorator)} is a ${format(decoratorType)}`))
+                    } else {
+                        const boundType = bindInvocationGenericArgs(ctx, {
+                            kind: 'invocation',
+                            subject: decorator.decorator,
+                            args: [
+                                current.value
+                            ],
+                            typeArgs: [],
+                            spreadArg: undefined,
+                            bubbles: false,
+                            ...AST_NOISE
+                        })
+    
+                        if (boundType == null || boundType.kind !== 'func-type' || boundType.returnType == null || subsumationIssues(ctx, baseDeclType, boundType.returnType)) {
+                            sendError(miscError(decorator, `Couldn't use ${format(decorator.decorator)} as a decorator for ${current.name.name}`))
+                        }
                     }
                 }
             } break;
