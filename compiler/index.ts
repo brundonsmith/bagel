@@ -249,7 +249,7 @@ function printProblems (ctx: Pick<Context, "allModules"|"canonicalModuleName">, 
         for (const [module, errs] of problems.entries()) {
             totalErrors += errs.length;
 
-            for (const err of errs) {
+            for (const err of errs.slice().sort((a, b) => (a.ast?.startIndex ?? 0) - (b.ast?.startIndex ?? 0))) {
                 console.log(prettyProblem(ctx, module, err))
                 console.log()
             }
