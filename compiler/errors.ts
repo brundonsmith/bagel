@@ -220,7 +220,7 @@ export function prettyProblem(ctx: Pick<Context, "allModules" | "canonicalModule
             if (code[i] === '\n' || i === code.length) {
                 if (i > startIndex) {
                     if (firstLine == null) {
-                        firstLine = lineNumber
+                        firstLine = lineNumber - 1
                     }
 
                     let newLine = ''
