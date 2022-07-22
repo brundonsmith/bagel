@@ -975,24 +975,27 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Refinement trap-door pass",
+  name: "Refinement invalidation pass",
   fn() {
     testTypecheck(
     `
     func foo(x: { prop: number }): ((n: number) => number) =>
       (n: number) => n * x.prop
-
+    
+    proc log(x: unknown) { }
     proc bar() {
-      let obj: { prop: number } = { prop: 14 };
-      const cb = foo(obj);
-      const x = cb(1);
-    }`
+      let obj: { prop: number|string } = { prop: 14 };
+      if obj.prop instanceof number {
+        log(obj.prop * 2);
+      }
+    }
+    `
     , false)
   }
 })
 
 Deno.test({
-  name: "Refinement trap-door fail",
+  name: "Refinement invalidation fail 1",
   fn() {
     testTypecheck(
     `
@@ -1001,13 +1004,24 @@ Deno.test({
         (n: number) => n * x.prop
       } else {
         (n: number) => n + 2
-      }
+      }`
+    , true)
+  }
+})
+
+Deno.test({
+  name: "Refinement invalidation fail 2",
+  fn() {
+    testTypecheck(
+    `
+    proc log(x: unknown) { }
 
     proc bar() {
       let obj: { prop: number|string } = { prop: 14 };
-      const cb = foo(obj);
-      obj.prop = 'foo';
-      const x = cb(1);
+      if obj.prop instanceof number {
+        obj.prop = 'foo';
+        log(obj.prop * 2);
+      }
     }`
     , true)
   }

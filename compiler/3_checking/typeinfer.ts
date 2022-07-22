@@ -1012,75 +1012,85 @@ function resolveRefinements(ctx: Pick<Context, "allModules" | "visited" | "canon
     const refinements: Refinement[] = []
 
     let current: AST = expr
-    let parent = expr.parent
-    let grandparent = parent?.parent
+    let parent = current.parent
+    let grandparent = current?.parent?.parent
+    let greatGrandparent = current?.parent?.parent?.parent
 
     // traverse upwards through the AST, looking for nodes that refine the type 
     // of the current expression
     // TODO: for closures, we can carve out some cases where the value does not depend on a reference to a mutable object. but this might get complicated!
     while (parent != null && parent.kind !== 'func' && parent.kind !== 'proc') {
-        if ((parent.kind === 'case' || parent.kind === 'case-block') && 
-            (grandparent?.kind === 'if-else-expression' || grandparent?.kind === 'if-else-statement') &&  // we know this, but TS doesn't
-            current === parent.outcome) {
-            const cases = grandparent.cases as readonly (Case|CaseBlock)[] // HACK
+        if (
+            (parent.kind === 'case' && grandparent?.kind === 'if-else-expression' && current === parent.outcome) ||
+            (parent.kind === 'if-else-expression' && current === parent.defaultCase)
+        ) {
+            const pastCases = (
+                parent.kind === 'case' && grandparent?.kind === 'if-else-expression'
+                    ? grandparent.cases.slice(0, grandparent.cases.indexOf(parent))
+                    : (parent as IfElseExpression).cases
+            )
 
-            for (let i = 0; i < cases.indexOf(parent); i++) {
-                const condition = cases[i]?.condition
-
-                // conditions for all past clauses are false
-                const refinement = conditionToRefinement(ctx, condition, false)
-                if (refinement) {
-                    refinements.push(refinement)
-                }
+            // conditions for all past clauses are false
+            for (const { condition } of pastCases) {
+                refinements.push(conditionToRefinement(ctx, condition, false))
             }
             
-            // condition for current clause is true
-            const refinement = conditionToRefinement(ctx, parent.condition, true)
-            if (refinement) {
-                refinements.push(refinement)
-            }
-        } else if ((parent.kind === 'if-else-expression' || parent.kind === 'if-else-statement') && current === parent.defaultCase) {
-            for (const { condition } of parent.cases) {
-
-                // conditions for all past clauses are false
-                const refinement = conditionToRefinement(ctx, condition, false)
-                if (refinement) {
-                    refinements.push(refinement)
-                }
+            // condition for current clause is true (if not default case)
+            if (parent.kind === 'case') {
+                refinements.push(conditionToRefinement(ctx, parent.condition, true))
             }
         } else if (parent.kind === 'switch-case' &&  // || parent.kind === 'switch-statement'
                     grandparent?.kind === 'switch-expression' &&  // we know this, but TS doesn't
                     current === parent.outcome) {
             refinements.push({ kind: 'narrowing', type: parent.type, targetExpression: grandparent.value })
         } else if (parent.kind === 'switch-expression' && current === parent.defaultCase) { // || parent.kind === 'switch-statement') {
+            // conditions for all past clauses are false
             for (const { type } of parent.cases) {
-
-                // conditions for all past clauses are false
                 refinements.push({ kind: 'subtraction', type, targetExpression: current })
             }
         } else if (parent.kind === 'binary-operator' && current === parent.right) {
             if (parent.op.op === '&&') {
-                const refinement = conditionToRefinement(ctx, parent.left, true)
-                if (refinement) {
-                    refinements.push(refinement)
-                }
+                refinements.push(conditionToRefinement(ctx, parent.left, true))
             } else if (parent.op.op === '||') {
-                const refinement = conditionToRefinement(ctx, parent.left, false)
-                if (refinement) {
-                    refinements.push(refinement)
+                refinements.push(conditionToRefinement(ctx, parent.left, false))
+            }
+        } else if (
+            (grandparent?.kind === 'case-block' && greatGrandparent?.kind === 'if-else-statement' && parent === grandparent.outcome) ||
+            (grandparent?.kind === 'if-else-statement' && parent === grandparent.defaultCase)
+        ) {
+            // if this isn't the very first statement in the block, the value might have changed
+            if (current === parent.statements[0]) {
+                // TODO: Refinement might also be safe here if:
+                //  - The refined expression is const type (but not just readonly! and not const statements!)
+        
+                const pastCases = (
+                    grandparent.kind === 'case-block' && greatGrandparent?.kind === 'if-else-statement'
+                        ? greatGrandparent.cases.slice(0, greatGrandparent.cases.indexOf(grandparent))
+                        : (grandparent as IfElseStatement).cases
+                )
+    
+                // conditions for all past clauses are false
+                for (const { condition } of pastCases) {
+                    refinements.push(conditionToRefinement(ctx, condition, false))
+                }
+                
+                // condition for current clause is true (if not default case)
+                if (grandparent.kind === 'case-block') {
+                    refinements.push(conditionToRefinement(ctx, grandparent.condition, true))
                 }
             }
         }
 
         current = parent
-        parent = parent.parent
-        grandparent =parent?.parent
+        parent = current.parent
+        grandparent = current?.parent?.parent
+        greatGrandparent = current?.parent?.parent?.parent
     }
 
     return refinements
 }
 
-function conditionToRefinement(ctx: Pick<Context, "allModules" | "visited" | "canonicalModuleName">, condition: Expression, conditionIsTrue: boolean): Refinement|undefined {
+function conditionToRefinement(ctx: Pick<Context, "allModules" | "visited" | "canonicalModuleName">, condition: Expression, conditionIsTrue: boolean): Refinement {
     if (condition.kind === "binary-operator") {
 
         if (condition.op.op === '==' || condition.op.op === '!=') {
