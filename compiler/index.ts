@@ -13,15 +13,26 @@ import { ERROR_SYM } from "https://raw.githubusercontent.com/brundonsmith/bagel/
 let subprocess: Deno.Process<{
     cmd: string[];
 }> | undefined;
+
 async function handleFileChange() {
     if (subprocess) {
-        subprocess.kill("SIGTERM")
+        try {
+            subprocess.kill("SIGTERM")
+        } catch {
+
+        }
         subprocess.close()
     }
 
-    start = Date.now()
-    await run()
-    console.log(`Took ${((Date.now() - start) / 1000).toFixed(2)}s`);
+    if (devMode) {
+        console.log('\n\n----------------------------------------------------\n\n')
+        Deno.run({ cmd: ['deno', 'run', '--allow-all', '--unstable', import.meta.url, ...Deno.args] })
+        Deno.exit(0)
+    } else {
+        start = Date.now()
+        await run()
+        console.log(`Took ${((Date.now() - start) / 1000).toFixed(2)}s`);
+    }
 }
 
 async function run(): Promise<0 | 1> {
@@ -38,7 +49,7 @@ async function run(): Promise<0 | 1> {
 
             const ctx = { allModules, config, canonicalModuleName }
             
-            if (flags.watch) {
+            if (flags.watch && !devMode) {
                 console.clear()
             }
             printProblems(ctx, allProblems(ctx))
@@ -107,7 +118,7 @@ async function run(): Promise<0 | 1> {
                 
                 const ctx = { allModules, config, canonicalModuleName }
 
-                if (flags.watch) {
+                if (flags.watch && !devMode) {
                     console.clear()
                 }
                 printProblems(ctx, allProblems(ctx))

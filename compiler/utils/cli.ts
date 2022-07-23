@@ -2,7 +2,7 @@ import { debounce } from "https://deno.land/std@0.107.0/async/debounce.ts";
 import { path, fs, Colors } from "../deps.ts";
 import { ModuleName } from "../_model/common.ts";
 import { Platform } from "../_model/declarations.ts";
-import { exists, on } from "./misc.ts";
+import { devMode, exists, on } from "./misc.ts";
 
 export const POSSIBLE_COMMANDS = ['new', 'init', 'build', 'run', 'transpile', 'check', 
 'test', 'format', 'autofix', 'clean'] as const
@@ -224,5 +224,8 @@ function watchPath(path: string, cb: () => void) {
 
 export function watch(cb: () => void) {
     const debouncedCb = debounce(cb, 100)
+    if (devMode) {
+        watchPath(path.resolve(path.dirname(new URL(import.meta.url).pathname), '../'), debouncedCb)
+    }
     watchPath(target.path, debouncedCb)
 }
