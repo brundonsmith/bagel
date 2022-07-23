@@ -5,15 +5,19 @@ import { AllModules, Context, ModuleName } from "./_model/common.ts";
 import { autofix, lint, LintProblem } from "./other/lint.ts";
 import { ImportAllDeclaration, ImportDeclaration } from "./_model/declarations.ts";
 import { memo } from "../lib/ts/reactivity.ts";
-import { cacheDir, diskModulePath, entry, pad, pathIsInProject, pathIsRemote, canonicalModuleName } from "./utils/cli.ts";
+import { cacheDir, diskModulePath, pad, pathIsInProject, pathIsRemote, canonicalModuleName, target } from "./utils/cli.ts";
 import { Module } from "./_model/ast.ts";
 import { compile, CompileContext } from "./4_compile/index.ts";
 import { format,DEFAULT_OPTIONS } from "./other/format.ts";
-import { fs,Colors } from "./deps.ts";
+import { fs,Colors, path } from "./deps.ts";
 import { devMode } from "./utils/misc.ts";
 
-export const loadAllModules = async (entries: readonly ModuleName[]): Promise<AllModules> => {
-    let frontier = new Set<ModuleName>(entries)
+export const loadAllModules = async (): Promise<AllModules> => {
+    let frontier = new Set<ModuleName>(
+        target.kind === 'script' || target.kind === 'project-dir'
+            ? [target.entry]
+            : getAllFiles(target.path)
+    )
     const modules = new Map<ModuleName, ReturnType<typeof parse>>()
 
     while (frontier.size > 0) {
@@ -49,6 +53,20 @@ export const loadAllModules = async (entries: readonly ModuleName[]): Promise<Al
     }
 
     return modules
+}
+
+function getAllFiles(dirPath: string, arrayOfFiles: ModuleName[] = []): ModuleName[] {
+    for (const file of Deno.readDirSync(dirPath)) {
+        const filePath = path.resolve(dirPath, file.name);
+
+        if (Deno.statSync(filePath).isDirectory) {
+            getAllFiles(filePath, arrayOfFiles);
+        } else {
+            arrayOfFiles.push(filePath as ModuleName);
+        }
+    }
+  
+    return arrayOfFiles;
 }
 
 const loadModuleSource = async (module: ModuleName): Promise<string | undefined> => {
@@ -160,9 +178,10 @@ const typeerrors = memo(function typeerrors (ctx: Pick<Context, "allModules" | "
     const sendError = (err: BagelError) => errors.push(err)
 
     typecheck(
-        { ...ctx, sendError, entry },
+        { ...ctx, sendError, entry: target.entry },
         ast
     )
+    
     return errors
 })
 

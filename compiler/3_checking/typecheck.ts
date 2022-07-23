@@ -1,4 +1,4 @@
-import { AST, Block, Module, PlainIdentifier } from "../_model/ast.ts";
+import { AST, Module, PlainIdentifier } from "../_model/ast.ts";
 import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType, STRING_TYPE } from "../_model/type-expressions.ts";
 import { exists, given, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
@@ -18,7 +18,7 @@ const msgFormat = (ast: AST) => format(ast, { ...DEFAULT_OPTIONS, lineBreaks: fa
 export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'canonicalModuleName'> & { entry: ModuleName | undefined }, ast: Module): void {
     const { allModules, sendError, config, entry, canonicalModuleName } = ctx
 
-    if (ast.module === entry) {
+    if (entry != null && ast.module === entry) {
         if (!ast.declarations.some(decl => decl.kind === 'proc-declaration' && decl.name.name === 'main')) {
             sendError(miscError(ast, `Entry module doesn't have a proc named "main". Entry module is: ${entry}`))
         }
@@ -592,6 +592,8 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                             
                             sendError(miscError(current, `Const declarations cannot be initialized from mutable state (referencing '${msgFormat(current)}')`))
                         }
+
+                        // TODO: Once we have pure/impure functions, forbid impure functions when initializing a const!
 
                         if (within(current, binding.value)) {
                             // value referenced in its own initialization

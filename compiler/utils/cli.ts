@@ -16,6 +16,7 @@ export const { command, target, testFilter, flags } = (() => {
 
     const target = path.resolve(Deno.cwd(), nonFlags[1] || '.')
     const targetExists = fs.existsSync(target)
+    const targetStat = Deno.statSync(target)
 
     const testFilter = nonFlags[2]
 
@@ -36,7 +37,11 @@ export const { command, target, testFilter, flags } = (() => {
 
     return {
         command: command as Command,
-        target,
+        target: (
+            targetStat.isFile ? { kind: 'script', path: target as ModuleName, entry: target as ModuleName } as const :
+            fs.existsSync(path.resolve(target, 'index.bgl')) ? { kind: 'project-dir', path: target, entry: path.resolve(target, 'index.bgl') as ModuleName } as const :
+            { kind: 'anonymous-dir', path: target } as const
+        ),
         testFilter,
         flags: {
             watch: flags.includes('--watch'),
@@ -67,59 +72,10 @@ export const cliPlatforms = [
     flags.node ? 'node' : undefined,
 ].filter(exists) as Platform[]
 
-const targetStat = Deno.statSync(target)
-export const targetDir = targetStat.isDirectory ? target : path.dirname(target)
-export const targetIsScript = targetStat.isFile
-
-export const entry = (() => {
-    const entry = (
-        command === 'run' || command === 'build' ? (
-            targetStat.isDirectory
-                ? path.resolve(target, 'index.bgl') as ModuleName
-                : target as ModuleName
-        ) :
-        targetStat.isFile ? target as ModuleName :
-        undefined
-    )
-
-    if (entry != null && (!fs.existsSync(entry) || path.extname(entry) !== '.bgl')) {
-        fail(`Couldn't find entry '${entry}'`)
-    }
-
-    return entry
-})()
-
-export const allEntries = (
-    command === 'build' || command === 'run' ? [entry as ModuleName] :
-    Deno.statSync(target).isDirectory ? getAllFiles(target).filter(f => f.match(/.*\.bgl$/)) : // TODO: This won't pick up new files
-    [ target as ModuleName ]
-)
-
-function getAllFiles(dirPath: string, arrayOfFiles: ModuleName[] = []): ModuleName[] {
-    for (const file of Deno.readDirSync(dirPath)) {
-        const filePath = path.resolve(dirPath, file.name);
-
-        if (Deno.statSync(filePath).isDirectory) {
-            getAllFiles(filePath, arrayOfFiles);
-        } else {
-            arrayOfFiles.push(filePath as ModuleName);
-        }
-    }
-  
-    return arrayOfFiles;
-}
-
-type Mode = 'project-dir' | 'script' | 'anonymous'
-const mode: Mode = (
-    targetIsScript ? 'script' :
-    entry == null ? 'anonymous' :
-    'project-dir'
-)
-
 export const scratchDir = (() => {
-    if (mode === 'project-dir') {
+    if (target.kind === 'project-dir') {
         // project-local
-        return targetDir
+        return target.path
     } else {
         // In user's home directory
 
@@ -167,8 +123,8 @@ fs.ensureDirSync(cacheDir)
 fs.ensureDirSync(buildDir)
 
 export const bundlePath = (
-    mode === 'project-dir' ? path.resolve(buildDir, path.basename(targetDir) + '.bundle.js') :
-    entry ? path.resolve(buildDir, uniqueFileName(entry) + '.bundle.js') :
+    target.kind === 'project-dir' ? path.resolve(buildDir, path.basename(target.path) + '.bundle.js') :
+    target.kind === 'script' ? path.resolve(buildDir, uniqueFileName(target.path) + '.bundle.js') :
     ''
 )
 
@@ -189,7 +145,7 @@ function uniqueFileName(module: string) {
 export function transpilePath(module: string): string {
     if (command === 'transpile' && pathIsInProject(module)) {
         return module + '.ts'
-    } else if (mode === 'script') {
+    } else if (target.kind === 'script') {
         return path.resolve(buildDir, uniqueFileName(module)) + '.ts'
     } else {
         return path.resolve(buildDir, pathRelativeToProject(diskModulePath(module))) + '.ts'
@@ -198,8 +154,9 @@ export function transpilePath(module: string): string {
 
 export function pathIsInProject(module: string): boolean {
     return (
-        module === target ||
-        ((mode === 'project-dir' || mode === 'anonymous') && isWithin(targetDir, module))
+        module === target.path ||
+        module === target.entry ||
+        ((target.kind === 'project-dir' || target.kind === 'anonymous-dir') && isWithin(target.path, module))
     )
 }
 
@@ -217,7 +174,7 @@ export function pathIsRemote(path: string): boolean {
 }
 
 export function pathRelativeToProject(module: string): string {
-    return path.relative(targetDir, diskModulePath(module))
+    return path.relative(target.path, diskModulePath(module))
 }
 
 export function isWithin(dir: string, other: string) {
@@ -267,8 +224,5 @@ function watchPath(path: string, cb: () => void) {
 
 export function watch(cb: () => void) {
     const debouncedCb = debounce(cb, 100)
-
-    for (const entry of allEntries) {
-        watchPath(entry, debouncedCb)
-    }
+    watchPath(target.path, debouncedCb)
 }

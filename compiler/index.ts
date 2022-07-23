@@ -4,7 +4,7 @@ import { BagelError, prettyProblem } from "./errors.ts";
 
 import { AllModules, Context, DEFAULT_CONFIG, ModuleName } from "./_model/common.ts";
 import { ALL_LINT_RULE_SEVERITIES, DEFAULT_SEVERITY, LintProblem, LintRuleName, LintRuleSeverity } from "./other/lint.ts";
-import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, pad, allEntries, canonicalModuleName, testFilter, watch } from "./utils/cli.ts";
+import { command,target,flags,transpilePath,pathIsInProject, bundlePath, pad, canonicalModuleName, testFilter, watch } from "./utils/cli.ts";
 import { esOrNone, sOrNone, devMode } from "./utils/misc.ts";
 import { ALL_PLATFORMS, Platform } from "./_model/declarations.ts";
 import { loadAllModules,allProblems,hasProblems,formatted,autofixed,compiled } from "./store.ts";
@@ -29,14 +29,10 @@ async function run(): Promise<0 | 1> {
         watch(handleFileChange)
     }
 
-    window.addEventListener("unload", () => {
-        console.log(`Took ${((Date.now() - start) / 1000).toFixed(2)}s`);
-    });
-
     switch (command) {
         case 'build':
         case 'run': {
-            const allModules = await loadAllModules(allEntries)
+            const allModules = await loadAllModules()
             await transpileAll(allModules)
             const config = await loadConfig()
 
@@ -102,7 +98,7 @@ async function run(): Promise<0 | 1> {
         case 'test':
         case 'format':
         case 'autofix': {
-            const allModules = await loadAllModules(allEntries)
+            const allModules = await loadAllModules()
 
             if (command === 'transpile' || command === 'check' || command === 'test') {
                 await transpileAll(allModules)
@@ -122,7 +118,7 @@ async function run(): Promise<0 | 1> {
                         console.log(Colors.green(pad('Transpiled')) + `${localModules} Bagel file${sOrNone(localModules)}`)
                         return 0
                     } else if (command === 'test') {
-                        const modulesWithFailures = await test()
+                        const modulesWithFailures = await test([...allModules.keys()])
 
                         return (
                             modulesWithFailures > 0
@@ -156,12 +152,12 @@ async function run(): Promise<0 | 1> {
             }
         } break;
         case 'new':
-            fs.ensureDirSync(target)
-            Deno.writeTextFileSync(path.resolve(target, 'index.bgl'), DEFAULT_INDEX_BGL)
+            await fs.ensureDir(target.path)
+            await Deno.writeTextFile(path.resolve(target.path, 'index.bgl'), DEFAULT_INDEX_BGL)
             console.log(Colors.green(pad('Created')) + `new Bagel project ${target}`)
             return 0
         case 'init':
-            Deno.writeTextFileSync(path.resolve(Deno.cwd(), 'index.bgl'), DEFAULT_INDEX_BGL)
+            await Deno.writeTextFile(path.resolve(Deno.cwd(), 'index.bgl'), DEFAULT_INDEX_BGL)
             console.log(Colors.green(pad('Initialized')) + `Bagel project in current directory`)
             return 0
         default:
@@ -179,7 +175,10 @@ async function transpileAll(allModules: AllModules) {
             await Deno.writeTextFile(jsPath, js)
             if(devMode) console.log(Colors.cyan('Info ') + `Wrote transpiled ${jsPath}`)
 
-            if (moduleName === entry) {
+            if (
+                (target.kind === 'script' && target.path === moduleName) ||
+                (target.kind === 'project-dir' && target.entry === moduleName)
+            ) {
                 const entryPath = bundleEntryPath(moduleName)
                 await Deno.writeTextFile(entryPath, js + "\nsetTimeout(main, 0);\n")
                 if(devMode) console.log(Colors.cyan('Info ') + `Wrote transpiled bundle-entry ${entryPath}`)
@@ -194,7 +193,8 @@ const bundleEntryPath = (moduleName: ModuleName) => {
 }
 
 async function loadConfig() {
-    if (entry == null) return DEFAULT_CONFIG;
+    if (target.kind === 'anonymous-dir') return DEFAULT_CONFIG;
+    const entry = target.entry
 
     try {
         const entryModule = await import(transpilePath(entry))
@@ -281,7 +281,8 @@ function printProblems (ctx: Pick<Context, "allModules"|"canonicalModuleName">, 
 }
 
 const bundleOutput = async () => {
-    if (entry == null) return;
+    if (target.kind === 'anonymous-dir') return
+    const entry = target.entry
 
     // const result = await Deno.emit(windowsPathToModulePath(bagelFileToTsFile(entryFile)), {
     //     bundle: "classic",
@@ -342,14 +343,14 @@ type Tests = {
 }
 
 // TODO: Don't run tests in modules outside of the local project or specified directory or file
-async function test() {
+async function test(modules: ModuleName[]) {
     let totalModules = 0
     let modulesWithFailures = 0
     let totalSuccesses = 0
     let totalFailures = 0
     let totalTests = 0
 
-    for (const moduleName of allEntries) {
+    for (const moduleName of modules) {
         totalModules++
 
         try {

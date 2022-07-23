@@ -1,8 +1,7 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
-import { BinaryOp, Case, ElementTag, ExactStringLiteral, Expression, IfElseExpression, Invocation, isExpression, ObjectEntry, ObjectLiteral } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, ProcType, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, SpreadArgs, Args, POISONED_TYPE } from "../_model/type-expressions.ts";
+import { BinaryOp, ElementTag, ExactStringLiteral, Expression, IfElseExpression, Invocation, isExpression, ObjectEntry, ObjectLiteral } from "../_model/expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, SpreadArgs, Args, POISONED_TYPE } from "../_model/type-expressions.ts";
 import { exists, given, devMode } from "../utils/misc.ts";
-import { log } from '../utils/debugging.ts'
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
