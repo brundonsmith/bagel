@@ -145,7 +145,7 @@ async function run() {
 }
 
 async function transpileAll(allModules: AllModules) {
-    for (const moduleName of allModules.keys() ?? []) {
+    await Promise.all([...allModules.keys()].map(async moduleName => {
         const jsPath = transpilePath(moduleName)
         const js = compiled({ allModules, moduleName, transpilePath, canonicalModuleName, includeTests: true })
         
@@ -160,7 +160,7 @@ async function transpileAll(allModules: AllModules) {
                 if(devMode) console.log(Colors.cyan('Info ') + `Wrote transpiled bundle-entry ${entryPath}`)
             }
         }
-    }
+    }))
 }
 
 const bundleEntryPath = (moduleName: ModuleName) => {

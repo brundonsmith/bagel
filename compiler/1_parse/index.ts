@@ -13,7 +13,7 @@ import { path } from '../deps.ts';
 import { AST_NOISE } from "../3_checking/typeinfer.ts";
 import { memo } from "../../lib/ts/reactivity.ts";
 
-export const parse = (moduleName: ModuleName, code: string): { ast: Module, noPreludeAst: Module, errors: readonly BagelError[] } | undefined => {
+export const parse = memo((moduleName: ModuleName, code: string): { ast: Module, noPreludeAst: Module, errors: readonly BagelError[] } | undefined => {
     const fileType = path.extname(moduleName)
 
     if (fileType === '.bgl') {
@@ -101,7 +101,7 @@ export const parse = (moduleName: ModuleName, code: string): { ast: Module, noPr
             errors: []
         }
     }
-}
+})
 
 export const JSON_AND_PLAINTEXT_EXPORT_NAME = "CONTENTS"
 
