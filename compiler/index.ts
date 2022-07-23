@@ -4,14 +4,31 @@ import { BagelError, prettyProblem } from "./errors.ts";
 
 import { AllModules, Context, DEFAULT_CONFIG, ModuleName } from "./_model/common.ts";
 import { ALL_LINT_RULE_SEVERITIES, DEFAULT_SEVERITY, LintProblem, LintRuleName, LintRuleSeverity } from "./other/lint.ts";
-import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, pad, allEntries, canonicalModuleName, testFilter } from "./utils/cli.ts";
+import { command,target,flags,transpilePath,pathIsInProject,entry, bundlePath, pad, allEntries, canonicalModuleName, testFilter, watch } from "./utils/cli.ts";
 import { esOrNone, sOrNone, devMode } from "./utils/misc.ts";
 import { ALL_PLATFORMS, Platform } from "./_model/declarations.ts";
 import { loadAllModules,allProblems,hasProblems,formatted,autofixed,compiled } from "./store.ts";
 import { ERROR_SYM } from "https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts";
 
-async function run() {
-    const start = Date.now()
+let subprocess: Deno.Process<{
+    cmd: string[];
+}> | undefined;
+async function handleFileChange() {
+    if (subprocess) {
+        subprocess.kill("SIGTERM")
+        subprocess.close()
+    }
+
+    start = Date.now()
+    await run()
+    console.log(`Took ${((Date.now() - start) / 1000).toFixed(2)}s`);
+}
+
+async function run(): Promise<0 | 1> {
+    if (flags.watch) {
+        watch(handleFileChange)
+    }
+
     window.addEventListener("unload", () => {
         console.log(`Took ${((Date.now() - start) / 1000).toFixed(2)}s`);
     });
@@ -24,16 +41,17 @@ async function run() {
             const config = await loadConfig()
 
             const ctx = { allModules, config, canonicalModuleName }
-
-            printProblems(ctx, allProblems(ctx), flags.watch)
+            
+            if (flags.watch) {
+                console.clear()
+            }
+            printProblems(ctx, allProblems(ctx))
             
             if (!hasProblems(ctx)) {
                 await bundleOutput()
 
                 if (command === 'build') {
-                    if (!flags.watch) {
-                        Deno.exit(0)
-                    }
+                    return 0
                 } else {
                     const nodePath = Deno.env.get('BAGEL_NODE_BIN')
                     const denoPath = Deno.env.get('BAGEL_DENO_BIN')
@@ -45,44 +63,38 @@ async function run() {
                     
                     if (flags.deno || (!platforms?.includes('node') && platforms?.includes('deno'))) {
                         console.log(Colors.green('Running (deno) ') + bundlePath)
-                        await Deno.run({ cmd: denoCommand }).status()
-                        Deno.exit(0)
+                        subprocess = Deno.run({ cmd: denoCommand })
                     } else if (flags.node || (platforms?.includes('node') && !platforms?.includes('deno'))) {
                         console.log(Colors.green('Running (node) ') + bundlePath)
-                        await Deno.run({ cmd: nodeCommand }).status()
-                        Deno.exit(0)
+                        subprocess = Deno.run({ cmd: nodeCommand })
                     } else if (denoPath) {
                         console.log(Colors.green('Running (' + denoPath + ')     ') + bundlePath)
-                        await Deno.run({ cmd: denoCommand }).status()
-                        Deno.exit(0)
+                        subprocess = Deno.run({ cmd: denoCommand })
                     } else if (nodePath) {
                         console.log(Colors.green('Running (' + nodePath + ')     ') + bundlePath)
-                        await Deno.run({ cmd: nodeCommand }).status()
-                        Deno.exit(0)
+                        subprocess = Deno.run({ cmd: nodeCommand })
                     } else {
                         try {
                             await Deno.run({ cmd: ["deno", "--version"], stdout: 'piped' }).status()
                             console.log(Colors.green('Running (deno) ') + bundlePath)
-                            await Deno.run({ cmd: denoCommand }).status()
-                            Deno.exit(0)
+                            subprocess = Deno.run({ cmd: denoCommand })
                         } catch {
                             try {
                                 await Deno.run({ cmd: ["node", "-v"], stdout: 'piped' }).status()
                                 console.log(Colors.green('Running (node) ') + bundlePath)
-                                await Deno.run({ cmd: nodeCommand }).status()
-                                Deno.exit(0)
+                                subprocess = Deno.run({ cmd: nodeCommand })
                             } catch {
+                                console.error(Colors.red('Failed to run: ') + 'Couldn\'t find a Node or Deno installation; please install one of the two or supply a path as BAGEL_NODE_BIN or BAGEL_DENO_BIN')
+                                return 1
                             }
                         }
                     }
 
-                    console.error(Colors.red('Failed to run: ') + 'Couldn\'t find a Node or Deno installation; please install one of the two or supply a path as BAGEL_NODE_BIN or BAGEL_DENO_BIN')
-                    Deno.exit(1)
+                    await subprocess.status()
+                    return 0
                 }
             } else {
-                if (!flags.watch) {
-                    Deno.exit(1)
-                }
+                return 1
             }
         } break;
         case 'transpile':
@@ -94,29 +106,40 @@ async function run() {
 
             if (command === 'transpile' || command === 'check' || command === 'test') {
                 await transpileAll(allModules)
+
                 const config = await loadConfig()
                 
                 const ctx = { allModules, config, canonicalModuleName }
 
-                printProblems(ctx, allProblems(ctx), flags.watch)
+                if (flags.watch) {
+                    console.clear()
+                }
+                printProblems(ctx, allProblems(ctx))
 
                 if (!hasProblems(ctx)) {    
                     if (command === 'transpile') { 
                         const localModules = [...allModules.keys() ?? []].filter(module => pathIsInProject(module)).length
                         console.log(Colors.green(pad('Transpiled')) + `${localModules} Bagel file${sOrNone(localModules)}`)
+                        return 0
                     } else if (command === 'test') {
-                        await test()
-                    }
-                }
+                        const modulesWithFailures = await test()
 
-                if (!flags.watch) {
-                    Deno.exit(
+                        return (
+                            modulesWithFailures > 0
+                                ? 1
+                                : 0
+                        )
+                    } else {
+                        return 0
+                    }
+                } else {
+                    return (
                         hasProblems(ctx)
                             ? 1
                             : 0
                     )
                 }
-            } else if (command === 'format' || command === 'autofix') {
+            } else {
                 const transform = command === 'format' ? formatted : autofixed
 
                 for (const module of allModules.keys() ?? []) {
@@ -128,19 +151,21 @@ async function run() {
                         }
                     }
                 }
-            } else {
-                // test
+
+                return 0
             }
         } break;
         case 'new':
             fs.ensureDirSync(target)
             Deno.writeTextFileSync(path.resolve(target, 'index.bgl'), DEFAULT_INDEX_BGL)
             console.log(Colors.green(pad('Created')) + `new Bagel project ${target}`)
-            Deno.exit(0)
+            return 0
         case 'init':
             Deno.writeTextFileSync(path.resolve(Deno.cwd(), 'index.bgl'), DEFAULT_INDEX_BGL)
             console.log(Colors.green(pad('Initialized')) + `Bagel project in current directory`)
-            Deno.exit(0)
+            return 0
+        default:
+            return 0
     }
 }
 
@@ -229,12 +254,8 @@ proc main() {
 }
 `
 
-function printProblems (ctx: Pick<Context, "allModules"|"canonicalModuleName">, problems: Map<ModuleName, (BagelError|LintProblem)[]>, clearConsole: boolean) {
+function printProblems (ctx: Pick<Context, "allModules"|"canonicalModuleName">, problems: Map<ModuleName, (BagelError|LintProblem)[]>) {
     const { allModules } = ctx
-
-    if (clearConsole) {
-        console.clear()
-    }
 
     let totalErrors = 0;
 
@@ -378,48 +399,14 @@ async function test() {
     }
 
     console.log(`\nFound ${totalTests} test${sOrNone(totalTests)} across ${totalModules} module${sOrNone(totalModules)}${testFilter ? ` matching filter "${testFilter}"` : ''}; ${Colors.green(String(totalSuccesses) + ' success' + esOrNone(totalSuccesses))}, ${Colors.red(String(totalFailures) + ' failure' + sOrNone(totalFailures))}`)
-    Deno.exit(modulesWithFailures > 0 ? 1 : 0)
+    
+    return modulesWithFailures
 }
 
-// testInWorker(file.path)
-//     .then(failed => {
-//         for (const name of failed) {
-//             console.error(name)
-//         }
-//     })
+let start = Date.now()
+const statusCode = await run()
+console.log(`Took ${((Date.now() - start) / 1000).toFixed(2)}s`);
 
-// function testInWorker(fileToTest: string): Promise<string[]> {
-//     const code = `
-//         // import { tests } from '${fileToTest.replace(/^[a-z]+:/i, '').replaceAll('\\', '/')}.ts';
-//         import { tests } from '../tests/sample-files-3/tests-sample.bgl.ts';
-
-//         const failed = [];
-
-//         for (const test of tests.testExprs) {
-//             if (test.expr === false) {
-//                 failed.push(test.name)
-//             }
-//         }
-
-//         for (const test of tests.testBlocks) {
-//             try {
-//                 test.block()
-//             } catch {
-//                 failed.push(test.name)
-//             }
-//         }
-
-//         postMessage(JSON.stringify(failed));
-//     `
-//     console.log(code)
-
-//     const worker = new Worker(`data:text/javascript;base64,${btoa(code)}`, { type: "module" });
-
-//     return new Promise(res => {
-//         worker.onmessage = function (event) {
-//             res(JSON.parse(event.data))
-//         }
-//     })
-// }
-
-run()
+if (!flags.watch) {
+    Deno.exit(statusCode)
+}

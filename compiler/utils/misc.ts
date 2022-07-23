@@ -89,7 +89,7 @@ export async function all<T>(iter: AsyncIterable<T>): Promise<T[]> {
 const NOMINAL_FLAG = Symbol('NOMINAL_FLAG')
 export type NominalType<T, S extends symbol> = T & { [NOMINAL_FLAG]: S }
 
-export const devMode = true
+export const devMode = false
 
 export function spaces(spaces: number) {
     let str = ''

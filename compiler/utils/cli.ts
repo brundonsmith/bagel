@@ -1,7 +1,8 @@
+import { debounce } from "https://deno.land/std@0.107.0/async/debounce.ts";
 import { path, fs, Colors } from "../deps.ts";
 import { ModuleName } from "../_model/common.ts";
 import { Platform } from "../_model/declarations.ts";
-import { exists } from "./misc.ts";
+import { exists, on } from "./misc.ts";
 
 export const POSSIBLE_COMMANDS = ['new', 'init', 'build', 'run', 'transpile', 'check', 
 'test', 'format', 'autofix', 'clean'] as const
@@ -47,7 +48,7 @@ export const { command, target, testFilter, flags } = (() => {
     }
 })()
 
-export function fail(msg: string): any {
+function fail(msg: string): any {
     console.error(Colors.red(pad('Failed')) + msg)
     Deno.exit(1)
 }
@@ -90,7 +91,7 @@ export const entry = (() => {
 
 export const allEntries = (
     command === 'build' || command === 'run' ? [entry as ModuleName] :
-    Deno.statSync(target).isDirectory ? getAllFiles(target).filter(f => f.match(/.*\.bgl$/)) :
+    Deno.statSync(target).isDirectory ? getAllFiles(target).filter(f => f.match(/.*\.bgl$/)) : // TODO: This won't pick up new files
     [ target as ModuleName ]
 )
 
@@ -246,4 +247,28 @@ function cleanCache() {
 
 if (command === 'clean' || flags.clean) {
     cleanCache()
+}
+
+
+const watchers = new Map<string, Deno.FsWatcher>()
+function watchPath(path: string, cb: () => void) {
+    if (watchers.get(path) == null) {
+        try {
+            const watcher = Deno.watchFs(path);
+            watchers.set(path, watcher);
+
+            on(watcher, cb)
+        } catch {
+            console.error(Colors.red('Error') + `    couldn't find ${path}`)
+        }
+    }
+}
+
+
+export function watch(cb: () => void) {
+    const debouncedCb = debounce(cb, 100)
+
+    for (const entry of allEntries) {
+        watchPath(entry, debouncedCb)
+    }
 }
