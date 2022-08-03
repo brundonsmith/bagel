@@ -86,7 +86,7 @@ export function errorMessage(error: BagelError): string {
         case "bagel-syntax-error":
             return error.message
         case "bagel-assignable-to-error":
-            return serializeIssues(error.issues);
+            return '\n' + serializeIssues(error.issues);
         case "bagel-cannot-find-name-error":
             return `Cannot find name "${error.name}"`;
         case "bagel-already-declared-error":
@@ -102,7 +102,7 @@ export function errorMessage(error: BagelError): string {
 
 export function serializeIssues(issues: (string | string[])[]) {
     return issues.map((issue, index) => {
-        const indentation = spaces(index)
+        const indentation = spaces(index + 1)
 
         return (
             typeof issue === 'string'

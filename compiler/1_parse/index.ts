@@ -1055,7 +1055,7 @@ const deriveOrRemoteDelcaration: ParseFunction<DeriveDeclaration|RemoteDeclarati
     given(consumeWhitespace(code, index), index =>
     given(_maybeTypeAnnotation(module, code, index), ({ parsed: type, index }) =>
     given(consumeWhitespace(code, index), index =>
-    expec(consume(code, index, '=>'), err(code, index, "'=>'"), index =>
+    expec(consume(code, index, '=>'), err(code, index, '"=>"'), index =>
     given(consumeWhitespace(code, index), index =>
     given(expression(module, code, index), ({ parsed: expr, index }) => ({
         parsed: {

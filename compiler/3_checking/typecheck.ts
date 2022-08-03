@@ -9,8 +9,11 @@ import { DEFAULT_OPTIONS, format } from "../other/format.ts";
 import { ExactStringLiteral, Expression, Func, Proc } from "../_model/expressions.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { ImportDeclaration, ValueDeclaration } from "../_model/declarations.ts";
+import { Colors } from "../deps.ts";
 
 const msgFormat = (ast: AST) => format(ast, { ...DEFAULT_OPTIONS, lineBreaks: false })
+
+const hlt = Colors.blue
 
 /**
  * Walk an entire AST and report all issues that we find
@@ -42,9 +45,9 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
 
                 if (imported) {
                     if (imported == null) {
-                        sendError(miscError(current, `Can't find declaration '${current.name.name}' in module '${(current.parent as ImportDeclaration).path.value}'`))
+                        sendError(miscError(current, `Can't find declaration ${hlt(current.name.name)} in module ${hlt((current.parent as ImportDeclaration).path.value)}`))
                     } else if(!imported.exported) {
-                        sendError(miscError(current, `Declaration '${current.name.name}' exists in module '${(current.parent as ImportDeclaration).path.value}' but is not exported`))
+                        sendError(miscError(current, `Declaration ${hlt(current.name.name)} exists in module ${hlt((current.parent as ImportDeclaration).path.value)} but is not exported`))
                     }
                 }
             } break;
@@ -227,7 +230,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
 
                     if (subsumationIssues(ctx, PLAN_OF_ANY, valueType)) {
                         // make sure value is a plan
-                        sendError(miscError(current.value, `Can only await expressions of type Plan; found type '${msgFormat(valueType)}'`))
+                        sendError(miscError(current.value, `Can only await expressions of type Plan; found type ${hlt(msgFormat(valueType))}`))
                     } else {
                         valueType = (valueType as PlanType).inner
                     }
@@ -236,18 +239,18 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 if (current.kind !== 'value-declaration' && current.destination.kind === 'destructure') {
                     if (current.destination.destructureKind === 'object') {
                         if (subsumationIssues(ctx, RECORD_OF_ANY, valueType)) {
-                            sendError(miscError(current.value, `Can only destructure object types using '{ }'; found type '${msgFormat(valueType)}'`))
+                            sendError(miscError(current.value, `Can only destructure object types using '{ }'; found type ${hlt(msgFormat(valueType))}`))
                         } else {
                             const objectProperties = propertiesOf(ctx, valueType)
                             for (const property of current.destination.properties) {
                                 if (!objectProperties?.find(prop => getName(prop.name) === property.name)) {
-                                    sendError(miscError(property, `Property '${property.name}' does not exist on type '${msgFormat(valueType)}'`))
+                                    sendError(miscError(property, `Property ${hlt(property.name)} does not exist on type ${hlt(msgFormat(valueType))}`))
                                 }
                             }
                         }
                     } else {
                         if (subsumationIssues(ctx, ARRAY_OF_ANY, valueType)) {
-                            sendError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type '${msgFormat(valueType)}'`))
+                            sendError(miscError(current.value, `Can only destructure array or tuple types using '[ ]'; found type ${hlt(msgFormat(valueType))}`))
                         } else {
                             const resolvedValueType = resolveType(ctx, valueType)
                             if (resolvedValueType.kind === 'tuple-type') {
@@ -283,7 +286,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     }
                 } else {
                     // make sure value is a plan
-                    sendError(miscError(current.expr, `Remote declarations must be defined with a Plan expression; found type '${msgFormat(exprType)}'`))
+                    sendError(miscError(current.expr, `Remote declarations must be defined with a Plan expression; found type ${hlt(msgFormat(exprType))}`))
                 }
             } break;
             case "test-expr-declaration": {
@@ -311,7 +314,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 if (current.op.op === '==' || current.op.op === '!=') {
                     if (subsumationIssues(ctx, leftType, rightType) 
                      && subsumationIssues(ctx, rightType, leftType)) {
-                        sendError(miscError(current, `Can't compare types '${msgFormat(leftType)}' and '${msgFormat(rightType)}' because they have no overlap`))
+                        sendError(miscError(current, `Can't compare types ${hlt(msgFormat(leftType))} and ${hlt(msgFormat(rightType))} because they have no overlap`))
                     }
                 } else if (current.op.op !== '??' && current.op.op !== '&&' && current.op.op !== '||') {
                     const types = BINARY_OPERATOR_TYPES[current.op.op]?.find(({ left, right }) =>
@@ -319,7 +322,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                         !subsumationIssues(ctx, right, rightType))
 
                     if (types == null) {
-                        sendError(miscError(current.op, `Operator '${current.op.op}' cannot be applied to types '${msgFormat(leftType)}' and '${msgFormat(rightType)}'`));
+                        sendError(miscError(current.op, `Operator ${hlt(current.op.op)} cannot be applied to types ${hlt(msgFormat(leftType))} and ${hlt(msgFormat(rightType))}`));
                     }
                 }
             } break;
@@ -369,7 +372,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 } else if ( // check that subject is callable
                     subjectType.kind !== "func-type" && subjectType.kind !== "proc-type" 
                 && (subjectType.kind !== 'generic-type' || (subjectType.inner.kind !== 'func-type' && subjectType.inner.kind !== 'proc-type'))) {
-                    sendError(miscError(invocation.subject, `Expression must be a function or procedure to be called; '${msgFormat(invocation.subject)}' is of type '${msgFormat(subjectType)}'`));
+                    sendError(miscError(invocation.subject, `Expression must be a function or procedure to be called; ${hlt(msgFormat(invocation.subject))} is of type ${hlt(msgFormat(subjectType))}`));
                 } else {
                     const invoked = subjectType.kind === 'generic-type' ? subjectType.inner as FuncType|ProcType : subjectType
         
@@ -471,7 +474,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 const finalType = resolveType(ctx, remainingType)
                 if (current.defaultCase == null && !isEmptyType(finalType)) {
                     // if no default case, check that arms are exhaustive
-                    sendError(miscError(current, `Switch expression doesn't handle all possible values; ${msgFormat(current.value)} can still be a '${msgFormat(remainingType)}'. Either add cases to cover the rest of the possible values, or add a default case.`))
+                    sendError(miscError(current, `Switch expression doesn't handle all possible values; ${msgFormat(current.value)} can still be a ${hlt(msgFormat(remainingType))}. Either add cases to cover the rest of the possible values, or add a default case.`))
                 } else if (current.defaultCase != null && isEmptyType(finalType)) {
                     // if default case, check that arms are *not* exhaustive
                     sendError(miscError(current.defaultCase, `Default case will never be reached, because all possible values for ${msgFormat(current.value)} are covered by cases above`))
@@ -487,7 +490,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     const nillable = subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
 
                     if (nillable && !current.optional) {
-                        sendError(miscError(current.property, `Can't access properties on '${format(subjectType)}' without an optional-chaining operator (".?"), because it is potentially nil`))
+                        sendError(miscError(current.property, `Can't access properties on ${hlt(format(subjectType))} without an optional-chaining operator (".?"), because it is potentially nil`))
                     }
 
                     const effectiveSubjectType = current.optional && nillable
@@ -502,13 +505,13 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
 
                         if (effectiveSubjectType.kind === 'record-type') {
                             if (subsumationIssues(ctx, effectiveSubjectType.keyType, literalType(name))) {
-                                sendError(miscError(current.subject, `Property '${name}' will never be found on object with type '${msgFormat(subjectType)}'`))
+                                sendError(miscError(current.subject, `Property ${hlt(name)} will never be found on object with type ${hlt(msgFormat(subjectType))}`))
                             }
                         } else {
                             if (subjectProperties == null) {
-                                sendError(miscError(current.subject, `Can only use dot operator (".") on objects with properties (value is of type "${msgFormat(subjectType)}")`));
+                                sendError(miscError(current.subject, `Can only use dot operator (".") on objects with properties (value is of type ${hlt(msgFormat(subjectType))})`));
                             } else if (!subjectProperties.some(p => getName(p.name) === name)) {
-                                sendError(miscError(property, `Property '${name}' does not exist on type '${msgFormat(subjectType)}'`));
+                                sendError(miscError(property, `Property ${hlt(name)} does not exist on type ${hlt(msgFormat(subjectType))}`));
                             }
                         }
                     } else {
@@ -519,11 +522,11 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                             const valueType = subjectProperties?.find(entry => getName(entry.name) === key)?.type;
                             
                             if (valueType == null) {
-                                sendError(miscError(property, `Property '${key}' doesn't exist on type '${msgFormat(subjectType)}'`));
+                                sendError(miscError(property, `Property ${hlt(key)} doesn't exist on type ${hlt(msgFormat(subjectType))}`));
                             }
                         } else if (effectiveSubjectType.kind === "record-type") {
                             expect(ctx, effectiveSubjectType.keyType, property,
-                                (_, val) => `Expression of type '${msgFormat(val)}' can't be used to index type '${msgFormat(subjectType)}'`)
+                                (_, val) => `Expression of type ${hlt(msgFormat(val))} can't be used to index type ${hlt(msgFormat(subjectType))}`)
                         } else if (
                             !subsumationIssues(ctx,
                                 unionOf([
@@ -533,17 +536,17 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                                 effectiveSubjectType)
                         ) {
                             expect(ctx, NUMBER_TYPE, property,
-                                (_, val) => `Expression of type '${msgFormat(val)}' can't be used to index type '${msgFormat(subjectType)}'`)
+                                (_, val) => `Expression of type ${hlt(msgFormat(val))} can't be used to index type ${hlt(msgFormat(subjectType))}`)
     
                             if (effectiveSubjectType.kind === "tuple-type" || (effectiveSubjectType.kind === 'literal-type' && effectiveSubjectType.value.kind === 'exact-string-literal')) {
                                 const max = effectiveSubjectType.kind === 'tuple-type' ? effectiveSubjectType.members.length : (effectiveSubjectType.value as ExactStringLiteral).value.length
     
                                 if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal' && (indexType.value.value < 0 || indexType.value.value >= max)) {
-                                    sendError(miscError(property, `Index ${indexType.value.value} is out of range on type '${msgFormat(subjectType)}'`));
+                                    sendError(miscError(property, `Index ${indexType.value.value} is out of range on type ${hlt(msgFormat(subjectType))}`));
                                 }
                             }
                         } else {
-                            sendError(miscError(property, `Expression of type '${msgFormat(indexType)}' can't be used to index type '${msgFormat(subjectType)}'`));
+                            sendError(miscError(property, `Expression of type ${hlt(msgFormat(indexType))} can't be used to index type ${hlt(msgFormat(subjectType))}`));
                         }
                     }
                 }
@@ -572,7 +575,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     sendError(cannotFindName(current, current.name.name))
                 } else {
                     if (binding.owner?.kind !== 'type-declaration' && binding.owner?.kind !== 'generic-param-type') {
-                        sendError(miscError(current, `'${current.name.name}' is not a type`))
+                        sendError(miscError(current, `${hlt(current.name.name)} is not a type`))
                     }
                 }
             } break;
@@ -590,14 +593,14 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                             !binding.isConst &&
                             (findAncestor(current, a => a.kind === 'value-declaration') as ValueDeclaration|undefined)?.isConst) {
                             
-                            sendError(miscError(current, `Const declarations cannot be initialized from mutable state (referencing '${msgFormat(current)}')`))
+                            sendError(miscError(current, `Const declarations cannot be initialized from mutable state (referencing ${hlt(msgFormat(current))})`))
                         }
 
                         // TODO: Once we have pure/impure functions, forbid impure functions when initializing a const!
 
                         if (within(current, binding.value)) {
                             // value referenced in its own initialization
-                            sendError(miscError(current, `Can't reference "${current.name}" in its own initialization`))
+                            sendError(miscError(current, `Can't reference ${hlt(current.name)} in its own initialization`))
                         } else {
                             // check correct order of declarations
                             let child: AST = current
@@ -614,7 +617,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
 
                                     if (identIndex > -1 && declarationIndex > -1) {
                                         if (declarationIndex > identIndex) {
-                                            sendError(miscError(current, `Can't reference "${current.name}" before initialization`))
+                                            sendError(miscError(current, `Can't reference ${hlt(current.name)} before initialization`))
                                         }
 
                                         break;
@@ -626,7 +629,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                         }
                     } else if (binding.kind === 'type-declaration') {
                         if (binding.type.kind !== 'nominal-type') { // nominals with no inner value are allowed here
-                            sendError(miscError(current, `'${current.name}' is a type, but it's used like a value`))
+                            sendError(miscError(current, `${hlt(current.name)} is a type, but it's used like a value`))
                         }
                     }
                     
@@ -634,7 +637,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                         const unmetPlatforms = config.platforms.filter(platform => !binding.platforms.includes(platform))
 
                         if (unmetPlatforms.length > 0) {
-                            sendError(miscError(current, `Project is configured to target platforms ${config.platforms.join(', ')}, but '${current.name}' is only supported in ${binding.platforms.join(', ')}`))
+                            sendError(miscError(current, `Project is configured to target platforms ${config.platforms.join(', ')}, but ${hlt(current.name)} is only supported in ${binding.platforms.join(', ')}`))
                         }
                     }
                 } else {
@@ -646,14 +649,14 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 // if assigning directly to variable, make sure it isn't a constant
                 const resolved = current.target.kind === "local-identifier" ? resolve(ctx, current.target.name, current.target, true) : undefined
                 if (current.target.kind === "local-identifier" && resolved != null && getBindingMutability(resolved, current.target) !== "assignable") {
-                    sendError(miscError(current.target, `Cannot assign to '${current.target.name}' because it's constant`));
+                    sendError(miscError(current.target, `Cannot assign to ${hlt(current.target.name)} because it's constant`));
                 }
 
                 // if assigning into object or array, make sure the subject isn't immutable
                 if (current.target.kind === "property-accessor") {
                     const subjectType = resolveType(ctx, inferType(ctx, current.target.subject))
                     if (subjectType.mutability !== "mutable") {
-                        sendError(miscError(current.target, `Cannot assign to '${msgFormat(current.target)}' because '${msgFormat(current.target.subject)}' is immutable`));
+                        sendError(miscError(current.target, `Cannot assign to ${hlt(msgFormat(current.target))} because ${hlt(msgFormat(current.target.subject))} is immutable`));
                     }
                 }
 
@@ -669,7 +672,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
 
                     if (types == null) {
                         // check that both sides of operator can be handled by it
-                        sendError(miscError(current.operator, `Operator '${current.operator.op}' cannot be applied to types '${msgFormat(leftType)}' and '${msgFormat(rightType)}'`));
+                        sendError(miscError(current.operator, `Operator ${hlt(current.operator.op)} cannot be applied to types ${hlt(msgFormat(leftType))} and ${hlt(msgFormat(rightType))}`));
                     } else {
                         // check that resulting value is assignable to target
                         const issues = subsumationIssues(ctx, targetType, types.output)
@@ -685,13 +688,13 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             } break;
             case "range":
                 expect(ctx, NUMBER_TYPE, current.start, 
-                    (_, val) => `Expected number for start of range; got '${msgFormat(val)}'`)
+                    (_, val) => `Expected number for start of range; got ${hlt(msgFormat(val))}`)
                 expect(ctx, NUMBER_TYPE, current.end, 
-                    (_, val) => `Expected number for end of range; got '${msgFormat(val)}'`)
+                    (_, val) => `Expected number for end of range; got ${hlt(msgFormat(val))}`)
                 break;
             case "for-loop":
                 expect(ctx, ITERATOR_OF_ANY, current.iterator, 
-                    (_, val) => `Expected iterator after "of" in for loop; found '${msgFormat(val)}'`)
+                    (_, val) => `Expected iterator after "of" in for loop; found ${hlt(msgFormat(val))}`)
                 break;
             case "test-block-declaration":
             case "try-catch": {
@@ -710,7 +713,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             } break;
             case "throw-statement": {
                 expect(ctx, ERROR_OF_ANY, current.errorExpression,
-                    (_, val) => `Can only thow Errors; this is a '${msgFormat(val)}'`)
+                    (_, val) => `Can only thow Errors; this is a ${hlt(msgFormat(val))}`)
                 
                 const nearestFuncOrProc = getNearestFuncOrProc(current)
                 if (nearestFuncOrProc?.kind === 'proc') {
@@ -719,7 +722,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
 
                     if (throws != null) {
                         expect(ctx, throws, current.errorExpression,
-                            (_, val) => `This proc can only throw ${msgFormat(throws)}; this is a '${msgFormat(val)}'`)
+                            (_, val) => `This proc can only throw ${msgFormat(throws)}; this is a ${hlt(msgFormat(val))}`)
                     }
                 }
             } break;
@@ -952,7 +955,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
     const resolvedDestination = resolveType(ctx, destination)
     const resolvedValue = resolveType(ctx, value)
 
-    const baseErrorMessage = `Type '${msgFormat(resolvedValue)}' is not assignable to type '${msgFormat(resolvedDestination)}'`
+    const baseErrorMessage = `Type ${hlt(msgFormat(resolvedValue))} is not assignable to type ${hlt(msgFormat(resolvedDestination))}`
     const withBase = (inner: Array<string | string[]>) => [baseErrorMessage, ...inner]
     const all = (...inner: Array<Array<string | string[]> | undefined>) =>
         given(emptyToUndefined(inner.filter(exists).flat()), withBase)
@@ -969,7 +972,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
         // constants can't be assigned to mutable slots
         return [
             baseErrorMessage,
-            `Value with ${resolvedValue.mutability} type '${msgFormat(value)}' isn't compatible with ${resolvedDestination.mutability} type '${msgFormat(destination)}'`
+            `Value with ${resolvedValue.mutability} type ${hlt(msgFormat(value))} isn't compatible with ${resolvedDestination.mutability} type ${hlt(msgFormat(destination))}`
         ];
     } else if (resolvedValue.kind === "unknown-type") {
         return [baseErrorMessage];
@@ -1014,7 +1017,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
         } else {
             return [
                 baseErrorMessage,
-                `'${msgFormat(resolvedValue)}' and '${msgFormat(resolvedDestination)}' are different nominal types`
+                `${hlt(msgFormat(resolvedValue))} and ${hlt(msgFormat(resolvedDestination))} are different nominal types`
             ]
         }
     } else if (typesEqual(resolvedDestination, resolvedValue)) {
@@ -1031,14 +1034,14 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                     if (minMaxArgsValue.min > minMaxArgsDestination.min) {
                         return [
                             baseErrorMessage,
-                            `'${msgFormat(resolvedValue)}' requires ${minMaxArgsValue.min} arguments, but '${msgFormat(resolvedDestination)}' is only provided with ${minMaxArgsDestination.min}`
+                            `${hlt(msgFormat(resolvedValue))} requires ${minMaxArgsValue.min} arguments, but ${hlt(msgFormat(resolvedDestination))} is only provided with ${minMaxArgsDestination.min}`
                         ]
                     }
                 } else { // destination could pass any number of arguments
                     if (minMaxArgsValue.min > 0) {
                         return [
                             baseErrorMessage,
-                            `'${msgFormat(resolvedValue)}' requires ${minMaxArgsValue.min} arguments, but '${msgFormat(resolvedDestination)}' may not be passed that many`
+                            `${hlt(msgFormat(resolvedValue))} requires ${minMaxArgsValue.min} arguments, but ${hlt(msgFormat(resolvedDestination))} may not be passed that many`
                         ]
                     }
                 }
@@ -1054,7 +1057,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                 : undefined
 
             const asyncIssues = resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" && resolvedDestination.isAsync !== resolvedValue.isAsync
-                ? [ `'${msgFormat(resolvedValue)}' is ${resolvedValue.isAsync ? '' : 'not '}async, but '${msgFormat(resolvedDestination)}' is ${resolvedDestination.isAsync ? '' : 'not '}async` ]
+                ? [ `${hlt(msgFormat(resolvedValue))} is ${resolvedValue.isAsync ? '' : 'not '}async, but ${hlt(msgFormat(resolvedDestination))} is ${resolvedDestination.isAsync ? '' : 'not '}async` ]
                 : undefined
 
             const throwsTypeIssues = resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type"
@@ -1127,7 +1130,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
             if (resolvedValue.members.length !== resolvedDestination.members.length) {
                 return [
                     baseErrorMessage,
-                    `'${resolvedDestination}' has exactly ${resolvedDestination.members.length} members, but '${resolvedValue.members.length}' has ${resolvedValue.members.length}`
+                    `${hlt(msgFormat(resolvedDestination))} has exactly ${resolvedDestination.members.length} members, but ${hlt(msgFormat(resolvedValue))} has ${resolvedValue.members.length}`
                 ]
             }
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
@@ -1192,7 +1195,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
             }
         }
         const missingPropertiesMessage = missingProperties.length > 0
-            ? [`Missing propert${iesOrY(missingProperties.length)} ${missingProperties.map(p => `'${p}'`).join(', ')} required by type '${msgFormat(resolvedDestination)}'`]
+            ? [`Missing propert${iesOrY(missingProperties.length)} ${missingProperties.map(p => `${hlt(p)}`).join(', ')} required by type ${hlt(msgFormat(resolvedDestination))}`]
             : []
 
         const extraProperties: string[] = []
@@ -1205,7 +1208,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
             }
         }
         const extraPropertiesMessage = extraProperties.length > 0
-            ? [`Has propert${iesOrY(extraProperties.length)} ${extraProperties.map(p => `'${p}'`).join(', ')} not found on type '${msgFormat(resolvedDestination)}'`]
+            ? [`Has propert${iesOrY(extraProperties.length)} ${extraProperties.map(p => `${hlt(p)}`).join(', ')} not found on type ${hlt(msgFormat(resolvedDestination))}`]
             : []
 
         if (missingPropertiesMessage || extraPropertiesMessage) {
