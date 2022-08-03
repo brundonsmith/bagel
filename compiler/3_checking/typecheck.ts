@@ -656,7 +656,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 if (current.target.kind === "property-accessor") {
                     const subjectType = resolveType(ctx, inferType(ctx, current.target.subject))
                     if (subjectType.mutability !== "mutable") {
-                        sendError(miscError(current.target, `Cannot assign to ${hlt(msgFormat(current.target))} because ${hlt(msgFormat(current.target.subject))} is immutable`));
+                        sendError(miscError(current.target, `Cannot assign to ${hlt(msgFormat(current.target))} because ${hlt(msgFormat(current.target.subject))} is readonly`));
                     }
                 }
 
@@ -922,6 +922,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "element-tag":
             case "regular-expression":
             case "regular-expression-type":
+            case "readonly-type":
                 break;
             default:
                 // @ts-expect-error: exhaustiveness
@@ -1286,6 +1287,11 @@ export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'
             return resolveType(ctx, type.extends ?? UNKNOWN_TYPE)
         case "parenthesized-type":
             return resolveType(ctx, type.inner)
+        case "readonly-type":
+            return resolveType(ctx, {
+                ...type.inner,
+                mutability: type.inner.mutability != null ? 'readonly' : type.inner.mutability as any
+            })
         case "typeof-type":
             return inferType(ctx, type.expr)
         case "keyof-type": {

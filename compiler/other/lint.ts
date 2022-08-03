@@ -290,3 +290,5 @@ export const DEFAULT_SEVERITY: { readonly [rule in LintRuleName]: LintRuleSeveri
     // 'pureFunctions': 'error',
     // 'unnecessary-nil-coalescing': 'warning'
 }
+
+// TODO: Lint against certain cases where `readonly` is obviously redundant (primitives, etc)

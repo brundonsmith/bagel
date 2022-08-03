@@ -5,7 +5,7 @@ import { ModuleName,ReportError } from "../_model/common.ts";
 import { ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator, TestTypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration, ALL_REG_EXP_FLAGS, RegularExpression, RegularExpressionFlag } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement, Autorun } from "../_model/statements.ts";
-import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType, ReadonlyType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
@@ -390,20 +390,19 @@ const genericType: ParseFunction<GenericType> = memo((module, code, startIndex) 
     }))))
 
 const arrayType: ParseFunction<ArrayType> = memo((module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'readonly'), ({ parsed: readonly, index }) =>
-    given(TYPE_PARSER.parseBeneath(module, code, index, arrayType), ({ parsed: element, index }) =>
+    given(TYPE_PARSER.parseBeneath(module, code, startIndex, arrayType), ({ parsed: element, index }) =>
     given(consume(code, index, "[]"), index => ({
         parsed: {
             kind: "array-type",
             element,
-            mutability: readonly ? "readonly" : "mutable",
+            mutability: "mutable",
             module,
             code,
             startIndex,
             endIndex: index,
         },
         index,
-    })))))
+    }))))
 
 const maybeType: ParseFunction<MaybeType> = memo((module, code, startIndex) =>
     given(TYPE_PARSER.parseBeneath(module, code, startIndex, maybeType), ({ parsed: inner, index }) =>
@@ -463,8 +462,7 @@ const namedType: ParseFunction<NamedType|RegularExpressionType> = memo((module, 
     })))
 
 const objectType: ParseFunction<ObjectType> = memo((module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'readonly'), ({ parsed: readonly, index }) =>
-    given(consume(code, index, "{"), index =>
+    given(consume(code, startIndex, "{"), index =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, _typeSpreadOrEntry, ","), ({ parsed: entries, index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -474,13 +472,13 @@ const objectType: ParseFunction<ObjectType> = memo((module, code, startIndex) =>
             spreads: entries.filter((e): e is NamedType => e.kind === "named-type"),
             entries: entries.filter((e): e is Attribute => e.kind === "attribute"),
             module,
-            mutability: readonly ? "readonly" : "mutable",
+            mutability: "mutable",
             code,
             startIndex,
             endIndex: index,
         },
         index,
-    }))))))))
+    })))))))
 
 const _typeSpreadOrEntry: ParseFunction<NamedType|Attribute> = memo((module, code, startIndex) => 
     attribute(module, code, startIndex) ?? _objectTypeSpread(module, code, startIndex))
@@ -492,7 +490,7 @@ const _objectTypeSpread: ParseFunction<NamedType> = memo((module, code, startInd
             ? syntaxError(code, index, `Can't spread type ${format(res.parsed)}`)
             : res as ParseResult<NamedType>)))
 
-const attribute: ParseFunction<Attribute> =memo((module, code, startIndex) =>
+const attribute: ParseFunction<Attribute> = memo((module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex) ?? exactStringLiteral(module, code, startIndex), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseOptional(module, code, index, parseExact("?")), ({ parsed: optional, index: indexAfterQuestionMark }) =>
@@ -505,7 +503,6 @@ const attribute: ParseFunction<Attribute> =memo((module, code, startIndex) =>
             type,
             optional: optional != null,
             forceReadonly: false,
-            mutability: undefined,
             module,
             code,
             startIndex,
@@ -515,8 +512,7 @@ const attribute: ParseFunction<Attribute> =memo((module, code, startIndex) =>
     }))))))))
 
 const recordType: ParseFunction<RecordType> = memo((module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'readonly'), ({ parsed: readonly, index }) =>
-    given(consume(code, index, "{"), index =>
+    given(consume(code, startIndex, "{"), index =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "["), index =>
     given(consumeWhitespace(code, index), index =>
@@ -532,18 +528,17 @@ const recordType: ParseFunction<RecordType> = memo((module, code, startIndex) =>
             kind: "record-type",
             keyType,
             valueType,
-            mutability: readonly ? "readonly" : "mutable",
+            mutability: "mutable",
             module,
             code,
             startIndex,
             endIndex: index,
         },
         index,
-    })))))))))))))))
+    }))))))))))))))
 
 const tupleType: ParseFunction<TupleType> = memo((module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'readonly'), ({ parsed: readonly, index }) =>
-    given(consume(code, index, "["), index =>
+    given(consume(code, startIndex, "["), index =>
     given(consumeWhitespace(code, index), index =>
     given(parseSeries(module, code, index, typeExpression, ","), ({ parsed: members, index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -551,14 +546,30 @@ const tupleType: ParseFunction<TupleType> = memo((module, code, startIndex) =>
         parsed: {
             kind: "tuple-type",
             members,
-            mutability: readonly ? "readonly" : "mutable",
+            mutability: "mutable",
             module,
             code,
             startIndex,
             endIndex: index,
         },
         index,
-    }))))))))
+    })))))))
+
+const readonlyType: ParseFunction<ReadonlyType> = memo((module, code, startIndex) =>
+    given(consume(code, startIndex, "readonly"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(typeExpression(module, code, index), err(code, index, 'Type'), ({ parsed: inner, index }) => ({
+        parsed: {
+            kind: "readonly-type",
+            inner,
+            mutability: undefined,
+            module,
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    })))))
 
 const primitiveType: ParseFunction<PrimitiveType> = memo((module, code, startIndex) =>
     given(consume(code, startIndex, "string"), index => ({
@@ -2590,7 +2601,7 @@ const EXPRESSION_PARSER = new TieredParser<Expression>([
 ])
 
 const TYPE_PARSER = new TieredParser<TypeExpression>([
-    [ typeofType, keyofValueofElementofType ],
+    [ typeofType, keyofValueofElementofType, readonlyType ],
     [ genericType ],
     [ unionType ],
     [ maybeType ],

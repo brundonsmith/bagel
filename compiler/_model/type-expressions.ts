@@ -14,6 +14,7 @@ export type TypeExpression =
     | RecordType
     | ArrayType
     | TupleType
+    | ReadonlyType
     | StringType
     | NumberType
     | BooleanType
@@ -125,7 +126,7 @@ export type ObjectType = SourceInfo & Mutability & {
     readonly entries: readonly Attribute[],
 }
 
-export type Attribute = SourceInfo & NoMutability & {
+export type Attribute = SourceInfo & {
     readonly kind: "attribute",
     readonly name: PlainIdentifier | ExactStringLiteral,
     readonly type: TypeExpression,
@@ -147,6 +148,11 @@ export type ArrayType = SourceInfo & Mutability & {
 export type TupleType = SourceInfo & Mutability & {
     readonly kind: "tuple-type",
     readonly members: readonly TypeExpression[],
+}
+
+export type ReadonlyType = SourceInfo & NoMutability & {
+    readonly kind: "readonly-type",
+    readonly inner: TypeExpression,
 }
 
 export type PrimitiveType = 

@@ -405,7 +405,6 @@ const inferTypeInner = memo(function inferTypeInner(
                             type: valueType,
                             optional: false,
                             forceReadonly: false,
-                            mutability: undefined,
                             parent, module, code, startIndex, endIndex
                         }
                     } else {
