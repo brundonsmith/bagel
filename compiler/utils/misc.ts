@@ -1,3 +1,5 @@
+import { Colors } from "../deps.ts";
+
 export function given<T, R>(val: T|undefined, fn: (val: T) => R): R|undefined {
     if (val != null) {
         return fn(val);
@@ -100,3 +102,5 @@ export function spaces(spaces: number) {
 
     return str
 }
+
+export const hlt = Colors.blue
