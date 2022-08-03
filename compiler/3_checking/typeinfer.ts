@@ -68,18 +68,22 @@ const inferTypeInner = memo(function inferTypeInner(
             return ast.type
         case "proc": {
             // TODO: infer arg types just like we do under func
-            const thrown = throws(ctx, ast.body)
             const procType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
-
-            return {
-                ...procType,
-                throws: thrown.length > 0
-                    ? {
-                        kind: 'union-type',
-                        members: thrown,
-                        ...TYPE_AST_NOISE
-                    }
-                    : undefined
+            
+            if (procType.throws) {
+                return procType
+            } else {
+                const thrown = throws(ctx, ast.body)
+                return {
+                    ...procType,
+                    throws: thrown.length > 0
+                        ? {
+                            kind: 'union-type',
+                            members: thrown,
+                            ...TYPE_AST_NOISE
+                        }
+                        : undefined
+                }
             }
         }
         case "func": {
@@ -1279,15 +1283,22 @@ function fitTemplate(
         if (parameterizedArgs.kind === 'args') {
             if (reifiedArgs.kind === 'args') {
                 matchGroups.push(
-                    ...parameterizedArgs.args.map((arg, index) =>
-                        fitTemplate(ctx, arg.type ?? UNKNOWN_TYPE, reifiedArgs.args[index].type ?? UNKNOWN_TYPE))
+                    ...parameterizedArgs.args
+                        .map((arg, index) => [arg.type, reifiedArgs.args[index].type] as const)
+                        .filter((pair): pair is readonly [TypeExpression, TypeExpression] => pair[0] != null && pair[1] != null)
+                        .map(([parameterized, reified]) =>
+                            fitTemplate(ctx, parameterized, reified))
                 )
             } else {
-                matchGroups.push(fitTemplate(ctx, unionOf(parameterizedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE)), reifiedArgs.type))
+                matchGroups.push(fitTemplate(ctx,
+                    unionOf(parameterizedArgs.args.map(arg => arg.type).filter(exists)),
+                    reifiedArgs.type))
             }
         } else {
             if (reifiedArgs.kind === 'args') {
-                matchGroups.push(fitTemplate(ctx, parameterizedArgs.type, tupleOf(reifiedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE), 'readonly')))
+                matchGroups.push(fitTemplate(ctx,
+                    parameterizedArgs.type,
+                    tupleOf(reifiedArgs.args.map(arg => arg.type ?? UNKNOWN_TYPE), 'readonly')))
             } else {
                 matchGroups.push(fitTemplate(ctx, parameterizedArgs.type, reifiedArgs.type))
             }

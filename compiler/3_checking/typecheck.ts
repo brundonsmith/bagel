@@ -708,10 +708,21 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     sendError(assignmentError(current.valueType, current.destinationType, current.valueType, issues));
                 })
             } break;
-            case "throw-statement":
+            case "throw-statement": {
                 expect(ctx, ERROR_OF_ANY, current.errorExpression,
                     (_, val) => `Can only thow Errors; this is a '${msgFormat(val)}'`)
-                break;
+                
+                const nearestFuncOrProc = getNearestFuncOrProc(current)
+                if (nearestFuncOrProc?.kind === 'proc') {
+                    const procType = nearestFuncOrProc.type.kind === 'generic-type' ? nearestFuncOrProc.type.inner : nearestFuncOrProc.type
+                    const { throws } = procType
+
+                    if (throws != null) {
+                        expect(ctx, throws, current.errorExpression,
+                            (_, val) => `This proc can only throw ${msgFormat(throws)}; this is a '${msgFormat(val)}'`)
+                    }
+                }
+            } break;
             case "spread": {
                 if (parent?.kind === 'object-literal') {
                     expect(ctx, RECORD_OF_ANY, current.expr, 
@@ -1033,15 +1044,6 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                 }
             }
         }
-
-        if (resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type") {
-            if (resolvedDestination.isAsync !== resolvedValue.isAsync) {
-                return [
-                    baseErrorMessage,
-                    `'${msgFormat(resolvedValue)}' is ${resolvedValue.isAsync ? '' : 'not '}async, but '${msgFormat(resolvedDestination)}' is ${resolvedDestination.isAsync ? '' : 'not '}async`
-                ]
-            }
-        }
         
         {
             const valueArgs = resolvedValue.args
@@ -1051,13 +1053,23 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                 ? subsumationIssues(ctx, resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)
                 : undefined
 
+            const asyncIssues = resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" && resolvedDestination.isAsync !== resolvedValue.isAsync
+                ? [ `'${msgFormat(resolvedValue)}' is ${resolvedValue.isAsync ? '' : 'not '}async, but '${msgFormat(resolvedDestination)}' is ${resolvedDestination.isAsync ? '' : 'not '}async` ]
+                : undefined
+
+            const throwsTypeIssues = resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type"
+                ? subsumationIssues(ctx, resolvedDestination.throws ?? UNKNOWN_TYPE, resolvedValue.throws ?? UNKNOWN_TYPE)
+                : undefined
+
             if (valueArgs.kind === 'args') {
                 if (destinationArgs.kind === 'args') {
                     return all(
                         ...destinationArgs.args.map((_, i) => 
                             // NOTE: Value and destination are flipped on purpose for args!
                             subsumationIssues(ctx, valueArgs.args[i]?.type ?? UNKNOWN_TYPE, destinationArgs.args[i]?.type ?? UNKNOWN_TYPE)),
-                        returnTypeIssues
+                        returnTypeIssues,
+                        asyncIssues,
+                        throwsTypeIssues
                     )
                 } else {
                     const elementOfDestination = elementOf(destinationArgs.type)
@@ -1065,7 +1077,9 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                     return all(
                         ...valueArgs.args.map(valueArg =>
                             subsumationIssues(ctx, valueArg.type ?? UNKNOWN_TYPE, elementOfDestination)),
-                        returnTypeIssues
+                        returnTypeIssues,
+                        asyncIssues,
+                        throwsTypeIssues
                     )
                 }
             } else {
@@ -1075,13 +1089,17 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                     return all(
                         ...destinationArgs.args.map(destinationArg =>
                             subsumationIssues(ctx, elementOfValue, destinationArg.type ?? UNKNOWN_TYPE)),
-                        returnTypeIssues
+                        returnTypeIssues,
+                        asyncIssues,
+                        throwsTypeIssues
                     )
                     
                 } else {
                     return all(
                         subsumationIssues(ctx, valueArgs.type, destinationArgs.type),
-                        returnTypeIssues
+                        returnTypeIssues,
+                        asyncIssues,
+                        throwsTypeIssues
                     )
                 }
             }

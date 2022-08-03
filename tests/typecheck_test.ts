@@ -2869,6 +2869,68 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Throws declaration pass",
+  fn() {
+    testTypecheck(`
+    proc foo() throws Error<number> {
+      throw Error(12);
+    }
+
+    type MyProc = (a: string) throws Error<number> { }
+
+    const x: MyProc = foo`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Throws declaration fail 1",
+  fn() {
+    testTypecheck(`
+    proc foo() throws Error<number> {
+      throw Error('stuff');
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Throws declaration fail 2",
+  fn() {
+    testTypecheck(`
+    proc foo() throws Error<number> {
+      throw Error(12);
+    }
+
+    type MyProc = (a: string) throws Error<string> { }
+
+    const x: MyProc = foo`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Throws declaration fail 3",
+  fn() {
+    testTypecheck(`
+    proc log(x: unknown) {}
+
+    proc foo() throws Error<string> {
+      throw Error('stuff');
+    }
+
+    proc bar() {
+      try {
+        foo();
+      } catch e {
+        log(e.value * 2);
+      }
+    }`,
+    true)
+  }
+})
+
+Deno.test({
   name: "Circular type pass 1",
   fn() {
     testTypecheck(`

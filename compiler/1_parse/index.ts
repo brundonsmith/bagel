@@ -659,6 +659,8 @@ const procType: ParseFunction<ProcType|GenericProcType> = memo((module, code, st
     given(parseOptional(module, code, index, _typeParams), ({ parsed: typeParams, index }) =>
     given(_parenthesizedArguments(module, code, index), ({ parsed: args, index }) =>
     given(consumeWhitespace(code, index), index =>
+    given(parseOptional(module, code, index, _throwsDeclaration), ({ parsed: throws, index }) =>
+    given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "{"), index =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "}"), index => {
@@ -666,7 +668,7 @@ const procType: ParseFunction<ProcType|GenericProcType> = memo((module, code, st
             kind: "proc-type",
             args,
             isAsync,
-            throws: undefined, // TODO: Parse optional explicit "throws" type
+            throws,
             mutability: undefined,
             module,
             code,
@@ -691,7 +693,7 @@ const procType: ParseFunction<ProcType|GenericProcType> = memo((module, code, st
             ),
             index
         }
-    }))))))))
+    }))))))))))
 
 const _typeParam: ParseFunction<TypeParam> = memo((module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
@@ -1199,12 +1201,15 @@ const proc: ParseFunction<Proc> = memo((module, code, startIndex) =>
 
 const _procHeader = (isAsync: boolean): ParseFunction<ProcType|GenericProcType> => memo((module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index }) =>
-    given(_parenthesizedArguments(module, code, index), ({ parsed: args, index }) => {
+    given(_parenthesizedArguments(module, code, index), ({ parsed: args, index }) => 
+    given(consumeWhitespace(code, index), index =>
+    given(parseOptional(module, code, index, _throwsDeclaration), ({ parsed: throws, index }) =>
+    {
         const procType: ProcType = {
             kind: "proc-type",
             args,
             isAsync,
-            throws: undefined, // TODO: Parse optional explicit "throws" type
+            throws,
             mutability: undefined,
             module,
             code,
@@ -1229,7 +1234,12 @@ const _procHeader = (isAsync: boolean): ParseFunction<ProcType|GenericProcType> 
             ),
             index
         }
-    })))
+    })))))
+
+const _throwsDeclaration: ParseFunction<TypeExpression | undefined> = (module, code, startIndex) =>
+    given(consume(code, startIndex, "throws"), index =>
+    given(consumeWhitespaceRequired(code, index), index =>
+    expec(typeExpression(module, code, index), err(code, index, 'Throws type'), res => res)))
 
 const statement: ParseFunction<Statement> = memo((module, code, startIndex) =>
     javascriptEscape(module, code, startIndex)
