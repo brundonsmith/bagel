@@ -266,6 +266,7 @@ export function prettyProblem(ctx: Pick<Context, "allModules" | "canonicalModule
         }
 
         const minIndentation = lines
+            .filter(line => line.trimStart().length > 0)
             .map(line => line.length - line.trimStart().length)
             .reduce((min, current) => Math.min(min, current), Number.MAX_SAFE_INTEGER)
 
