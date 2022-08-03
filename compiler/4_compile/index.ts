@@ -394,6 +394,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
         case "number-type": return `number`;
         case "boolean-type": return `boolean`;
         case "nil-type": return `(null | undefined)`;
+        case "readonly-type": return `Readonly<${c(ast.inner)}>`;
         case "unknown-type":
         case "poisoned-type":
             return `unknown`;
