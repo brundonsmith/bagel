@@ -302,7 +302,8 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "typeof-type": return `typeof ${f(ast.expr)}`;
         case "keyof-type":
         case "valueof-type":
-        case "elementof-type": {
+        case "elementof-type":
+        case "readonly-type": {
             const keyword = ast.kind.split('-')[0]
             return `${keyword} ${f(ast.inner)}`;
         }

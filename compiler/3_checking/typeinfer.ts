@@ -1255,6 +1255,7 @@ function fitTemplate(
     const { descendant } = ctx
     ctx = { ...ctx, descendant: true }
 
+    parameterized = resolveType({ ...ctx, preserveNamedTypes: true }, parameterized)
     reified = resolveType(ctx, reified)
 
     function isGenericParam(type: TypeExpression): type is NamedType {
@@ -1371,7 +1372,11 @@ function fitTemplate(
     } else if (
         (parameterized.kind === "iterator-type" && reified.kind === "iterator-type") ||
         (parameterized.kind === "plan-type" && reified.kind === "plan-type") ||
-        (parameterized.kind === "remote-type" && reified.kind === "remote-type")
+        (parameterized.kind === "remote-type" && reified.kind === "remote-type") ||
+        (parameterized.kind === "keyof-type" && reified.kind === "keyof-type") ||
+        (parameterized.kind === "valueof-type" && reified.kind === "valueof-type") ||
+        (parameterized.kind === "elementof-type" && reified.kind === "elementof-type") ||
+        (parameterized.kind === "readonly-type" && reified.kind === "readonly-type")
     ) {
         return fitTemplate(ctx, parameterized.inner, reified.inner);
     } else if (parameterized.kind === "union-type") {

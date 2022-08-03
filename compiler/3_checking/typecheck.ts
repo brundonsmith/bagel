@@ -1247,12 +1247,12 @@ const getNearestFuncOrProc = (node: AST): Func|Proc|undefined => {
  * simplify unions; generally collapse a type into its "real" form, whatever 
  * that means.
  */
-export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'canonicalModuleName'>, type: TypeExpression): TypeExpression {
-    const { encounteredNames = [] } = ctx
+export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'canonicalModuleName'> & { preserveNamedTypes?: boolean }, type: TypeExpression): TypeExpression {
+    const { encounteredNames = [], preserveNamedTypes } = ctx
     
     switch (type.kind) {
         case "named-type": {
-            if (encounteredNames.includes(type.name.name)) {
+            if (encounteredNames.includes(type.name.name) || preserveNamedTypes) {
                 return type
             } else {
                 ctx = {
@@ -1288,10 +1288,11 @@ export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'
         case "parenthesized-type":
             return resolveType(ctx, type.inner)
         case "readonly-type":
-            return resolveType(ctx, {
-                ...type.inner,
-                mutability: type.inner.mutability != null ? 'readonly' : type.inner.mutability as any
-            })
+            const inner = resolveType(ctx, type.inner)
+            return {
+                ...inner,
+                mutability: inner.mutability != null ? 'readonly' : inner.mutability as any
+            }
         case "typeof-type":
             return inferType(ctx, type.expr)
         case "keyof-type": {
@@ -1383,7 +1384,6 @@ export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'
         }
         case "bound-generic-type": {
             const resolvedGeneric = resolveType(ctx, type.generic)
-            console.log('resolvedGeneric: ' + format(resolvedGeneric, { lineBreaks: false }))
 
             if (resolvedGeneric.kind !== 'generic-type') {
                 return UNKNOWN_TYPE
