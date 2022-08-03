@@ -337,7 +337,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                             if (resolvedType.inner) {
                                 expect(ctx, resolvedType.inner, current.args[0])
                             } else {
-                                sendError(miscError(current.args[0] ?? current, `Nominal type ${current.subject.name} doesn't have an inner value`))
+                                sendError(miscError(current.args[0] ?? current, `Nominal type ${hlt(current.subject.name)} doesn't have an inner value`))
                             }
                             break;
                         }
@@ -363,7 +363,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     for (let i = 0; i < Math.min(subject.typeParams.length, invocation.typeArgs.length); i++) {
                         const constraint = subject.typeParams[i].extends
                         if (constraint && subsumationIssues(ctx, constraint, invocation.typeArgs[i])) {
-                            sendError(miscError(invocation.typeArgs[i], `${format(invocation.typeArgs[i])} is not a valid type argument for ${subject.typeParams[i].name.name} because it doesn't match the extends clause (${format(constraint)})`))
+                            sendError(miscError(invocation.typeArgs[i], `${hlt(msgFormat(invocation.typeArgs[i]))} is not a valid type argument for ${hlt(subject.typeParams[i].name.name)} because it doesn't match the extends clause (${hlt(msgFormat(constraint))})`))
                         }
                     }
                 } else if ( // check that subject is callable
@@ -462,7 +462,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     // check that no cases are redundant
                     if (subsumationIssues(ctx, remainingType, type)) {
                         const neverEver = isFirst || subsumationIssues(ctx, valueType, type)
-                        sendError(miscError(type, `${msgFormat(current.value)} can never be a ${msgFormat(type)}${neverEver ?  '' : ' at this point'}, so this case will never be reached`))
+                        sendError(miscError(type, `${hlt(msgFormat(current.value))} can never be a ${hlt(msgFormat(type))}${neverEver ?  '' : ' at this point'}, so this case will never be reached`))
                     }
                     
                     remainingType = subtract(ctx, remainingType, type)
@@ -471,10 +471,10 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 const finalType = resolveType(ctx, remainingType)
                 if (current.defaultCase == null && !isEmptyType(finalType)) {
                     // if no default case, check that arms are exhaustive
-                    sendError(miscError(current, `Switch expression doesn't handle all possible values; ${msgFormat(current.value)} can still be a ${hlt(msgFormat(remainingType))}. Either add cases to cover the rest of the possible values, or add a default case.`))
+                    sendError(miscError(current, `Switch expression doesn't handle all possible values; ${hlt(msgFormat(current.value))} can still be a ${hlt(msgFormat(remainingType))}. Either add cases to cover the rest of the possible values, or add a default case.`))
                 } else if (current.defaultCase != null && isEmptyType(finalType)) {
                     // if default case, check that arms are *not* exhaustive
-                    sendError(miscError(current.defaultCase, `Default case will never be reached, because all possible values for ${msgFormat(current.value)} are covered by cases above`))
+                    sendError(miscError(current.defaultCase, `Default case will never be reached, because all possible values for ${hlt(msgFormat(current.value))} are covered by cases above`))
                 }
             } break;
             case "property-accessor": {
@@ -558,10 +558,10 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             } break;
             case "as-cast": {
                 expect(ctx, current.type, current.inner,
-                    (dest, val) => `Expression of type ${msgFormat(val)} cannot be expanded to type ${msgFormat(dest)}`)
+                    (dest, val) => `Expression of type ${hlt(msgFormat(val))} cannot be expanded to type ${hlt(msgFormat(dest))}`)
 
                 if (typesEqual(resolveType(ctx, current.type), resolveType(ctx, inferType(ctx, current.inner)))) {
-                    sendError(miscError(current, `Casting here is redundant, because ${msgFormat(current.inner)} is already of type ${msgFormat(current.type)}`))
+                    sendError(miscError(current, `Casting here is redundant, because ${hlt(msgFormat(current.inner))} is already of type ${hlt(msgFormat(current.type))}`))
                 }
             } break;
             case "named-type": {
@@ -719,17 +719,17 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
 
                     if (throws != null) {
                         expect(ctx, throws, current.errorExpression,
-                            (_, val) => `This proc can only throw ${msgFormat(throws)}; this is a ${hlt(msgFormat(val))}`)
+                            (_, val) => `This proc can only throw ${hlt(msgFormat(throws))}; this is a ${hlt(msgFormat(val))}`)
                     }
                 }
             } break;
             case "spread": {
                 if (parent?.kind === 'object-literal') {
                     expect(ctx, RECORD_OF_ANY, current.expr, 
-                        (_, val) => `Only objects can be spread into an object; found ${msgFormat(val)}`)
+                        (_, val) => `Only objects can be spread into an object; found ${hlt(msgFormat(val))}`)
                 } else if (parent?.kind === 'array-literal') {
                     expect(ctx, ARRAY_OF_ANY, current.expr, 
-                        (_, val) => `Only arrays or tuples can be spread into an array; found ${msgFormat(val)}`)
+                        (_, val) => `Only arrays or tuples can be spread into an array; found ${hlt(msgFormat(val))}`)
                 }
             } break;
             case "args": {
@@ -776,7 +776,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "object-type": {
                 for (const spread of current.spreads) {
                     if (subsumationIssues(ctx, RECORD_OF_ANY, spread)) {
-                        sendError(miscError(spread, `${msgFormat(spread)} is not an object type; can only spread object types into object types`))
+                        sendError(miscError(spread, `${hlt(msgFormat(spread))} is not an object type; can only spread object types into object types`))
                     }
                 }
             } break;
@@ -784,9 +784,9 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 const exprType = inferType(ctx, current.expr)
 
                 if (subsumationIssues(ctx, exprType, current.type)) {
-                    sendError(miscError(current, `This check will always be false, because ${msgFormat(current.expr)} can never be a ${msgFormat(current.type)}`))
+                    sendError(miscError(current, `This check will always be false, because ${hlt(msgFormat(current.expr))} can never be a ${hlt(msgFormat(current.type))}`))
                 } else if (typesEqual(resolveType(ctx, exprType), resolveType(ctx, current.type))) {
-                    sendError(miscError(current, `This check will always be true, because ${msgFormat(current.expr)} will always be a ${msgFormat(current.type)}`))
+                    sendError(miscError(current, `This check will always be true, because ${hlt(msgFormat(current.expr))} will always be a ${hlt(msgFormat(current.type))}`))
                 }
             } break;
             case "generic-type": {
@@ -811,12 +811,12 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "valueof-type":
                 if (subsumationIssues(ctx, RECORD_OF_ANY, current.inner)) {
                     const keyword = current.kind === 'keyof-type' ? 'keyof' : 'valueof'
-                    sendError(miscError(current, `${keyword} can only be used on object types; found ${msgFormat(current.inner)}`))
+                    sendError(miscError(current, `${keyword} can only be used on object types; found ${hlt(msgFormat(current.inner))}`))
                 }
                 break;
             case "elementof-type":
                 if (subsumationIssues(ctx, ARRAY_OF_ANY, current.inner)) {
-                    sendError(miscError(current, `elementof can only be used on array types; found ${msgFormat(current.inner)}`))
+                    sendError(miscError(current, `elementof can only be used on array types; found ${hlt(msgFormat(current.inner))}`))
                 }
                 break;
             case "bound-generic-type": {
@@ -839,7 +839,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     const decoratorType = inferType(ctx, decorator.decorator)
                     
                     if (decoratorType.kind !== 'func-type' && (decoratorType.kind !== 'generic-type' || decoratorType.inner.kind !== 'func-type')) {
-                        sendError(miscError(decorator, `Decorators must be functions, but ${format(decorator.decorator)} is a ${format(decoratorType)}`))
+                        sendError(miscError(decorator, `Decorators must be functions, but ${hlt(format(decorator.decorator))} is a ${hlt(format(decoratorType))}`))
                     } else {
                         const boundType = bindInvocationGenericArgs(ctx, {
                             kind: 'invocation',
@@ -854,7 +854,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                         })
     
                         if (boundType == null || boundType.kind !== 'func-type' || boundType.returnType == null || subsumationIssues(ctx, baseDeclType, boundType.returnType)) {
-                            sendError(miscError(decorator, `Couldn't use ${format(decorator.decorator)} as a decorator for ${current.name.name}`))
+                            sendError(miscError(decorator, `Couldn't use ${hlt(format(decorator.decorator))} as a decorator for ${hlt(current.name.name)}`))
                         }
                     }
                 }
