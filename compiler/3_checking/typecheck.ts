@@ -841,6 +841,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     if (decoratorType.kind !== 'func-type' && (decoratorType.kind !== 'generic-type' || decoratorType.inner.kind !== 'func-type')) {
                         sendError(miscError(decorator, `Decorators must be functions, but ${hlt(format(decorator.decorator))} is a ${hlt(format(decoratorType))}`))
                     } else {
+                        const { module, code, startIndex, endIndex } = decorator
                         const boundType = bindInvocationGenericArgs(ctx, {
                             kind: 'invocation',
                             subject: decorator.decorator,
@@ -850,7 +851,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                             typeArgs: [],
                             spreadArg: undefined,
                             bubbles: false,
-                            ...AST_NOISE
+                            module, code, startIndex, endIndex
                         })
     
                         if (boundType == null || boundType.kind !== 'func-type' || boundType.returnType == null || subsumationIssues(ctx, baseDeclType, boundType.returnType)) {
