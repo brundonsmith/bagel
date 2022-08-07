@@ -1195,27 +1195,29 @@ export const propertiesOf = memo(function propertiesOf (
             let sharedProperties: readonly Attribute[] | undefined
 
             for (const props of allProperties) {
-                if (sharedProperties == null) {
-                    sharedProperties = [...(props ?? [])]
-                } else {
-                    const newSharedProperties: Attribute[] = []
+                if (props) {
+                    if (sharedProperties == null) {
+                        sharedProperties = [...props]
+                    } else {
+                        const newSharedProperties: Attribute[] = []
 
-                    for (const prop of (sharedProperties as readonly Attribute[])) {
-                        const matched = props?.find(p => getName(p.name) === getName(prop.name))
+                        for (const prop of sharedProperties) {
+                            const matched = props.find(p => getName(p.name) === getName(prop.name))
 
-                        if (matched) {
-                            if (!typesEqual(matched.type, prop.type)) {
-                                newSharedProperties.push({
-                                    ...prop,
-                                    type: unionOf([matched.type, prop.type])
-                                })
-                            } else {
-                                newSharedProperties.push(prop)
+                            if (matched) {
+                                if (!typesEqual(matched.type, prop.type)) {
+                                    newSharedProperties.push({
+                                        ...prop,
+                                        type: unionOf([matched.type, prop.type])
+                                    })
+                                } else {
+                                    newSharedProperties.push(prop)
+                                }
                             }
                         }
-                    }
 
-                    sharedProperties = newSharedProperties
+                        sharedProperties = newSharedProperties
+                    }
                 }
             }
 
