@@ -248,9 +248,8 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 // make sure test value might be an error
                 const exprType = inferType(ctx, current.expr)
 
-                if (subsumationIssues(ctx, exprType, ERROR_OF_ANY)) {
-                    sendError(miscError(current.expr, `Test is redundant; this expression won't ever be an Error`))
-                }
+                expectType(ctx, current.expr, exprType, ERROR_OF_ANY, () =>
+                    `Test is redundant; this expression won't ever be an Error`)
             } break;
             case "func":
             case "proc": {
@@ -418,10 +417,10 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     const isFirst = type === current.cases[0]?.type
 
                     // check that no cases are redundant
-                    if (subsumationIssues(ctx, remainingType, type)) {
-                        const neverEver = isFirst || subsumationIssues(ctx, valueType, type)
-                        sendError(miscError(type, `${hlt(msgFormat(current.value))} can never be a ${hlt(msgFormat(type))}${neverEver ?  '' : ' at this point'}, so this case will never be reached`))
-                    }
+                    expectType(ctx, type, remainingType, type, (_dest, val) => {
+                        const neverEver = isFirst || subsumationIssues(ctx, valueType, val)
+                        return `${hlt(msgFormat(current.value))} can never be a ${hlt(msgFormat(val))}${neverEver ?  '' : ' at this point'}, so this case will never be reached`
+                    })
                     
                     remainingType = subtract(ctx, remainingType, type)
                 }
@@ -459,9 +458,8 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                         const { name } = property
 
                         if (effectiveSubjectType.kind === 'record-type') {
-                            if (subsumationIssues(ctx, effectiveSubjectType.keyType, literalType(name))) {
-                                sendError(miscError(current.subject, `Property ${hlt(name)} will never be found on object with type ${hlt(msgFormat(subjectType))}`))
-                            }
+                            expectType(ctx, current.subject, effectiveSubjectType.keyType, literalType(name), () =>
+                                `Property ${hlt(name)} will never be found on object with type ${hlt(msgFormat(subjectType))}`)
                         } else {
                             if (subjectProperties == null) {
                                 sendError(miscError(current.subject, `Can only use dot operator (".") on objects with properties (value is of type ${hlt(msgFormat(subjectType))})`));
@@ -715,15 +713,13 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 }
             } break;
             case "spread-args": {
-                if (subsumationIssues(ctx, ARRAY_OF_ANY, current.type)) {
-                    sendError(miscError(current.type, `Can only spread an array or tuple type as args`))
-                }
+                expectType(ctx, current.type, ARRAY_OF_ANY, current.type, () =>
+                    `Can only spread an array or tuple type as args`)
             } break;
             case "object-type": {
                 for (const spread of current.spreads) {
-                    if (subsumationIssues(ctx, RECORD_OF_ANY, spread)) {
-                        sendError(miscError(spread, `${hlt(msgFormat(spread))} is not an object type; can only spread object types into object types`))
-                    }
+                    expectType(ctx, spread, RECORD_OF_ANY, spread, (_dest, val) =>
+                        `${hlt(msgFormat(val))} is not an object type; can only spread object types into object types`)
                 }
             } break;
             case "instance-of": {
@@ -744,15 +740,14 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             } break;
             case "keyof-type":
             case "valueof-type":
-                if (subsumationIssues(ctx, RECORD_OF_ANY, current.inner)) {
+                expectType(ctx, current, RECORD_OF_ANY, current.inner, (_dest, val) => {
                     const keyword = current.kind === 'keyof-type' ? 'keyof' : 'valueof'
-                    sendError(miscError(current, `${keyword} can only be used on object types; found ${hlt(msgFormat(current.inner))}`))
-                }
+                    return `${keyword} can only be used on object types; found ${hlt(msgFormat(val))}`
+                })
                 break;
             case "elementof-type":
-                if (subsumationIssues(ctx, ARRAY_OF_ANY, current.inner)) {
-                    sendError(miscError(current, `elementof can only be used on array types; found ${hlt(msgFormat(current.inner))}`))
-                }
+                expectType(ctx, current, ARRAY_OF_ANY, current.inner, (_dest, val) =>
+                    `elementof can only be used on array types; found ${hlt(msgFormat(val))}`)
                 break;
             case "bound-generic-type": {
                 const resolvedGeneric = resolveType(ctx, current.generic)
@@ -888,14 +883,17 @@ function findDuplicateIdentifiers<T>(iter: Iterable<T>, cb: (el: T) => PlainIden
 }
 
 function expect(ctx: Pick<Context, 'allModules'|'sendError'|'encounteredNames'|'canonicalModuleName'>, destinationType: TypeExpression, value: Expression, generateMessage?: (dest: TypeExpression, val: TypeExpression) => string) {
+    expectType(ctx, value, destinationType, inferType(ctx, value), generateMessage)
+}
+
+function expectType(ctx: Pick<Context, 'allModules'|'sendError'|'encounteredNames'|'canonicalModuleName'>, ast: AST, destinationType: TypeExpression, valueType: TypeExpression, generateMessage?: (dest: TypeExpression, val: TypeExpression) => string) {
     const { sendError } = ctx
     
-    const inferredType = inferType(ctx, value);
-    given(subsumationIssues(ctx, destinationType, inferredType), issues => {
+    given(subsumationIssues(ctx, destinationType, valueType), issues => {
         sendError(
             generateMessage
-                ? miscError(value, generateMessage(destinationType, inferredType))
-                : assignmentError(value, destinationType, inferredType, issues));
+                ? miscError(ast, generateMessage(destinationType, valueType))
+                : assignmentError(ast, destinationType, valueType, issues));
     })
 }
 
