@@ -1,9 +1,9 @@
 import { resolve } from "../3_checking/resolve.ts";
 import { resolveType, subsumationIssues } from "../3_checking/typecheck.ts";
-import { elementTagToObject, inferType, invocationFromMethodCall } from "../3_checking/typeinfer.ts";
+import { inferType } from "../3_checking/typeinfer.ts";
 import { path } from "../deps.ts";
 import { format } from "../other/format.ts";
-import { getName } from "../utils/ast.ts";
+import { elementTagToObject, getName, invocationFromMethodCall } from "../utils/ast.ts";
 import { exists, given } from "../utils/misc.ts";
 import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { Context, ModuleName } from "../_model/common.ts";
@@ -23,7 +23,7 @@ export const compile = (ctx: CompileContext, ast: Module, excludeJsPrelude?: boo
     )
 }
 
-export const IMPORTED_ITEMS = [
+export const IMPORTED_ITEMS: readonly string[] = [
     // reactivity
     'observe', 'invalidate', 'memo', 'autorun', 'action', 'WHOLE_OBJECT', 
 

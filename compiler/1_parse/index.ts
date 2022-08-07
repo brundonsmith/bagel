@@ -7,10 +7,9 @@ import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, F
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement, Autorun } from "../_model/statements.ts";
 import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, RemoteType, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType, ReadonlyType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
-import { setParents } from "../utils/ast.ts";
+import { AST_NOISE, setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
 import { path } from '../deps.ts';
-import { AST_NOISE } from "../3_checking/typeinfer.ts";
 import { memo } from "../../lib/ts/reactivity.ts";
 
 export const parse = memo((moduleName: ModuleName, code: string): { ast: Module, noPreludeAst: Module, errors: readonly BagelError[] } | undefined => {

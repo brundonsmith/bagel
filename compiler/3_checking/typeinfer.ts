@@ -1,11 +1,11 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
-import { BinaryOp, ElementTag, ExactStringLiteral, Expression, IfElseExpression, Invocation, isExpression, ObjectEntry, ObjectLiteral } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, SpreadArgs, Args, POISONED_TYPE } from "../_model/type-expressions.ts";
+import { BinaryOp, Expression, IfElseExpression, Invocation, isExpression, ObjectEntry } from "../_model/expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE } from "../_model/type-expressions.ts";
 import { exists, given, devMode } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
-import { AST, Block, PlainIdentifier, SourceInfo } from "../_model/ast.ts";
-import { areSame, expressionsEqual, getName, literalType, mapParseTree, maybeOf, tupleOf, typesEqual, unionOf } from "../utils/ast.ts";
+import { AST, Block, SourceInfo } from "../_model/ast.ts";
+import { areSame, argType, AST_NOISE, attribute, elementTagToObject, expressionsEqual, getName, identifierToExactString, invocationFromMethodCall, literalType, mapParseTree, maybeOf, tupleOf, typesEqual, TYPE_AST_NOISE, unionOf } from "../utils/ast.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
@@ -788,7 +788,7 @@ function broadenTypeForMutation(ctx: Pick<Context, "allModules"|"encounteredName
     return type
 }
 
-export function distillOverlappingUnionMembers(ctx: Pick<Context, "allModules"|"encounteredNames"|"canonicalModuleName">, type: UnionType): UnionType {
+function distillOverlappingUnionMembers(ctx: Pick<Context, "allModules"|"encounteredNames"|"canonicalModuleName">, type: UnionType): UnionType {
     const indicesToDrop = new Set<number>();
 
     for (let i = 0; i < type.members.length; i++) {
@@ -1224,23 +1224,6 @@ export const propertiesOf = memo(function propertiesOf (
     }
 })
 
-/**
- * Convenience function for creating a simple Attribute
- */
-function attribute(name: string, type: TypeExpression, forceReadonly: boolean): Attribute {
-    return {
-        kind: "attribute",
-        name: { kind: "plain-identifier", name, parent: type.parent, ...AST_NOISE },
-        type,
-        optional: false,
-        forceReadonly,
-        parent: type.parent,
-        ...TYPE_AST_NOISE
-    }
-}
-
-export const AST_NOISE = { module: undefined, code: undefined, startIndex: undefined, endIndex: undefined }
-export const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
 
 /**
  * Given some type containing generic type params, and some other type intended
@@ -1434,43 +1417,6 @@ function fitTemplate(
     return new Map();
 }
 
-/**
- * Convert a.foo() to foo(a)
- */
-export function invocationFromMethodCall(ctx: Pick<Context, "allModules" | "visited" | "canonicalModuleName">, expr: Expression): Invocation|undefined {
-    if (expr.kind === 'invocation' && expr.subject.kind === 'property-accessor' && expr.subject.property.kind === 'plain-identifier') {
-        const fnName = expr.subject.property.name
-        const subjectType = inferType(ctx, expr.subject.subject)
-
-        if (!propertiesOf(ctx, subjectType)?.some(p => getName(p.name) === fnName)) {
-            const { module, code, startIndex, endIndex } = expr.subject.property
-
-            const inv: Invocation = {
-                ...expr,
-                module,
-                code,
-                startIndex,
-                endIndex,
-                subject: {
-                    kind: 'local-identifier',
-                    name: fnName,
-                    parent: expr.parent,
-                    module,
-                    code,
-                    startIndex,
-                    endIndex
-                },
-                args: [
-                    expr.subject.subject,
-                    ...expr.args
-                ]
-            }
-
-            return inv
-        }
-    }
-}
-
 export const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] }> = {
     "+": [
         { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE },
@@ -1507,6 +1453,9 @@ export const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExp
     ],
 }
 
+/**
+ * Get the types of all possible Errors thrown within the given Block (recursive)
+ */
 export function throws(ctx: Pick<Context, "allModules" | "visited"|"canonicalModuleName">, block: Block): TypeExpression[] {
     const errorTypes: TypeExpression[] = []
 
@@ -1543,100 +1492,4 @@ export function throws(ctx: Pick<Context, "allModules" | "visited"|"canonicalMod
     }
 
     return errorTypes
-}
-
-const identifierToExactString = (ident: PlainIdentifier): ExactStringLiteral => ({
-    kind: 'exact-string-literal',
-    value: ident.name,
-    module: ident.module,
-    code: ident.code,
-    startIndex: ident.startIndex,
-    endIndex: ident.endIndex,
-})
-
-export const elementTagToObject = memo((tag: ElementTag): ObjectLiteral => {
-    const { parent, module, code, startIndex, endIndex } = tag
-
-    return {
-        kind: 'object-literal',
-        entries: [
-            {
-                kind: 'object-entry',
-                key: { kind: 'plain-identifier', name: 'tag', ...AST_NOISE },
-                value: {
-                    kind: 'exact-string-literal',
-                    value: tag.tagName.name,
-                    module: tag.tagName.module,
-                    code: tag.tagName.code,
-                    parent: tag.tagName.parent,
-                    startIndex: tag.tagName.startIndex,
-                    endIndex: tag.tagName.endIndex
-                },
-                module: tag.tagName.module,
-                code: tag.tagName.code,
-                parent: tag.tagName.parent,
-                startIndex: tag.tagName.startIndex,
-                endIndex: tag.tagName.endIndex
-            },
-            {
-                kind: 'object-entry',
-                key: { kind: 'plain-identifier', name: 'attributes', ...AST_NOISE },
-                value: {
-                    kind: 'object-literal',
-                    entries: tag.attributes,
-                    parent, module, code,
-                    startIndex: tag.attributes[0]?.startIndex,
-                    endIndex: tag.attributes[tag.children.length - 1]?.endIndex
-                },
-                parent, module, code, startIndex, endIndex
-            },
-            {
-                kind: 'object-entry',
-                key: { kind: 'plain-identifier', name: 'children', ...AST_NOISE },
-                value: {
-                    kind: 'array-literal',
-                    entries: tag.children,
-                    parent, module, code,
-                    startIndex: tag.children[0]?.startIndex,
-                    endIndex: tag.children[tag.children.length - 1]?.endIndex
-                },
-                parent, module, code, startIndex, endIndex
-            }
-        ],
-        parent, module, code, startIndex, endIndex
-    }
-})
-
-export function argType(ctx: Pick<Context, "allModules" | "encounteredNames"|"canonicalModuleName">, args: Args | SpreadArgs, index: number): TypeExpression | undefined {
-    if (args.kind === 'args') {
-        return args.args[index]?.type
-    } else {
-        const resolved = resolveType(ctx, args.type)
-
-        if (resolved.kind === 'tuple-type') {
-            return resolved.members[index]
-        } else if (resolved.kind === 'array-type') {
-            return maybeOf(resolved.element)
-        } else {
-            return undefined
-        }
-    }
-}
-
-export function argsBounds(ctx: Pick<Context, "allModules" | "encounteredNames"|"canonicalModuleName">, args: Args | SpreadArgs) {
-    if (args.kind === 'args') {
-        return {
-            min: args.args.filter(a => !a.optional).length,
-            max: args.args.length
-        }
-    } else {
-        const resolved = resolveType(ctx, args.type)
-
-        if (resolved.kind === 'tuple-type') {
-            return {
-                min: resolved.members.length,
-                max: resolved.members.length
-            }
-        }
-    }
 }
