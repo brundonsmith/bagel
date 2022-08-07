@@ -1340,8 +1340,8 @@ function fitTemplate(
     const mutabilityCompatible = (
         parameterized.mutability === undefined || reified.mutability === undefined ||
         parameterized.mutability === reified.mutability ||
-        reified.mutability === 'literal' ||
-        (parameterized.mutability === 'readonly' && reified.mutability === 'constant')
+        parameterized.mutability === 'readonly' ||
+        reified.mutability === 'literal'
     )
     
     if (parameterized.kind === "array-type" && reified.kind === "array-type" && mutabilityCompatible) {
