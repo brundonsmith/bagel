@@ -1336,10 +1336,7 @@ function fitTemplate(
 
         for (let i = 0; i < parameterized.members.length; i++) {
             const matches = fitTemplate(ctx, parameterized.members[i], reified.members[i]);
-
-            for (const key in matches) {
-                all.set(key, matches.get(key) as TypeExpression)
-            }
+            assign(all, matches)
         }
 
         return all
@@ -1351,10 +1348,7 @@ function fitTemplate(
 
             if (other) {
                 const matches = fitTemplate(ctx, entry.type, other.type);
-
-                for (const key in matches) {
-                    all.set(key, matches.get(key) as TypeExpression)
-                }
+                assign(all, matches)
             }
         }
 
@@ -1393,13 +1387,7 @@ function fitTemplate(
             if (parameterizedMembersRemaining.length === 1 && isGenericParam(parameterizedMembersRemaining[0])) {
                 const matches = new Map<string, TypeExpression>();
 
-                matches.set(parameterizedMembersRemaining[0].name.name, resolveType(ctx, {
-                    kind: "union-type",
-                    members: reifiedMembersRemaining,
-                    mutability: undefined,
-                    parent: reifiedMembers[0]?.parent,
-                    module: undefined, code: undefined, startIndex: undefined, endIndex: undefined
-                }))
+                matches.set(parameterizedMembersRemaining[0].name.name, resolveType(ctx, unionOf(reifiedMembersRemaining)))
                 
                 return matches;
             }
@@ -1415,6 +1403,14 @@ function fitTemplate(
     }
 
     return new Map();
+}
+
+function assign<K, V>(a: Map<K, V>, b: ReadonlyMap<K, V> | undefined) {
+    if (b) {
+        for (const [key, value] of b.entries()) {
+            a.set(key, value)
+        }
+    }
 }
 
 export const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] }> = {
