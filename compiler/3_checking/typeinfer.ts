@@ -901,7 +901,7 @@ export function bindInvocationGenericArgs(ctx: Pick<Context, "allModules"|"visit
                 invocationSubjectType
             );
 
-            if (inferredBindings && inferredBindings.size === subjectType.typeParams.length) {
+            if (inferredBindings.size === subjectType.typeParams.length) {
 
                 // check that inferred type args fit `extends` clauses
                 for (const param of subjectType.typeParams) {
@@ -1236,7 +1236,7 @@ function fitTemplate(
     ctx: Pick<Context, "allModules"|"canonicalModuleName"> & { descendant?: boolean },
     parameterized: TypeExpression, 
     reified: TypeExpression, 
-): ReadonlyMap<string, TypeExpression>|undefined {
+): ReadonlyMap<string, TypeExpression> {
     const { descendant } = ctx
     ctx = { ...ctx, descendant: true }
 
@@ -1263,7 +1263,7 @@ function fitTemplate(
      || (parameterized.kind === "proc-type" && reified.kind === "proc-type")) {
         const parameterizedArgs = parameterized.args
         const reifiedArgs = reified.args
-        const matchGroups: (ReadonlyMap<string, TypeExpression> | undefined)[] = []
+        const matchGroups: ReadonlyMap<string, TypeExpression>[] = []
         
         if (parameterizedArgs.kind === 'args') {
             if (reifiedArgs.kind === 'args') {
@@ -1296,30 +1296,14 @@ function fitTemplate(
             )
         }
 
-        if (matchGroups.some(g => g == null)) { // some match errored
-            return undefined
-        } else { // combine all matches and return
-            const matches = new Map<string, TypeExpression>();
+        // combine all matches and return
+        const all = new Map<string, TypeExpression>();
 
-            for (const map of matchGroups as ReadonlyMap<string, TypeExpression>[]) {
-                for (const [key, value] of map.entries()) {
-                    const existing = matches.get(key)
-                    if (existing) {
-                        if (!subsumationIssues(ctx, existing, value)) {
-                            // do nothing
-                        } else if (!subsumationIssues(ctx, value, existing)) {
-                            matches.set(key, value);
-                        } else {
-                            return undefined
-                        }
-                    } else {
-                        matches.set(key, value);
-                    }
-                }
-            }
-            
-            return matches;
+        for (const matches of matchGroups) {
+            assign(all, matches)
         }
+        
+        return all;
     }
 
     const mutabilityCompatible = (
@@ -1410,7 +1394,9 @@ function fitTemplate(
 function assign<K, V>(a: Map<K, V>, b: ReadonlyMap<K, V> | undefined) {
     if (b) {
         for (const [key, value] of b.entries()) {
-            a.set(key, value)
+            if (!a.has(key)) {
+                a.set(key, value)
+            }
         }
     }
 }
