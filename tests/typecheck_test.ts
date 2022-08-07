@@ -3765,7 +3765,7 @@ function testTypecheck(source: string, shouldFail: boolean): void {
     const sendError = (e: BagelError|LintProblem) => {
       errors.push(e)
     }
-    typecheck({ ...ctx, entry: '' as ModuleName, sendError }, parseResult.noPreludeAst)
+    typecheck({ ...ctx, sendError }, parseResult.noPreludeAst)
 
     if (!errors) throw Error('Bwahhhh!')
   
@@ -3796,7 +3796,7 @@ function testMultiModuleTypecheck(testModules: {[key: string]: string}, shouldFa
     if (parseResult) {
       errors.push(...parseResult.errors)
       errors.push(...lint(ctx, parseResult.noPreludeAst).filter(e => e.severity === 'error'))
-      typecheck({ ...ctx, entry: '' as ModuleName, sendError: e => errors.push(e) }, parseResult.noPreludeAst)
+      typecheck({ ...ctx, sendError: e => errors.push(e) }, parseResult.noPreludeAst)
     }
   }
 

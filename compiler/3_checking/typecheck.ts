@@ -15,14 +15,15 @@ const msgFormat = (ast: AST) => format(ast, { ...DEFAULT_OPTIONS, lineBreaks: fa
 /**
  * Walk an entire AST and report all issues that we find
  */
-export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'canonicalModuleName'> & { entry: ModuleName | undefined }, ast: Module): void {
-    const { allModules, sendError, config, entry, canonicalModuleName } = ctx
+export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'canonicalModuleName'>, ast: Module): void {
+    const { allModules, sendError, config, canonicalModuleName } = ctx
 
-    if (entry != null && ast.module === entry) {
-        if (!ast.declarations.some(decl => decl.kind === 'proc-declaration' && decl.name.name === 'main')) {
-            sendError(miscError(ast, `Entry module doesn't have a proc named "main". Entry module is: ${entry}`))
-        }
-    }
+    // TODO: This needs to be broadened to factor in autoruns, even in non-entry modules in the project
+    // if (entry != null && ast.module === entry) {
+    //     if (!ast.declarations.some(decl => decl.kind === 'proc-declaration' && decl.name.name === 'main')) {
+    //         sendError(miscError(ast, `Entry module doesn't have a proc named "main". Entry module is: ${entry}`))
+    //     }
+    // }
 
     for (const { current, parent } of iterateParseTree(ast)) {
             

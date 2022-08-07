@@ -178,7 +178,7 @@ const typeerrors = memo(function typeerrors (ctx: Pick<Context, "allModules" | "
     const sendError = (err: BagelError) => errors.push(err)
 
     typecheck(
-        { ...ctx, sendError, entry: target.entry },
+        { ...ctx, sendError },
         ast
     )
     
