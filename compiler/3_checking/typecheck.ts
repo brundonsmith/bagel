@@ -959,7 +959,12 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
     const all = (...inner: Array<Array<string | string[]> | undefined>) =>
         given(emptyToUndefined(inner.filter(exists).flat()), withBase)
 
-    if (
+    if (resolvedDestination.mutability === "mutable" && resolvedValue.mutability !== undefined && resolvedValue.mutability !== "mutable" && resolvedValue.mutability !== "literal") {
+        return [
+            baseErrorMessage,
+            `Value with ${resolvedValue.mutability} type ${hlt(msgFormat(value))} isn't compatible with ${resolvedDestination.mutability} type ${hlt(msgFormat(destination))}`
+        ];
+    } else if (
         resolvedValue.kind === "javascript-escape-type" || 
         resolvedValue.kind === "any-type" || 
         resolvedValue.kind === "poisoned-type" ||
@@ -967,12 +972,6 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
         resolvedDestination.kind === "unknown-type"
     ) {
         return undefined;
-    } else if (resolvedDestination.mutability === "mutable" && (resolvedValue.mutability !== "mutable" && resolvedValue.mutability !== "literal")) {
-        // constants can't be assigned to mutable slots
-        return [
-            baseErrorMessage,
-            `Value with ${resolvedValue.mutability} type ${hlt(msgFormat(value))} isn't compatible with ${resolvedDestination.mutability} type ${hlt(msgFormat(destination))}`
-        ];
     } else if (resolvedValue.kind === "unknown-type") {
         return [baseErrorMessage];
     } else if (

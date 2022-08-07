@@ -619,7 +619,7 @@ const primitiveType: ParseFunction<PrimitiveType> = memo((module, code, startInd
     ?? given(consume(code, startIndex, "unknown"), index => ({
         parsed: {
             kind: "unknown-type",
-            mutability: undefined,
+            mutability: "mutable",
             module,
             code,
             startIndex,
@@ -829,7 +829,7 @@ const unknownType: ParseFunction<UnknownType> = memo((module, code, startIndex) 
     given(consume(code, startIndex, "unknown"), index => ({
         parsed: {
             kind: "unknown-type",
-            mutability: undefined,
+            mutability: "mutable",
             module,
             code,
             startIndex,

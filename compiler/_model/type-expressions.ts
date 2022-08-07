@@ -239,7 +239,7 @@ export type ElementofType = SourceInfo & NoMutability & {
     readonly inner: TypeExpression,
 }
 
-export type UnknownType = SourceInfo & NoMutability & {
+export type UnknownType = SourceInfo & Mutability & {
     readonly kind: "unknown-type",
 }
 
@@ -340,7 +340,7 @@ export const NIL_TYPE: NilType = {
 }
 export const UNKNOWN_TYPE: UnknownType = {
     kind: "unknown-type",
-    mutability: undefined,
+    mutability: "mutable",
     parent: undefined,
     module: undefined,
     code: undefined,

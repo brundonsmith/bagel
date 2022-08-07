@@ -1674,6 +1674,39 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Immutability test 10",
+  fn() {
+    testTypecheck(`
+    proc foo(param: readonly string) {
+      const x: string = param;
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 11",
+  fn() {
+    testTypecheck(`
+    proc foo(param: readonly number[]) {
+      const x: readonly unknown = param;
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 12",
+  fn() {
+    testTypecheck(`
+    proc foo(param: readonly number[]) {
+      const x: unknown = param;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
   name: "Parentehsized type pass",
   fn() {
     testTypecheck(`
