@@ -49,45 +49,32 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 }
             } break;
             case "module": {
-                const seen = new Map<string, PlainIdentifier>()
-                const duplicates = new Set<PlainIdentifier>()
 
-                for (const decl of current.declarations) {
-                    const names = (() => {
-                        switch(decl.kind) {
-                            case "import-declaration":
-                                return decl.imports.map(i => i.alias ?? i.name)
-                            case "import-all-declaration":
-                            case "type-declaration":
-                            case "proc-declaration":
-                            case "func-declaration":
-                            case "value-declaration":
-                            case "derive-declaration":
-                            case "remote-declaration":
-                                return [decl.name]
-                            case "autorun":
-                            case "test-expr-declaration":
-                            case "test-block-declaration":
-                            case "test-type-declaration":
-                            case "debug":
-                            case "javascript-escape":
-                                return []
-                            default:
-                                // @ts-expect-error: exhaustiveness
-                                throw Error(decl.kind)
-                        }
-                    })()
-
-                    for (const name of names) {
-                        const existing = seen.get(name.name)
-                        if (existing) {
-                            duplicates.add(existing)
-                            duplicates.add(name)
-                        } else {
-                            seen.set(name.name, name)
-                        }
+                // check against re-declarations of symbols
+                const duplicates = findDuplicateIdentifiers(current.declarations, decl => {
+                    switch (decl.kind) {
+                        case "import-declaration":
+                            return decl.imports.map(i => i.alias ?? i.name)
+                        case "import-all-declaration":
+                        case "type-declaration":
+                        case "proc-declaration":
+                        case "func-declaration":
+                        case "value-declaration":
+                        case "derive-declaration":
+                        case "remote-declaration":
+                            return [decl.name]
+                        case "autorun":
+                        case "test-expr-declaration":
+                        case "test-block-declaration":
+                        case "test-type-declaration":
+                        case "debug":
+                        case "javascript-escape":
+                            return []
+                        default:
+                            // @ts-expect-error: exhaustiveness
+                            throw Error(decl.kind)
                     }
-                }
+                })
 
                 for (const duplicate of duplicates) {
                     sendError(alreadyDeclared(duplicate))
@@ -96,44 +83,31 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "block": {
 
                 // check against re-declarations of symbols
-                const seen = new Map<string, PlainIdentifier>()
-                const duplicates = new Set<PlainIdentifier>()
-
-                for (const stmt of current.statements) {
-                    const names = (() => {
-                        switch(stmt.kind) {
-                            case "declaration-statement":
-                                if (stmt.destination.kind === 'name-and-type') {
-                                    return [stmt.destination.name]
-                                } else {
-                                    return stmt.destination.properties
-                                }
-                            case "invocation":
-                            case "if-else-statement":
-                            case "for-loop":
-                            case "while-loop":
-                            case "assignment":
-                            case "javascript-escape":
-                            case "try-catch":
-                            case "throw-statement":
-                            case "autorun":
-                                return []
-                            default:
-                                // @ts-expect-error: exhaustiveness
-                                throw Error(stmt.kind)
-                        }
-                    })()
-
-                    for (const name of names) {
-                        const existing = seen.get(name.name)
-                        if (existing) {
-                            duplicates.add(existing)
-                            duplicates.add(name)
-                        } else {
-                            seen.set(name.name, name)
-                        }
+                const duplicates = findDuplicateIdentifiers(current.statements, stmt => {
+                    switch(stmt.kind) {
+                        case "declaration-statement":
+                            if (stmt.destination.kind === 'name-and-type') {
+                                return [
+                                    stmt.destination.name
+                                ]
+                            } else {
+                                return stmt.destination.properties
+                            }
+                        case "invocation":
+                        case "if-else-statement":
+                        case "for-loop":
+                        case "while-loop":
+                        case "assignment":
+                        case "javascript-escape":
+                        case "try-catch":
+                        case "throw-statement":
+                        case "autorun":
+                            return []
+                        default:
+                            // @ts-expect-error: exhaustiveness
+                            throw Error(stmt.kind)
                     }
-                }
+                })
 
                 for (const duplicate of duplicates) {
                     sendError(alreadyDeclared(duplicate))
@@ -167,26 +141,10 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 }
             } break;
             case "inline-const-group": {
-                const seen = new Map<string, PlainIdentifier>()
-                const duplicates = new Set<PlainIdentifier>()
-
-                for (const decl of current.declarations) {
-                    const names = (
-                        decl.destination.kind === 'name-and-type'
-                            ? [decl.destination.name]
-                            : decl.destination.properties
-                    )
-
-                    for (const name of names) {
-                        const existing = seen.get(name.name)
-                        if (existing) {
-                            duplicates.add(existing)
-                            duplicates.add(name)
-                        } else {
-                            seen.set(name.name, name)
-                        }
-                    }
-                }
+                const duplicates = findDuplicateIdentifiers(current.declarations, decl => 
+                    decl.destination.kind === 'name-and-type'
+                        ? [decl.destination.name]
+                        : decl.destination.properties)
 
                 for (const duplicate of duplicates) {
                     sendError(alreadyDeclared(duplicate))
@@ -733,21 +691,9 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 }
             } break;
             case "args": {
-                { // make sure no duplicate arg names
-                    const seen = new Map<string, PlainIdentifier>()
-                    const duplicates = new Set<PlainIdentifier>()
-    
-                    for (const { name } of current.args) {
-                        if (name) {
-                            const existing = seen.get(name.name)
-                            if (existing) {
-                                duplicates.add(existing)
-                                duplicates.add(name)
-                            } else {
-                                seen.set(name.name, name)
-                            }
-                        }
-                    }
+                {
+                    // make sure no duplicate arg names
+                    const duplicates = findDuplicateIdentifiers(current.args, arg => [arg.name])
 
                     for (const duplicate of duplicates) {
                         sendError(alreadyDeclared(duplicate))
@@ -790,18 +736,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 }
             } break;
             case "generic-type": {
-                const seen = new Map<string, PlainIdentifier>()
-                const duplicates = new Set<PlainIdentifier>()
-
-                for (const { name } of current.typeParams) {
-                    const existing = seen.get(name.name)
-                    if (existing) {
-                        duplicates.add(existing)
-                        duplicates.add(name)
-                    } else {
-                        seen.set(name.name, name)
-                    }
-                }
+                const duplicates = findDuplicateIdentifiers(current.typeParams, param => [param.name])
 
                 for (const duplicate of duplicates) {
                     sendError(alreadyDeclared(duplicate))
@@ -927,6 +862,29 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 throw Error("No typecheck logic for: " + current.kind)
         }        
     }
+}
+
+/**
+ * Walk through `iter`, producing an array of PlainIdentifiers for each element,
+ * and gather and return any duplicated identifiers from the bunch
+ */
+function findDuplicateIdentifiers<T>(iter: Iterable<T>, cb: (el: T) => PlainIdentifier[]) {
+    const seen = new Map<string, PlainIdentifier>()
+    const duplicates = new Set<PlainIdentifier>()
+
+    for (const el of iter) {
+        for (const ident of cb(el)) {
+            const existing = seen.get(ident.name)
+            if (existing) {
+                duplicates.add(existing)
+                duplicates.add(ident)
+            } else {
+                seen.set(ident.name, ident)
+            }
+        }
+    }
+
+    return duplicates
 }
 
 function expect(ctx: Pick<Context, 'allModules'|'sendError'|'encounteredNames'|'canonicalModuleName'>, destinationType: TypeExpression, value: Expression, generateMessage?: (dest: TypeExpression, val: TypeExpression) => string) {
