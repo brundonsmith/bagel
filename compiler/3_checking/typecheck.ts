@@ -1285,12 +1285,13 @@ export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'
             return resolveType(ctx, type.extends ?? UNKNOWN_TYPE)
         case "parenthesized-type":
             return resolveType(ctx, type.inner)
-        case "readonly-type":
+        case "readonly-type": {
             const inner = resolveType(ctx, type.inner)
             return {
                 ...inner,
                 mutability: inner.mutability != null ? 'readonly' : inner.mutability as any
             }
+        }
         case "typeof-type":
             return inferType(ctx, type.expr)
         case "keyof-type": {
