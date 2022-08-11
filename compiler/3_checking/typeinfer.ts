@@ -96,10 +96,9 @@ const inferTypeInner = memo(function inferTypeInner(
 
                     // method call
                     const invocation = invocationFromMethodCall(ctx, parent) ?? parent;
-                    console.log('invocation: ', format(invocation, { lineBreaks: false }))
+
                     // bound generic
                     const parentSubjectType = bindInvocationGenericArgs(ctx, invocation)
-                    console.log('parentSubjectType: ', parentSubjectType && format(parentSubjectType, { lineBreaks: false }))
 
                     if (parentSubjectType) {
                         const thisArgIndex = invocation.args.findIndex(a => areSame(a, ast))
