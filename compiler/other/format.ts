@@ -256,7 +256,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                 return ast.members.map(f).join(" | ")
             }
         }
-        case "maybe-type": return f(ast.inner) + '?';
+        case "maybe-type": return (ast.inner.kind === 'union-type' ? `(${f(ast.inner)})` : f(ast.inner)) + '?';
         case "named-type":
         case "generic-param-type": return ast.name.name;
         case "generic-type": return maybeTypeParams(options, indent, parent, ast.typeParams) + f(ast.inner);
@@ -277,7 +277,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
                 .join(',')}${br}${currentIndentation}}`;
         case "attribute": return  `${f(ast.name)}: ${f(ast.type)}`
         case "record-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
-        case "array-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `${f(ast.element)}[]`; // TODO: Add parens if union type (and also keyof, etc?)
+        case "array-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `${ast.element.kind === 'union-type' ? `(${f(ast.element)})` : f(ast.element)}[]`; // TODO: Add parens if union type (and also keyof, etc?)
         case "tuple-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `[${ast.members.map(f).join(", ")}]`;
         case "string-type": return `string`;
         case "number-type": return `number`;
