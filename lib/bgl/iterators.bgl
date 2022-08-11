@@ -26,7 +26,7 @@ test expr 'zip()' => assert(
     arr[1]?.[0] == 2 &&
     arr[1]?.[1] == 4
 )
-test expr 'find()' => assert([2, 4, 6, 8].iter().find((n: number) => n > 5) == 6)
+test expr 'find()' => assert([2, 4, 6, 8].iter().find(n => n > 5) == 6)
 
 export js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> =>            {# return iter.map(fn) #}
 export js func reduce<T, R>(iter: Iterator<T>, init: R, fn: (acc: R, el: T) => R): R => {# return iter.reduce(init, fn) #}

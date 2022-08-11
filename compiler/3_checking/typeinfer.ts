@@ -17,12 +17,13 @@ import { Colors } from "../deps.ts";
 export function inferType(
     ctx: Pick<Context, 'allModules'|'visited'|'canonicalModuleName'>,
     ast: Expression,
-    skipRefinement?: boolean,
+    skipTypeRefinement?: boolean,
+    skipReturnTypeInference?: boolean,
 ): TypeExpression {
-    const baseType = inferTypeInner(ctx, ast)
+    const baseType = inferTypeInner(ctx, ast, skipReturnTypeInference)
 
     let refinedType = baseType
-    if (!skipRefinement) {
+    if (!skipTypeRefinement) {
         const refinements = resolveRefinements(ctx, ast)
 
         for (const refinement of refinements ?? []) {
@@ -45,11 +46,10 @@ export function inferType(
 const inferTypeInner = memo(function inferTypeInner(
     ctx: Pick<Context, 'allModules'|'visited'|'canonicalModuleName'>,
     ast: Expression,
+    skipReturnTypeInference?: boolean,
 ): TypeExpression {
     const { visited } = ctx
     const { parent, module, code, startIndex, endIndex, ..._rest } = ast
-
-    // assert(() => !previouslyVisited.includes(ast))
 
     if (visited?.includes(ast)) {
         if (devMode) console.log(Colors.red(`Encountered inference cycle and aborted type inference for ${format(ast, { lineBreaks: false })}`))
@@ -87,24 +87,33 @@ const inferTypeInner = memo(function inferTypeInner(
             }
         }
         case "func": {
-            
+
             // infer callback type based on context
             const typeDictatedByInvocation = (() => {
                 const parent = ast.parent
 
                 if (parent?.kind === "invocation") {
-                    const parentSubjectType = resolveType(ctx, inferType(ctx, parent.subject))
-                    const thisArgIndex = parent.args.findIndex(a => areSame(a, ast))
 
-                    if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {
-                        const thisArgParentType = argType(ctx, parentSubjectType.args, thisArgIndex)
+                    // method call
+                    const invocation = invocationFromMethodCall(ctx, parent) ?? parent;
+                    console.log('invocation: ', format(invocation, { lineBreaks: false }))
+                    // bound generic
+                    const parentSubjectType = bindInvocationGenericArgs(ctx, invocation)
+                    console.log('parentSubjectType: ', parentSubjectType && format(parentSubjectType, { lineBreaks: false }))
 
-                        if (thisArgParentType && thisArgParentType.kind === ast.type.kind) {
-                            return (
-                                thisArgParentType.kind === 'generic-type'
-                                    ? thisArgParentType.inner as FuncType 
-                                    : thisArgParentType
-                            )
+                    if (parentSubjectType) {
+                        const thisArgIndex = invocation.args.findIndex(a => areSame(a, ast))
+    
+                        if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {    
+                            const thisArgParentType = argType(ctx, parentSubjectType.args, thisArgIndex)
+    
+                            if (thisArgParentType && thisArgParentType.kind === ast.type.kind) {
+                                return (
+                                    thisArgParentType.kind === 'generic-type'
+                                        ? thisArgParentType.inner as FuncType 
+                                        : thisArgParentType
+                                )
+                            }
                         }
                     }
                 }
@@ -127,7 +136,9 @@ const inferTypeInner = memo(function inferTypeInner(
                     funcType.returnType ??
                     typeDictatedByInvocation?.returnType ??
                     // if no return-type is declared, try inferring the type from the inner expression
-                    inferType(ctx, ast.body)
+                    (skipReturnTypeInference
+                        ? UNKNOWN_TYPE // HACK: To avoid cycle when doing argtype inference in callback, have to skip looking at the body
+                        : inferType(ctx, ast.body))
                 )
             }
 
@@ -647,7 +658,7 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
             }
 
 
-            const inferredHolderType = inferType(ctx, decl)
+            const inferredHolderType = inferType(ctx, decl, false, true)
 
 
             if (inferredHolderType.kind !== 'func-type' && inferredHolderType.kind !== 'proc-type') return UNKNOWN_TYPE

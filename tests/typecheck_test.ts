@@ -122,6 +122,18 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Function-as-argument inference 5",
+  fn() {
+    testTypecheck(`
+    js func iter<T>(arr: T[]): Iterator<T> => {# #}
+    func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? => nil
+
+    const x = [2, 4, 6, 8].iter().find(n => n > 5)`,
+    false)
+  }
+})
+
+Deno.test({
   name: "Basic constant inference",
   fn() {
     testTypecheck(
@@ -3739,13 +3751,6 @@ Deno.test({
 //     false)
 //   }
 // })
-
-// this._modulesSource = new Map()
-
-// for (const [k, v] of Object.entries(mode.modules)) {
-//     const moduleName = k as ModuleName
-//     this.setSource(moduleName, v)
-// }
 
 const canonicalModuleName = (_: ModuleName, m: string) => m as ModuleName
 
