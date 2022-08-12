@@ -1,6 +1,6 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
 import { BinaryOp, Expression, IfElseExpression, Invocation, isExpression, ObjectEntry } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE } from "../_model/type-expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE, Args, SpreadArgs } from "../_model/type-expressions.ts";
 import { exists, given, devMode } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
@@ -640,40 +640,14 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
         case 'proc': {
             const funcOrProcType = decl.type.kind === 'generic-type' ? decl.type.inner : decl.type
 
-            if (funcOrProcType.args.kind === 'args') {
-                const arg = funcOrProcType.args.args.find(a => a.name.name === binding.identifier.name)
-
-                if (arg?.type) {
-                    if (arg.optional) {
-                        return maybeOf(arg.type)
-                    } else {
-                        return arg.type
-                    }
-                }
-            } else {
-                if (funcOrProcType.args.name?.name === binding.identifier.name) {
-                    return funcOrProcType.args.type
-                }
+            const argType = getArgTypeByName(funcOrProcType.args, binding.identifier.name)
+            if (argType) {
+                return argType
             }
 
-
             const inferredHolderType = inferType(ctx, decl, false, true)
-
-
-            if (inferredHolderType.kind !== 'func-type' && inferredHolderType.kind !== 'proc-type') return UNKNOWN_TYPE
-
-            if (inferredHolderType.args.kind === 'args') {
-                const inferredArg = inferredHolderType.args.args.find(a => a.name?.name === binding.identifier.name)
-
-                if (inferredArg?.type) {
-                    if (inferredArg.optional) {
-                        return maybeOf(inferredArg.type)
-                    } else {
-                        return inferredArg.type
-                    }
-                }
-            } else if (inferredHolderType.args.name?.name === binding.identifier.name) {
-                return inferredHolderType.args.type
+            if (inferredHolderType.kind === 'func-type' || inferredHolderType.kind === 'proc-type') {
+                return getArgTypeByName(inferredHolderType.args, binding.identifier.name) ?? UNKNOWN_TYPE
             }
 
             return UNKNOWN_TYPE
@@ -764,6 +738,22 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
     }
 
     return UNKNOWN_TYPE
+}
+
+function getArgTypeByName(args: Args | SpreadArgs, name: string) {
+    if (args.kind === 'args') {
+        const arg = args.args.find(a => a.name?.name === name)
+
+        if (arg?.type) {
+            if (arg.optional) {
+                return maybeOf(arg.type)
+            } else {
+                return arg.type
+            }
+        }
+    } else if (args.name?.name === name) {
+        return args.type
+    }
 }
 
 /**
