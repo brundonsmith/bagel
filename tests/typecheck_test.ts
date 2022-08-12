@@ -133,6 +133,17 @@ Deno.test({
   }
 })
 
+// Deno.test({
+//   name: "Function-as-argument inference 6",
+//   fn() {
+//     testTypecheck(`
+//     js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> => {# #}
+
+//     func foo(i: Iterator<number>): Iterator<string> => i.map(n => n + 'a')`,
+//     false)
+//   }
+// })
+
 Deno.test({
   name: "Basic constant inference",
   fn() {
