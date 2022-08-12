@@ -1,8 +1,8 @@
 import { AST, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType, STRING_TYPE } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType, STRING_TYPE, STRING_OR_NUMBER_TYPE } from "../_model/type-expressions.ts";
 import { exists, given, hlt, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, BINARY_OPERATOR_TYPES, throws } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, throws } from "./typeinfer.ts";
 import { Context, getBindingMutability, ModuleName } from "../_model/common.ts";
 import { ancestors, argsBounds, elementOf, findAncestor, getName, invocationFromMethodCall, iterateParseTree, literalType, maybeOf, planOf, typesEqual, unionOf, within } from "../utils/ast.ts";
 import { DEFAULT_OPTIONS, format } from "../other/format.ts";
@@ -266,18 +266,27 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 const leftType = inferType(ctx, current.left)
                 const rightType = inferType(ctx, current.right)
 
-                if (current.op.op === '==' || current.op.op === '!=') {
+                const op = current.op.op
+                switch (op) {
+                    case '==':
+                    case '!=':
+                        if (subsumationIssues(ctx, leftType, rightType) 
                     if (subsumationIssues(ctx, leftType, rightType) 
-                     && subsumationIssues(ctx, rightType, leftType)) {
-                        sendError(miscError(current, `Can't compare types ${hlt(msgFormat(leftType))} and ${hlt(msgFormat(rightType))} because they have no overlap`))
-                    }
-                } else if (current.op.op !== '??' && current.op.op !== '&&' && current.op.op !== '||') {
-                    const types = BINARY_OPERATOR_TYPES[current.op.op]?.find(({ left, right }) =>
-                        !subsumationIssues(ctx, left, leftType) && 
-                        !subsumationIssues(ctx, right, rightType))
+                        if (subsumationIssues(ctx, leftType, rightType) 
+                         && subsumationIssues(ctx, rightType, leftType)) {
+                            sendError(miscError(current, `Can't compare types ${hlt(msgFormat(leftType))} and ${hlt(msgFormat(rightType))} because they have no overlap`))
+                        }
+                        break;
+                    case '??':
+                    case '&&':
+                    case '||':
+                        break;
+                    default: {
+                        const required = REQUIRED_OPERANDS[op]
 
-                    if (types == null) {
-                        sendError(miscError(current.op, `Operator ${hlt(current.op.op)} cannot be applied to types ${hlt(msgFormat(leftType))} and ${hlt(msgFormat(rightType))}`));
+                        if (subsumationIssues(ctx, required, leftType) || subsumationIssues(ctx, required, rightType)) {
+                            sendError(miscError(current.op, `Operator ${hlt(current.op.op)} cannot be applied to types ${hlt(msgFormat(leftType))} and ${hlt(msgFormat(rightType))}`));
+                        }
                     }
                 }
             } break;
@@ -620,19 +629,25 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     // +=, -=, etc
                     const leftType = targetType
                     const rightType = inferType(ctx, current.value)
-                    const types = BINARY_OPERATOR_TYPES[current.operator.op]?.find(({ left, right }) =>
-                        !subsumationIssues(ctx, left, leftType) && 
-                        !subsumationIssues(ctx, right, rightType))
+                    const op = current.operator.op as '+' | '-' | '*' | '/' // enforced in parse/index.ts
 
-                    if (types == null) {
+                    const required = REQUIRED_OPERANDS[op]
+
+                    if (subsumationIssues(ctx, required, leftType) || subsumationIssues(ctx, required, rightType)) {
                         // check that both sides of operator can be handled by it
-                        sendError(miscError(current.operator, `Operator ${hlt(current.operator.op)} cannot be applied to types ${hlt(msgFormat(leftType))} and ${hlt(msgFormat(rightType))}`));
+                        sendError(miscError(current.operator, `Operator ${hlt(op)} cannot be applied to types ${hlt(msgFormat(leftType))} and ${hlt(msgFormat(rightType))}`));
                     } else {
+                        const output = (
+                            op === '+' && (!subsumationIssues(ctx, STRING_TYPE, leftType) || !subsumationIssues(ctx, STRING_TYPE, rightType))
+                                ? STRING_TYPE
+                                : NUMBER_TYPE
+                        )
+
                         // check that resulting value is assignable to target
-                        const issues = subsumationIssues(ctx, targetType, types.output)
+                        const issues = subsumationIssues(ctx, targetType, output)
 
                         if (issues) {
-                            sendError(assignmentError(current, targetType, types.output, issues));
+                            sendError(assignmentError(current, targetType, output, issues));
                         }
                     }
                 } else {
@@ -859,6 +874,17 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
         }        
     }
 }
+
+const REQUIRED_OPERANDS = {
+    '+': STRING_OR_NUMBER_TYPE,
+    '-': NUMBER_TYPE,
+    '*': NUMBER_TYPE,
+    '/': NUMBER_TYPE,
+    '<': NUMBER_TYPE,
+    '<=': NUMBER_TYPE,
+    '>': NUMBER_TYPE,
+    '>=': NUMBER_TYPE,
+} as const
 
 /**
  * Walk through `iter`, producing an array of PlainIdentifiers for each element,

@@ -1297,7 +1297,8 @@ const assignment: ParseFunction<Assignment> = memo((module, code, startIndex) =>
     expec(expression(module, code, index), err(code, index, "Assignment value"), ({ parsed: value, index }) => 
     given(consumeWhitespace(code, index), index =>
     expec(consume(code, index, ";"), err(code, index, '";"'), index => 
-        target.kind === "local-identifier" || target.kind === "property-accessor" ? {
+        (target.kind === "local-identifier" || target.kind === "property-accessor") &&
+        (operator == null || operator.op === '+' || operator.op === '-' || operator.op === '*' || operator.op === '/') ? {
             parsed: {
                 kind: "assignment",
                 target,

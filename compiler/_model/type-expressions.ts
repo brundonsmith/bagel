@@ -284,6 +284,16 @@ export const NUMBER_TYPE: NumberType = {
     startIndex: undefined,
     endIndex: undefined,
 }
+export const STRING_OR_NUMBER_TYPE: UnionType = {
+    kind: "union-type",
+    members: [STRING_TYPE, NUMBER_TYPE],
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
 export const BOOLEAN_TYPE: BooleanType = {
     kind: "boolean-type",
     mutability: undefined,

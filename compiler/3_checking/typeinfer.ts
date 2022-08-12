@@ -1,6 +1,6 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
-import { BinaryOp, Expression, IfElseExpression, Invocation, isExpression, ObjectEntry } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE, Args, SpreadArgs } from "../_model/type-expressions.ts";
+import { Expression, IfElseExpression, Invocation, isExpression, ObjectEntry } from "../_model/expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, STRING_OR_NUMBER_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE, Args, SpreadArgs } from "../_model/type-expressions.ts";
 import { exists, given, devMode } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
@@ -156,68 +156,73 @@ const inferTypeInner = memo(function inferTypeInner(
 
             if (leftType.kind === "poisoned-type" || rightType.kind === "poisoned-type") {
                 return POISONED_TYPE
-            } else if (ast.op.op === '??') {
-                return {
-                    kind: "union-type",
-                    members: [
-                        subtract(ctx, leftType, NIL_TYPE),
-                        rightType
-                    ],
-                    mutability: undefined, parent, module, code, startIndex, endIndex
-                }
-            } else if (ast.op.op === '&&') {
-                return {
-                    kind: "union-type",
-                    members: [
-                        rightType,
-                        narrow(ctx, leftType, FALSY)
-                    ],
-                    mutability: undefined, parent, module, code, startIndex, endIndex
-                }
-            } else if (ast.op.op === '||') {
-                return {
-                    kind: "union-type",
-                    members: [
-                        subtract(ctx, leftType, FALSY),
-                        rightType
-                    ],
-                    mutability: undefined, parent, module, code, startIndex, endIndex
-                }
-            } else if (
-                (ast.op.op === '+' || ast.op.op === '-' || ast.op.op === '*' || ast.op.op === '/') &&
-                leftType.kind === 'literal-type' && 
-                rightType.kind === 'literal-type'
-            ) {
-                if (
-                    ast.op.op === '+' &&
-                    (leftType.value.kind === 'exact-string-literal' || leftType.value.kind === 'number-literal') &&
-                    (rightType.value.kind === 'exact-string-literal' || rightType.value.kind === 'number-literal')
-                ) {
-                    // @ts-ignore "Operator '+' cannot be applied to types 'string | number' and 'string | number'." ???
-                    return literalType(leftType.value.value + rightType.value.value)
-                } else if (leftType.value.kind === 'number-literal' && rightType.value.kind === 'number-literal') {
-                    switch (ast.op.op) {
-                        case '-': return literalType(leftType.value.value - rightType.value.value)
-                        case '*': return literalType(leftType.value.value * rightType.value.value)
-                        case '/': return literalType(leftType.value.value / rightType.value.value)
-                        default: return UNKNOWN_TYPE
-                    }
-                } else {
-                    return UNKNOWN_TYPE
-                }
-            } else {
-                const types = BINARY_OPERATOR_TYPES[ast.op.op]?.find(({ left, right }) =>
-                    !subsumationIssues(ctx, left, leftType) && 
-                    !subsumationIssues(ctx, right, rightType))
-
-                if (types != null) {
-                    return types.output
-                } else if (BINARY_OPERATOR_TYPES[ast.op.op]?.length === 1) {
-                    return BINARY_OPERATOR_TYPES[ast.op.op]?.[0].output ?? UNKNOWN_TYPE
-                } else {
-                    return UNKNOWN_TYPE
-                }
             }
+            
+            const op = ast.op.op
+            switch (op) {
+                case '??':
+                    return {
+                        kind: "union-type",
+                        members: [
+                            subtract(ctx, leftType, NIL_TYPE),
+                            rightType
+                        ],
+                        mutability: undefined, parent, module, code, startIndex, endIndex
+                    }
+                case '&&':
+                    return {
+                        kind: "union-type",
+                        members: [
+                            rightType,
+                            narrow(ctx, leftType, FALSY)
+                        ],
+                        mutability: undefined, parent, module, code, startIndex, endIndex
+                    }
+                case '||':
+                    return {
+                        kind: "union-type",
+                        members: [
+                            subtract(ctx, leftType, FALSY),
+                            rightType
+                        ],
+                        mutability: undefined, parent, module, code, startIndex, endIndex
+                    }
+                case '+':
+                case '-':
+                case '*':
+                case '/':
+                    if (leftType.kind === 'literal-type' && rightType.kind === 'literal-type') {
+                        if (
+                            ast.op.op === '+' &&
+                            (leftType.value.kind === 'exact-string-literal' || leftType.value.kind === 'number-literal') &&
+                            (rightType.value.kind === 'exact-string-literal' || rightType.value.kind === 'number-literal')
+                        ) {
+                            // @ts-ignore "Operator '+' cannot be applied to types 'string | number' and 'string | number'." ???
+                            return literalType(leftType.value.value + rightType.value.value)
+                        } else if (leftType.value.kind === 'number-literal' && rightType.value.kind === 'number-literal') {
+                            switch (op) {
+                                case '-': return literalType(leftType.value.value - rightType.value.value)
+                                case '*': return literalType(leftType.value.value * rightType.value.value)
+                                case '/': return literalType(leftType.value.value / rightType.value.value)
+                            }
+                        }
+                    } else if (!subsumationIssues(ctx, NUMBER_TYPE, leftType) && !subsumationIssues(ctx, NUMBER_TYPE, rightType)) {
+                        return NUMBER_TYPE
+                    } else if (op === '+' && !subsumationIssues(ctx, STRING_OR_NUMBER_TYPE, leftType) && !subsumationIssues(ctx, STRING_OR_NUMBER_TYPE, rightType)) {
+                        return STRING_TYPE
+                    }
+
+                    return UNKNOWN_TYPE
+                case '<':
+                case '>':
+                case '<=':
+                case '>=':
+                case '==':
+                case '!=':
+                    return BOOLEAN_TYPE
+            }
+            
+            throw Error("No typecheck logic for: " + op)
         }
         case "negation-operator": return BOOLEAN_TYPE;
         case "invocation": {
@@ -1399,42 +1404,6 @@ function assign<K, V>(a: Map<K, V>, b: ReadonlyMap<K, V> | undefined) {
             }
         }
     }
-}
-
-export const BINARY_OPERATOR_TYPES: Partial<{ [key in BinaryOp]: { left: TypeExpression, right: TypeExpression, output: TypeExpression }[] }> = {
-    "+": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE },
-        { left: STRING_TYPE, right: STRING_TYPE, output: STRING_TYPE },
-        { left: NUMBER_TYPE, right: STRING_TYPE, output: STRING_TYPE },
-        { left: STRING_TYPE, right: NUMBER_TYPE, output: STRING_TYPE },
-    ],
-    "-": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
-    ],
-    "*": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
-    ],
-    "/": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: NUMBER_TYPE }
-    ],
-    "<": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    ">": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "<=": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    ">=": [
-        { left: NUMBER_TYPE, right: NUMBER_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "==": [
-        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
-    ],
-    "!=": [
-        { left: UNKNOWN_TYPE, right: UNKNOWN_TYPE, output: BOOLEAN_TYPE }
-    ],
 }
 
 /**
