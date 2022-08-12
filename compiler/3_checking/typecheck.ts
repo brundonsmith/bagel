@@ -271,8 +271,6 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     case '==':
                     case '!=':
                         if (subsumationIssues(ctx, leftType, rightType) 
-                    if (subsumationIssues(ctx, leftType, rightType) 
-                        if (subsumationIssues(ctx, leftType, rightType) 
                          && subsumationIssues(ctx, rightType, leftType)) {
                             sendError(miscError(current, `Can't compare types ${hlt(msgFormat(leftType))} and ${hlt(msgFormat(rightType))} because they have no overlap`))
                         }
