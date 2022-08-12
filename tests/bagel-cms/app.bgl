@@ -40,7 +40,7 @@ export func renderApp(entityTypes: EntityDescriptor[], entitiesByType: {[string]
 
 @memo()
 func renderEntityForm(entityTypes: EntityDescriptor[], entity: Entity) =>
-    const entityType = entityTypes.iter().find((type: EntityDescriptor) => type.id == entity.type),
+    const entityType = entityTypes.iter().find(type => type.id == entity.type),
 
     if entityType == nil {
         <div>
