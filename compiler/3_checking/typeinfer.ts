@@ -470,7 +470,7 @@ const inferTypeInner = memo(function inferTypeInner(
             }
 
             if (arraySpreads.length === 0) {
-                return tupleOf(memberTypes, undefined, ast)
+                return tupleOf(memberTypes, 'literal', ast)
             } else {
                 return arrayOf(resolveType(ctx, {
                     kind: "union-type",
