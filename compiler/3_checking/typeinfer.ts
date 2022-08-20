@@ -5,7 +5,7 @@ import { exists, given, devMode } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, SourceInfo } from "../_model/ast.ts";
-import { areSame, argType, AST_NOISE, attribute, elementTagToObject, expressionsEqual, getName, identifierToExactString, invocationFromMethodCall, literalType, mapParseTree, maybeOf, tupleOf, typesEqual, TYPE_AST_NOISE, unionOf } from "../utils/ast.ts";
+import { areSame, argType, arrayOf, AST_NOISE, attribute, elementTagToObject, errorOf, expressionsEqual, getName, identifierToExactString, invocationFromMethodCall, iteratorOf, literalType, mapParseTree, maybeOf, planOf, tupleOf, typesEqual, TYPE_AST_NOISE, unionOf } from "../utils/ast.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
@@ -161,32 +161,20 @@ const inferTypeInner = memo(function inferTypeInner(
             const op = ast.op.op
             switch (op) {
                 case '??':
-                    return {
-                        kind: "union-type",
-                        members: [
-                            subtract(ctx, leftType, NIL_TYPE),
-                            rightType
-                        ],
-                        mutability: undefined, parent, module, code, startIndex, endIndex
-                    }
+                    return unionOf([
+                        subtract(ctx, leftType, NIL_TYPE),
+                        rightType
+                    ], ast)
                 case '&&':
-                    return {
-                        kind: "union-type",
-                        members: [
-                            rightType,
-                            narrow(ctx, leftType, FALSY)
-                        ],
-                        mutability: undefined, parent, module, code, startIndex, endIndex
-                    }
+                    return unionOf([
+                        rightType,
+                        narrow(ctx, leftType, FALSY)
+                    ], ast)
                 case '||':
-                    return {
-                        kind: "union-type",
-                        members: [
-                            subtract(ctx, leftType, FALSY),
-                            rightType
-                        ],
-                        mutability: undefined, parent, module, code, startIndex, endIndex
-                    }
+                    return unionOf([
+                        subtract(ctx, leftType, FALSY),
+                        rightType
+                    ], ast)
                 case '+':
                 case '-':
                 case '*':
@@ -262,12 +250,8 @@ const inferTypeInner = memo(function inferTypeInner(
                     subject: inferType(ctx, ast.subject),
                     property: ast.property,
                     optional: ast.optional,
-                    parent: ast.parent,
-                    module: ast.module,
-                    code: ast.code,
-                    startIndex: ast.startIndex,
-                    endIndex: ast.endIndex,
-                    mutability: undefined
+                    mutability: undefined,
+                    parent, module, code, startIndex, endIndex,
                 }
             } else {
                 const subjectType = resolveType(ctx, inferType(ctx, ast.subject));
@@ -301,12 +285,7 @@ const inferTypeInner = memo(function inferTypeInner(
                     if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
                         return effectiveSubjectType.members[indexType.value.value] ?? NIL_TYPE
                     } else {
-                        return {
-                            kind: "union-type",
-                            members: [ ...effectiveSubjectType.members, NIL_TYPE ],
-                            parent,
-                            ...TYPE_AST_NOISE
-                        }
+                        return unionOf([ ...effectiveSubjectType.members, NIL_TYPE ], ast)
                     }
                 } else if (effectiveSubjectType.kind === 'string-type' && indexIsNumber) {
                     return maybeOf(STRING_TYPE)
@@ -345,12 +324,7 @@ const inferTypeInner = memo(function inferTypeInner(
             }
         }
         case "range": {
-            return {
-                kind: 'iterator-type',
-                inner: NUMBER_TYPE,
-                mutability: undefined,
-                parent, module, code, startIndex, endIndex
-            }
+            return iteratorOf(NUMBER_TYPE, ast)
         }
         case "debug": {
             if (isExpression(ast.inner)) {
@@ -373,12 +347,7 @@ const inferTypeInner = memo(function inferTypeInner(
             const innerType = inferType(ctx, ast.inner);
 
             if (ast.kind === 'inline-const-group' && ast.declarations.some(d => d.awaited)) {
-                return {
-                    kind: 'plan-type',
-                    inner: innerType,
-                    mutability: undefined,
-                    parent, module, code, startIndex, endIndex
-                }
+                return planOf(innerType, ast)
             }
 
             return innerType
@@ -501,24 +470,14 @@ const inferTypeInner = memo(function inferTypeInner(
             }
 
             if (arraySpreads.length === 0) {
-                return {
-                    kind: "tuple-type",
-                    members: memberTypes,
-                    mutability: "literal",
-                    parent, module, code, startIndex, endIndex
-                }
+                return tupleOf(memberTypes, undefined, ast)
             } else {
-                return {
-                    kind: "array-type",
-                    element: resolveType(ctx, {
-                        kind: "union-type",
-                        members: [...memberTypes, ...arraySpreads.map(t => t.element)],
-                        mutability: undefined,
-                        parent, module, code, startIndex, endIndex
-                    }),
-                    mutability: "literal",
+                return arrayOf(resolveType(ctx, {
+                    kind: "union-type",
+                    members: [...memberTypes, ...arraySpreads.map(t => t.element)],
+                    mutability: undefined,
                     parent, module, code, startIndex, endIndex
-                }
+                }), 'literal', ast)
             }
         }
         case "regular-expression": return {
@@ -535,12 +494,7 @@ const inferTypeInner = memo(function inferTypeInner(
         case "instance-of": return BOOLEAN_TYPE;
         case "as-cast": return ast.type;
         case "error-expression":
-            return {
-                kind: "error-type",
-                inner: inferType(ctx, ast.inner),
-                mutability: undefined,
-                parent, module, code, startIndex, endIndex
-            }
+            return errorOf(inferType(ctx, ast.inner), ast)
         default:
             // @ts-expect-error: exhaustiveness
             throw Error(ast.kind)
@@ -553,22 +507,22 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
 
     type MutabilityKind = Mutability['mutability']|undefined
 
-    const decl = binding.owner
+    const { owner } = binding
 
-    switch (decl.kind) {
+    switch (owner.kind) {
         case 'value-declaration':{
-            if (decl.type != null) return decl.type
+            if (owner.type != null) return owner.type
 
-            const valueType = resolveType(ctx, inferType(ctx, decl.value))
+            const valueType = resolveType(ctx, inferType(ctx, owner.value))
             const mutability: MutabilityKind = given(valueType.mutability, mutability =>
-                decl.isConst || (decl.exported === 'expose' && decl.module !== module)
+                owner.isConst || (owner.exported === 'expose' && owner.module !== module)
                     ? 'constant'
                     : mutability
             )
 
             // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
             const broadenedValueType = (
-                !decl.isConst
+                !owner.isConst
                     ? broadenTypeForMutation(ctx, valueType)
                     : valueType
             )
@@ -580,14 +534,14 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
         }
         case 'func-declaration':
         case 'proc-declaration': {
-            return resolveType(ctx, inferType(ctx, decl.value))
+            return resolveType(ctx, inferType(ctx, owner.value))
         }
         case 'declaration-statement':
         case 'inline-declaration': {
-            if (decl.destination.kind === 'name-and-type' && decl.destination.type != null) return decl.destination.type
+            if (owner.destination.kind === 'name-and-type' && owner.destination.type != null) return owner.destination.type
 
-            let valueType = resolveType(ctx, inferType(ctx, decl.value))
-            if (decl.awaited) {
+            let valueType = resolveType(ctx, inferType(ctx, owner.value))
+            if (owner.awaited) {
                 if (valueType.kind === 'plan-type') {
                     valueType = valueType.inner
                 } else {
@@ -596,43 +550,43 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
             }
 
             const mutability: MutabilityKind = given(valueType.mutability, mutability =>
-                decl.kind === 'declaration-statement' && decl.isConst
+                owner.kind === 'declaration-statement' && owner.isConst
                     ? 'constant'
                     : mutability
             )
 
             // if this is a let declaration, its type may need to be made less exact to enable reasonable mutation
             const broadenedValueType = (
-                decl.kind === 'declaration-statement' && !decl.isConst
+                owner.kind === 'declaration-statement' && !owner.isConst
                     ? broadenTypeForMutation(ctx, valueType)
                     : valueType
             )
 
-            if (decl.destination.kind === 'name-and-type') {
+            if (owner.destination.kind === 'name-and-type') {
                 return {
                     ...broadenedValueType,
                     mutability: mutability === 'literal' ? 'mutable' : mutability
                 } as TypeExpression
             } else {
-                if (decl.destination.destructureKind === 'object' && valueType.kind === 'object-type') {
+                if (owner.destination.destructureKind === 'object' && valueType.kind === 'object-type') {
                     const props = propertiesOf(ctx, valueType)
                     return props?.find(prop => getName(prop.name) === binding.identifier.name)?.type ?? UNKNOWN_TYPE
-                } else if (decl.destination.destructureKind === 'array') {
+                } else if (owner.destination.destructureKind === 'array') {
                     if (valueType.kind === 'array-type') {
                         return maybeOf(valueType.element)
                     } else if (valueType.kind === 'tuple-type') {
-                        const index = decl.destination.properties.findIndex(p => p.name === binding.identifier.name)
+                        const index = owner.destination.properties.findIndex(p => p.name === binding.identifier.name)
                         return valueType.members[index] ?? UNKNOWN_TYPE
                     }
                 }
             }
         } break;
         case 'derive-declaration':
-            return decl.type ?? resolveType(ctx, inferType(ctx, decl.expr))
+            return owner.type ?? resolveType(ctx, inferType(ctx, owner.expr))
         case 'remote-declaration': {
-            const inner = decl.type ?? resolveType(ctx, inferType(ctx, decl.expr))
+            const inner = owner.type ?? resolveType(ctx, inferType(ctx, owner.expr))
 
-            const { module, code, startIndex, endIndex } = decl
+            const { module, code, startIndex, endIndex } = owner
 
             return {
                 kind: 'remote-type',
@@ -643,14 +597,14 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
         }
         case 'func':
         case 'proc': {
-            const funcOrProcType = decl.type.kind === 'generic-type' ? decl.type.inner : decl.type
+            const funcOrProcType = owner.type.kind === 'generic-type' ? owner.type.inner : owner.type
 
             const argType = getArgTypeByName(funcOrProcType.args, binding.identifier.name)
             if (argType) {
                 return argType
             }
 
-            const inferredHolderType = inferType(ctx, decl, false, true)
+            const inferredHolderType = inferType(ctx, owner, false, true)
             if (inferredHolderType.kind === 'func-type' || inferredHolderType.kind === 'proc-type') {
                 return getArgTypeByName(inferredHolderType.args, binding.identifier.name) ?? UNKNOWN_TYPE
             }
@@ -658,27 +612,23 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
             return UNKNOWN_TYPE
         }
         case 'for-loop': {
-            const iteratorType = resolveType(ctx, inferType(ctx, decl.iterator))
+            const iteratorType = resolveType(ctx, inferType(ctx, owner.iterator))
 
             return iteratorType.kind === 'iterator-type'
                 ? iteratorType.inner
                 : UNKNOWN_TYPE
         }
         case 'try-catch': {
-            const thrown = throws(ctx, decl.tryBlock)
+            const thrown = throws(ctx, owner.tryBlock)
 
             if (thrown.length === 0) {
                 return UNKNOWN_TYPE
             } else {
-                return {
-                    kind: 'union-type',
-                    members: thrown,
-                    ...TYPE_AST_NOISE
-                }
+                return unionOf(thrown)
             }
         }
         case 'import-all-declaration': {
-            const otherModuleName = canonicalModuleName(decl.module as ModuleName, decl.path.value)
+            const otherModuleName = canonicalModuleName(owner.module as ModuleName, owner.path.value)
             const otherModule = allModules.get(otherModuleName)?.ast
 
             if (otherModule == null) {
@@ -701,7 +651,7 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
                     entries: exportedDeclarations.map(otherDecl => {
                         return attribute(
                             otherDecl.name.name, 
-                            getBindingType(ctx, decl, { identifier: otherDecl.name, owner: otherDecl }),
+                            getBindingType(ctx, owner, { identifier: otherDecl.name, owner: otherDecl }),
                             false
                         )
                     }),
@@ -722,15 +672,15 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
             }
         }
         case 'import-item': {
-            const imported = resolveImport(ctx, decl)
+            const imported = resolveImport(ctx, owner)
 
             if (imported) {
                 return getBindingType(ctx, importedFrom, { owner: imported, identifier: imported.name })
             }
         } break;
         case 'type-declaration': {
-            if (decl.type.kind === 'nominal-type' && decl.type.inner == null) {
-                return decl.type
+            if (owner.type.kind === 'nominal-type' && owner.type.inner == null) {
+                return owner.type
             } else {
                 return UNKNOWN_TYPE
             }
@@ -739,7 +689,7 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
             return UNKNOWN_TYPE
         default:
             // @ts-expect-error: exhaustiveness
-            if (Deno.env.get('DEV_MODE')) throw Error('getDeclType is nonsensical on declaration of type ' + decl?.kind)
+            if (Deno.env.get('DEV_MODE')) throw Error('getDeclType is nonsensical on declaration of type ' + owner?.kind)
     }
 
     return UNKNOWN_TYPE
@@ -769,24 +719,21 @@ function broadenTypeForMutation(ctx: Pick<Context, "allModules"|"encounteredName
     if (type.kind === 'union-type') {
         return distillOverlappingUnionMembers(ctx, type)
     } else if (type.kind === 'literal-type') {
-        if (type.value.kind === 'exact-string-literal') {
-            return STRING_TYPE
-        }
-        if (type.value.kind === 'number-literal') {
-            return NUMBER_TYPE
-        }
-        if (type.value.kind === 'boolean-literal') {
-            return BOOLEAN_TYPE
+        switch (type.value.kind) {
+            case 'exact-string-literal': return STRING_TYPE
+            case 'number-literal': return NUMBER_TYPE
+            case 'boolean-literal': return BOOLEAN_TYPE
         }
     } else if (type.mutability === 'mutable' || type.mutability === 'literal') {
-        if (type.kind === 'tuple-type') {
-            return { ...type, kind: 'array-type', element: distillOverlappingUnionMembers(ctx, { kind: 'union-type', members: type.members.map(m => broadenTypeForMutation(ctx, m)), parent: type.parent, ...TYPE_AST_NOISE }) }
-        } else if (type.kind === 'array-type') {
-            return { ...type, element: broadenTypeForMutation(ctx, type.element) }
-        } else if (type.kind === 'object-type') {
-            return { ...type, entries: type.entries.map(attribute => ({ ...attribute, type: broadenTypeForMutation(ctx, attribute.type) })) }
-        } else if (type.kind === 'record-type') {
-            return { ...type, keyType: broadenTypeForMutation(ctx, type.keyType), valueType: broadenTypeForMutation(ctx, type.valueType) }
+        switch (type.kind) {
+            case 'tuple-type':
+                return { ...type, kind: 'array-type', element: distillOverlappingUnionMembers(ctx, { kind: 'union-type', members: type.members.map(m => broadenTypeForMutation(ctx, m)), parent: type.parent, ...TYPE_AST_NOISE }) }
+            case 'array-type':
+                return { ...type, element: broadenTypeForMutation(ctx, type.element) }
+            case 'object-type':
+                return { ...type, entries: type.entries.map(attribute => ({ ...attribute, type: broadenTypeForMutation(ctx, attribute.type) })) }
+            case 'record-type':
+                return { ...type, keyType: broadenTypeForMutation(ctx, type.keyType), valueType: broadenTypeForMutation(ctx, type.valueType) }
         }
     }
 

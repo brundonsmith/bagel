@@ -1174,7 +1174,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
             }
         }
         const missingPropertiesMessage = missingProperties.length > 0
-            ? [`Missing propert${iesOrY(missingProperties.length)} ${missingProperties.map(p => `${hlt(p)}`).join(', ')} required by type ${hlt(msgFormat(resolvedDestination))}`]
+            ? [`Missing propert${iesOrY(missingProperties.length)} ${missingProperties.map(hlt).join(', ')} required by type ${hlt(msgFormat(resolvedDestination))}`]
             : []
 
         const extraProperties: string[] = []

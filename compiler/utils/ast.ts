@@ -4,7 +4,7 @@ import { inferType,propertiesOf } from "../3_checking/typeinfer.ts";
 import { AST,PlainIdentifier,SourceInfo } from "../_model/ast.ts";
 import { Context } from "../_model/common.ts";
 import { BooleanLiteral, ElementTag, ExactStringLiteral, Expression, Invocation, LocalIdentifier, NumberLiteral, ObjectLiteral } from "../_model/expressions.ts";
-import { Args, Attribute, ElementofType, LiteralType, MaybeType, PlanType, SpreadArgs, TupleType, TypeExpression, UnionType } from "../_model/type-expressions.ts";
+import { Args, ArrayType, Attribute, ElementofType, ErrorType, IteratorType, LiteralType, MaybeType, PlanType, SpreadArgs, TupleType, TypeExpression, UnionType } from "../_model/type-expressions.ts";
 import { deepEquals } from "./misc.ts";
 
 export function areSame(a: AST|undefined, b: AST|undefined) {
@@ -126,8 +126,8 @@ export function setParents(ast: AST) {
     }
 }
 
-export function unionOf(members: readonly TypeExpression[]): UnionType {
-    const { parent, module, code, startIndex } = members[0]
+export function unionOf(members: readonly TypeExpression[], basedOn?: SourceInfo): UnionType {
+    const { parent, module, code, startIndex } = basedOn ?? members[0]
 
     return {
         kind: 'union-type',
@@ -138,8 +138,8 @@ export function unionOf(members: readonly TypeExpression[]): UnionType {
     }
 }
 
-export function tupleOf(members: TypeExpression[], mutability?: 'constant'|"readonly"|"mutable"|"literal"): TupleType {
-    const { parent, module, code, startIndex } = members[0] ?? {}
+export function tupleOf(members: TypeExpression[], mutability?: 'constant'|"readonly"|"mutable"|"literal", basedOn?: SourceInfo): TupleType {
+    const { parent, module, code, startIndex } = basedOn ?? members[0] ?? {}
     const memberMutability = members.map(m => m.mutability).filter((el, index, arr) => arr.indexOf(el) === index)
 
     return {
@@ -156,8 +156,19 @@ export function tupleOf(members: TypeExpression[], mutability?: 'constant'|"read
     }
 }
 
-export function maybeOf(inner: TypeExpression): MaybeType {
-    const { parent, module, code, startIndex, endIndex } = inner
+export function arrayOf(element: TypeExpression, mutability?: 'constant'|"readonly"|"mutable"|"literal", basedOn?: SourceInfo): ArrayType {
+    const { parent, module, code, startIndex, endIndex } = basedOn ?? element
+
+    return {
+        kind: 'array-type',
+        element,
+        mutability: element.mutability ?? 'readonly',
+        parent, module, code, startIndex, endIndex
+    }
+}
+
+export function maybeOf(inner: TypeExpression, basedOn?: SourceInfo): MaybeType {
+    const { parent, module, code, startIndex, endIndex } = basedOn ?? inner
 
     return {
         kind: 'maybe-type',
@@ -167,8 +178,19 @@ export function maybeOf(inner: TypeExpression): MaybeType {
     }
 }
 
-export function planOf(inner: TypeExpression): PlanType {
-    const { parent, module, code, startIndex, endIndex } = inner
+export function iteratorOf(inner: TypeExpression, basedOn?: SourceInfo): IteratorType {
+    const { parent, module, code, startIndex, endIndex } = basedOn ?? inner
+
+    return {
+        kind: 'iterator-type',
+        inner,
+        mutability: undefined,
+        parent, module, code, startIndex, endIndex
+    }
+}
+
+export function planOf(inner: TypeExpression, basedOn?: SourceInfo): PlanType {
+    const { parent, module, code, startIndex, endIndex } = basedOn ?? inner
 
     return {
         kind: 'plan-type',
@@ -178,12 +200,23 @@ export function planOf(inner: TypeExpression): PlanType {
     }
 }
 
-export function elementOf(arrType: TypeExpression): ElementofType {
-    const { parent, module, code, startIndex, endIndex } = arrType
+export function elementOf(arrType: TypeExpression, basedOn?: SourceInfo): ElementofType {
+    const { parent, module, code, startIndex, endIndex } = basedOn ?? arrType
 
     return {
         kind: 'elementof-type',
         inner: arrType,
+        mutability: undefined,
+        parent, module, code, startIndex, endIndex
+    }
+}
+
+export function errorOf(inner: TypeExpression, basedOn?: SourceInfo): ErrorType {
+    const { parent, module, code, startIndex, endIndex } = basedOn ?? inner
+
+    return {
+        kind: 'error-type',
+        inner,
         mutability: undefined,
         parent, module, code, startIndex, endIndex
     }
