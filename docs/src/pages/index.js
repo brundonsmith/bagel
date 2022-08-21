@@ -18,8 +18,9 @@ function HomepageHeader() {
           <Link
             className="button button--secondary button--lg"
             to="/docs/highlights">
-            Highlights
+            Sample code
           </Link>
+          <div className={styles.spacer} />
           <Link
             className="button button--secondary button--lg"
             to="/docs/intro">

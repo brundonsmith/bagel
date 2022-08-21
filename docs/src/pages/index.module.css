@@ -22,6 +22,9 @@
   justify-content: center;
 }
 
-body {
-  background: var(--background-color);
+.spacer {
+  width: 1em;
+  height: 1em;
+  flex-grow: 0;
+  flex-shrink: 0;
 }

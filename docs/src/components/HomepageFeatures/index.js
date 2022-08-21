@@ -30,7 +30,7 @@ const FeatureList = [
     src: '/img/coder-bagel.png',
     description: (
       <>
-        Reactivity to chaing state is built into the language, whether you use
+        Reactivity to changing state is built into the language, whether you use
         it for a UI or something else. You'll never have to track
         dependencies or manually synchronize state again.
       </>
