@@ -4,8 +4,8 @@ title: Bagel By Example
 ---
 
 > This is just a whirlwind tour of what Bagel's all about, for people who are
-curious. If you're ready to download it and get started, head to the Getting
-Started guide!
+> curious. If you're ready to download it and get started, head to the Getting
+> Started guide!
 
 ## Basics
 
@@ -47,7 +47,7 @@ const circumference = (
 )
 ```
 
-Bagel functions can't modify variables or have other side-effects, but 
+Bagel functions can't modify variables or have other side-effects, but
 procedures can:
 
 ```bagel
@@ -89,6 +89,7 @@ Bagel is statically typed, like TypeScript:
 ```bagel
 const x: number = 'foo'
 ```
+
 ```
 type error: type 'foo' is not assignable to type number
 ```
@@ -98,6 +99,7 @@ But in some ways, it's a little smarter about it:
 ```bagel
 const comparison = 2 + 2 == 3
 ```
+
 ```
 type error: can't compare types 4 and 3 because they have no overlap
 ```
@@ -130,7 +132,6 @@ func getName(json: unknown): string? =>
     }
 ```
 
-
 ## Markup syntax
 
 Bagel has JSX-like syntax:
@@ -149,7 +150,8 @@ func renderProfile(person: Person) =>
     </div>
 ```
 
-But instead of calling out to a specific framework like React, it generates plain JSON data, which can then be passed to any library:
+But instead of calling out to a specific framework like React, it generates
+plain JSON data, which can then be passed to any library:
 
 ```bagel
 type ExpectedMarkup = {
@@ -202,24 +204,28 @@ type ExpectedMarkup = {
 const myMarkup: ExpectedMarkup = renderProfile(person)
 ```
 
-Official Preact integration is available, but integrations can be written
-for other rendering libraries.
+Official Preact integration is available, but integrations can be written for
+other rendering libraries.
 
 ## JavaScript interaction
 
 Bagel compiles to a single, minified JavaScript bundle:
+
 ```
 bagel build my-project/index.bgl
 ```
 
 This bundle can be targeted at web browsers, node, deno, or any combination of
 the three:
+
 ```
 <script src="my-project.bundle.js"></script>
 ```
+
 ```
 node my-project.bundle.js
 ```
+
 ```
 deno run my-project.bundle.js
 ```
@@ -293,8 +299,8 @@ Instead of Promises, Bagel has Plans:
 const request: Plan<unknown> = fetch('/some_endpoint')
 ```
 
-A Plan is like a Promise that hasn't been kicked off yet. That means you can re-use
-the same Plan multiple times:
+A Plan is like a Promise that hasn't been kicked off yet. That means you can
+re-use the same Plan multiple times:
 
 ```bagel
 const request: Plan<unknown> = fetch('/some_endpoint')  // no request has been sent yet
@@ -321,9 +327,9 @@ async proc showUser1() {
 
 ## Reactivity
 
-A fundamental problem when building certain kinds of apps, especially user 
-interfaces, is updating something when some variable changes. Bagel is unique
-by supporting this at the language level.
+A fundamental problem when building certain kinds of apps, especially user
+interfaces, is updating something when some variable changes. Bagel is unique by
+supporting this at the language level.
 
 In Bagel you can `autorun` a procedural block when a variable that's used in it
 changes:
@@ -342,6 +348,7 @@ proc main() {
     counter += 1;
 }
 ```
+
 ```
 1
 2
@@ -349,6 +356,7 @@ proc main() {
 ```
 
 We might update a UI in the same way:
+
 ```bagel
 let list: string[] = []
 
@@ -371,8 +379,8 @@ autorun {
 forever
 ```
 
-Every variable referenced will be tracked automatically. Any changes to it
-will trigger all reactions it's involved in.
+Every variable referenced will be tracked automatically. Any changes to it will
+trigger all reactions it's involved in.
 
 Reactivity can also be used for caching:
 
@@ -391,9 +399,9 @@ func maximumAge(): number => users.iter()
 
 Here, if `maximumAge()` is called multiple times in a row, the result will only
 be computed once and re-used. But, if an element is added to or removed from the
-`users` array or if one of the users' `age` properties is modified, the cached 
+`users` array or if one of the users' `age` properties is modified, the cached
 result will automatically be invalidated. The next call to `maximumAge()` would
 then re-compute the new result and cache it again.
 
 > `@memo` is a "decorator"; there are other decorators, and you can write your
-own, but this one just happens to be a uniquely special part of the language!
+> own, but this one just happens to be a uniquely special part of the language!
