@@ -3,7 +3,7 @@
 rm -rf coverage
 
 # generate raw data
-DEV_MODE=true deno test --coverage=coverage --unstable --allow-all
+DEV_MODE=true deno test --coverage=coverage --unstable --allow-all --ignore=docs
 
 # generate .lcov file
 deno coverage coverage --lcov > coverage/cov.xml
