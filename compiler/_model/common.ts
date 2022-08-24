@@ -1,6 +1,6 @@
 import { ForLoop, TryCatch, DeclarationStatement } from "./statements.ts";
 import { GenericParamType, TypeExpression } from "./type-expressions.ts";
-import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, RemoteDeclaration, DeriveDeclaration, TypeDeclaration, ImportItem, ALL_PLATFORMS, Platform } from "./declarations.ts";
+import { ValueDeclaration, FuncDeclaration, ProcDeclaration, ImportAllDeclaration, TypeDeclaration, ImportItem, ALL_PLATFORMS, Platform } from "./declarations.ts";
 import { Expression, Func, InlineDeclaration, Proc } from "./expressions.ts";
 import { BagelError } from "../errors.ts";
 import { NominalType } from "../utils/misc.ts";
@@ -41,8 +41,6 @@ export type Binding = {
         | ProcDeclaration
         | FuncDeclaration
         | DeclarationStatement
-        | DeriveDeclaration
-        | RemoteDeclaration
         | ForLoop
         | Func
         | Proc
@@ -68,8 +66,6 @@ export function getBindingMutability(binding: Binding, from: AST): 'constant'|"r
             return 'mutable'
         case 'func-declaration':
         case 'proc-declaration':
-        case 'derive-declaration':
-        case 'remote-declaration':
         case 'inline-declaration':
         case 'type-declaration':
         case 'generic-param-type':

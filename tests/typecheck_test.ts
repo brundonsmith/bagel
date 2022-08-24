@@ -1982,26 +1982,6 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Derive declaration pass",
-  fn() {
-    testTypecheck(`
-    let bar = 12
-    derive foo: number => bar * 2`,
-    false)
-  }
-})
-
-Deno.test({
-  name: "Derive declaration fail",
-  fn() {
-    testTypecheck(`
-    let bar = 12
-    derive foo: string => bar * 2`,
-    true)
-  }
-})
-
-Deno.test({
   name: "Pure function",
   fn() {
     testTypecheck(`
@@ -2713,99 +2693,6 @@ Deno.test({
       arr.push(4);
     }`,
     false)
-  }
-})
-
-Deno.test({
-  name: "Remote pass",
-  fn() {
-    testTypecheck(`
-    proc log(val: unknown) { }
-
-    js func get(n: number): Plan<string> => {# #}
-
-    let incr = 0
-    remote foo: string => get(incr)
-    
-    proc thing() {
-      if (!foo.loading) {
-        log(foo.value);
-      }
-
-      incr = incr + 1;
-    }`,
-    false)
-  }
-})
-
-Deno.test({
-  name: "Remote fail 1",
-  fn() {
-    testTypecheck(`
-    proc log(val: unknown) { }
-
-    js func get(n: number): Plan<string> => {# #}
-
-    let incr = 0
-    remote foo: number => get(incr)
-    `,
-    true)
-  }
-})
-
-Deno.test({
-  name: "Remote fail 2",
-  fn() {
-    testTypecheck(`
-    js func get(n: number): Plan<string> => {# #}
-
-    let incr = 0
-    remote foo: string => get(incr)
-    
-    proc thing() {
-      foo.value = 'stuff';
-    }`,
-    true)
-  }
-})
-
-Deno.test({
-  name: "Remote fail 3",
-  fn() {
-    testTypecheck(`
-    js func get(n: number): Plan<string> => {# #}
-
-    let incr = 0
-    remote foo: string => incr`,
-    true)
-  }
-})
-
-Deno.test({
-  name: "Derive pass",
-  fn() {
-    testTypecheck(`
-    proc log(val: unknown) { }
-
-    let incr = 0
-    derive doubled: number => incr * 2
-    
-    proc thing() {
-      log(doubled + incr);
-    }`,
-    false)
-  }
-})
-
-Deno.test({
-  name: "Derive fail",
-  fn() {
-    testTypecheck(`
-    proc log(val: unknown) { }
-
-    let incr = 0
-    derive doubled: boolean => incr * 2`,
-    true)
   }
 })
 

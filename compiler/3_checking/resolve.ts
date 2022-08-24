@@ -1,7 +1,7 @@
 import { memo } from "../../lib/ts/reactivity.ts";
 import { AST } from "../_model/ast.ts";
 import { Binding, Context, ModuleName } from "../_model/common.ts";
-import { ImportItem,ValueDeclaration,FuncDeclaration,ProcDeclaration,TypeDeclaration,DeriveDeclaration,RemoteDeclaration,ImportDeclaration } from "../_model/declarations.ts";
+import { ImportItem,ValueDeclaration,FuncDeclaration,ProcDeclaration,TypeDeclaration,ImportDeclaration } from "../_model/declarations.ts";
 
 export const resolve = memo(function resolve (ctx: Pick<Context, 'allModules'|'canonicalModuleName'>, name: string, from: AST, resolveImports?: boolean): Binding|undefined {
     let resolved = resolveInner(name, from, from)
@@ -41,8 +41,6 @@ const resolveInner = (name: string, from: AST, originator: AST): Binding|undefin
                     case "func-declaration":
                     case "proc-declaration":
                     case "value-declaration":
-                    case "derive-declaration":
-                    case "remote-declaration":
                     case "import-all-declaration": {
                         if (declaration.name.name === name) {
                             return {
@@ -214,9 +212,7 @@ export function resolveImport(ctx: Pick<Context, 'allModules'|'canonicalModuleNa
         (other.kind === 'value-declaration' ||
         other.kind === 'func-declaration' ||
         other.kind === 'proc-declaration' ||
-        other.kind === 'type-declaration' ||
-        other.kind === 'derive-declaration' ||
-        other.kind === 'remote-declaration')
+        other.kind === 'type-declaration')
         && other.name.name === importItem.name.name
-    ) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|DeriveDeclaration|RemoteDeclaration|undefined
+    ) as ValueDeclaration|FuncDeclaration|ProcDeclaration|TypeDeclaration|undefined
 }

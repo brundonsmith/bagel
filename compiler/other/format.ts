@@ -97,11 +97,6 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
 
             return `${l} ${entries.join(', ')} ${r}`
         }
-        case "derive-declaration":
-        case "remote-declaration": {
-            const keyword = ast.kind === 'derive-declaration' ? 'derive' : 'remote'
-            return exported(ast.exported) + `${keyword} ${ast.name.name}${maybeTypeAnnotation(options, indent, parent, ast.type)} => ${format(ast.expr)}`
-        }
         case "type-declaration":
             if (ast.type.kind === 'nominal-type') {
                 const inner = ast.type.inner ? `(${f(ast.type.inner)})` : ''
@@ -287,8 +282,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "nominal-type": return ast.name ?? '<unnamed nominal>';
         case "iterator-type":
         case "plan-type":
-        case "error-type":
-        case "remote-type": {
+        case "error-type": {
             const segment = ast.kind.split('-')[0]
             const typeName = segment[0].toUpperCase() + segment.slice(1)
 

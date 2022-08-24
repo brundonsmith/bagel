@@ -28,12 +28,12 @@ export const IMPORTED_ITEMS: readonly string[] = [
     'observe', 'invalidate', 'memo', 'autorun', 'action', 'WHOLE_OBJECT', 
 
     // used in compiler output
-    'range', 'Iter', 'Plan', 'Error', 'ERROR_SYM', 'Remote',
+    'range', 'Iter', 'Plan', 'Error', 'ERROR_SYM',
     
     // runtime type-checking 
     'instanceOf', 'RT_UNKNOWN', 
     'RT_NIL', 'RT_BOOLEAN', 'RT_NUMBER', 'RT_STRING', 'RT_LITERAL', 'RT_ITERATOR',
-    'RT_PLAN', 'RT_REMOTE', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT', 'RT_NOMINAL',
+    'RT_PLAN', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT', 'RT_NOMINAL',
     'RT_ERROR'
 ]
 
@@ -176,15 +176,6 @@ function compileOne(ctx: CompileContext, ast: AST): string {
 
             return `${l} ${entries.join(', ')} ${r}`
         }
-        case "derive-declaration": 
-            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `: () => ${c(ast.type)}` : ``} = ${INT}memo(
-                () => ${c(ast.expr)}
-            )`
-        case "remote-declaration": {
-            return exported(ast.exported) + `const ${ast.name.name}${ast.type ? `: ${INT}Remote<${c(ast.type)}>` : ``} = new ${INT}Remote(
-                () => ${c(ast.expr)}
-            )`
-        }
         case "autorun": return `${INT}autorun(() => ${c(ast.effect)}, ${ast.until ? '() => ' + fixTruthinessIfNeeded(ctx, ast.until) : 'undefined'})`;
         case "assignment": {
             const value = c(ast.value)
@@ -310,8 +301,6 @@ function compileOne(ctx: CompileContext, ast: AST): string {
 
             if ((binding?.owner.kind === 'value-declaration' || binding?.owner.kind === 'declaration-statement') && !binding.owner.isConst) {
                 return `${INT}observe(${ast.name}, 'value')`
-            } else if (binding?.owner.kind === 'derive-declaration') {
-                return `${ast.name}()`
             } else {
                 return ast.name
             }
@@ -388,7 +377,6 @@ function compileOne(ctx: CompileContext, ast: AST): string {
         case "iterator-type": return `${INT}Iter<${c(ast.inner)}>`;
         case "plan-type": return `${INT}Plan<${c(ast.inner)}>`;
         case "error-type": return `${INT}Error<${c(ast.inner)}>`;
-        case "remote-type": return `${INT}Remote<${c(ast.inner)}>`;
         case "literal-type": return `${c(ast.value)}`;
         case "string-type": return `string`;
         case "number-type": return `number`;
@@ -428,7 +416,6 @@ function compileRuntimeType(type: TypeExpression): string {
         case 'error-type': return `{ kind: ${INT}RT_ERROR, inner: ${compileRuntimeType(type.inner)} }`
         case 'iterator-type': return `{ kind: ${INT}RT_ITERATOR, inner: ${compileRuntimeType(type.inner)} }`
         case 'plan-type': return `{ kind: ${INT}RT_PLAN, inner: ${compileRuntimeType(type.inner)} }`
-        case 'remote-type': return `{ kind: ${INT}RT_REMOTE, inner: ${compileRuntimeType(type.inner)} }`
         case 'union-type': return `[ ${type.members.map(compileRuntimeType).join(', ')} ]`;
     }
 

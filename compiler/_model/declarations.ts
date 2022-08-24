@@ -11,8 +11,6 @@ export type Declaration =
     | ProcDeclaration
     | FuncDeclaration
     | ValueDeclaration
-    | DeriveDeclaration
-    | RemoteDeclaration
     | Autorun
     | TestExprDeclaration
     | TestBlockDeclaration
@@ -79,20 +77,6 @@ export type Decorator = SourceInfo & {
 export const ALL_PLATFORMS = ["node", "deno", "browser"] as const
 
 export type Platform = "node" | "deno" | "browser"
-
-export type DeriveDeclaration = SourceInfo & Exported & {
-    readonly kind: "derive-declaration",
-    readonly name: PlainIdentifier,
-    readonly type: TypeExpression | undefined,
-    readonly expr: Expression,
-}
-
-export type RemoteDeclaration = SourceInfo & Exported & {
-    readonly kind: "remote-declaration",
-    readonly name: PlainIdentifier,
-    readonly type: TypeExpression | undefined,
-    readonly expr: Expression,
-}
 
 export type TestExprDeclaration = SourceInfo & {
     readonly kind: "test-expr-declaration",

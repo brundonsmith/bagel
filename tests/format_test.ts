@@ -369,8 +369,6 @@ const BAGEL_SNIPPETS = [
         console.log("hello world")
       #}`,
       `func foo<T>(x: T): T => x`,
-      `derive foo: string => ('a' + 'b')`,
-      `remote foo: string => fetch('foo')`,
       `const str = 'Hello, \${name}!'`,
       `proc foo() {
         while true {

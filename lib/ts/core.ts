@@ -8,8 +8,7 @@ export {
     autorun,
     memo,
     action,
-    WHOLE_OBJECT,
-    Remote
+    WHOLE_OBJECT
 } from './reactivity.ts'
 
 export type {
@@ -413,7 +412,6 @@ export const RT_STRING = Symbol('RT_STRING')
 export const RT_LITERAL = Symbol('RT_LITERAL')
 export const RT_ITERATOR = Symbol('RT_ITERATOR')
 export const RT_PLAN = Symbol('RT_PLAN')
-export const RT_REMOTE = Symbol('RT_REMOTE')
 export const RT_ERROR = Symbol('RT_ERROR')
 export const RT_NOMINAL = Symbol('RT_NOMINAL')
 export const RT_ARRAY = Symbol('RT_ARRAY')
@@ -429,7 +427,7 @@ type RuntimeType =
     | { kind: typeof RT_LITERAL, value: string|number|boolean }
     | { kind: typeof RT_NOMINAL, nominal: symbol }
     | {
-        kind: typeof RT_ITERATOR | typeof RT_PLAN | typeof RT_REMOTE | typeof RT_ARRAY,
+        kind: typeof RT_ITERATOR | typeof RT_PLAN | typeof RT_ARRAY,
         inner: RuntimeType
     }
     | RuntimeType[] // union
@@ -502,7 +500,6 @@ export function instanceOf(val: any, type: RuntimeType): boolean {
                 // TODO:
                 // case RT_ITERATOR: return val instanceof Iter;
                 // case RT_PLAN: return false
-                // case RT_REMOTE: return val instanceof Remote;
             }
         }
     }

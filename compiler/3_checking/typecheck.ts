@@ -61,8 +61,6 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                         case "proc-declaration":
                         case "func-declaration":
                         case "value-declaration":
-                        case "derive-declaration":
-                        case "remote-declaration":
                             return [decl.name]
                         case "autorun":
                         case "test-expr-declaration":
@@ -216,33 +214,6 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                             }
                         }
                     }
-                }
-            } break;
-            case "derive-declaration": {
-                const exprType = resolveType(ctx, inferType(ctx, current.expr))
-                const declaredType = current.type
-
-                if (declaredType) {
-                    // make sure value fits declared type, if there is one
-                    given(subsumationIssues(ctx, declaredType, exprType), issues => {
-                        sendError(assignmentError(current.expr, declaredType, exprType, issues))
-                    })
-                }
-            } break;
-            case "remote-declaration": {
-                const exprType = resolveType(ctx, inferType(ctx, current.expr))
-                const declaredType = current.type
-
-                if (exprType.kind === 'plan-type') {
-                    if (declaredType != null) {
-                        // make sure value fits declared type, if there is one
-                        given(subsumationIssues(ctx, declaredType, exprType.inner), issues => {
-                            sendError(assignmentError(current.expr, declaredType, exprType.inner, issues))
-                        })
-                    }
-                } else {
-                    // make sure value is a plan
-                    sendError(miscError(current.expr, `Remote declarations must be defined with a Plan expression; found type ${hlt(msgFormat(exprType))}`))
                 }
             } break;
             case "test-expr-declaration": {
@@ -850,7 +821,6 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "nominal-type":
             case "iterator-type":
             case "plan-type":
-            case "remote-type":
             case "parenthesized-type":
             case "unknown-type":
             case "poisoned-type":
@@ -1199,8 +1169,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
         }
     } else if ((resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") ||
                 (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") ||
-                (resolvedDestination.kind === "error-type" && resolvedValue.kind === "error-type") ||
-                (resolvedDestination.kind === "remote-type" && resolvedValue.kind === "remote-type")) {
+                (resolvedDestination.kind === "error-type" && resolvedValue.kind === "error-type")) {
         return all(subsumationIssues(ctx, resolvedDestination.inner, resolvedValue.inner));
     }
 
@@ -1330,7 +1299,6 @@ export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'
             }
         }
         case "error-type":
-        case "remote-type":
         case "iterator-type": {
             return {
                 ...type,
