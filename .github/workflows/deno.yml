@@ -35,7 +35,7 @@ jobs:
       #   run: deno lint
 
       - name: Run tests
-        run: DEV_MODE=test deno test -A --unstable
+        run: DEV_MODE=test deno test -A --unstable --ignore=docs
 
       - name: Check lib/bgl
         run: XDG_CACHE_HOME=$(pwd) compiler/run.sh check lib/bgl
