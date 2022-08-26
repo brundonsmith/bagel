@@ -23,6 +23,7 @@ export type TypeExpression =
     | NominalType
     | IteratorType
     | PlanType
+    | RemoteType
     | ErrorType
     | ParenthesizedType
     | TypeofType
@@ -195,6 +196,11 @@ export type IteratorType = SourceInfo & NoMutability & {
 
 export type PlanType = SourceInfo & NoMutability & {
     readonly kind: "plan-type",
+    readonly inner: TypeExpression,
+}
+
+export type RemoteType = SourceInfo & NoMutability & {
+    readonly kind: "remote-type",
     readonly inner: TypeExpression,
 }
 
@@ -443,6 +449,16 @@ export const ERROR_OF_ANY: ErrorType = {
     startIndex: undefined,
     endIndex: undefined,
 }
+export const REMOTE_OF_ANY: RemoteType = {
+    kind: "remote-type",
+    inner: ANY_TYPE,
+    mutability: undefined,
+    parent: undefined,
+    module: undefined,
+    code: undefined,
+    startIndex: undefined,
+    endIndex: undefined,
+}
 
 export const FUNC: FuncType = {
     kind: "func-type",
@@ -506,6 +522,7 @@ export const TRUTHINESS_SAFE_TYPES: UnionType = {
         ARRAY_OF_ANY,
         ITERATOR_OF_ANY,
         PLAN_OF_ANY,
+        REMOTE_OF_ANY,
         PROC,
         FUNC
     ],

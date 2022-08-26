@@ -1121,6 +1121,13 @@ export const propertiesOf = memo(function propertiesOf (
                 attribute("value", resolvedType.inner, true),
             ]
         }
+        case "remote-type": {
+            return [
+                attribute("value", resolvedType.inner, true),
+                attribute("loading", BOOLEAN_TYPE, true),
+                // TODO: reload() proc
+            ]
+        }
         case "union-type": {
             const allProperties = resolvedType.members.map(m => propertiesOf(ctx, m))
             let sharedProperties: readonly Attribute[] | undefined
@@ -1275,6 +1282,7 @@ function fitTemplate(
     } else if (
         (parameterized.kind === "iterator-type" && reified.kind === "iterator-type") ||
         (parameterized.kind === "plan-type" && reified.kind === "plan-type") ||
+        (parameterized.kind === "remote-type" && reified.kind === "remote-type") ||
         (parameterized.kind === "keyof-type" && reified.kind === "keyof-type") ||
         (parameterized.kind === "valueof-type" && reified.kind === "valueof-type") ||
         (parameterized.kind === "elementof-type" && reified.kind === "elementof-type") ||

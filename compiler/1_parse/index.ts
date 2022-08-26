@@ -5,7 +5,7 @@ import { ModuleName,ReportError } from "../_model/common.ts";
 import { ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator, TestTypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration, ALL_REG_EXP_FLAGS, RegularExpression, RegularExpressionFlag } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement, Autorun } from "../_model/statements.ts";
-import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType, ReadonlyType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType, ReadonlyType, RemoteType } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { AST_NOISE, setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
@@ -718,10 +718,10 @@ const _typeParam: ParseFunction<TypeParam> = memo((module, code, startIndex) =>
         index: indexAfterExtends ?? index
     })))))
 
-const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType|ErrorType> = memo((module, code, startIndex) =>
+const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType|ErrorType|RemoteType> = memo((module, code, startIndex) =>
     given(TYPE_PARSER.beneath(boundGenericType)(module, code, startIndex), ({ parsed: generic, index }) =>
     given(_typeArgs(module, code, index), ({ parsed: typeArgs, index }) => 
-        generic.kind === 'named-type' && (generic.name.name === 'Iterator' || generic.name.name === 'Plan' || generic.name.name === 'Error')
+        generic.kind === 'named-type' && (generic.name.name === 'Iterator' || generic.name.name === 'Plan' || generic.name.name === 'Error' || generic.name.name === 'Remote')
             ? (typeArgs.length !== 1
                 ? syntaxError(code, index, `${generic.name.name} types must have exactly one type parameter; found ${typeArgs.length}`)
                 : {
@@ -730,7 +730,8 @@ const boundGenericType: ParseFunction<BoundGenericType|IteratorType|PlanType|Err
                             generic.name.name === 'Iterator' ? "iterator-type" :
                             generic.name.name === 'Plan' ? "plan-type" :
                             generic.name.name === 'Error' ? "error-type" :
-                            "error-type" // unreachable
+                            generic.name.name === 'Remote' ? "remote-type" :
+                            "remote-type" // unreachable
                         ),
                         inner: typeArgs[0],
                         mutability: undefined,

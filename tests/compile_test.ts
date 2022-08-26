@@ -581,6 +581,7 @@ Deno.test({
     const f = x instanceof 'stuff'
     const g = x instanceof Iterator<number>
     const h = x instanceof Plan<number>
+    const i = x instanceof Remote<number>
     const j = x instanceof Error<number>
     const k = x instanceof FooNominal
     const l = x instanceof number[]
@@ -603,6 +604,7 @@ Deno.test({
     const f = ___instanceOf(x, { kind: ___RT_LITERAL, value: "stuff" });
     const g = ___instanceOf(x, { kind: ___RT_ITERATOR, inner: ___RT_NUMBER });
     const h = ___instanceOf(x, { kind: ___RT_PLAN, inner: ___RT_NUMBER });
+    const i = ___instanceOf(x, { kind: ___RT_REMOTE, inner: ___RT_NUMBER });
     const j = ___instanceOf(x, { kind: ___RT_ERROR, inner: ___RT_NUMBER });
     const k = ___instanceOf(x, { kind: ___RT_NOMINAL, nominal: FooNominal.sym });
     const l = ___instanceOf(x, { kind: ___RT_ARRAY, inner: ___RT_NUMBER });
@@ -684,13 +686,14 @@ Deno.test({
     testCompile(`
     export type Foo = {
       a: string[],
-      b: 'stuff'
+      b: 'stuff',
+      c: Remote<Other>
     }
 
     export nominal type Bar(number)
     `,
     `
-    export type Foo = {a: string[], b: "stuff"};
+    export type Foo = {a: string[], b: "stuff", c: ___Remote<Other>};
 
     const ___Bar = Symbol('Bar');
     export const Bar = ((value: number): Bar => ({ kind: ___Bar, value })) as (((value: number) => Bar) & { sym: typeof ___Bar });

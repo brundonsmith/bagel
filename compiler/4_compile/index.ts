@@ -28,12 +28,12 @@ export const IMPORTED_ITEMS: readonly string[] = [
     'observe', 'invalidate', 'memo', 'autorun', 'action', 'WHOLE_OBJECT', 
 
     // used in compiler output
-    'range', 'Iter', 'Plan', 'Error', 'ERROR_SYM',
+    'range', 'Iter', 'Plan', 'Error', 'ERROR_SYM', 'Remote',
     
     // runtime type-checking 
     'instanceOf', 'RT_UNKNOWN', 
     'RT_NIL', 'RT_BOOLEAN', 'RT_NUMBER', 'RT_STRING', 'RT_LITERAL', 'RT_ITERATOR',
-    'RT_PLAN', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT', 'RT_NOMINAL',
+    'RT_PLAN', 'RT_REMOTE', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT', 'RT_NOMINAL',
     'RT_ERROR'
 ]
 
@@ -377,6 +377,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
         case "iterator-type": return `${INT}Iter<${c(ast.inner)}>`;
         case "plan-type": return `${INT}Plan<${c(ast.inner)}>`;
         case "error-type": return `${INT}Error<${c(ast.inner)}>`;
+        case "remote-type": return `${INT}Remote<${c(ast.inner)}>`;
         case "literal-type": return `${c(ast.value)}`;
         case "string-type": return `string`;
         case "number-type": return `number`;
@@ -416,6 +417,7 @@ function compileRuntimeType(type: TypeExpression): string {
         case 'error-type': return `{ kind: ${INT}RT_ERROR, inner: ${compileRuntimeType(type.inner)} }`
         case 'iterator-type': return `{ kind: ${INT}RT_ITERATOR, inner: ${compileRuntimeType(type.inner)} }`
         case 'plan-type': return `{ kind: ${INT}RT_PLAN, inner: ${compileRuntimeType(type.inner)} }`
+        case 'remote-type': return `{ kind: ${INT}RT_REMOTE, inner: ${compileRuntimeType(type.inner)} }`
         case 'union-type': return `[ ${type.members.map(compileRuntimeType).join(', ')} ]`;
     }
 
