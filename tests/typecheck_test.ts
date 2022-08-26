@@ -862,18 +862,6 @@ Deno.test({
   },
 });
 
-// Deno.test({
-//   name: "Chained type refinement pass",
-//   fn() {
-//     testTypecheck(
-//       `
-//       func foo(x: { bar: number|nil }): number|nil =>
-//         x.bar && x.bar + `,
-//       true,
-//     );
-//   },
-// });
-
 Deno.test({
   name: "Chained if/else refinement pass",
   fn() {
@@ -3487,6 +3475,41 @@ Deno.test({
     
     @myDecorator
     func foo(n: number): number => n`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Memo decorator pass",
+  fn() {
+    testTypecheck(`
+    export func memo() => <
+        TArgs extends readonly unknown[],
+        TReturn
+    >(fn: (...args: TArgs) => readonly TReturn): (...args: TArgs) => readonly TReturn => js# #js
+
+    @memo()
+    func foo(a: number, b: string): readonly (number|string)[] => [a, b]
+
+    @memo()
+    func bar(a: number): number => a * 2
+    `,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Memo decorator fail",
+  fn() {
+    testTypecheck(`
+    export func memo() => <
+        TArgs extends readonly unknown[],
+        TReturn
+    >(fn: (...args: TArgs) => readonly TReturn): (...args: TArgs) => readonly TReturn => js# #js
+
+    @memo()
+    func foo(a: number, b: string): (number|string)[] => [a, b]
+    `,
     true)
   }
 })
