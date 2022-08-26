@@ -115,7 +115,7 @@ const config = {
               },
               {
                 label: 'GitHub',
-                href: 'https://github.com/brundonsmith/bagels',
+                href: 'https://github.com/brundonsmith/bagel',
               },
             ],
           },
