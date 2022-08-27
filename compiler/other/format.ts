@@ -41,6 +41,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             const front = 
                 (ast.value.kind === 'js-func' || ast.value.kind === 'js-proc' ? 'js ' : '') +
                 exported(ast.exported) + 
+                (ast.value.isPure ? 'pure ' : '') +
                 (ast.value.isAsync ? 'async ' : '') +
                 (ast.kind === 'func-declaration' ? 'func ' : 'proc ') +
                 ast.name.name
@@ -174,6 +175,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "func":
         case "proc": {
             const funcOrProcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
+            const pure = ast.isPure ? 'pure ' : ''
             const azync = ast.isAsync ? 'async ' : ''
             const typeParams = ast.type.kind === 'generic-type' ? maybeTypeParams(options, indent, parent, ast.type.typeParams) : ''
             const args = (
@@ -187,9 +189,9 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             )
 
             if (ast.kind === 'func') {
-                return azync + typeParams + `${args}${maybeTypeAnnotation(options, indent, parent, (funcOrProcType as FuncType).returnType)} =>${br}${nextIndentation}${fIndent(ast.body)}`
+                return pure + azync + typeParams + `${args}${maybeTypeAnnotation(options, indent, parent, (funcOrProcType as FuncType).returnType)} =>${br}${nextIndentation}${fIndent(ast.body)}`
             } else {
-                return azync + typeParams + `${args} ${f(ast.body)}`
+                return pure + azync + typeParams + `${args} ${f(ast.body)}`
             }
         }
         case "instance-of":
@@ -261,9 +263,9 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             const args = `(${f(ast.args)})`
 
             if (ast.kind === 'proc-type') {
-                return (ast.isAsync ? 'async ' : '') + `${args} {}`;
+                return (ast.isPure ? 'pure ' : '') + (ast.isAsync ? 'async ' : '') + `${args} {}`;
             } else {
-                return `${args} => ${f(ast.returnType ?? UNKNOWN_TYPE)}`;
+                return (ast.isPure ? 'pure ' : '') + `${args} => ${f(ast.returnType ?? UNKNOWN_TYPE)}`;
             }
         }
         case "object-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `{${
