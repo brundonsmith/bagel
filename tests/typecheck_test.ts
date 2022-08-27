@@ -1559,6 +1559,23 @@ Deno.test({
 });
 
 Deno.test({
+  name: "String insertion type",
+  fn() {
+    testTypecheck(
+      `
+      const a = 'a'
+      const one = 1
+      const t = true
+
+      const foo: 'bar' = 'b\${a}r'
+      const bar: 'b1r1' = 'b\${one}r\${one}'
+      const stuff: 'it\\'s true!' = 'it\\'s \${t}!'`,
+      false,
+    );
+  },
+});
+
+Deno.test({
   name: "As-casting pass",
   fn() {
     testTypecheck(`

@@ -485,7 +485,25 @@ const inferTypeInner = memo(function inferTypeInner(
             mutability: undefined,
             parent, module, code, startIndex, endIndex
         }
-        case "string-literal": return STRING_TYPE;
+        case "string-literal": {
+            let literal = ''
+
+            for (const segment of ast.segments) {
+                if (typeof segment === 'string') {
+                    literal += segment
+                } else {
+                    const segmentType = inferType(ctx, segment)
+
+                    if (segmentType.kind === 'literal-type') {
+                        literal += String(segmentType.value.value)
+                    } else {
+                        return STRING_TYPE
+                    }
+                }
+            }
+            
+            return literalType(literal)
+        }
         case "exact-string-literal":
         case "number-literal":
         case "boolean-literal": return literalType(ast);
