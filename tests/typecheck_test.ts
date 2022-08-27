@@ -986,6 +986,25 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Comparison types pass",
+  fn() {
+    testTypecheck(`
+    const a: true = 1 < 2
+    const b: false = 2 < 1
+    
+    const c: true = 2 > 1
+    const d: false = 1 > 1
+    
+    const e: true = 2 >= 2
+    const f: false = 1 >= 2
+    
+    const g: true = 3 <= 4
+    const h: false = 5 <= 1
+    `, false)
+  }
+})
+
+Deno.test({
   name: "Refinement invalidation pass",
   fn() {
     testTypecheck(

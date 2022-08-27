@@ -204,10 +204,36 @@ const inferTypeInner = memo(function inferTypeInner(
                 case '<':
                 case '>':
                 case '<=':
-                case '>=':
-                case '==':
-                case '!=':
+                case '>=': {
+                    if (leftType.kind === 'literal-type' && leftType.value.kind === 'number-literal' &&
+                        rightType.kind === 'literal-type' && rightType.value.kind === 'number-literal') {
+                        const left = leftType.value.value
+                        const right = rightType.value.value
+
+                        switch (ast.op.op) {
+                            case '<': return literalType(left < right)
+                            case '>': return literalType(left > right)
+                            case '<=': return literalType(left <= right)
+                            case '>=': return literalType(left >= right)
+                        }
+                    }
+
                     return BOOLEAN_TYPE
+                }
+                case '==':
+                case '!=': {
+                    if (leftType.kind === 'literal-type' && rightType.kind === 'literal-type') {
+                        const left = leftType.value.value
+                        const right = rightType.value.value
+
+                        switch (ast.op.op) {
+                            case '==': return literalType(left === right)
+                            case '!=': return literalType(left !== right)
+                        }
+                    }
+
+                    return BOOLEAN_TYPE
+                }
             }
             
             throw Error("No typecheck logic for: " + op)
