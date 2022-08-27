@@ -627,7 +627,8 @@ const primitiveType: ParseFunction<PrimitiveType> = memo((module, code, startInd
     })))
 
 const funcType: ParseFunction<FuncType|GenericFuncType> = memo((module, code, startIndex) =>
-    given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index }) =>
+    given(parseKeyword(code, startIndex, 'pure'), ({ parsed: isPure, index }) =>
+    given(parseOptional(module, code, index, _typeParams), ({ parsed: typeParams, index }) =>
     given(_parenthesizedArguments(module, code, index), ({ parsed: args, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(consume(code, index, "=>"), index =>
@@ -637,6 +638,7 @@ const funcType: ParseFunction<FuncType|GenericFuncType> = memo((module, code, st
             kind: "func-type",
             args,
             returnType,
+            isPure,
             mutability: undefined,
             module,
             code,
@@ -661,10 +663,11 @@ const funcType: ParseFunction<FuncType|GenericFuncType> = memo((module, code, st
             ),
             index
         }
-    })))))))
+    }))))))))
 
 const procType: ParseFunction<ProcType|GenericProcType> = memo((module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'async'), ({ parsed: isAsync, index }) =>
+    given(parseKeyword(code, startIndex, 'pure'), ({ parsed: isPure, index }) =>
+    given(parseKeyword(code, index, 'async'), ({ parsed: isAsync, index }) =>
     given(parseOptional(module, code, index, _typeParams), ({ parsed: typeParams, index }) =>
     given(_parenthesizedArguments(module, code, index), ({ parsed: args, index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -676,6 +679,7 @@ const procType: ParseFunction<ProcType|GenericProcType> = memo((module, code, st
         const procType: ProcType = {
             kind: "proc-type",
             args,
+            isPure,
             isAsync,
             throws,
             mutability: undefined,
@@ -702,7 +706,7 @@ const procType: ParseFunction<ProcType|GenericProcType> = memo((module, code, st
             ),
             index
         }
-    }))))))))))
+    })))))))))))
 
 const _typeParam: ParseFunction<TypeParam> = memo((module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex), ({ parsed: name, index }) =>
@@ -840,13 +844,14 @@ const procDeclaration: ParseFunction<ProcDeclaration> = memo((module, code, star
     given(parseSeries(module, code, startIndex, decorator), ({ parsed: decorators, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseKeyword(code, index, 'export'), ({ parsed: exported, index }) =>
+    given(parseKeyword(code, index, 'pure'), ({ parsed: isPure, index }) =>
     given(parseKeyword(code, index, 'async'), ({ parsed: isAsync, index }) =>
     given(parseOptional(module, code, index, parseJsOrPlatform), ({ parsed: platform, index }) =>
     given(consume(code, index, "proc"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
-    given(_procHeader(isAsync)(module, code, index), ({ parsed: type, index }) => 
+    given(_procHeader(isAsync, isPure)(module, code, index), ({ parsed: type, index }) => 
     given(consumeWhitespace(code, index), index =>
     platform 
         ? expec(consume(code, index, "{#"), err(code, index, '"{#"'), jsStartIndex => {
@@ -866,6 +871,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = memo((module, code, star
                         kind: "js-proc",
                         type,
                         isAsync,
+                        isPure,
                         body: code.substring(jsStartIndex, jsEndIndex),
                         module,
                         code,
@@ -891,6 +897,7 @@ const procDeclaration: ParseFunction<ProcDeclaration> = memo((module, code, star
                     kind: "proc",
                     type,
                     isAsync,
+                    isPure,
                     body,
                     module,
                     code,
@@ -906,19 +913,20 @@ const procDeclaration: ParseFunction<ProcDeclaration> = memo((module, code, star
                 endIndex: index
             },
             index,
-        }))))))))))))))
+        })))))))))))))))
 
 const funcDeclaration: ParseFunction<FuncDeclaration> = memo((module, code, startIndex) => 
     given(parseSeries(module, code, startIndex, decorator), ({ parsed: decorators, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseKeyword(code, index, 'export'), ({ parsed: exported, index }) =>
+    given(parseKeyword(code, index, 'pure'), ({ parsed: isPure, index }) =>
     given(parseKeyword(code, index, 'async'), ({ parsed: isAsync, index }) =>
     given(parseOptional(module, code, index, parseJsOrPlatform), ({ parsed: platform, index }) =>
     given(consume(code, index, "func"), index =>
     given(consumeWhitespaceRequired(code, index), index =>
     given(plainIdentifier(module, code, index), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
-    given(_funcHeader(module, code, index), ({ parsed: type, index }) => 
+    given(_funcHeader(isPure)(module, code, index), ({ parsed: type, index }) => 
     given(consumeWhitespace(code, index), index =>
     platform 
         ? expec(consume(code, index, "{#"), err(code, index, '"{#"'), jsStartIndex => {
@@ -938,6 +946,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = memo((module, code, star
                         kind: "js-func",
                         type,
                         isAsync,
+                        isPure,
                         body: code.substring(jsStartIndex, jsEndIndex),
                         module,
                         code,
@@ -963,6 +972,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = memo((module, code, star
                     kind: "func",
                     type,
                     isAsync,
+                    isPure,
                     body,
                     module,
                     code,
@@ -978,7 +988,7 @@ const funcDeclaration: ParseFunction<FuncDeclaration> = memo((module, code, star
                 endIndex: index,
             },
             index,
-        }))))))))))))))
+        })))))))))))))))
     
 const decorator: ParseFunction<Decorator> = memo((module, code, startIndex) =>
     given(consume(code, startIndex, '@'), index =>
@@ -1166,14 +1176,16 @@ const _testDeclFront = memo((module: ModuleName, code: string, startIndex: numbe
     })))))))))
 
 const proc: ParseFunction<Proc> = memo((module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'async'), ({ parsed: isAsync, index }) =>
-    given(_procHeader(isAsync)(module, code, index), ({ parsed: type, index }) =>
+    given(parseKeyword(code, startIndex, 'pure'), ({ parsed: isPure, index }) =>
+    given(parseKeyword(code, index, 'async'), ({ parsed: isAsync, index }) =>
+    given(_procHeader(isAsync, isPure)(module, code, index), ({ parsed: type, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseBlock(module, code, index), ({ parsed: body, index }) => ({
         parsed: {
             kind: "proc",
             type,
             isAsync,
+            isPure,
             body,
             module,
             code,
@@ -1181,9 +1193,9 @@ const proc: ParseFunction<Proc> = memo((module, code, startIndex) =>
             endIndex: index
         },
         index,
-    }))))))
+    })))))))
 
-const _procHeader = (isAsync: boolean): ParseFunction<ProcType|GenericProcType> => memo((module, code, startIndex) =>
+const _procHeader = (isAsync: boolean, isPure: boolean): ParseFunction<ProcType|GenericProcType> => memo((module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index }) =>
     given(_parenthesizedArguments(module, code, index), ({ parsed: args, index }) => 
     given(consumeWhitespace(code, index), index =>
@@ -1193,6 +1205,7 @@ const _procHeader = (isAsync: boolean): ParseFunction<ProcType|GenericProcType> 
             kind: "proc-type",
             args,
             isAsync,
+            isPure,
             throws,
             mutability: undefined,
             module,
@@ -1469,14 +1482,16 @@ const expression: ParseFunction<Expression> = memo((module, code, startIndex) =>
     EXPRESSION_PARSER.parseStartingFromTier(0)(module, code, startIndex))
 
 const func: ParseFunction<Func> = memo((module, code, startIndex) =>
-    given(parseKeyword(code, startIndex, 'async'), ({ parsed: isAsync, index }) =>
-    given(_funcHeader(module, code, index), ({ parsed: type, index }) =>
+    given(parseKeyword(code, startIndex, 'pure'), ({ parsed: isPure, index }) =>
+    given(parseKeyword(code, index, 'async'), ({ parsed: isAsync, index }) =>
+    given(_funcHeader(isPure)(module, code, index), ({ parsed: type, index }) =>
     given(consumeWhitespace(code, index), index =>
     expec(expression(module, code, index), err(code, index, 'Function body'), ({ parsed: body, index }) => ({
         parsed: {
             kind: "func",
             type,
             isAsync,
+            isPure,
             body,
             module,
             code,
@@ -1484,9 +1499,9 @@ const func: ParseFunction<Func> = memo((module, code, startIndex) =>
             endIndex: index
         },
         index,
-    }))))))
+    })))))))
 
-const _funcHeader: ParseFunction<FuncType|GenericFuncType> = memo((module, code, startIndex) =>
+const _funcHeader = (isPure: boolean): ParseFunction<FuncType|GenericFuncType> => memo((module, code, startIndex) =>
     given(parseOptional(module, code, startIndex, _typeParams), ({ parsed: typeParams, index }) =>
     given(_funcArgs(module, code, index), ({ parsed: args, index }) =>
     given(consumeWhitespace(code, index), index =>
@@ -1497,6 +1512,7 @@ const _funcHeader: ParseFunction<FuncType|GenericFuncType> = memo((module, code,
             kind: "func-type",
             args,
             returnType,
+            isPure,
             mutability: undefined,
             module,
             code,

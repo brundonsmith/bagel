@@ -61,6 +61,7 @@ export type GenericParamType = SourceInfo & NoMutability & {
 export type ProcType = SourceInfo & NoMutability & {
     readonly kind: "proc-type",
     readonly args: Args | SpreadArgs,
+    readonly isPure: boolean,
     readonly isAsync: boolean,
     readonly throws: TypeExpression|undefined,
 }
@@ -69,6 +70,7 @@ export type FuncType = SourceInfo & NoMutability & {
     readonly kind: "func-type",
     readonly args: Args | SpreadArgs,
     readonly returnType?: TypeExpression,
+    readonly isPure: boolean,
 }
 
 export type GenericType = SourceInfo & NoMutability & {
@@ -472,6 +474,7 @@ export const FUNC: FuncType = {
         endIndex: undefined,
     },
     returnType: ANY_TYPE,
+    isPure: false,
     mutability: undefined,
     parent: undefined,
     module: undefined,
@@ -491,6 +494,7 @@ export const PROC: ProcType = {
         endIndex: undefined,
     },
     isAsync: false,
+    isPure: false,
     throws: undefined,
     mutability: undefined,
     parent: undefined,

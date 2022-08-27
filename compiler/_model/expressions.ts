@@ -40,6 +40,7 @@ export type Func = SourceInfo & {
     readonly kind: "func",
     readonly type: FuncType|GenericFuncType,
     readonly isAsync: boolean,
+    readonly isPure: boolean,
     readonly body: Expression,
 }
 
@@ -47,6 +48,7 @@ export type JsFunc = SourceInfo & {
     readonly kind: "js-func",
     readonly type: FuncType|GenericFuncType,
     readonly isAsync: boolean,
+    readonly isPure: boolean,
     readonly body: string,
 }
 
@@ -67,6 +69,7 @@ export type Proc = SourceInfo & {
     readonly kind: "proc",
     readonly type: ProcType|GenericProcType,
     readonly isAsync: boolean,
+    readonly isPure: boolean,
     readonly body: Block,
 }
 
@@ -74,6 +77,7 @@ export type JsProc = SourceInfo & {
     readonly kind: "js-proc",
     readonly type: ProcType|GenericProcType,
     readonly isAsync: boolean,
+    readonly isPure: boolean,
     readonly body: string,
 }
 

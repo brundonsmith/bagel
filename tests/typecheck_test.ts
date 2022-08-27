@@ -756,6 +756,19 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Initializing a const from impure function",
+  fn() {
+    testTypecheck(
+      `
+      let a = 12
+      func foo() => a
+      const b = foo()`,
+      true,
+    );
+  },
+});
+
+Deno.test({
   name: "Let declarations out of order",
   fn() {
     testTypecheck(
@@ -3708,6 +3721,101 @@ Deno.test({
 //     false)
 //   }
 // })
+
+Deno.test({
+  name: "Pure functions pass",
+  fn() {
+    testTypecheck(`
+    let val = 12
+
+    pure func foo(n: number) => n * 2
+
+    func doubleVal() => foo(val)
+
+    func labeled() => doubleVal() + ' is val'
+
+    const x = foo(2)
+    `, false)
+  }
+})
+
+Deno.test({
+  name: "Pure functions fail 1",
+  fn() {
+    testTypecheck(`
+    let val = 12
+
+    pure func foo() => val * 2
+    `, true)
+  }
+})
+
+Deno.test({
+  name: "Pure functions fail 2",
+  fn() {
+    testTypecheck(`
+    let val = 12
+
+    pure func foo(n: number) => n * 2
+
+    func doubleVal() => foo(val)
+
+    pure func labeled() => doubleVal() + ' is val'
+    `, true)
+  }
+})
+
+Deno.test({
+  name: "Pure procs pass",
+  fn() {
+    testTypecheck(`
+    let val = 12
+
+    pure proc foo(n: number) {
+      let x = n;
+    }
+
+    proc bar() {
+      foo(val);
+    }
+
+    proc main() {
+      bar();
+    }
+    `, false)
+  }
+})
+
+Deno.test({
+  name: "Pure procs fail 1",
+  fn() {
+    testTypecheck(`
+    let val = 12
+
+    pure proc foo(n: number) {
+      let x = val;
+    }
+    `, true)
+  }
+})
+
+Deno.test({
+  name: "Pure procs fail 2",
+  fn() {
+    testTypecheck(`
+    let val = 12
+
+    proc foo() {
+      let x = val;
+    }
+
+    pure proc bar() {
+      foo();
+    }
+    `, true)
+  }
+})
+
 
 const canonicalModuleName = (_: ModuleName, m: string) => m as ModuleName
 

@@ -370,6 +370,21 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                             }
                         }
                     }
+
+                    {
+                        
+                        // check that impure procs/functions aren't called from within pure procs/functions
+                        if (!invoked.isPure) {
+                            const nearestFuncOrProc = getNearestFuncOrProc(current)
+
+                            if (nearestFuncOrProc?.isPure) {
+                                const name = nearestFuncOrProc.kind === 'func' ? 'function' : 'procedure'
+                                sendError(miscError(current, `Pure ${name}s can't call impure ${name}s`))
+                            } else if ((findAncestor(current, a => a.kind === 'value-declaration') as ValueDeclaration|undefined)?.isConst) {
+                                sendError(miscError(current, `Const declarations can't be initialized using impure functions`))
+                            }
+                        }
+                    }
                 }
                 
                 // check that provided type args fit `extends` clauses
@@ -520,15 +535,17 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                         binding.kind === 'declaration-statement' ||
                         binding.kind === 'inline-declaration') {
 
-                        // using a let-declaration to initialize a const
-                        if (binding.kind === 'value-declaration' && 
-                            !binding.isConst &&
-                            (findAncestor(current, a => a.kind === 'value-declaration') as ValueDeclaration|undefined)?.isConst) {
-                            
-                            sendError(miscError(current, `Const declarations cannot be initialized from mutable state (referencing ${hlt(msgFormat(current))})`))
-                        }
+                        // referencing a let-declaration
+                        if ((binding.kind === 'value-declaration' || binding.kind === 'declaration-statement') && !binding.isConst) {
+                            const nearestFuncOrProc = getNearestFuncOrProc(current)
 
-                        // TODO: Once we have pure/impure functions, forbid impure functions when initializing a const!
+                            if (nearestFuncOrProc?.isPure) {
+                                const name = nearestFuncOrProc.kind === 'func' ? 'function' : 'procedure'
+                                sendError(miscError(current, `Pure ${name}s can't reference external ${hlt('let')} declarations`))
+                            } else if ((findAncestor(current, a => a.kind === 'value-declaration') as ValueDeclaration|undefined)?.isConst) {
+                                sendError(miscError(current, `Const declarations can't be initialized from ${hlt('let')} declarations`))
+                            }
+                        }
 
                         if (within(current, binding.value)) {
                             // value referenced in its own initialization

@@ -634,6 +634,8 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
                 return argType
             }
 
+            // TODO: Infer when func or proc is pure, even without keyword
+
             const inferredHolderType = inferType(ctx, owner, false, true)
             if (inferredHolderType.kind === 'func-type' || inferredHolderType.kind === 'proc-type') {
                 return getArgTypeByName(inferredHolderType.args, binding.identifier.name) ?? UNKNOWN_TYPE
