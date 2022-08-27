@@ -1023,6 +1023,10 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                 ? subsumationIssues(ctx, resolvedDestination.returnType ?? UNKNOWN_TYPE, resolvedValue.returnType ?? UNKNOWN_TYPE)
                 : undefined
 
+            const pureIssues = resolvedDestination.isPure && !resolvedValue.isPure
+                ? [ `${hlt(msgFormat(resolvedDestination))} is pure, but ${hlt(msgFormat(resolvedValue))} is not pure` ]
+                : undefined
+
             const asyncIssues = resolvedDestination.kind === "proc-type" && resolvedValue.kind === "proc-type" && resolvedDestination.isAsync !== resolvedValue.isAsync
                 ? [ `${hlt(msgFormat(resolvedValue))} is ${resolvedValue.isAsync ? '' : 'not '}async, but ${hlt(msgFormat(resolvedDestination))} is ${resolvedDestination.isAsync ? '' : 'not '}async` ]
                 : undefined
@@ -1038,6 +1042,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                             // NOTE: Value and destination are flipped on purpose for args!
                             subsumationIssues(ctx, valueArgs.args[i]?.type ?? UNKNOWN_TYPE, destinationArgs.args[i]?.type ?? UNKNOWN_TYPE)),
                         returnTypeIssues,
+                        pureIssues,
                         asyncIssues,
                         throwsTypeIssues
                     )
@@ -1048,6 +1053,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                         ...valueArgs.args.map(valueArg =>
                             subsumationIssues(ctx, valueArg.type ?? UNKNOWN_TYPE, elementOfDestination)),
                         returnTypeIssues,
+                        pureIssues,
                         asyncIssues,
                         throwsTypeIssues
                     )
@@ -1060,6 +1066,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                         ...destinationArgs.args.map(destinationArg =>
                             subsumationIssues(ctx, elementOfValue, destinationArg.type ?? UNKNOWN_TYPE)),
                         returnTypeIssues,
+                        pureIssues,
                         asyncIssues,
                         throwsTypeIssues
                     )
@@ -1068,6 +1075,7 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
                     return all(
                         subsumationIssues(ctx, valueArgs.type, destinationArgs.type),
                         returnTypeIssues,
+                        pureIssues,
                         asyncIssues,
                         throwsTypeIssues
                     )
