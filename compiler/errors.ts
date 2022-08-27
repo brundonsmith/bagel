@@ -233,8 +233,6 @@ export function prettyProblem(ctx: Pick<Context, "allModules" | "canonicalModule
                         lines.push(code.substring(previousLineStart, currentLineStart - 1))
                     }
 
-                    // newLine += numberAndPadding(lineNumber, maxLineDigits)
-                    
                     if (currentLineStart < startIndex) { // left end is white
                         newLine += code.substring(currentLineStart, startIndex)
                     }
@@ -280,8 +278,8 @@ export function prettyProblem(ctx: Pick<Context, "allModules" | "canonicalModule
 }
 
 function numberAndPadding(line: number, maxWidth: number) {
-    const padding = spaces(maxWidth - String(line).length) + '  '
-    return Colors.bgWhite(Colors.black(String(line))) + padding    
+    const padding = spaces(maxWidth - String(line).length)
+    return Colors.bgWhite(padding + Colors.black(String(line))) + '  '  
 }
 
 function lineAndColumn(code: string, index: number): { line: number, column: number } {
