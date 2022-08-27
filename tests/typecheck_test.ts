@@ -3735,6 +3735,11 @@ Deno.test({
     func labeled() => doubleVal() + ' is val'
 
     const x = foo(2)
+
+    type Foo = pure (n: number) => number
+    type Bar = (n: number) => number
+
+    func dfkj(fn: Foo): Bar => fn
     `, false)
   }
 })
@@ -3766,6 +3771,18 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Pure functions fail 3",
+  fn() {
+    testTypecheck(`
+    type Foo = pure (n: number) => number
+    type Bar = (n: number) => number
+
+    func dfkj(fn: Bar): Foo => fn
+    `, true)
+  }
+})
+
+Deno.test({
   name: "Pure procs pass",
   fn() {
     testTypecheck(`
@@ -3782,6 +3799,11 @@ Deno.test({
     proc main() {
       bar();
     }
+
+    type Foo = pure (n: number) { }
+    type Bar = (n: number) { }
+
+    func dfkj(fn: Foo): Bar => fn
     `, false)
   }
 })
@@ -3812,6 +3834,18 @@ Deno.test({
     pure proc bar() {
       foo();
     }
+    `, true)
+  }
+})
+
+Deno.test({
+  name: "Pure procs fail 3",
+  fn() {
+    testTypecheck(`
+    type Foo = pure (n: number) { }
+    type Bar = (n: number) { }
+
+    func dfkj(fn: Bar): Foo => fn
     `, true)
   }
 })
