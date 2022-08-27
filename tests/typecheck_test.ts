@@ -79,7 +79,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func foo(fn: (val: number) => boolean) => nil
+      func foo(fn: (val: number) => boolean) => nil
       const x = foo(n => n)`,
       true
     )
@@ -91,7 +91,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func foo(fn: (val: number) => boolean) => nil
+      func foo(fn: (val: number) => boolean) => nil
       const x = foo(n => n > 0)`,
       false
     )
@@ -103,7 +103,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func foo(fn: (val: number) => boolean) => nil
+      func foo(fn: (val: number) => boolean) => nil
       const x = foo((n: number) => n > 0)`,
       false
     )
@@ -114,7 +114,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func foo(fn: (val: number) => boolean) => nil
+      func foo(fn: (val: number) => boolean) => nil
       const x = foo((n: string) => n == 'foo')`,
       true
     )
@@ -125,8 +125,8 @@ Deno.test({
   name: "Function-as-argument inference 5",
   fn() {
     testTypecheck(`
-    pure js func iter<T>(arr: T[]): Iterator<T> => {# #}
-    pure func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? => nil
+    js func iter<T>(arr: T[]): Iterator<T> => {# #}
+    func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? => nil
 
     const x = [2, 4, 6, 8].iter().find(n => n > 5)`,
     false)
@@ -189,7 +189,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func fn(_: string) => 'foo'
+      func fn(_: string) => 'foo'
       const y: string = fn('z')`,
       false,
     );
@@ -201,7 +201,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func fn(_: string) => 'foo'
+      func fn(_: string) => 'foo'
       const y: number = fn('z')`,
       true,
     );
@@ -261,7 +261,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func getThird<T extends string[]>(arr: T) => arr[2]
+      func getThird<T extends string[]>(arr: T) => arr[2]
       const third: string|nil = getThird(['one', 'two', 'three'])`,
       false
     )
@@ -358,8 +358,8 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func foo(fn: pure (n: number) => number) => fn(12)
-      const bar = foo(pure n => 2 * n)`,
+      func foo(fn: (n: number) => number) => fn(12)
+      const bar = foo(n => 2 * n)`,
       false
     )
   }
@@ -370,7 +370,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T>(a: T): T => a
+      func other<T>(a: T): T => a
       const c: number = other<number>(12)`,
       false,
     );
@@ -382,7 +382,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T>(a: T): T => a
+      func other<T>(a: T): T => a
       const c: number = other<number>('foo')`,
       true,
     );
@@ -394,7 +394,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T extends { foo: number }>(a: T): number => a.foo
+      func other<T extends { foo: number }>(a: T): number => a.foo
       const c: number = other<{ foo: number, bar: string }>({ foo: 12, bar: 'stuff' })`,
       false,
     );
@@ -406,7 +406,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T extends { foo: number }>(a: T): number => a.foo
+      func other<T extends { foo: number }>(a: T): number => a.foo
       const c: number = other<{ foo: string, bar: string }>({ foo: 'stuff', bar: 13 })`,
       true,
     );
@@ -418,7 +418,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T extends { foo: number }>(a: T): number => a
+      func other<T extends { foo: number }>(a: T): number => a
       const c: number = other<{ foo: number, bar: string }>({ foo: 12, bar: 'stuff' })`,
       true,
     );
@@ -430,7 +430,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T>(a: T): T => a
+      func other<T>(a: T): T => a
       const c: string = other<number>(12)`,
       true,
     );
@@ -442,7 +442,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T>(a: T) => a
+      func other<T>(a: T) => a
       const c: number = other<number>(12)`,
       false,
     );
@@ -454,8 +454,8 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func fnA<R>(a: R) => a
-      pure func fnB<T>(b: T): T => fnA<T>(b)
+      func fnA<R>(a: R) => a
+      func fnB<T>(b: T): T => fnA<T>(b)
       const c: number = fnB<number>(12)`,
       false,
     );
@@ -467,8 +467,8 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func fnA<T>(a: R) => a
-      pure func fnB<T>(b: T): T => fnA<T>(12)
+      func fnA<T>(a: R) => a
+      func fnB<T>(b: T): T => fnA<T>(12)
       const c: number = fnB<number>(12)`,
       true,
     );
@@ -480,8 +480,8 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func fnA<R>(a: R): R => a
-      pure func fnB<T>(b: T) => fnA<T>(b)
+      func fnA<R>(a: R): R => a
+      func fnB<T>(b: T) => fnA<T>(b)
       const c: number = fnB<number>(12)`,
       false,
     );
@@ -493,8 +493,8 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func fnA<T>(a: R): R => a
-      pure func fnB<T>(b: T) => fnA<T>(b)
+      func fnA<T>(a: R): R => a
+      func fnB<T>(b: T) => fnA<T>(b)
       const c: string = fnB<number>(12)`,
       true,
     );
@@ -506,8 +506,8 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func fnA<T>(a: T): T => a
-      pure func fnB<T>(b: T): T => fnA<T>(b)
+      func fnA<T>(a: T): T => a
+      func fnB<T>(b: T): T => fnA<T>(b)
       const c: number = fnB<number>(12)`,
       false,
     );
@@ -519,7 +519,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T>(a: T): T => a
+      func other<T>(a: T): T => a
       const c: number = other(12)`,
       false
     )
@@ -531,7 +531,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T>(a: T): T => a
+      func other<T>(a: T): T => a
       const c: number = other('foo')`,
       true
     )
@@ -543,7 +543,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T>(a: T|nil): T|nil => a
+      func other<T>(a: T|nil): T|nil => a
       const c: number|nil = other(12)`,
       false
     )
@@ -555,7 +555,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T>(a: T|nil): T|nil => a
+      func other<T>(a: T|nil): T|nil => a
       const c: number = other(12)`,
       true
     )
@@ -594,18 +594,18 @@ Deno.test({
     testTypecheck(
       `
       // copied from lib/bgl
-      export pure js func iter<T>(x: readonly T[]): Iterator<T> => {#
+      export js func iter<T>(x: readonly T[]): Iterator<T> => {#
         return ___iter(x)
       #}
-      export pure js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>     {# return iter.filter(fn) #}
-      export pure js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
-      export pure js func concat<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<T|R> =>         {# return iter.concat(other) #}
-      export pure js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
+      export js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>     {# return iter.filter(fn) #}
+      export js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
+      export js func concat<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<T|R> =>         {# return iter.concat(other) #}
+      export js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
 
       const i: Iterator<number> = [1, 2, 3].iter()
       const foo: number? = i.filter((n: number) => n > 2).first()
 
-      pure func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? =>
+      func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? =>
         iter.filter(fn).first()
 
       const x: number[] = concat([2, 4].iter(), [6, 8].iter()).collectArray()
@@ -620,7 +620,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func foo<T>(val: { prop: T }) => [val.prop]
+      func foo<T>(val: { prop: T }) => [val.prop]
       const x: number[] = foo<number>({ prop: 12 })`,
       false
     )
@@ -632,7 +632,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func foo<T>(val: { prop: T }) => [val.prop]
+      func foo<T>(val: { prop: T }) => [val.prop]
       const x: string[] = foo<number>({ prop: 12 })`,
       true
     )
@@ -661,7 +661,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func other<T>(a: T|nil): T|nil => a
+      func other<T>(a: T|nil): T|nil => a
       const c: number = other(12)`,
       true
     )
@@ -672,7 +672,7 @@ Deno.test({
   name: "Generic extends clause fail",
   fn() {
     testTypecheck(`
-    pure func foo<T extends string>(x: T) => x
+    func foo<T extends string>(x: T) => x
 
     const z = foo<number>(12)
     `,
@@ -761,7 +761,7 @@ Deno.test({
     testTypecheck(
       `
       let a = 12
-      pure func foo() => a
+      func foo() => a
       const b = foo()`,
       true,
     );
@@ -1340,7 +1340,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func foo(a: number, b?: string) => a + (b ?? 'foo')
+      func foo(a: number, b?: string) => a + (b ?? 'foo')
       
       const b = foo(12)
       const c = foo(12, 'stuff')`,
@@ -1365,7 +1365,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func foo(a: number, b?: string) => a + (b ?? 'foo')
+      func foo(a: number, b?: string) => a + (b ?? 'foo')
       
       const b = foo(12)
       const c = foo(12, 13)`,
@@ -1379,7 +1379,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      pure func foo(a: number, b?: string) => a + (b ?? 'foo')
+      func foo(a: number, b?: string) => a + (b ?? 'foo')
       
       const b = foo(12)
       const c = foo(12, 13, 14)`,
@@ -1452,7 +1452,7 @@ Deno.test({
   fn() {
     testMultiModuleTypecheck({
       "module-1.bgl": `
-      export pure func foo(b: number) => b * 2`,
+      export func foo(b: number) => b * 2`,
 
       "module-2.bgl": `
       from 'module-1.bgl' import { foo }
@@ -1466,8 +1466,8 @@ Deno.test({
   fn() {
     testMultiModuleTypecheck({
       "module-1.bgl": `
-      pure func foo(a: number) => a * 2
-      export pure func bar(b: number) => foo(b) * 2`,
+      func foo(a: number) => a * 2
+      export func bar(b: number) => foo(b) * 2`,
 
       "module-2.bgl": `
       from 'module-1.bgl' import { bar }
@@ -1806,7 +1806,7 @@ Deno.test({
   name: "Function method call",
   fn() {
     testTypecheck(`
-    pure func foo(s: string) => s.length
+    func foo(s: string) => s.length
     const a: number = 'foo'.foo()`,
     false)
   }
@@ -1816,7 +1816,7 @@ Deno.test({
   name: "Function method call fail",
   fn() {
     testTypecheck(`
-    pure func foo(s: string) => s.length
+    func foo(s: string) => s.length
     const a: string = 'foo'.foo()`,
     true)
   }
@@ -1826,10 +1826,10 @@ Deno.test({
   name: "Function method call with property 1",
   fn() {
     testTypecheck(`
-    type T = { foo: pure () => string }
-    const t: T = { foo: pure () => 'stuff' }
+    type T = { foo: () => string }
+    const t: T = { foo: () => 'stuff' }
 
-    pure func foo(s: T) => 12
+    func foo(s: T) => 12
     const a: string = t.foo()`,
     false)
   }
@@ -1839,10 +1839,10 @@ Deno.test({
   name: "Function method call with property 2",
   fn() {
     testTypecheck(`
-    type T = { foo: pure () => string }
-    const t: T = { foo: pure () => 'stuff' }
+    type T = { foo: () => string }
+    const t: T = { foo: () => 'stuff' }
 
-    pure func bar(s: T) => 12
+    func bar(s: T) => 12
     const a: string = t.foo()`,
     false)
   }
@@ -1855,7 +1855,7 @@ Deno.test({
     type T = { foo: () => string }
     const t: T = { foo: () => 'stuff' }
 
-    pure func bar(s: T) => 12
+    func bar(s: T) => 12
     const a: number = t.bar()`,
     false)
   }
@@ -2023,7 +2023,7 @@ Deno.test({
   fn() {
     testTypecheck(`
     const a = 12
-    pure func foo(b: number) => a * b`,
+    func foo(b: number) => a * b`,
     false)
   }
 })
@@ -2042,7 +2042,7 @@ Deno.test({
   name: "Import all pass",
   fn() {
     testMultiModuleTypecheck({
-      'a.bgl': `export pure func foo(a: number) => a + 'stuff'`,
+      'a.bgl': `export func foo(a: number) => a + 'stuff'`,
       'b.bgl': `
       import 'a.bgl' as moduleA
       const x = moduleA.foo(12)`
@@ -2055,7 +2055,7 @@ Deno.test({
   name: "Import all fail 1",
   fn() {
     testMultiModuleTypecheck({
-      'a.bgl': `export pure func foo2(a: number) => a + 'stuff'`,
+      'a.bgl': `export func foo2(a: number) => a + 'stuff'`,
       'b.bgl': `
       import 'a.bgl' as moduleA
       const x = moduleA.foo(12)`
@@ -2068,7 +2068,7 @@ Deno.test({
   name: "Import all fail 2",
   fn() {
     testMultiModuleTypecheck({
-      'a.bgl': `export pure func foo(a: number) => a + 'stuff'`,
+      'a.bgl': `export func foo(a: number) => a + 'stuff'`,
       'b.bgl': `
       import 'a.bgl' as moduleA
       const x = foo(12)`
@@ -2081,7 +2081,7 @@ Deno.test({
   name: "Import all fail 3",
   fn() {
     testMultiModuleTypecheck({
-      'a.bgl': `export pure func foo(a: number) => a + 'stuff'`,
+      'a.bgl': `export func foo(a: number) => a + 'stuff'`,
       'b.bgl': `
       import 'a.bgl' as moduleA
       const x = moduleA.foo('stuff')`
@@ -2094,7 +2094,7 @@ Deno.test({
   name: "Import all fail 4",
   fn() {
     testMultiModuleTypecheck({
-      'a.bgl': `export pure func foo(a: number) => a + 'stuff'`,
+      'a.bgl': `export func foo(a: number) => a + 'stuff'`,
       'b.bgl': `
       import 'c.bgl' as moduleA`
     },
@@ -2442,7 +2442,7 @@ Deno.test({
     testTypecheck(`
     const a = { a: 1, b: 2, c: 3 }
     
-    pure func foo(val: typeof a) => nil
+    func foo(val: typeof a) => nil
     
     const b = foo(a)`,
     false)
@@ -2455,7 +2455,7 @@ Deno.test({
     testTypecheck(`
     const a = { a: 1, b: 2, c: 3 }
     
-    pure func foo(val: typeof a) => nil
+    func foo(val: typeof a) => nil
     
     const b = foo(12)`,
     true)
@@ -2468,7 +2468,7 @@ Deno.test({
     testTypecheck(`
     const a = { a: 1, b: 2, c: 3 }
     
-    pure func foo(val: keyof typeof a) => nil
+    func foo(val: keyof typeof a) => nil
     
     const b = foo('a')`,
     false)
@@ -2481,7 +2481,7 @@ Deno.test({
     testTypecheck(`
     const a = { a: 1, b: 2, c: 3 }
     
-    pure func foo(val: keyof typeof a) => nil
+    func foo(val: keyof typeof a) => nil
     
     const b = foo('other')`,
     true)
@@ -2494,7 +2494,7 @@ Deno.test({
     testTypecheck(`
     const a = { a: 1, b: 2, c: 3 }
     
-    pure func foo(val: valueof typeof a) => nil
+    func foo(val: valueof typeof a) => nil
     
     const b = foo(1)`,
     false)
@@ -2507,7 +2507,7 @@ Deno.test({
     testTypecheck(`
     const a = { a: 1, b: 2, c: 3 }
     
-    pure func foo(val: valueof typeof a) => nil
+    func foo(val: valueof typeof a) => nil
     
     const b = foo(12)`,
     true)
@@ -2520,7 +2520,7 @@ Deno.test({
     testTypecheck(`
     const a = [1, 2, 3]
     
-    pure func foo(val: elementof typeof a) => nil
+    func foo(val: elementof typeof a) => nil
     
     const b = foo(1)`,
     false)
@@ -2533,7 +2533,7 @@ Deno.test({
     testTypecheck(`
     const a = [1, 2, 3]
     
-    pure func foo(val: elementof typeof a) => nil
+    func foo(val: elementof typeof a) => nil
     
     const b = foo(12)`,
     true)
@@ -3257,7 +3257,7 @@ Deno.test({
   name: "Object literal to record pass",
   fn() {
     testTypecheck(`
-    pure func foo(key: string) => {
+    func foo(key: string) => {
       foo: 'sdfasdf',
       ['sfdgsdgf']: 'poijnk',
       [key]: 12
@@ -3407,13 +3407,13 @@ Deno.test({
   name: "Spread arguments pass",
   fn() {
     testTypecheck(`
-    pure func foo(...args: number[]): number? => args[0]
+    func foo(...args: number[]): number? => args[0]
 
     const a = foo(1)
     const b = foo(1, 2)
     const c = foo(1, 2, 3)
 
-    pure func hof(fn: (num: number) => number?) => nil
+    func hof(fn: (num: number) => number?) => nil
 
     const x = hof(foo)
     `,
@@ -3425,7 +3425,7 @@ Deno.test({
   name: "Spread arguments fail 1",
   fn() {
     testTypecheck(`
-    pure func foo(...args: number[]): number? => args[0]
+    func foo(...args: number[]): number? => args[0]
 
     const a = foo('stuff')
     `,
@@ -3437,9 +3437,9 @@ Deno.test({
   name: "Spread arguments fail 2",
   fn() {
     testTypecheck(`
-    pure func foo(...args: string[]): number? => args[0]
+    func foo(...args: string[]): number? => args[0]
 
-    pure func hof(fn: (num: number) => nil) => nil
+    func hof(fn: (num: number) => nil) => nil
 
     const x = hof(foo)
     `,
