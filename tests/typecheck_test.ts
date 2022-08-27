@@ -125,7 +125,7 @@ Deno.test({
   name: "Function-as-argument inference 5",
   fn() {
     testTypecheck(`
-    js func iter<T>(arr: T[]): Iterator<T> => {# #}
+    pure js func iter<T>(arr: T[]): Iterator<T> => {# #}
     func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? => nil
 
     const x = [2, 4, 6, 8].iter().find(n => n > 5)`,
@@ -358,7 +358,7 @@ Deno.test({
   fn() {
     testTypecheck(
       `
-      func foo(fn: (n: number) => number) => fn(12)
+      func foo(fn: pure (n: number) => number) => fn(12)
       const bar = foo(n => 2 * n)`,
       false
     )
@@ -594,13 +594,13 @@ Deno.test({
     testTypecheck(
       `
       // copied from lib/bgl
-      export js func iter<T>(x: readonly T[]): Iterator<T> => {#
+      export pure js func iter<T>(x: readonly T[]): Iterator<T> => {#
         return ___iter(x)
       #}
-      export js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>     {# return iter.filter(fn) #}
-      export js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
-      export js func concat<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<T|R> =>         {# return iter.concat(other) #}
-      export js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
+      export pure js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>     {# return iter.filter(fn) #}
+      export pure js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
+      export pure js func concat<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<T|R> =>         {# return iter.concat(other) #}
+      export pure js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
 
       const i: Iterator<number> = [1, 2, 3].iter()
       const foo: number? = i.filter((n: number) => n > 2).first()
@@ -1826,7 +1826,7 @@ Deno.test({
   name: "Function method call with property 1",
   fn() {
     testTypecheck(`
-    type T = { foo: () => string }
+    type T = { foo: pure () => string }
     const t: T = { foo: () => 'stuff' }
 
     func foo(s: T) => 12
@@ -1839,7 +1839,7 @@ Deno.test({
   name: "Function method call with property 2",
   fn() {
     testTypecheck(`
-    type T = { foo: () => string }
+    type T = { foo: pure () => string }
     const t: T = { foo: () => 'stuff' }
 
     func bar(s: T) => 12

@@ -1,11 +1,11 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
-import { Expression, IfElseExpression, Invocation, isExpression, ObjectEntry } from "../_model/expressions.ts";
+import { Expression, Func, IfElseExpression, Invocation, isExpression, ObjectEntry, Proc } from "../_model/expressions.ts";
 import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, STRING_OR_NUMBER_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE, Args, SpreadArgs } from "../_model/type-expressions.ts";
 import { exists, given, devMode } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, SourceInfo } from "../_model/ast.ts";
-import { areSame, argType, arrayOf, AST_NOISE, attribute, elementTagToObject, errorOf, expressionsEqual, getName, identifierToExactString, invocationFromMethodCall, iteratorOf, literalType, mapParseTree, maybeOf, planOf, tupleOf, typesEqual, TYPE_AST_NOISE, unionOf } from "../utils/ast.ts";
+import { areSame, argType, arrayOf, AST_NOISE, attribute, elementTagToObject, errorOf, expressionsEqual, getName, identifierToExactString, invocationFromMethodCall, iterateParseTree, iteratorOf, literalType, mapParseTree, maybeOf, planOf, tupleOf, typesEqual, TYPE_AST_NOISE, unionOf } from "../utils/ast.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
@@ -70,20 +70,24 @@ const inferTypeInner = memo(function inferTypeInner(
             // TODO: infer arg types just like we do under func
             const procType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
             
-            if (procType.throws) {
-                return procType
-            } else {
-                const thrown = throws(ctx, ast.body)
-                return {
-                    ...procType,
-                    throws: thrown.length > 0
+            const throws = procType.throws ?? (() => {
+                const thrown = getThrows(ctx, ast.body)
+
+                return (
+                    thrown.length > 0
                         ? {
                             kind: 'union-type',
                             members: thrown,
                             ...TYPE_AST_NOISE
                         }
                         : undefined
-                }
+                )
+            })()
+            
+            return {
+                ...procType,
+                isPure: procType.isPure || inferredToBePure(ctx, ast),
+                throws
             }
         }
         case "func": {
@@ -122,6 +126,7 @@ const inferTypeInner = memo(function inferTypeInner(
 
             const inferredFuncType = {
                 ...funcType,
+                isPure: funcType.isPure || inferredToBePure(ctx, ast),
                 args: (
                     funcType.args.kind === 'args'
                         ? {
@@ -651,7 +656,7 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
                 : UNKNOWN_TYPE
         }
         case 'try-catch': {
-            const thrown = throws(ctx, owner.tryBlock)
+            const thrown = getThrows(ctx, owner.tryBlock)
 
             if (thrown.length === 0) {
                 return UNKNOWN_TYPE
@@ -1388,7 +1393,7 @@ function assign<K, V>(a: Map<K, V>, b: ReadonlyMap<K, V> | undefined) {
 /**
  * Get the types of all possible Errors thrown within the given Block (recursive)
  */
-export function throws(ctx: Pick<Context, "allModules" | "visited"|"canonicalModuleName">, block: Block): TypeExpression[] {
+export function getThrows(ctx: Pick<Context, "allModules" | "visited"|"canonicalModuleName">, block: Block): TypeExpression[] {
     const errorTypes: TypeExpression[] = []
 
     for (const statement of block.statements) {
@@ -1404,17 +1409,17 @@ export function throws(ctx: Pick<Context, "allModules" | "visited"|"canonicalMod
             // case 'destructuring-declaration-statement'
             case 'for-loop':
             case 'while-loop':
-                errorTypes.push(...throws(ctx, statement.body))
+                errorTypes.push(...getThrows(ctx, statement.body))
                 break;
             case 'try-catch':
-                errorTypes.push(...throws(ctx, statement.catchBlock))
+                errorTypes.push(...getThrows(ctx, statement.catchBlock))
                 break;
             case 'if-else-statement':
                 for (const { outcome } of statement.cases) {
-                    errorTypes.push(...throws(ctx, outcome))
+                    errorTypes.push(...getThrows(ctx, outcome))
                 }
                 if (statement.defaultCase) {
-                    errorTypes.push(...throws(ctx, statement.defaultCase))
+                    errorTypes.push(...getThrows(ctx, statement.defaultCase))
                 }
                 break;
             case 'throw-statement':
@@ -1424,4 +1429,25 @@ export function throws(ctx: Pick<Context, "allModules" | "visited"|"canonicalMod
     }
 
     return errorTypes
+}
+
+function inferredToBePure(ctx: Pick<Context, 'allModules'|'visited'|'canonicalModuleName'>, ast: Func | Proc): boolean {
+    for (const { current } of iterateParseTree(ast.body)) {
+        if (current.kind === 'local-identifier') {
+            const binding = resolve(ctx, current.name, current, true)?.owner
+            
+            if (binding && binding.kind === 'value-declaration' && !binding.isConst) {
+                return false
+            }
+        } else if (current.kind === 'invocation') {
+            const subjectType = inferType(ctx, current.subject)
+            const realType = subjectType.kind === 'generic-type' ? subjectType.inner : subjectType
+
+            if ((realType.kind === 'func-type' || realType.kind === 'proc-type') && !realType.isPure) {
+                return false
+            }
+        }
+    }
+
+    return true
 }

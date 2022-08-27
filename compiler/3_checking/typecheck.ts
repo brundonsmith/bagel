@@ -2,7 +2,7 @@ import { AST, Module, PlainIdentifier } from "../_model/ast.ts";
 import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType, STRING_TYPE, STRING_OR_NUMBER_TYPE } from "../_model/type-expressions.ts";
 import { exists, given, hlt, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
-import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, throws } from "./typeinfer.ts";
+import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, getThrows } from "./typeinfer.ts";
 import { Context, getBindingMutability, ModuleName } from "../_model/common.ts";
 import { ancestors, argsBounds, elementOf, findAncestor, getName, invocationFromMethodCall, iterateParseTree, literalType, maybeOf, planOf, typesEqual, unionOf, within } from "../utils/ast.ts";
 import { DEFAULT_OPTIONS, format } from "../other/format.ts";
@@ -654,7 +654,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "test-block-declaration":
             case "try-catch": {
                 const block = current.kind === 'try-catch' ? current.tryBlock : current.block
-                const thrown = throws(ctx, block)
+                const thrown = getThrows(ctx, block)
 
                 if (thrown.length === 0) {
                     const blockName = current.kind === 'try-catch' ? 'Try/catch' : 'Test'
@@ -765,7 +765,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                 break;
             case "proc-declaration":
             case "func-declaration": {
-                const baseDeclType = inferType(ctx, current.value)
+                const baseDeclType = current.value.type
 
                 for (const decorator of current.decorators) {
                     const decoratorType = inferType(ctx, decorator.decorator)
