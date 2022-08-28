@@ -928,10 +928,17 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
     const all = (...inner: Array<Array<string | string[]> | undefined>) =>
         given(emptyToUndefined(inner.filter(exists).flat()), withBase)
 
-    if (resolvedDestination.mutability === "mutable" && (resolvedValue.mutability === 'constant' || resolvedValue.mutability === 'readonly')) {
+    if (
+        (resolvedDestination.mutability === "mutable" || resolvedDestination.mutability === 'literal' || (resolvedDestination.kind === 'union-type' && resolvedDestination.members.some(m => m.mutability === 'mutable' || m.mutability === 'literal'))) &&
+        (resolvedValue.mutability === 'constant' || resolvedValue.mutability === 'readonly' || (resolvedValue.kind === 'union-type' && resolvedValue.members.every(m => m.mutability === 'constant' || m.mutability === 'readonly')))
+    ) {
+        const valueMutability = resolvedValue.mutability === "constant" || resolvedValue.mutability === 'readonly'
+            ? resolvedValue.mutability
+            : 'readonly'
+            
         return [
             baseErrorMessage,
-            `Value with ${resolvedValue.mutability} type ${hlt(msgFormat(value))} isn't compatible with ${resolvedDestination.mutability} type ${hlt(msgFormat(destination))}`
+            `Value with ${valueMutability} type ${hlt(msgFormat(value))} isn't compatible with mutable type ${hlt(msgFormat(destination))}`
         ];
     } else if (
         resolvedValue.kind === "javascript-escape-type" ||
@@ -1263,9 +1270,20 @@ export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'
             return resolveType(ctx, type.inner)
         case "readonly-type": {
             const inner = resolveType(ctx, type.inner)
-            return {
-                ...inner,
-                mutability: inner.mutability != null ? 'readonly' : inner.mutability as any
+
+            if (inner.kind === 'union-type') {
+                return {
+                    ...inner,
+                    members: inner.members.map(m => ({
+                        ...m,
+                        mutability: m.mutability != null ? 'readonly' : m.mutability as any
+                    }))
+                }
+            } else {
+                return {
+                    ...inner,
+                    mutability: inner.mutability != null ? 'readonly' : inner.mutability as any
+                }
             }
         }
         case "typeof-type":

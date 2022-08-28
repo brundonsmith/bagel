@@ -1767,6 +1767,29 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Immutability test 13",
+  fn() {
+    testTypecheck(`
+    func foo(x: unknown): readonly unknown => x
+    const a: (x: unknown) => unknown = foo`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Immutability test 14",
+  fn() {
+    testTypecheck(`
+    type Objs = { foo: string } | { bar: number }
+    type Fn = (x: Objs) => Objs
+    type FnReadonlyReturn = (x: Objs) => readonly Objs
+
+    func foo(fn: FnReadonlyReturn): Fn => fn`,
+    true)
+  }
+})
+
+Deno.test({
   name: "Parentehsized type pass",
   fn() {
     testTypecheck(`
