@@ -369,6 +369,13 @@ function compileOne(ctx: CompileContext, ast: AST): string {
                     .join(', ')
             }}`
         );
+        case "interface-type": return (
+            `{${
+                ast.entries
+                    .map(c)
+                    .join(', ')
+            }}`
+        )
         case "attribute":
             return `${c(ast.name)}: ${c(ast.type)}`
         case "record-type": return `Record<${c(ast.keyType)}, ${c(ast.valueType)}>`;
