@@ -268,10 +268,10 @@ function compileOne(ctx: CompileContext, ast: AST): string {
             }
 
             if (ast.op.op === '==' || ast.op.op === '!=') {
-                const leftType = inferType(ctx, ast.left)
-                const rightType = inferType(ctx, ast.right)
+                const leftType = resolveType(ctx, inferType(ctx, ast.left))
+                const rightType = resolveType(ctx, inferType(ctx, ast.right))
 
-                if (!subsumationIssues(ctx, NIL_TYPE, leftType) || !subsumationIssues(ctx, NIL_TYPE, rightType)) {
+                if (leftType.kind === 'nil-type' || rightType.kind === 'nil-type') {
                     return `(${c(ast.left)} ${ast.op.op} ${c(ast.right)})`; // special case for nil-comparisons because of null/undefined
                 } else {
                     return `(${c(ast.left)} ${ast.op.op}= ${c(ast.right)})`;
@@ -526,7 +526,7 @@ const fixTruthinessIfNeeded = (ctx: CompileContext, expr: Expression) =>
 
 const needsTruthinessFix = (ctx: Pick<Context, "allModules"|"canonicalModuleName">, expr: Expression) => {
     const type = inferType(ctx, expr)
-    return subsumationIssues(ctx, TRUTHINESS_SAFE_TYPES, type) != null
+    return subsumationIssues(ctx, TRUTHINESS_SAFE_TYPES, type, true) != null
 }
 
 const truthinessOf = (compiledExpr: string) => 

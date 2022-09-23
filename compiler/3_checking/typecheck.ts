@@ -1,12 +1,12 @@
 import { AST, Module, PlainIdentifier } from "../_model/ast.ts";
-import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType, STRING_TYPE, STRING_OR_NUMBER_TYPE, Mutability } from "../_model/type-expressions.ts";
+import { ARRAY_OF_ANY, BOOLEAN_TYPE, FuncType, GenericFuncType, GenericProcType, GenericType, ITERATOR_OF_ANY, NIL_TYPE, NUMBER_TYPE, RECORD_OF_ANY, ProcType, STRING_TEMPLATE_INSERT_TYPE, TypeExpression, UNKNOWN_TYPE, ERROR_OF_ANY, PLAN_OF_ANY, VALID_RECORD_KEY, PlanType, isEmptyType, UnionType, STRING_TYPE, STRING_OR_NUMBER_TYPE, Mutability, POISONED_TYPE } from "../_model/type-expressions.ts";
 import { exists, given, hlt, iesOrY } from "../utils/misc.ts";
 import { alreadyDeclared, assignmentError,cannotFindModule,cannotFindName,miscError } from "../errors.ts";
 import { propertiesOf, inferType, subtract, bindInvocationGenericArgs, parameterizedGenericType, getThrows } from "./typeinfer.ts";
 import { Context, getBindingMutability, ModuleName } from "../_model/common.ts";
-import { ancestors, argsBounds, elementOf, findAncestor, getName, invocationFromMethodCall, iterateParseTree, literalType, maybeOf, planOf, typesEqual, unionOf, within } from "../utils/ast.ts";
+import { ancestors, argsBounds, elementOf, findAncestor, getName, identifierToExactString, invocationFromMethodCall, iterateParseTree, literalType, maybeOf, planOf, typesEqual, unionOf, within } from "../utils/ast.ts";
 import { DEFAULT_OPTIONS, format } from "../other/format.ts";
-import { ExactStringLiteral, Expression, Func, Proc } from "../_model/expressions.ts";
+import { Expression, Func, Proc } from "../_model/expressions.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { ImportDeclaration, ValueDeclaration } from "../_model/declarations.ts";
 
@@ -433,67 +433,31 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
 
                 if (!isMethodCall) {
                     const subjectType = resolveType(ctx, inferType(ctx, current.subject))
-                    const property = current.property
+                    const normalizedIndex = (
+                        current.property.kind === 'plain-identifier'
+                            ? identifierToExactString(current.property)
+                            : current.property
+                    )
+                    const indexType = inferType(ctx, normalizedIndex)
+                    const indexLiteral = (
+                        indexType.kind === 'literal-type'
+                            ? indexType.value.value
+                            : undefined
+                    )
 
                     const nillable = subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
 
                     if (nillable && !current.optional) {
-                        sendError(miscError(current.property, `Can't access properties on ${hlt(format(subjectType))} without an optional-chaining operator (".?"), because it is potentially nil`))
+                        sendError(miscError(current.property, `Can't access properties on ${hlt(format(subjectType))} without an optional-chaining operator ("?."), because it is potentially nil`))
                     }
 
-                    const effectiveSubjectType = current.optional && nillable
-                        ? resolveType(ctx, subtract(ctx, subjectType, NIL_TYPE))
-                        : subjectType
+                    const propertyType = getPropertyType(ctx, subjectType, indexType, current.optional)
 
-                    const subjectProperties = propertiesOf(ctx, effectiveSubjectType)
-
-
-                    if (property.kind === 'plain-identifier') {
-                        const { name } = property
-
-                        if (effectiveSubjectType.kind === 'record-type') {
-                            expectType(ctx, current.subject, effectiveSubjectType.keyType, literalType(name), () =>
-                                `Property ${hlt(name)} will never be found on object with type ${hlt(msgFormat(subjectType))}`)
+                    if (propertyType == null) {
+                        if (indexLiteral != null) {
+                            sendError(miscError(current.property, `Property ${hlt(String(indexLiteral))} does not exist on type ${hlt(msgFormat(subjectType))}`))
                         } else {
-                            if (subjectProperties == null) {
-                                sendError(miscError(current.subject, `Can only use dot operator (".") on objects with properties (value is of type ${hlt(msgFormat(subjectType))})`));
-                            } else if (!subjectProperties.some(p => getName(p.name) === name)) {
-                                sendError(miscError(property, `Property ${hlt(name)} does not exist on type ${hlt(msgFormat(subjectType))}`));
-                            }
-                        }
-                    } else {
-                        const indexType = resolveType(ctx, inferType(ctx, property))
-
-                        if (subjectProperties && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
-                            const key = indexType.value.value;
-                            const valueType = subjectProperties?.find(entry => getName(entry.name) === key)?.type;
-                            
-                            if (valueType == null) {
-                                sendError(miscError(property, `Property ${hlt(key)} doesn't exist on type ${hlt(msgFormat(subjectType))}`));
-                            }
-                        } else if (effectiveSubjectType.kind === "record-type") {
-                            expect(ctx, effectiveSubjectType.keyType, property,
-                                (_, val) => `Expression of type ${hlt(msgFormat(val))} can't be used to index type ${hlt(msgFormat(subjectType))}`)
-                        } else if (
-                            !subsumationIssues(ctx,
-                                unionOf([
-                                    ARRAY_OF_ANY,
-                                    STRING_TYPE,
-                                ]),
-                                effectiveSubjectType)
-                        ) {
-                            expect(ctx, NUMBER_TYPE, property,
-                                (_, val) => `Expression of type ${hlt(msgFormat(val))} can't be used to index type ${hlt(msgFormat(subjectType))}`)
-    
-                            if (effectiveSubjectType.kind === "tuple-type" || (effectiveSubjectType.kind === 'literal-type' && effectiveSubjectType.value.kind === 'exact-string-literal')) {
-                                const max = effectiveSubjectType.kind === 'tuple-type' ? effectiveSubjectType.members.length : (effectiveSubjectType.value as ExactStringLiteral).value.length
-    
-                                if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal' && (indexType.value.value < 0 || indexType.value.value >= max)) {
-                                    sendError(miscError(property, `Index ${indexType.value.value} is out of range on type ${hlt(msgFormat(subjectType))}`));
-                                }
-                            }
-                        } else {
-                            sendError(miscError(property, `Expression of type ${hlt(msgFormat(indexType))} can't be used to index type ${hlt(msgFormat(subjectType))}`));
+                            sendError(miscError(current.property, `Expression of type ${hlt(msgFormat(indexType))} can't be used to index type ${hlt(msgFormat(subjectType))}`))
                         }
                     }
                 }
@@ -915,7 +879,7 @@ function expectType(ctx: Pick<Context, 'allModules'|'sendError'|'encounteredName
  * Determine whether `value` can "fit into" `destination`. Used for verifying 
  * values passed to consts, arguments, etc, but for other things too.
  */
-export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNames'|'canonicalModuleName'>, destination: TypeExpression, value: TypeExpression): Array<string | string[]> | undefined {
+export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNames'|'canonicalModuleName'>, destination: TypeExpression, value: TypeExpression, errOnPoisons?: boolean): Array<string | string[]> | undefined {
 
     if (destination === value) {
         return undefined;
@@ -944,12 +908,12 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
     } else if (
         resolvedValue.kind === "javascript-escape-type" ||
         resolvedValue.kind === "any-type" || 
-        resolvedValue.kind === "poisoned-type" ||
         resolvedDestination.kind === "any-type" || 
-        resolvedDestination.kind === "unknown-type"
+        resolvedDestination.kind === "unknown-type" ||
+        (!errOnPoisons && resolvedValue.kind === "poisoned-type")
     ) {
         return undefined;
-    } else if (resolvedValue.kind === "unknown-type") {
+    } else if (resolvedValue.kind === "unknown-type" || resolvedValue.kind === "poisoned-type") {
         return [baseErrorMessage];
     } else if (
         (resolvedDestination.kind === "number-type" && resolvedValue.kind === "literal-type" && resolvedValue.value.kind === "number-literal") ||
@@ -1461,110 +1425,114 @@ export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'
                     ? literalType(type.property.name)
                     : resolveType(ctx, type.property)
             )
-            const indexerLiteral = (
-                normalizedPropertyType.kind === 'literal-type'
-                    ? normalizedPropertyType.value.value
-                    : undefined
-            )
-            const propertyName = (
-                typeof indexerLiteral === 'string'
-                    ? indexerLiteral
-                    : undefined
-            )
-            const nilTolerantSubjectType = type.optional && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-                ? resolveType(ctx, subtract(ctx, subjectType, NIL_TYPE))
-                : subjectType;
 
-            const property = (
-                propertyName != null
-                    ? propertiesOf(ctx, nilTolerantSubjectType)?.find(entry =>
-                        getName(entry.name) === propertyName)
-                    : undefined
-            )
-
-            if (property) {
-                // found an exact property of the subject
-
-                const mutability: Mutability['mutability'] | undefined = (
-                    property.type.mutability == null ? undefined :
-                    property.type.mutability === "mutable" && subjectType.mutability === "mutable" && !property.forceReadonly ? "mutable" :
-                    subjectType.mutability === 'constant' ? 'constant' :
-                    "readonly"
-                )
-    
-                return {
-                    ...resolveType(ctx, property.type),
-                    mutability: mutability as any
-                }
-            } else {
-                const indexerLiteral = (
-                    normalizedPropertyType.kind === 'literal-type'
-                        ? normalizedPropertyType.value.value
-                        : undefined
-                )
-                const indexIsNumber = !subsumationIssues(ctx, NUMBER_TYPE, normalizedPropertyType)
-
-                switch (nilTolerantSubjectType.kind) {
-                    case 'record-type': {
-                        return (
-                            !subsumationIssues(ctx, nilTolerantSubjectType.keyType, normalizedPropertyType)
-                                ? resolveType(ctx, maybeOf(nilTolerantSubjectType.valueType))
-                                : UNKNOWN_TYPE
-                        )
-                    }
-                    case 'array-type': {
-                        return (
-                            indexIsNumber
-                                ? resolveType(ctx, maybeOf(nilTolerantSubjectType.element))
-                                : UNKNOWN_TYPE
-                        )
-                    }
-                    case 'string-type': {
-                        return (
-                            indexIsNumber
-                                ? resolveType(ctx, maybeOf(STRING_TYPE))
-                                : UNKNOWN_TYPE
-                        )
-                    }
-                    case 'literal-type': {
-                        if (nilTolerantSubjectType.value.kind === 'exact-string-literal' && indexIsNumber) {
-                            if (typeof indexerLiteral === 'number') {
-                                const char = nilTolerantSubjectType.value.value[indexerLiteral]
-
-                                if (char) {
-                                    return literalType(char)
-                                } else {
-                                    return NIL_TYPE
-                                }
-                            } else {
-                                return resolveType(ctx, maybeOf(STRING_TYPE))
-                            }
-                        } else {
-                            return UNKNOWN_TYPE
-                        }
-                    }
-                    case 'object-type': {
-                        return (
-                            !subsumationIssues(ctx, STRING_TYPE, normalizedPropertyType)
-                                ? unionOf([ ...propertiesOf(ctx, nilTolerantSubjectType)?.map(property => resolveType(ctx, property.type)) ?? [], NIL_TYPE ], type)
-                                : UNKNOWN_TYPE
-                        )
-                    }
-                    case 'tuple-type': {
-                        return (
-                            indexIsNumber
-                                ? typeof indexerLiteral === 'number'
-                                    ? nilTolerantSubjectType.members[indexerLiteral] ?? NIL_TYPE
-                                    : resolveType(ctx, unionOf([ ...nilTolerantSubjectType.members, NIL_TYPE ], type))
-                                : UNKNOWN_TYPE
-                        )
-                    }
-                }
-            }
+            return getPropertyType(ctx, subjectType, normalizedPropertyType, type.optional) ?? POISONED_TYPE
         }
     }
 
     return type
+}
+
+function getPropertyType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'canonicalModuleName'> & { preserveNamedTypes?: boolean }, subjectType: TypeExpression, propertyType: TypeExpression, optionalChain: boolean): TypeExpression | undefined {
+    const indexerLiteral = (
+        propertyType.kind === 'literal-type'
+            ? propertyType.value.value
+            : undefined
+    )
+    const propertyName = (
+        typeof indexerLiteral === 'string'
+            ? indexerLiteral
+            : undefined
+    )
+    const nilTolerantSubjectType = optionalChain && subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
+        ? resolveType(ctx, subtract(ctx, subjectType, NIL_TYPE))
+        : subjectType;
+
+    const property = (
+        propertyName != null
+            ? propertiesOf(ctx, nilTolerantSubjectType)?.find(entry =>
+                getName(entry.name) === propertyName)
+            : undefined
+    )
+
+    if (property) {
+        // found an exact property of the subject
+
+        const mutability: Mutability['mutability'] | undefined = (
+            property.type.mutability == null ? undefined :
+            property.type.mutability === "mutable" && subjectType.mutability === "mutable" && !property.forceReadonly ? "mutable" :
+            subjectType.mutability === 'constant' ? 'constant' :
+            "readonly"
+        )
+
+        return {
+            ...resolveType(ctx, property.type),
+            mutability: mutability as any
+        }
+    } else {
+        switch (nilTolerantSubjectType.kind) {
+            case 'record-type': {
+                return (
+                    !subsumationIssues(ctx, nilTolerantSubjectType.keyType, propertyType)
+                        ? resolveType(ctx, maybeOf(nilTolerantSubjectType.valueType))
+                        : undefined
+                )
+            }
+            case 'array-type': {
+                return (
+                    !subsumationIssues(ctx, NUMBER_TYPE, propertyType)
+                        ? resolveType(ctx, maybeOf(nilTolerantSubjectType.element))
+                        : undefined
+                )
+            }
+            case 'string-type': {
+                return (
+                    !subsumationIssues(ctx, NUMBER_TYPE, propertyType)
+                        ? resolveType(ctx, maybeOf(STRING_TYPE))
+                        : undefined
+                )
+            }
+            case 'literal-type': {
+                if (nilTolerantSubjectType.value.kind === 'exact-string-literal' && !subsumationIssues(ctx, NUMBER_TYPE, propertyType)) {
+                    if (typeof indexerLiteral === 'number') {
+                        const char = nilTolerantSubjectType.value.value[indexerLiteral]
+
+                        if (char) {
+                            return literalType(char)
+                        } else {
+                            return NIL_TYPE
+                        }
+                    } else {
+                        return resolveType(ctx, maybeOf(STRING_TYPE))
+                    }
+                } else {
+                    return undefined
+                }
+            }
+            case 'object-type': {
+                return (
+                    indexerLiteral == null && !subsumationIssues(ctx, STRING_TYPE, propertyType)
+                        ? unionOf([
+                            ...propertiesOf(ctx, nilTolerantSubjectType)?.map(property => resolveType(ctx, property.type)) ?? [],
+                            NIL_TYPE
+                        ], subjectType)
+                        : undefined
+                )
+            }
+            case 'tuple-type': {
+                return (
+                    !subsumationIssues(ctx, NUMBER_TYPE, propertyType)
+                        ? typeof indexerLiteral === 'number'
+                            ? nilTolerantSubjectType.members[indexerLiteral]
+                            : resolveType(ctx, unionOf([
+                                ...nilTolerantSubjectType.members,
+                                NIL_TYPE
+                            ], subjectType))
+                        : undefined
+                )
+            }
+        }
+    }
 }
 
 /**
