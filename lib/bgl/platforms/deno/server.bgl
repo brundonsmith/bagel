@@ -43,7 +43,7 @@ type RequestDestination =
   | 'xslt'
 type Headers = {[string]: string}
 
-export type Request = readonly {
+export type Request = readonly interface {
     cache: RequestCache,
     credentials: RequestCredentials,
     destination: RequestDestination,
@@ -61,7 +61,7 @@ export type Request = readonly {
     body: string,
 }
 
-export type Response = {
+export type Response = interface {
     headers?: Headers,
     status?: number,
     statusText?: string,

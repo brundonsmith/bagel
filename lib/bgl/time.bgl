@@ -4,7 +4,7 @@ import { Temporal as ___Temporal } from '@js-temporal/polyfill'
 #js
 
 
-export type Instant = readonly {
+export type Instant = readonly interface {
     epoch: number,
     millisecond: number,
     second: number,

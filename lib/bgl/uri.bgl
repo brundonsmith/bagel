@@ -2,7 +2,7 @@
 export const decodeURIComponent: (str: string) => string = js# globalThis.decodeURIComponent #js
 export const encodeURIComponent: (str: string) => string = js# globalThis.encodeURIComponent #js
 
-export type URI = readonly {
+export type URI = readonly interface {
     href: string,
     protocol: string,
     origin: string,

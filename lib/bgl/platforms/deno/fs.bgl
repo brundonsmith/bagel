@@ -29,7 +29,7 @@ export async deno func stat(path: string): Plan<FileInfo> => {#
     return () => Deno.stat(path)
 #}
 
-export type DirEntry = readonly {
+export type DirEntry = readonly interface {
     name: string,
     isFile: boolean,
     isDirectory: boolean,
