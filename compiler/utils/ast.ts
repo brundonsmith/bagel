@@ -4,7 +4,7 @@ import { inferType,propertiesOf } from "../3_checking/typeinfer.ts";
 import { AST,PlainIdentifier,SourceInfo } from "../_model/ast.ts";
 import { Context } from "../_model/common.ts";
 import { BooleanLiteral, ElementTag, ExactStringLiteral, Expression, Invocation, LocalIdentifier, NumberLiteral, ObjectLiteral } from "../_model/expressions.ts";
-import { Args, ArrayType, Attribute, ElementofType, ErrorType, FALSE_TYPE, IteratorType, LiteralType, MaybeType, PlanType, SpreadArgs, TRUE_TYPE, TupleType, TypeExpression, UnionType } from "../_model/type-expressions.ts";
+import { Args, ArrayType, AST_NOISE, Attribute, ElementofType, ErrorType, FALSE_TYPE, IteratorType, LiteralType, MaybeType, PlanType, SpreadArgs, TRUE_TYPE, TupleType, TypeExpression, TYPE_AST_NOISE, UnionType } from "../_model/type-expressions.ts";
 import { deepEquals } from "./misc.ts";
 
 export function areSame(a: AST|undefined, b: AST|undefined) {
@@ -369,9 +369,6 @@ export function argsBounds(ctx: Pick<Context, "allModules" | "encounteredNames"|
         }
     }
 }
-
-export const AST_NOISE = { module: undefined, code: undefined, startIndex: undefined, endIndex: undefined }
-export const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
 
 export function literalType(value: ExactStringLiteral|NumberLiteral|BooleanLiteral|PlainIdentifier|string|number|boolean): LiteralType {
     if (typeof value === 'boolean') {

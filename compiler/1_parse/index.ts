@@ -5,9 +5,9 @@ import { ModuleName,ReportError } from "../_model/common.ts";
 import { ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator, TestTypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration, ALL_REG_EXP_FLAGS, RegularExpression, RegularExpressionFlag } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement, Autorun } from "../_model/statements.ts";
-import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType, ReadonlyType, RemoteType } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType, ReadonlyType, RemoteType, InterfaceType, AST_NOISE } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
-import { AST_NOISE, setParents } from "../utils/ast.ts";
+import { setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
 import { path } from '../deps.ts';
 import { memo } from "../../lib/ts/reactivity.ts";
@@ -477,6 +477,22 @@ const objectType: ParseFunction<ObjectType> = memo((module, code, startIndex) =>
         },
         index,
     })))))))
+
+const interfaceType: ParseFunction<InterfaceType> = memo((module, code, startIndex) =>
+    given(consume(code, startIndex, "interface"), index =>
+    given(consumeWhitespace(code, index), index =>
+    expec(objectType(module, code, index), err(code, index, 'Interface properties'), ({ parsed: obj, index }) => ({
+        parsed: {
+            kind: "interface-type",
+            entries: obj.entries,
+            module,
+            mutability: "mutable",
+            code,
+            startIndex,
+            endIndex: index,
+        },
+        index
+    })))))
 
 const _typeSpreadOrEntry: ParseFunction<NamedType|Attribute> = memo((module, code, startIndex) => 
     attribute(module, code, startIndex) ?? _objectTypeSpread(module, code, startIndex))
@@ -2598,7 +2614,7 @@ const TYPE_PARSER = new TieredParser<TypeExpression>([
     [ boundGenericType ],
     [ arrayType ],
     [ primitiveType, parenthesizedType, funcType, procType, 
-        literalType, recordType, objectType, 
+        literalType, recordType, interfaceType, objectType, 
         tupleType, unknownType ],
     [ namedType ]
 ])

@@ -1,6 +1,9 @@
 import { PlainIdentifier, SourceInfo } from "./ast.ts";
 import { BooleanLiteral, ExactStringLiteral, Expression, NumberLiteral } from "./expressions.ts";
 
+export const AST_NOISE = { module: undefined, code: undefined, startIndex: undefined, endIndex: undefined }
+export const TYPE_AST_NOISE = { mutability: undefined, ...AST_NOISE }
+
 export type TypeExpression =
     | UnionType
     | MaybeType
@@ -11,6 +14,7 @@ export type TypeExpression =
     | GenericType
     | BoundGenericType
     | ObjectType
+    | InterfaceType
     | RecordType
     | ArrayType
     | TupleType
@@ -125,6 +129,11 @@ export type SpreadArgs = SourceInfo & {
 export type ObjectType = SourceInfo & Mutability & {
     readonly kind: "object-type",
     readonly spreads: readonly NamedType[],
+    readonly entries: readonly Attribute[],
+}
+
+export type InterfaceType = SourceInfo & Mutability & {
+    readonly kind: "interface-type",
     readonly entries: readonly Attribute[],
 }
 
@@ -270,40 +279,20 @@ export type NoMutability = { readonly mutability: undefined }
 
 export const STRING_TYPE: StringType = {
     kind: "string-type",
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const NUMBER_TYPE: NumberType = {
     kind: "number-type",
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const STRING_OR_NUMBER_TYPE: UnionType = {
     kind: "union-type",
     members: [STRING_TYPE, NUMBER_TYPE],
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const BOOLEAN_TYPE: BooleanType = {
     kind: "boolean-type",
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const TRUE_TYPE: LiteralType = {
     kind: "literal-type",
@@ -316,12 +305,7 @@ export const TRUE_TYPE: LiteralType = {
         startIndex: undefined,
         endIndex: undefined,
     },
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const FALSE_TYPE: LiteralType = {
     kind: "literal-type",
@@ -334,70 +318,36 @@ export const FALSE_TYPE: LiteralType = {
         startIndex: undefined,
         endIndex: undefined,
     },
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const NIL_TYPE: NilType = {
     kind: "nil-type",
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const UNKNOWN_TYPE: UnknownType = {
     kind: "unknown-type",
     mutability: "mutable",
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...AST_NOISE
 }
 export const POISONED_TYPE: PoisonedType = {
     kind: "poisoned-type",
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const ANY_TYPE: AnyType = {
     kind: "any-type",
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const EMPTY_TYPE: UnionType = {
     kind: "union-type",
     members: [],
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export function isEmptyType(type: TypeExpression) {
     return type.kind === 'union-type' && type.members.length === 0
 }
 export const JAVASCRIPT_ESCAPE_TYPE: JavascriptEscapeType = {
     kind: "javascript-escape-type",
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const VALID_RECORD_KEY: TypeExpression = STRING_TYPE
 export const RECORD_OF_ANY: RecordType = {
@@ -405,61 +355,33 @@ export const RECORD_OF_ANY: RecordType = {
     keyType: ANY_TYPE,
     valueType: ANY_TYPE,
     mutability: 'constant',
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...AST_NOISE
 }
 export const ARRAY_OF_ANY: ArrayType = {
     kind: "array-type",
     element: ANY_TYPE,
     mutability: 'constant',
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...AST_NOISE
 }
 export const ITERATOR_OF_ANY: IteratorType = {
     kind: "iterator-type",
     inner: ANY_TYPE,
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const PLAN_OF_ANY: PlanType = {
     kind: "plan-type",
     inner: ANY_TYPE,
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const ERROR_OF_ANY: ErrorType = {
     kind: "error-type",
     inner: ANY_TYPE,
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const REMOTE_OF_ANY: RemoteType = {
     kind: "remote-type",
     inner: ANY_TYPE,
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 
 export const FUNC: FuncType = {
@@ -467,41 +389,23 @@ export const FUNC: FuncType = {
     args: {
         kind: 'spread-args',
         type: ARRAY_OF_ANY,
-        parent: undefined,
-        module: undefined,
-        code: undefined,
-        startIndex: undefined,
-        endIndex: undefined,
+        ...AST_NOISE
     },
     returnType: ANY_TYPE,
     isPure: false,
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const PROC: ProcType = {
     kind: "proc-type",
     args: {
         kind: 'spread-args',
         type: ARRAY_OF_ANY,
-        parent: undefined,
-        module: undefined,
-        code: undefined,
-        startIndex: undefined,
-        endIndex: undefined,
+        ...AST_NOISE
     },
     isAsync: false,
     isPure: false,
     throws: undefined,
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
     kind: "union-type",
@@ -510,12 +414,7 @@ export const STRING_TEMPLATE_INSERT_TYPE: TypeExpression = {
         NUMBER_TYPE,
         BOOLEAN_TYPE,
     ],
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const TRUTHINESS_SAFE_TYPES: UnionType = {
     kind: "union-type",
@@ -530,12 +429,7 @@ export const TRUTHINESS_SAFE_TYPES: UnionType = {
         PROC,
         FUNC
     ],
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 export const FALSY: UnionType = {
     kind: "union-type",
@@ -544,12 +438,7 @@ export const FALSY: UnionType = {
         NIL_TYPE,
         ERROR_OF_ANY
     ],
-    mutability: undefined,
-    parent: undefined,
-    module: undefined,
-    code: undefined,
-    startIndex: undefined,
-    endIndex: undefined,
+    ...TYPE_AST_NOISE
 }
 
 // TODO: Only allow known object properties when instantiating an object literal, like TypeScript does

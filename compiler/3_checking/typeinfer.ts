@@ -1,11 +1,11 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
 import { Expression, Func, IfElseExpression, Invocation, isExpression, ObjectEntry, Proc } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, STRING_OR_NUMBER_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE, Args, SpreadArgs } from "../_model/type-expressions.ts";
+import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, STRING_OR_NUMBER_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE, Args, SpreadArgs, AST_NOISE, TYPE_AST_NOISE } from "../_model/type-expressions.ts";
 import { exists, given, devMode } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, SourceInfo } from "../_model/ast.ts";
-import { areSame, argType, arrayOf, AST_NOISE, attribute, elementTagToObject, errorOf, expressionsEqual, getName, identifierToExactString, invocationFromMethodCall, iterateParseTree, iteratorOf, literalType, mapParseTree, maybeOf, planOf, tupleOf, typesEqual, TYPE_AST_NOISE, unionOf } from "../utils/ast.ts";
+import { areSame, argType, arrayOf, attribute, elementTagToObject, errorOf, expressionsEqual, getName, identifierToExactString, invocationFromMethodCall, iterateParseTree, iteratorOf, literalType, mapParseTree, maybeOf, planOf, tupleOf, typesEqual, unionOf } from "../utils/ast.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
@@ -1155,6 +1155,9 @@ export const propertiesOf = memo(function propertiesOf (
             }
 
             return attrs
+        }
+        case "interface-type": {
+            return resolvedType.entries
         }
         case "string-type":
         case "array-type": {

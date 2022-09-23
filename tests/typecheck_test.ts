@@ -293,7 +293,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Object type",
+  name: "Object type pass",
   fn() {
     testTypecheck(
       `type MyObj = {
@@ -348,6 +348,62 @@ Deno.test({
             foo: 'stuff',
             bar: 12
         }`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Object type fail 3",
+  fn() {
+    testTypecheck(
+      `type MyObj = {
+            foo: string,
+        }
+        
+        const obj: MyObj = {
+            foo: 12
+        }`,
+      true,
+    );
+  },
+});
+
+Deno.test({
+  name: "Interface type pass",
+  fn() {
+    testTypecheck(
+      `type MyInterface = interface {
+            foo: string
+        }
+        
+        const obj: MyInterface = {
+            foo: 'stuff'
+        }
+        
+        
+        type MyObj = {
+          foo: string
+        }
+
+        func foo(arg: MyObj): MyInterface => arg`,
+      false,
+    );
+  },
+});
+
+Deno.test({
+  name: "Interface type fail 1",
+  fn() {
+    testTypecheck(
+      `type MyInterface = interface {
+          foo: string
+        }
+        type MyObj = {
+          foo: string
+        }
+
+        func foo(arg: MyInterface): MyObj => arg`,
       true,
     );
   },

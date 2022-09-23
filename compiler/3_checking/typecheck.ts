@@ -797,6 +797,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                     expect(ctx, BOOLEAN_TYPE, current.until)
                 }
             } break;
+            case "interface-type":
             case "decorator":
             case "proc-type":
             case "func-type":
@@ -1193,13 +1194,40 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
             ? [`Has propert${iesOrY(extraProperties.length)} ${extraProperties.map(p => `${hlt(p)}`).join(', ')} not found on type ${hlt(msgFormat(resolvedDestination))}`]
             : []
 
-        if (missingPropertiesMessage || extraPropertiesMessage) {
-            return all(
-                missingPropertiesMessage,
-                extraPropertiesMessage,
-                propertyTypeIssues
-            )
+        return all(
+            missingPropertiesMessage,
+            extraPropertiesMessage,
+            propertyTypeIssues
+        )
+    } else if (resolvedDestination.kind === 'interface-type') {
+        const destinationEntries = propertiesOf(ctx, resolvedDestination)
+        const valueEntries =       propertiesOf(ctx, resolvedValue)
+
+        if (destinationEntries == null || valueEntries == null) {
+            return [baseErrorMessage]
         }
+
+        const missingProperties: string[] = []
+        const propertyTypeIssues: Array<string | string[]> = []
+        for (const { name: key, type: destinationValue, optional } of destinationEntries) {
+            const valueEntry = valueEntries.find(e => getName(e.name) === getName(key))
+
+            if (valueEntry == null) {
+                if (!optional) {
+                    missingProperties.push(getName(key))
+                }
+            } else {
+                propertyTypeIssues.push(...all(subsumationIssues(ctx, destinationValue, valueEntry.type)) ?? [])
+            }
+        }
+        const missingPropertiesMessage = missingProperties.length > 0
+            ? [`Missing propert${iesOrY(missingProperties.length)} ${missingProperties.map(hlt).join(', ')} required by type ${hlt(msgFormat(resolvedDestination))}`]
+            : []
+
+        return all(
+            missingPropertiesMessage,
+            propertyTypeIssues
+        )
     } else if ((resolvedDestination.kind === "iterator-type" && resolvedValue.kind === "iterator-type") ||
                 (resolvedDestination.kind === "plan-type" && resolvedValue.kind === "plan-type") ||
                 (resolvedDestination.kind === "error-type" && resolvedValue.kind === "error-type") ||
