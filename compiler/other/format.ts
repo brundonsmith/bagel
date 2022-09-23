@@ -275,7 +275,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "interface-type": return `interface {${
             ast.entries.map(e => br + nextIndentation + fIndent(e))
         .join(',')}${br}${currentIndentation}}`
-        case "attribute": return  `${f(ast.name)}: ${f(ast.type)}`
+        case "property": return  `${f(ast.name)}: ${f(ast.type)}`
         case "record-type":  return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `{ [${f(ast.keyType)}]: ${f(ast.valueType)} }`;
         case "array-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `${ast.element.kind === 'union-type' ? `(${f(ast.element)})` : f(ast.element)}[]`; // TODO: Add parens if union type (and also keyof, etc?)
         case "tuple-type":   return (ast.mutability !== 'mutable' && ast.mutability !== 'literal' ? 'readonly ' : '') + `[${ast.members.map(f).join(", ")}]`;

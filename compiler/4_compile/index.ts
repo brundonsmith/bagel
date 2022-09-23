@@ -376,7 +376,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
                     .join(', ')
             }}`
         )
-        case "attribute":
+        case "property":
             return `${c(ast.name)}: ${c(ast.type)}`
         case "record-type": return `Record<${c(ast.keyType)}, ${c(ast.valueType)}>`;
         case "array-type": return `${c(ast.element)}[]`;

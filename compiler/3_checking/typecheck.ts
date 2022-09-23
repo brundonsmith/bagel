@@ -809,7 +809,7 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
             case "negation-operator":
             case "js-proc":
             case "js-func":
-            case "attribute":
+            case "property":
             case "case":
             case "switch-case":
             case "case-block":

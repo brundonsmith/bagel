@@ -1218,6 +1218,8 @@ Deno.test({
       }
 
       const val: number = obj.foo.bar
+
+      func foo(obj: { a: number, b: string } | { a: string }): number|string => obj.a
       `,
       false
     )
@@ -1225,7 +1227,7 @@ Deno.test({
 })
 
 Deno.test({
-  name: "Property access fail",
+  name: "Property access fail 1",
   fn() {
     testTypecheck(`
       const obj = {
@@ -1235,6 +1237,17 @@ Deno.test({
       }
 
       const val: number = obj.foo.other
+      `,
+      true
+    )
+  }
+})
+
+Deno.test({
+  name: "Property access fail 2",
+  fn() {
+    testTypecheck(`
+      func foo(obj: { a: number, b: string } | { a: string }) => obj.b
       `,
       true
     )

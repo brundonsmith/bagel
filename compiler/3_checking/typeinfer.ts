@@ -1,11 +1,11 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
 import { Expression, Func, IfElseExpression, Invocation, isExpression, ObjectEntry, Proc } from "../_model/expressions.ts";
-import { ArrayType, Attribute, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, STRING_OR_NUMBER_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE, Args, SpreadArgs, AST_NOISE, TYPE_AST_NOISE } from "../_model/type-expressions.ts";
+import { ArrayType, Property, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, STRING_OR_NUMBER_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE, Args, SpreadArgs, AST_NOISE, TYPE_AST_NOISE } from "../_model/type-expressions.ts";
 import { exists, given, devMode } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, SourceInfo } from "../_model/ast.ts";
-import { areSame, argType, arrayOf, attribute, elementTagToObject, errorOf, expressionsEqual, getName, identifierToExactString, invocationFromMethodCall, iterateParseTree, iteratorOf, literalType, mapParseTree, maybeOf, planOf, tupleOf, typesEqual, unionOf } from "../utils/ast.ts";
+import { areSame, argType, arrayOf, property, elementTagToObject, errorOf, expressionsEqual, getName, identifierToExactString, invocationFromMethodCall, iterateParseTree, iteratorOf, literalType, mapParseTree, maybeOf, planOf, tupleOf, typesEqual, unionOf } from "../utils/ast.ts";
 import { ValueDeclaration,FuncDeclaration,ProcDeclaration } from "../_model/declarations.ts";
 import { resolve, resolveImport } from "./resolve.ts";
 import { JSON_AND_PLAINTEXT_EXPORT_NAME } from "../1_parse/index.ts";
@@ -396,9 +396,9 @@ const inferTypeInner = memo(function inferTypeInner(
             return inferType(ctx, elementTagToObject(ast))
         }
         case "object-literal": {
-            const entries = ast.entries.map((entry): Attribute | readonly Attribute[] | ObjectEntry | undefined => {
+            const entries = ast.entries.map((entry): Property | readonly Property[] | ObjectEntry | undefined => {
                 if (entry.kind === 'local-identifier') {
-                    return attribute(entry.name, resolveType(ctx, inferType(ctx, entry)), false)
+                    return property(entry.name, resolveType(ctx, inferType(ctx, entry)), false)
                 } else if (entry.kind === 'spread') {
                     const spreadObj = entry.expr
                     const spreadObjType = resolveType(ctx, inferType(ctx, spreadObj));
@@ -415,7 +415,7 @@ const inferTypeInner = memo(function inferTypeInner(
                         const valueType = inferType(ctx, value);
     
                         return {
-                            kind: "attribute",
+                            kind: "property",
                             name: key,
                             type: valueType,
                             optional: false,
@@ -474,7 +474,7 @@ const inferTypeInner = memo(function inferTypeInner(
                 return {
                     kind: "object-type",
                     spreads: [],
-                    entries: entries as Attribute[],
+                    entries: entries as Property[],
                     mutability: "literal",
                     parent, module, code, startIndex, endIndex
                 };
@@ -686,7 +686,7 @@ function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModu
                     kind: 'object-type',
                     spreads: [],
                     entries: exportedDeclarations.map(otherDecl => {
-                        return attribute(
+                        return property(
                             otherDecl.name.name, 
                             getBindingType(ctx, owner, { identifier: otherDecl.name, owner: otherDecl }),
                             false
@@ -1124,37 +1124,27 @@ function conditionToRefinement(ctx: Pick<Context, "allModules" | "visited" | "ca
     return { kind: conditionIsTrue ? "subtraction" : "narrowing", type: FALSY, targetExpression: condition }
 }
 
-export const propertiesOf = memo(function propertiesOf (
+export const propertiesOf = memo((
     ctx: Pick<Context, "allModules" | "encounteredNames"|"canonicalModuleName">,
     type: TypeExpression
-): readonly Attribute[] | undefined {
+): readonly Property[] | undefined => {
     const resolvedType = resolveType(ctx, type)
 
     switch (resolvedType.kind) {
         case "nominal-type": {
             if (resolvedType.inner) {
                 return [
-                    attribute("value", resolvedType.inner, false)
+                    property("value", resolvedType.inner, false)
                 ]
             } else {
                 return []
             }
         }
         case "object-type": {
-            const attrs = [...resolvedType.entries]
-
-            for (const spread of resolvedType.spreads) {
-                const resolved = resolve(ctx, spread.name.name, spread)
-
-                if (resolved != null && (resolved.owner.kind === 'type-declaration' || resolved.owner.kind === 'generic-param-type')) {
-                    const type = resolved.owner.kind === 'type-declaration' ? resolved.owner.type : resolved.owner
-                    if (type.kind === 'object-type') {
-                        attrs.push(...(propertiesOf(ctx, type) ?? []))
-                    }
-                }
-            }
-
-            return attrs
+            return [
+                ...resolvedType.spreads.map(spread => propertiesOf(ctx, spread)).flat().filter(exists),
+                ...resolvedType.entries
+            ]
         }
         case "interface-type": {
             return resolvedType.entries
@@ -1162,49 +1152,45 @@ export const propertiesOf = memo(function propertiesOf (
         case "string-type":
         case "array-type": {
             return [
-                attribute("length", NUMBER_TYPE, true),
+                property("length", NUMBER_TYPE, true),
             ]
         }
         case "tuple-type": {
             return [
-                attribute("length", literalType(resolvedType.members.length), true)
+                property("length", literalType(resolvedType.members.length), true)
             ]
         }
         case "error-type": {
             return [
-                attribute("value", resolvedType.inner, true),
+                property("value", resolvedType.inner, true),
             ]
         }
         case "remote-type": {
             return [
-                attribute("value", resolvedType.inner, true),
-                attribute("loading", BOOLEAN_TYPE, true),
+                property("value", resolvedType.inner, true),
+                property("loading", BOOLEAN_TYPE, true),
                 // TODO: reload() proc
             ]
         }
         case "union-type": {
             const allProperties = resolvedType.members.map(m => propertiesOf(ctx, m))
-            let sharedProperties: readonly Attribute[] | undefined
+            let sharedProperties: readonly Property[] | undefined
 
             for (const props of allProperties) {
                 if (props) {
                     if (sharedProperties == null) {
                         sharedProperties = [...props]
                     } else {
-                        const newSharedProperties: Attribute[] = []
+                        const newSharedProperties: Property[] = []
 
                         for (const prop of sharedProperties) {
                             const matched = props.find(p => getName(p.name) === getName(prop.name))
 
                             if (matched) {
-                                if (!typesEqual(matched.type, prop.type)) {
-                                    newSharedProperties.push({
-                                        ...prop,
-                                        type: unionOf([matched.type, prop.type])
-                                    })
-                                } else {
-                                    newSharedProperties.push(prop)
-                                }
+                                newSharedProperties.push({
+                                    ...prop,
+                                    type: unionOf([matched.type, prop.type])
+                                })
                             }
                         }
 

@@ -4,7 +4,7 @@ import { inferType,propertiesOf } from "../3_checking/typeinfer.ts";
 import { AST,PlainIdentifier,SourceInfo } from "../_model/ast.ts";
 import { Context } from "../_model/common.ts";
 import { BooleanLiteral, ElementTag, ExactStringLiteral, Expression, Invocation, LocalIdentifier, NumberLiteral, ObjectLiteral } from "../_model/expressions.ts";
-import { Args, ArrayType, AST_NOISE, Attribute, ElementofType, ErrorType, FALSE_TYPE, IteratorType, LiteralType, MaybeType, PlanType, SpreadArgs, TRUE_TYPE, TupleType, TypeExpression, TYPE_AST_NOISE, UnionType } from "../_model/type-expressions.ts";
+import { Args, ArrayType, AST_NOISE, Property, ElementofType, ErrorType, FALSE_TYPE, IteratorType, LiteralType, MaybeType, PlanType, SpreadArgs, TRUE_TYPE, TupleType, TypeExpression, TYPE_AST_NOISE, UnionType } from "../_model/type-expressions.ts";
 import { deepEquals } from "./misc.ts";
 
 export function areSame(a: AST|undefined, b: AST|undefined) {
@@ -225,7 +225,7 @@ export function errorOf(inner: TypeExpression, basedOn?: SourceInfo): ErrorType 
 /**
  * Convenience function for creating a simple Attribute
  */
-export function attribute(name: string, type: TypeExpression, forceReadonly: boolean): Attribute {
+export function property(name: string, type: TypeExpression, forceReadonly: boolean): Property {
     return {
         kind: "attribute",
         name: { kind: "plain-identifier", name, parent: type.parent, ...AST_NOISE },

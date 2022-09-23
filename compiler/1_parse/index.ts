@@ -5,7 +5,7 @@ import { ModuleName,ReportError } from "../_model/common.ts";
 import { ValueDeclaration, Declaration, FuncDeclaration, ImportDeclaration, ProcDeclaration, TestBlockDeclaration, TestExprDeclaration, TypeDeclaration, ImportAllDeclaration, ALL_PLATFORMS, Platform, ImportItem, Decorator, TestTypeDeclaration } from "../_model/declarations.ts";
 import { ArrayLiteral, BinaryOperator, BooleanLiteral, ElementTag, Expression, Func, Invocation, IfElseExpression, JavascriptEscape, LocalIdentifier, NilLiteral, NumberLiteral, ObjectLiteral, ParenthesizedExpression, Proc, PropertyAccessor, Range, StringLiteral, SwitchExpression, InlineConstGroup, ExactStringLiteral, Case, Operator, BINARY_OPS, NegationOperator, AsCast, Spread, SwitchCase, InstanceOf, ErrorExpression, ObjectEntry, InlineDeclaration, ALL_REG_EXP_FLAGS, RegularExpression, RegularExpressionFlag } from "../_model/expressions.ts";
 import { Assignment, CaseBlock, ForLoop, IfElseStatement, Statement, WhileLoop, DeclarationStatement, TryCatch, ThrowStatement, Autorun } from "../_model/statements.ts";
-import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Attribute, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType, ReadonlyType, RemoteType, InterfaceType, AST_NOISE } from "../_model/type-expressions.ts";
+import { ArrayType, FuncType, RecordType, LiteralType, NamedType, ObjectType, PrimitiveType, ProcType, TupleType, TypeExpression, UnionType, UnknownType, Property, Arg, GenericType, ParenthesizedType, MaybeType, BoundGenericType, IteratorType, PlanType, GenericFuncType, GenericProcType, TypeParam, ErrorType, TypeofType, ElementofType, KeyofType, ValueofType, SpreadArgs, Args, RegularExpressionType, ReadonlyType, RemoteType, InterfaceType, AST_NOISE } from "../_model/type-expressions.ts";
 import { consume, consumeWhitespace, consumeWhitespaceRequired, expec, given, identifierSegment, isNumeric, ParseFunction, parseExact, parseOptional, ParseResult, parseSeries, plainIdentifier, parseKeyword, TieredParser, isSymbolic } from "./utils.ts";
 import { setParents } from "../utils/ast.ts";
 import { format } from "../other/format.ts";
@@ -468,7 +468,7 @@ const objectType: ParseFunction<ObjectType> = memo((module, code, startIndex) =>
         parsed: {
             kind: "object-type",
             spreads: entries.filter((e): e is NamedType => e.kind === "named-type"),
-            entries: entries.filter((e): e is Attribute => e.kind === "attribute"),
+            entries: entries.filter((e): e is Property => e.kind === "attribute"),
             module,
             mutability: "mutable",
             code,
@@ -494,8 +494,8 @@ const interfaceType: ParseFunction<InterfaceType> = memo((module, code, startInd
         index
     })))))
 
-const _typeSpreadOrEntry: ParseFunction<NamedType|Attribute> = memo((module, code, startIndex) => 
-    attribute(module, code, startIndex) ?? _objectTypeSpread(module, code, startIndex))
+const _typeSpreadOrEntry: ParseFunction<NamedType|Property> = memo((module, code, startIndex) => 
+    property(module, code, startIndex) ?? _objectTypeSpread(module, code, startIndex))
 
 const _objectTypeSpread: ParseFunction<NamedType> = memo((module, code, startIndex) =>
     given(consume(code, startIndex, '...'), index =>
@@ -504,7 +504,7 @@ const _objectTypeSpread: ParseFunction<NamedType> = memo((module, code, startInd
             ? syntaxError(code, index, `Can't spread type ${format(res.parsed)}`)
             : res as ParseResult<NamedType>)))
 
-const attribute: ParseFunction<Attribute> = memo((module, code, startIndex) =>
+const property: ParseFunction<Property> = memo((module, code, startIndex) =>
     given(plainIdentifier(module, code, startIndex) ?? exactStringLiteral(module, code, startIndex), ({ parsed: name, index }) =>
     given(consumeWhitespace(code, index), index =>
     given(parseOptional(module, code, index, parseExact("?")), ({ parsed: optional, index: indexAfterQuestionMark }) =>
@@ -512,7 +512,7 @@ const attribute: ParseFunction<Attribute> = memo((module, code, startIndex) =>
     given(consumeWhitespace(code, index), index =>
     given(typeExpression(module, code, index), ({ parsed: type, index }) => ({
         parsed: {
-            kind: "attribute",
+            kind: "property",
             name,
             type,
             optional: optional != null,

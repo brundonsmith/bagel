@@ -129,16 +129,16 @@ export type SpreadArgs = SourceInfo & {
 export type ObjectType = SourceInfo & Mutability & {
     readonly kind: "object-type",
     readonly spreads: readonly NamedType[],
-    readonly entries: readonly Attribute[],
+    readonly entries: readonly Property[],
 }
 
 export type InterfaceType = SourceInfo & Mutability & {
     readonly kind: "interface-type",
-    readonly entries: readonly Attribute[],
+    readonly entries: readonly Property[],
 }
 
-export type Attribute = SourceInfo & {
-    readonly kind: "attribute",
+export type Property = SourceInfo & {
+    readonly kind: "property",
     readonly name: PlainIdentifier | ExactStringLiteral,
     readonly type: TypeExpression,
     readonly optional: boolean,
