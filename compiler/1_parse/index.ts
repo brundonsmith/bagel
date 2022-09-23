@@ -468,7 +468,7 @@ const objectType: ParseFunction<ObjectType> = memo((module, code, startIndex) =>
         parsed: {
             kind: "object-type",
             spreads: entries.filter((e): e is NamedType => e.kind === "named-type"),
-            entries: entries.filter((e): e is Property => e.kind === "attribute"),
+            entries: entries.filter((e): e is Property => e.kind === "property"),
             module,
             mutability: "mutable",
             code,

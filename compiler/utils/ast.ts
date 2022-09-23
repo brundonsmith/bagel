@@ -227,7 +227,7 @@ export function errorOf(inner: TypeExpression, basedOn?: SourceInfo): ErrorType 
  */
 export function property(name: string, type: TypeExpression, forceReadonly: boolean): Property {
     return {
-        kind: "attribute",
+        kind: "property",
         name: { kind: "plain-identifier", name, parent: type.parent, ...AST_NOISE },
         type,
         optional: false,
