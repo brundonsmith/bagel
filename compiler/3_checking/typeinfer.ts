@@ -275,66 +275,17 @@ const inferTypeInner = memo(function inferTypeInner(
             }
         }
         case "property-accessor": {
-            if (ast.property.kind === 'plain-identifier') {
-                return {
-                    kind: "property-type",
-                    subject: inferType(ctx, ast.subject),
-                    property: ast.property,
-                    optional: ast.optional,
-                    mutability: undefined,
-                    parent, module, code, startIndex, endIndex,
-                }
-            } else {
-                const subjectType = resolveType(ctx, inferType(ctx, ast.subject));
-                const indexType = resolveType(ctx, inferType(ctx, ast.property));
-
-                const nillable = subjectType.kind === "union-type" && subjectType.members.some(m => m.kind === "nil-type")
-
-                const effectiveSubjectType = ast.optional && nillable
-                    ? resolveType(ctx, subtract(ctx, subjectType, NIL_TYPE))
-                    : subjectType
-
-                const subjectProperties = propertiesOf(ctx, effectiveSubjectType)
-
-                const indexIsNumber = !subsumationIssues(ctx, NUMBER_TYPE, indexType)
-                
-                
-                if (subjectProperties && indexType.kind === "literal-type" && indexType.value.kind === "exact-string-literal") {
-                    const key = indexType.value.value;
-                    const valueType = subjectProperties.find(entry => getName(entry.name) === key)?.type;
-
-                    return valueType ?? UNKNOWN_TYPE;
-                } else if (effectiveSubjectType.kind === "record-type") {
-                    if (subsumationIssues(ctx, effectiveSubjectType.keyType, indexType)) {
-                        return UNKNOWN_TYPE;
-                    } else {
-                        return maybeOf(effectiveSubjectType.valueType)
-                    }
-                } else if (effectiveSubjectType.kind === "array-type" && indexIsNumber) {
-                    return maybeOf(effectiveSubjectType.element)
-                } else if (effectiveSubjectType.kind === "tuple-type" && indexIsNumber) {
-                    if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
-                        return effectiveSubjectType.members[indexType.value.value] ?? NIL_TYPE
-                    } else {
-                        return unionOf([ ...effectiveSubjectType.members, NIL_TYPE ], ast)
-                    }
-                } else if (effectiveSubjectType.kind === 'string-type' && indexIsNumber) {
-                    return maybeOf(STRING_TYPE)
-                } else if (effectiveSubjectType.kind === 'literal-type' && effectiveSubjectType.value.kind === 'exact-string-literal' && indexIsNumber) {
-                    if (indexType.kind === 'literal-type' && indexType.value.kind === 'number-literal') {
-                        const char = effectiveSubjectType.value.value[indexType.value.value]
-
-                        if (char) {
-                            return literalType(char)
-                        } else {
-                            return NIL_TYPE
-                        }
-                    } else {
-                        return maybeOf(STRING_TYPE)
-                    }
-                }
-
-                return UNKNOWN_TYPE;
+            return {
+                kind: "property-type",
+                subject: inferType(ctx, ast.subject),
+                property: (
+                    ast.property.kind === 'plain-identifier'
+                        ? ast.property
+                        : inferType(ctx, ast.property)
+                ),
+                optional: ast.optional,
+                mutability: undefined,
+                parent, module, code, startIndex, endIndex,
             }
         }
         case "if-else-expression":

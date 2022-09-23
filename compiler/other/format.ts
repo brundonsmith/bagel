@@ -308,7 +308,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
             return `${keyword} ${f(ast.inner)}`;
         }
         // case "element-type": return `<${ast.tagName}>`;
-        case "property-type": return `${f(ast.subject)}${ast.optional ? '?' : ''}.${ast.property.name}`;
+        case "property-type": return `${f(ast.subject)}${ast.optional ? '?' : ''}${ast.property.kind === 'plain-identifier' ? `.${ast.property.name}` : `${ast.optional ? '.' : ''}[${f(ast.property)}]`}`;
         case "javascript-escape-type": return "<js escape>";
         case "try-catch": return `try ${f(ast.tryBlock)} catch ${f(ast.errIdentifier)} ${f(ast.catchBlock)};`
         case "throw-statement": return `throw ${f(ast.errorExpression)};`

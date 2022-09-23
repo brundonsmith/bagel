@@ -266,7 +266,7 @@ export type AnyType = SourceInfo & NoMutability & {
 export type PropertyType = SourceInfo & NoMutability & {
     readonly kind: "property-type",
     readonly subject: TypeExpression,
-    readonly property: PlainIdentifier,
+    readonly property: PlainIdentifier | TypeExpression,
     readonly optional: boolean,
 }
 
