@@ -93,52 +93,34 @@ const inferTypeInner = memo(function inferTypeInner(
         case "func": {
 
             // infer callback type based on context
-            const typeDictatedByInvocation = (() => {
-                const parent = ast.parent
+            const expectedType = inferExpectedType(ctx, ast)
+            const { returnType: expectedReturnType, args: expectedArgs } = (
+                expectedType?.kind === ast.type.kind
+                    ? (
+                        expectedType.kind === 'generic-type'
+                            ? expectedType.inner as FuncType
+                            : expectedType
+                    )
+                    : { returnType: undefined, args: undefined }
+            )
 
-                if (parent?.kind === "invocation") {
-
-                    // method call
-                    const invocation = invocationFromMethodCall(ctx, parent) ?? parent;
-
-                    // bound generic
-                    const parentSubjectType = bindInvocationGenericArgs(ctx, invocation)
-
-                    if (parentSubjectType) {
-                        const thisArgIndex = invocation.args.findIndex(a => areSame(a, ast))
-    
-                        if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {    
-                            const thisArgParentType = argType(ctx, parentSubjectType.args, thisArgIndex)
-    
-                            if (thisArgParentType && thisArgParentType.kind === ast.type.kind) {
-                                return (
-                                    thisArgParentType.kind === 'generic-type'
-                                        ? thisArgParentType.inner as FuncType 
-                                        : thisArgParentType
-                                )
-                            }
-                        }
-                    }
-                }
-            })()
-
-            const funcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
+            const declaredFuncType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
 
             const inferredFuncType = {
-                ...funcType,
-                isPure: funcType.isPure || inferredToBePure(ctx, ast),
+                ...declaredFuncType,
+                isPure: declaredFuncType.isPure || inferredToBePure(ctx, ast),
                 args: (
-                    funcType.args.kind === 'args'
+                    declaredFuncType.args.kind === 'args'
                         ? {
-                            ...funcType.args,
-                            args: funcType.args.args.map((arg, index) =>
-                                ({ ...arg, type: arg.type ?? given(typeDictatedByInvocation, ({ args }) => argType(ctx, args, index)) }))
+                            ...declaredFuncType.args,
+                            args: declaredFuncType.args.args.map((arg, index) =>
+                                ({ ...arg, type: arg.type ?? given(expectedArgs, args => argType(ctx, args, index)) }))
                         }
-                        : funcType.args
+                        : declaredFuncType.args
                 ),
                 returnType: (
-                    funcType.returnType ??
-                    typeDictatedByInvocation?.returnType ??
+                    declaredFuncType.returnType ??
+                    expectedReturnType ??
                     // if no return-type is declared, try inferring the type from the inner expression
                     (skipReturnTypeInference
                         ? UNKNOWN_TYPE // HACK: To avoid cycle when doing argtype inference in callback, have to skip looking at the body
@@ -500,6 +482,39 @@ const inferTypeInner = memo(function inferTypeInner(
             throw Error(ast.kind)
     }
 })
+
+function inferExpectedType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModuleName">, expr: Expression): TypeExpression | undefined {
+    const { parent } = expr
+
+    switch (parent?.kind) {
+        case 'object-literal': break;
+        case 'array-literal': break;
+        case 'invocation': {
+            // method call
+            const invocation = invocationFromMethodCall(ctx, parent) ?? parent;
+
+            // bound generic
+            const parentSubjectType = bindInvocationGenericArgs(ctx, invocation)
+
+            if (parentSubjectType) {
+                const thisArgIndex = invocation.args.findIndex(a => areSame(a, expr))
+
+                if (parentSubjectType.kind === "func-type" || parentSubjectType.kind === "proc-type") {    
+                    return argType(ctx, parentSubjectType.args, thisArgIndex)
+                }
+            }
+        } break;
+        case 'value-declaration': return parent.type;
+        case 'inline-declaration':
+        case 'declaration-statement': return (
+            parent.destination.kind === 'name-and-type'
+                ? parent.destination.type
+                : undefined
+        )
+    }
+
+    return undefined
+}
 
 function getBindingType(ctx: Pick<Context, "allModules"|"visited"|"canonicalModuleName">, importedFrom: Pick<SourceInfo, 'parent' | 'module'>, binding: Binding): TypeExpression {
     const { allModules, canonicalModuleName } = ctx
