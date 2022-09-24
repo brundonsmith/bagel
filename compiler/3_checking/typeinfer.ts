@@ -2,7 +2,7 @@ import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
 import { Expression, Func, IfElseExpression, Invocation, isExpression, ObjectEntry, ObjectLiteral, Proc } from "../_model/expressions.ts";
 import { ArrayType, Property, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, STRING_OR_NUMBER_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE, Args, SpreadArgs, AST_NOISE, TYPE_AST_NOISE } from "../_model/type-expressions.ts";
 import { exists, given, devMode } from "../utils/misc.ts";
-import { resolveType, subsumationIssues } from "./typecheck.ts";
+import { getPropertyType, resolveType, subsumationIssues } from "./typecheck.ts";
 import { stripSourceInfo } from "../utils/debugging.ts";
 import { AST, Block, SourceInfo } from "../_model/ast.ts";
 import { areSame, argType, arrayOf, property, elementTagToObject, errorOf, expressionsEqual, getName, identifierToExactString, invocationFromMethodCall, iterateParseTree, iteratorOf, literalType, mapParseTree, maybeOf, planOf, tupleOf, typesEqual, unionOf } from "../utils/ast.ts";
@@ -497,16 +497,8 @@ function inferExpectedType(ctx: Pick<Context, "allModules"|"visited"|"canonicalM
                     : parent.key
             )
 
-            if (expectedObjectType?.kind === 'object-type') {
-                const properties = propertiesOf(ctx, expectedObjectType)
-                const thisProperty = properties?.find(prop =>
-                    normalizedIndex.kind === 'exact-string-literal' && getName(prop.name) === getName(normalizedIndex))
-
-                return thisProperty?.type
-            } else if (expectedObjectType?.kind === 'record-type') {
-                if (!subsumationIssues(ctx, expectedObjectType.keyType, inferType(ctx, normalizedIndex))) {
-                    return expectedObjectType.valueType
-                }
+            if (expectedObjectType != null) {
+                return getPropertyType(ctx, expectedObjectType, inferType(ctx, normalizedIndex), false)
             }
         } break;
         case 'array-literal': {
