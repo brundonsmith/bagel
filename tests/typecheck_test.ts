@@ -224,6 +224,32 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Function returned inference pass",
+  fn() {
+    testTypecheck(`
+    type MyFn = (n: number) => number
+    func foo(): MyFn => (
+      const factor = 3,
+      n => n * 3
+    )`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Function returned inference fail",
+  fn() {
+    testTypecheck(`
+    type MyFn = (n: number) => string
+    func foo(): MyFn => (
+      const factor = 3,
+      n => n * 3
+    )`,
+    true)
+  }
+})
+
+Deno.test({
   name: "Basic constant inference",
   fn() {
     testTypecheck(

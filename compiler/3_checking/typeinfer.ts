@@ -554,6 +554,15 @@ function inferExpectedType(ctx: Pick<Context, "allModules"|"visited"|"canonicalM
                 ? parent.destination.type
                 : undefined
         )
+        case 'parenthesized-expression':
+        case 'inline-const-group':
+            return inferExpectedType(ctx, parent)
+        case 'func':
+            return (
+                parent.type.kind === 'generic-type'
+                    ? parent.type.inner.returnType
+                    : parent.type.returnType
+            )
     }
 
     return undefined
