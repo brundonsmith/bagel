@@ -11,12 +11,12 @@ Deno.test({
             `
             let counter = 0
 
-            autorun {
-                output(counter);
-            }
-            forever
-
             proc runTest() {
+                autorun {
+                    output(counter);
+                }
+                forever;
+    
                 counter = counter + 1;
                 counter = counter + 1;
                 counter = counter + 1;
@@ -33,16 +33,16 @@ Deno.test({
             `
             let counterHolder: { prop: number, other: string } = { prop: 0, other: 'stuff' }
     
-            autorun {
-                // should be ignored in reactions!
-                output(counterHolder.other);
-            } forever
-    
-            autorun {
-                output(counterHolder.prop);
-            } forever
-    
             proc runTest() {
+                autorun {
+                    // should be ignored in reactions!
+                    output(counterHolder.other);
+                } forever;
+        
+                autorun {
+                    output(counterHolder.prop);
+                } forever;
+    
                 counterHolder.prop = counterHolder.prop + 1;
                 counterHolder.prop = counterHolder.prop + 1;
                 counterHolder.prop = counterHolder.prop + 1;
@@ -81,10 +81,6 @@ Deno.test({
             `
             let counter = 0
 
-            autorun {
-                output(counter);
-            } forever
-
             // copied from core.bgl
             js func action<
                 TArgs extends readonly unknown[]
@@ -94,6 +90,10 @@ Deno.test({
         
             @action
             proc runTest() {
+                autorun {
+                    output(counter);
+                } forever;
+
                 counter = counter + 1;
                 counter = counter + 1;
                 counter = counter + 1;

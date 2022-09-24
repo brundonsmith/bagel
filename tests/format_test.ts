@@ -398,15 +398,17 @@ const BAGEL_SNIPPETS = [
         <h1>hello world!</h1>
       '`,
       `
-      autorun {
-        log(foo);
-      }
-      forever
-
-      autorun {
-        log(foo);
-      }
-      until => foo.length > 10`,
+      proc foo() {
+        autorun {
+          log(foo);
+        }
+        forever;
+  
+        autorun {
+          log(foo);
+        }
+        until => foo.length > 10;
+      }`,
       `
       test expr 'Two plus two equals four' => assert(2 + 2 == 3)
 
