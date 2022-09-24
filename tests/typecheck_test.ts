@@ -1574,6 +1574,30 @@ Deno.test({
 });
 
 Deno.test({
+  name: "Optional property access pass",
+  fn() {
+    testTypecheck(`
+    type Obj = { foo?: string }
+    proc foo(obj: Obj) {
+      const str: string? = obj.foo;
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Optional property access fail",
+  fn() {
+    testTypecheck(`
+    type Obj = { foo?: string }
+    proc foo(obj: Obj) {
+      const str: string = obj.foo;
+    }`,
+    true)
+  }
+})
+
+Deno.test({
   name: "Fail to import module",
   fn() {
     testMultiModuleTypecheck({
@@ -1960,6 +1984,19 @@ Deno.test({
 
     func foo(fn: FnReadonlyReturn): Fn => fn`,
     true)
+  }
+})
+
+Deno.test({
+  name: "Mutability test 1",
+  fn() {
+    testTypecheck(`
+    type Obj = { foo?: string }
+    proc foo(obj: Obj) {
+      obj.foo = 'foo';
+      obj.foo = nil;
+    }`,
+    false)
   }
 })
 

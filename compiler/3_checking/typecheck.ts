@@ -1466,7 +1466,11 @@ export function getPropertyType(ctx: Pick<Context, 'allModules'|'encounteredName
         )
 
         return {
-            ...resolveType(ctx, property.type),
+            ...resolveType(ctx, (
+                property.optional
+                    ? maybeOf(property.type)
+                    : property.type
+            )),
             mutability: mutability as any
         }
     } else {
