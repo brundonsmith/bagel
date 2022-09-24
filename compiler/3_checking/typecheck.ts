@@ -1433,7 +1433,7 @@ export function resolveType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'
     return type
 }
 
-function getPropertyType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'canonicalModuleName'> & { preserveNamedTypes?: boolean }, subjectType: TypeExpression, propertyType: TypeExpression, optionalChain: boolean): TypeExpression | undefined {
+export function getPropertyType(ctx: Pick<Context, 'allModules'|'encounteredNames'|'canonicalModuleName'> & { preserveNamedTypes?: boolean }, subjectType: TypeExpression, propertyType: TypeExpression, optionalChain: boolean): TypeExpression | undefined {
     const indexerLiteral = (
         propertyType.kind === 'literal-type'
             ? propertyType.value.value
