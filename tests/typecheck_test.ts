@@ -165,6 +165,60 @@ Deno.test({
 })
 
 Deno.test({
+  name: "Function in object declaration inference pass",
+  fn() {
+    testTypecheck(`
+    type MyObj = {
+      myFn: (n: number) => number
+    }
+    const x: MyObj = {
+      myFn: n => n * 2
+    }`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Function in object declaration inference fail",
+  fn() {
+    testTypecheck(`
+    type MyObj = {
+      myFn: (n: number) => string
+    }
+    const x: MyObj = {
+      myFn: n => n * 2
+    }`,
+    true)
+  }
+})
+
+Deno.test({
+  name: "Function in array declaration inference pass",
+  fn() {
+    testTypecheck(`
+    type MyArr = ((n: number) => number)[]
+    const x: MyArr = [
+      n => n * 2,
+      n => n + 3
+    ]`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Function in array declaration inference fail",
+  fn() {
+    testTypecheck(`
+    type MyArr = ((n: number) => string)[]
+    const x: MyArr = [
+      n => n * 2,
+      n => n + 'foo'
+    ]`,
+    true)
+  }
+})
+
+Deno.test({
   name: "Basic constant inference",
   fn() {
     testTypecheck(

@@ -1,5 +1,5 @@
 import { Refinement, ModuleName, Binding, Context } from "../_model/common.ts";
-import { Expression, Func, IfElseExpression, Invocation, isExpression, ObjectEntry, Proc } from "../_model/expressions.ts";
+import { Expression, Func, IfElseExpression, Invocation, isExpression, ObjectEntry, ObjectLiteral, Proc } from "../_model/expressions.ts";
 import { ArrayType, Property, BOOLEAN_TYPE, FALSE_TYPE, FALSY, FuncType, GenericType, JAVASCRIPT_ESCAPE_TYPE, Mutability, NamedType, EMPTY_TYPE, NIL_TYPE, NUMBER_TYPE, STRING_TYPE, STRING_OR_NUMBER_TYPE, TRUE_TYPE, TypeExpression, UNKNOWN_TYPE, UnionType, isEmptyType, POISONED_TYPE, Args, SpreadArgs, AST_NOISE, TYPE_AST_NOISE } from "../_model/type-expressions.ts";
 import { exists, given, devMode } from "../utils/misc.ts";
 import { resolveType, subsumationIssues } from "./typecheck.ts";
@@ -487,8 +487,38 @@ function inferExpectedType(ctx: Pick<Context, "allModules"|"visited"|"canonicalM
     const { parent } = expr
 
     switch (parent?.kind) {
-        case 'object-literal': break;
-        case 'array-literal': break;
+        case 'object-entry': {
+            const objectLiteral = parent.parent as ObjectLiteral
+            const expectedObjectType = given(inferExpectedType(ctx, objectLiteral), expected => resolveType(ctx, expected))
+            
+            const normalizedIndex = (
+                parent.key.kind === 'plain-identifier'
+                    ? identifierToExactString(parent.key)
+                    : parent.key
+            )
+
+            if (expectedObjectType?.kind === 'object-type') {
+                const properties = propertiesOf(ctx, expectedObjectType)
+                const thisProperty = properties?.find(prop =>
+                    normalizedIndex.kind === 'exact-string-literal' && getName(prop.name) === getName(normalizedIndex))
+
+                return thisProperty?.type
+            } else if (expectedObjectType?.kind === 'record-type') {
+                if (!subsumationIssues(ctx, expectedObjectType.keyType, inferType(ctx, normalizedIndex))) {
+                    return expectedObjectType.valueType
+                }
+            }
+        } break;
+        case 'array-literal': {
+            const expectedArrayType = given(inferExpectedType(ctx, parent), expected => resolveType(ctx, expected))
+            
+            if (expectedArrayType?.kind === 'tuple-type') {
+                const thisIndex = parent.entries.findIndex(a => areSame(a, expr))
+                return expectedArrayType.members[thisIndex]
+            } else if (expectedArrayType?.kind === 'array-type') {
+                return expectedArrayType.element
+            }
+        } break;
         case 'invocation': {
             // method call
             const invocation = invocationFromMethodCall(ctx, parent) ?? parent;
