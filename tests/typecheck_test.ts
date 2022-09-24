@@ -145,11 +145,16 @@ Deno.test({
 // })
 
 Deno.test({
-  name: "Function in declaration inference pass",
+  name: "Function and proc in declaration inference pass",
   fn() {
     testTypecheck(`
     type MyFn = (n: number) => number
-    const x: MyFn = n => n * 2`,
+    type MyProc = (n: number) { }
+
+    const x: MyFn = n => n * 2
+    const y: MyProc = (n) {
+      const a = n * 2;
+    }`,
     false)
   }
 })

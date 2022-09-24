@@ -67,10 +67,22 @@ const inferTypeInner = memo(function inferTypeInner(
         case "js-func":
             return ast.type
         case "proc": {
-            // TODO: infer arg types just like we do under func
-            const procType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
+
+            // infer callback type based on context
+            const expectedType = given(inferExpectedType(ctx, ast), expected => resolveType(ctx, expected))
+            const { args: expectedArgs } = (
+                expectedType?.kind === ast.type.kind
+                    ? (
+                        expectedType.kind === 'generic-type'
+                            ? expectedType.inner as ProcType
+                            : expectedType
+                    )
+                    : { args: undefined }
+            )
+
+            const declaredProcType = ast.type.kind === 'generic-type' ? ast.type.inner : ast.type
             
-            const throws = procType.throws ?? (() => {
+            const throws = declaredProcType.throws ?? (() => {
                 const thrown = getThrows(ctx, ast.body)
 
                 return (
@@ -85,8 +97,17 @@ const inferTypeInner = memo(function inferTypeInner(
             })()
             
             return {
-                ...procType,
-                isPure: procType.isPure || inferredToBePure(ctx, ast),
+                ...declaredProcType,
+                args: (
+                    declaredProcType.args.kind === 'args'
+                        ? {
+                            ...declaredProcType.args,
+                            args: declaredProcType.args.args.map((arg, index) =>
+                                ({ ...arg, type: arg.type ?? given(expectedArgs, args => argType(ctx, args, index)) }))
+                        }
+                        : declaredProcType.args
+                ),
+                isPure: declaredProcType.isPure || inferredToBePure(ctx, ast),
                 throws
             }
         }
