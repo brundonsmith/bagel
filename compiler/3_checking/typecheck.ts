@@ -1112,15 +1112,13 @@ export function subsumationIssues(ctx: Pick<Context, 'allModules'|'encounteredNa
         }
         if (resolvedValue.kind === "object-type") {
             if (resolvedDestination.mutability !== 'mutable' || resolvedValue.mutability === 'literal') {
-                // TODO: Spreads
-                return all(...resolvedValue.entries.map(({ name, type }) => all(
+                return all(...(propertiesOf(ctx, resolvedValue) ?? []).map(({ name, type }) => all(
                     subsumationIssues(ctx, resolvedDestination.keyType, literalType(name)),
                     subsumationIssues(ctx, resolvedDestination.valueType, type)
                 )))
             }
         }
     } else if (resolvedDestination.kind === "object-type" && resolvedValue.kind === "object-type") {
-        // TODO: Spreads
         const destinationEntries = propertiesOf(ctx, resolvedDestination)
         const valueEntries =       propertiesOf(ctx, resolvedValue)
 
