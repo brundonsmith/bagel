@@ -145,6 +145,26 @@ Deno.test({
 // })
 
 Deno.test({
+  name: "Function in declaration inference pass",
+  fn() {
+    testTypecheck(`
+    type MyFn = (n: number) => number
+    const x: MyFn = n => n * 2`,
+    false)
+  }
+})
+
+Deno.test({
+  name: "Function in declaration inference fail",
+  fn() {
+    testTypecheck(`
+    type MyFn = (n: number) => string
+    const x: MyFn = n => n * 2`,
+    true)
+  }
+})
+
+Deno.test({
   name: "Basic constant inference",
   fn() {
     testTypecheck(
