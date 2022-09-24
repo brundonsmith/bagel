@@ -93,7 +93,7 @@ const inferTypeInner = memo(function inferTypeInner(
         case "func": {
 
             // infer callback type based on context
-            const expectedType = inferExpectedType(ctx, ast)
+            const expectedType = given(inferExpectedType(ctx, ast), expected => resolveType(ctx, expected))
             const { returnType: expectedReturnType, args: expectedArgs } = (
                 expectedType?.kind === ast.type.kind
                     ? (
