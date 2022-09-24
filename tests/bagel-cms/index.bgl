@@ -3,11 +3,6 @@ from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl/integr
 from './app.bgl' import { renderApp }
 import './store.bgl' as store
 
-autorun {
-    log('rendered!');
-    render(renderApp(store.entityTypes, store.entitiesByType));
-} forever
-
 export const config: BagelConfig = {
 
     // Remove entries from this list to enable different platform-specific APIs
@@ -18,5 +13,8 @@ export const config: BagelConfig = {
 }
 
 proc main() {
-
+    autorun {
+        log('rendered!');
+        render(renderApp(store.entityTypes, store.entitiesByType));
+    } forever;
 }
