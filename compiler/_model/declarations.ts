@@ -1,6 +1,5 @@
 import { Block, Debug, PlainIdentifier, SourceInfo } from "./ast.ts";
 import { ExactStringLiteral, Expression, Func, Invocation, JavascriptEscape, JsFunc, JsProc, LocalIdentifier, Proc } from "./expressions.ts";
-import { Autorun } from "./statements.ts";
 import { TypeExpression } from "./type-expressions.ts";
 
 export type Declaration =
@@ -11,7 +10,6 @@ export type Declaration =
     | ProcDeclaration
     | FuncDeclaration
     | ValueDeclaration
-    | Autorun
     | TestExprDeclaration
     | TestBlockDeclaration
     | TestTypeDeclaration

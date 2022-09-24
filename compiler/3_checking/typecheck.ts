@@ -62,7 +62,6 @@ export function typecheck(ctx: Pick<Context, 'allModules'|'sendError'|'config'|'
                         case "func-declaration":
                         case "value-declaration":
                             return [decl.name]
-                        case "autorun":
                         case "test-expr-declaration":
                         case "test-block-declaration":
                         case "test-type-declaration":
