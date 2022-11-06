@@ -37,10 +37,13 @@ export const IMPORTED_ITEMS: readonly string[] = [
     'RT_ERROR'
 ]
 
+const LIB_LOCATION = 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib'
+// const LIB_LOCATION = '/Users/brundolf/git/bagel/lib'
+
 const JS_PRELUDE = `
 import { ${
     IMPORTED_ITEMS.map(s => `${s} as ___${s}`).join(', ')
-} } from "https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts";
+} } from "${LIB_LOCATION}/ts/core.ts";
 
 `
 

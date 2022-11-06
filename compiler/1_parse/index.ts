@@ -176,6 +176,7 @@ function preludeFor(module: ModuleName) {
 }
 
 const LIB_LOCATION = 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/bgl'
+// const LIB_LOCATION = '/Users/brundolf/git/bagel/lib/bgl'
 
 const BGL_PRELUDE_DATA = [
     { module: LIB_LOCATION + '/core.bgl' as ModuleName, imports: [ 'log', 'logf', 'iter', 'memo', 'planned', 'Loading', 'action', 'UnknownObject', 'BagelConfig', 'Element', 'assert' ] },
