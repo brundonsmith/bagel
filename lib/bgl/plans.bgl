@@ -1,4 +1,4 @@
 
-export js func timeout(millis: number): Plan<nil> => {#
+export pure js func timeout(millis: number): Plan<nil> => {#
     return () => new Promise(res => setTimeout(() => res(), millis))
 #}

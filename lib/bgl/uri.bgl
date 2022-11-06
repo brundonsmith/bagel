@@ -16,7 +16,7 @@ export type URI = readonly interface {
     password: string?,
 }
 
-export js func parseUri(str: string): URI|Error<string> => {#
+export pure js func parseUri(str: string): URI|Error<string> => {#
     try {
         const url = new URL(str);
     } catch (e) {
@@ -41,7 +41,7 @@ export js func parseUri(str: string): URI|Error<string> => {#
     }
 #}
 
-export js func parseSearchParams(str: string): {[string]: string}? => {#
+export pure js func parseSearchParams(str: string): {[string]: string}? => {#
     try {
         const params = new URLSearchParams(str);
     } catch {

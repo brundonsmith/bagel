@@ -1,6 +1,6 @@
 
 // TODO: Or error
-export js func parseJson(str: string): JSON|Error<string> => {#
+export pure js func parseJson(str: string): JSON|Error<string> => {#
     try {
         return JSON.parse(str)
     } catch (e) {
@@ -8,7 +8,7 @@ export js func parseJson(str: string): JSON|Error<string> => {#
     }
 #}
 
-export js func stringifyJson(val: JSON, indentation: number): string => {#
+export pure js func stringifyJson(val: JSON, indentation: number): string => {#
     return JSON.stringify(val, x => typeof x === 'undefined' ? null : x, indentation)
 #}
 

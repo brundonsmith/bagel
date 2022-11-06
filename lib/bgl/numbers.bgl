@@ -8,39 +8,39 @@ export const PI: number = js# Math.PI #js
 export const SQRT1_2: number = js# Math.SQRT1_2 #js
 export const SQRT2: number = js# Math.SQRT2 #js
 
-export const abs:   (x: number) => number = js# Math.abs #js
-export const acos:  (x: number) => number = js# Math.acos #js
-export const acosh: (x: number) => number = js# Math.acosh #js
-export const asin:  (x: number) => number = js# Math.asin #js
-export const asinh: (x: number) => number = js# Math.asinh #js
-export const atan:  (x: number) => number = js# Math.atan #js
-export const atanh: (x: number) => number = js# Math.atanh #js
-export const atan2: (a: number, b: number) => number = js# Math.atan2 #js
-export const cbrt:  (x: number) => number = js# Math.cbrt #js
-export const ceil:  (x: number) => number = js# Math.ceil #js
-export const cos:   (x: number) => number = js# Math.cos #js
-export const cosh:  (x: number) => number = js# Math.cosh #js
-export const exp:   (x: number) => number = js# Math.exp #js
-export const expm1: (x: number) => number = js# Math.expm1 #js
-export const floor: (x: number) => number = js# Math.floor #js
-export const hypot: (x: number) => number = js# Math.hypot #js
-export const logE:  (x: number) => number = js# Math.log #js
-export const log1p: (x: number) => number = js# Math.log1p #js
-export const log10: (x: number) => number = js# Math.log10 #js
-export const log2:  (x: number) => number = js# Math.log2 #js
-export const max:   (x: number) => number = js# Math.max #js
-export const min:   (x: number) => number = js# Math.min #js
-export const pow:   (x: number, n: number) => number = js# Math.pow #js
-export const round: (x: number) => number = js# Math.round #js
-export const sign:  (x: number) => number = js# Math.sign #js
-export const sin:   (x: number) => number = js# Math.sin #js
-export const sinh:  (x: number) => number = js# Math.sinh #js
-export const sqrt:  (x: number) => number = js# Math.sqrt #js
-export const tan:   (x: number) => number = js# Math.tan #js
-export const tanh:  (x: number) => number = js# Math.tanh #js
-export const trunc: (x: number) => number = js# Math.trunc #js
+export const abs:   pure (x: number) => number = js# Math.abs #js
+export const acos:  pure (x: number) => number = js# Math.acos #js
+export const acosh: pure (x: number) => number = js# Math.acosh #js
+export const asin:  pure (x: number) => number = js# Math.asin #js
+export const asinh: pure (x: number) => number = js# Math.asinh #js
+export const atan:  pure (x: number) => number = js# Math.atan #js
+export const atanh: pure (x: number) => number = js# Math.atanh #js
+export const atan2: pure (a: number, b: number) => number = js# Math.atan2 #js
+export const cbrt:  pure (x: number) => number = js# Math.cbrt #js
+export const ceil:  pure (x: number) => number = js# Math.ceil #js
+export const cos:   pure (x: number) => number = js# Math.cos #js
+export const cosh:  pure (x: number) => number = js# Math.cosh #js
+export const exp:   pure (x: number) => number = js# Math.exp #js
+export const expm1: pure (x: number) => number = js# Math.expm1 #js
+export const floor: pure (x: number) => number = js# Math.floor #js
+export const hypot: pure (x: number) => number = js# Math.hypot #js
+export const logE:  pure (x: number) => number = js# Math.log #js
+export const log1p: pure (x: number) => number = js# Math.log1p #js
+export const log10: pure (x: number) => number = js# Math.log10 #js
+export const log2:  pure (x: number) => number = js# Math.log2 #js
+export const max:   pure (x: number) => number = js# Math.max #js
+export const min:   pure (x: number) => number = js# Math.min #js
+export const pow:   pure (x: number, n: number) => number = js# Math.pow #js
+export const round: pure (x: number) => number = js# Math.round #js
+export const sign:  pure (x: number) => number = js# Math.sign #js
+export const sin:   pure (x: number) => number = js# Math.sin #js
+export const sinh:  pure (x: number) => number = js# Math.sinh #js
+export const sqrt:  pure (x: number) => number = js# Math.sqrt #js
+export const tan:   pure (x: number) => number = js# Math.tan #js
+export const tanh:  pure (x: number) => number = js# Math.tanh #js
+export const trunc: pure (x: number) => number = js# Math.trunc #js
 
-export js func parseNumber(s: string): number? => {#
+export pure js func parseNumber(s: string): number? => {#
     if (isNaN(s as any)) {
         return undefined
     } else {
@@ -48,6 +48,6 @@ export js func parseNumber(s: string): number? => {#
     }
 #}
 
-export js func stringifyNumber(x: number): string => {#
+export pure js func stringifyNumber(x: number): string => {#
     return String(x)
 #}

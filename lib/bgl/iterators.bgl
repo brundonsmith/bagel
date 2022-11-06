@@ -3,11 +3,11 @@ js#
 import { repeat as ___repeat } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts'
 #js
 
-export js func repeat<T>(val: T, count: number): Iterator<T> => {#
+export pure js func repeat<T>(val: T, count: number): Iterator<T> => {#
     return ___repeat(val, count)
 #}
 
-export js func join(iter: Iterator<string>, delimiter: string): string => {#
+export pure js func join(iter: Iterator<string>, delimiter: string): string => {#
     return iter.array().join(delimiter)
 #}
 
@@ -28,24 +28,24 @@ test expr 'zip()' => assert(
 )
 test expr 'find()' => assert([2, 4, 6, 8].iter().find(n => n > 5) == 6)
 
-export js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> =>            {# return iter.map(fn) #}
-export js func reduce<T, R>(iter: Iterator<T>, init: R, fn: (acc: R, el: T) => R): R => {# return iter.reduce(init, fn) #}
-export js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>     {# return iter.filter(fn) #}
-export js func slice<T>(iter: Iterator<T>, start: number, end?: number): Iterator<T> => {# return iter.slice(start, end) #}
-export js func takeWhile<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>  {# return iter.takeWhile(fn) #}
-export js func sorted<T>(iter: Iterator<T>, fn: (a: T, b: T) => number): Iterator<T> => {# return iter.sorted(fn) #}
-export js func every<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean =>          {# return iter.every(fn) #}
-export js func some<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean =>           {# return iter.some(fn) #}
-export js func count<T>(iter: Iterator<T>): number =>                                   {# return iter.count() #}
-export js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
-export js func concat<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<T|R> =>     {# return iter.concat(other) #}
-export js func zip<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<[T?, R?]> =>   {# return iter.zip(other) #}
-export js func indexed<T>(iter: Iterator<T>): Iterator<[T, number]> =>                  {# return iter.indexed() #}
+export pure js func map<T,R>(iter: Iterator<T>, fn: (el: T) => R): Iterator<R> =>            {# return iter.map(fn) #}
+export pure js func reduce<T, R>(iter: Iterator<T>, init: R, fn: (acc: R, el: T) => R): R => {# return iter.reduce(init, fn) #}
+export pure js func filter<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>     {# return iter.filter(fn) #}
+export pure js func slice<T>(iter: Iterator<T>, start: number, end?: number): Iterator<T> => {# return iter.slice(start, end) #}
+export pure js func takeWhile<T>(iter: Iterator<T>, fn: (el: T) => boolean): Iterator<T> =>  {# return iter.takeWhile(fn) #}
+export pure js func sorted<T>(iter: Iterator<T>, fn: (a: T, b: T) => number): Iterator<T> => {# return iter.sorted(fn) #}
+export pure js func every<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean =>          {# return iter.every(fn) #}
+export pure js func some<T>(iter: Iterator<T>, fn: (el: T) => boolean): boolean =>           {# return iter.some(fn) #}
+export pure js func count<T>(iter: Iterator<T>): number =>                                   {# return iter.count() #}
+export pure js func first<T>(iter: Iterator<T>): T? =>                                       {# return iter.first() #} 
+export pure js func concat<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<T|R> =>     {# return iter.concat(other) #}
+export pure js func zip<T,R>(iter: Iterator<T>, other: Iterator<R>): Iterator<[T?, R?]> =>   {# return iter.zip(other) #}
+export pure js func indexed<T>(iter: Iterator<T>): Iterator<[T, number]> =>                  {# return iter.indexed() #}
 
 // TODO: Infer new iterator type after filter()
 
-export func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? =>
+export pure func find<T>(iter: Iterator<T>, fn: (el: T) => boolean): T? =>
     iter.filter(fn).first()
 
-export js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
-export js func collectObject<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} =>  {# return iter.collectObject() #}
+export pure js func collectArray<T>(iter: Iterator<T>): T[] =>                               {# return iter.collectArray() #}
+export pure js func collectObject<K extends string, V>(iter: Iterator<[K, V]>): {[K]: V} =>  {# return iter.collectObject() #}

@@ -8,7 +8,7 @@ const ___traceColors = [
 ]
 #js
 
-export js func trace<
+export pure js func trace<
     TArgs extends readonly unknown[],
     TReturn extends unknown
 >(fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn => {#
