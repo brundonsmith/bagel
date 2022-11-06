@@ -1,52 +1,4 @@
 
-// class NMap {
-//     private contents = new Map()
-
-//     set(args: any[], value: any) {
-//         let current: WeakMap<any, any> = this.contents
-
-//         for (let i = 0; i < args.length - 1; i++) {
-//             if (!current.has(args[i])) {
-//                 current.set(args[i], new Map())
-//             } else if (!(current.get(args[i]) instanceof Map)) {
-//                 throw Error(`Expected WeakMap, found ${current.get(args[i])}`)
-//             }
-
-//             current = current.get(args[i])
-//         }
-
-//         current.set(args[args.length - 1], value)
-//     }
-
-//     get(args: any[]) {
-//         let current = this.contents
-
-//         for (let i = 0; i < args.length && current != null; i++) {
-//             if (!(current instanceof WeakMap)) {
-//                 return undefined
-//             } else {
-//                 current = current.get(args[i])
-//             }
-//         }
-
-//         return current
-//     }
-
-//     delete(args: any[]) {
-//         let current = this.contents
-
-//         for (let i = 0; i < args.length - 1 && current != null; i++) {
-//             if (!(current instanceof WeakMap)) {
-//                 return
-//             } else {
-//                 current = current.get(args[i])
-//             }
-//         }
-
-//         current.delete(args[args.length - 1])
-//     }
-// }
-
 export const WHOLE_OBJECT = Symbol('WHOLE_OBJECT')
 const COMPUTED_RESULT = Symbol('COMPUTED_RESULT')
 
@@ -108,10 +60,11 @@ let trigger: { readonly obj: object, readonly prop: string|number|typeof COMPUTE
 let observablesToReactions: Array<
     Observable & { effect: Reaction }
 > = []
-const memoCache = new NMap<{
+const memoCache = new NMap<MemoCacheEntry>()
+type MemoCacheEntry = {
     observables: Observable[]
     cached: unknown | typeof EMPTY_CACHE
-}>()
+}
 const EMPTY_CACHE = Symbol('EMPTY_CACHE')
 
 // @ts-ignore
