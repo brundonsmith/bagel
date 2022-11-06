@@ -25,7 +25,7 @@ export func memo(options?: MemoOptions) => <
     TReturn
 >(fn: (...args: TArgs) => readonly TReturn): (...args: TArgs) => readonly TReturn =>
     js#
-        ___memo(fn, options)
+        { return ___memo(fn, options) }
     #js
 
 export js func action<
