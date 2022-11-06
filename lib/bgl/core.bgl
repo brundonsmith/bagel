@@ -3,7 +3,7 @@ js#
 import { iter as ___iter } from 'https://raw.githubusercontent.com/brundonsmith/bagel/master/lib/ts/core.ts'
 #js
 
-export js proc log(x: unknown) {#
+export js proc log(x: readonly unknown) {#
     console.log(x);
 #}
 
@@ -35,10 +35,7 @@ export type MemoOptions = readonly {
 export func memo(options?: MemoOptions) => <
     TArgs extends readonly unknown[],
     TReturn
->(fn: (...args: TArgs) => readonly TReturn): (...args: TArgs) => readonly TReturn =>
-    js#
-        { return ___memo(fn, options) }
-    #js
+>(fn: (...args: TArgs) => readonly TReturn): (...args: TArgs) => readonly TReturn => js# ___memo(fn, options) #js
 
 export js func action<
     TArgs extends readonly unknown[]
