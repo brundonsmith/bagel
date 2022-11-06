@@ -43,7 +43,7 @@ class Remote<T> {
     }
 
     private latestRequestId: string|undefined;
-    public current: Planned<T> = LOADING;
+    public current: T | typeof LOADING = LOADING;
 }
 
 

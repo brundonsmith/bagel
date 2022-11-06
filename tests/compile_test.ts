@@ -691,7 +691,7 @@ Deno.test({
     export nominal type Bar(number)
     `,
     `
-    export type Foo = {a: string[], b: "stuff", c: ___Iterator<Other>};
+    export type Foo = {a: string[], b: "stuff", c: ___Iter<Other>};
 
     const ___Bar = Symbol('Bar');
     export const Bar = ((value: number): Bar => ({ kind: ___Bar, value })) as (((value: number) => Bar) & { sym: typeof ___Bar });
