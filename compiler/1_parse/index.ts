@@ -372,6 +372,7 @@ const typeExpression: ParseFunction<TypeExpression> =  memo((module, code, start
 
 const genericType: ParseFunction<GenericType> = memo((module, code, startIndex) =>
     given(_typeParams(module, code, startIndex), ({ parsed: typeParams, index }) =>
+    given(consumeWhitespace(code, index), index =>
     expec(typeExpression(module, code, index), err(code, index, "Type"), ({ parsed: inner, index }) => ({
         parsed: {
             kind: "generic-type",
@@ -384,7 +385,7 @@ const genericType: ParseFunction<GenericType> = memo((module, code, startIndex) 
             endIndex: index,
         },
         index
-    }))))
+    })))))
 
 const arrayType: ParseFunction<ArrayType> = memo((module, code, startIndex) =>
     given(TYPE_PARSER.parseBeneath(module, code, startIndex, arrayType), ({ parsed: element, index }) =>
