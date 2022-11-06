@@ -313,37 +313,3 @@ export function triggeredBy() {
 }
 
 export type Plan<T> = () => Promise<T>
-
-export class Remote<T> {
-
-    constructor (
-        private readonly fetcher: () => Plan<T>
-    ) {
-        autorun(this.update, undefined)
-    }
-
-    private latestRequestId: string|undefined;
-
-    public update = async () => {
-        const thisRequestId = this.latestRequestId = String(Math.random())
-            
-        this.loading = true; invalidate(this, 'loading');
-        
-        await this.fetcher()()
-            .then(res => {
-                if (thisRequestId === this.latestRequestId) {
-                    this.value = res; invalidate(this, 'value');
-                    this.loading = false; invalidate(this, 'loading');
-                }
-            })
-            .catch(() => {
-                if (thisRequestId === this.latestRequestId) {
-                    // TODO
-                    this.loading = false; invalidate(this, 'loading');
-                }
-            })
-    }
-
-    public value: T|undefined;
-    public loading = false;
-}

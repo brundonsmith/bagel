@@ -16,6 +16,18 @@ export js func iter<T>(x: readonly T[]): Iterator<T> => {#
     return ___iter(x)
 #}
 
+export nominal type Loading
+
+export js func planned<T>(plan: Plan<T>): T | Loading => {#
+    const current = ___planned(plan)
+
+    if (current === ___LOADING) {
+        return { sym: ___Loading }
+    } else {
+        return current
+    }
+#}
+
 export type MemoOptions = readonly {
     maxItems?: number
 }

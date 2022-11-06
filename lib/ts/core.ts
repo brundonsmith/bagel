@@ -1,6 +1,4 @@
 
-import { observe, WHOLE_OBJECT, Plan } from "./reactivity.ts";
-
 // Custom reactivity
 export {
     observe,
@@ -8,13 +6,45 @@ export {
     autorun,
     memo,
     action,
-    WHOLE_OBJECT,
-    Remote
+    WHOLE_OBJECT
 } from './reactivity.ts'
 
 export type {
     Plan,
 } from './reactivity.ts'
+
+
+import { observe, WHOLE_OBJECT, Plan, memo, autorun, invalidate } from "./reactivity.ts";
+
+export const LOADING = Symbol('LOADING')
+
+export function planned<T>(plan: Plan<T>): T | typeof LOADING {
+    return observe(getRemote(plan), 'current')
+}
+
+const getRemote = memo(<T,>(plan: Plan<T>) => new Remote(plan))
+
+class Remote<T> {
+    constructor (
+        plan: Plan<T>
+    ) {
+        autorun(async () => {
+            const thisRequestId = this.latestRequestId = String(Math.random())
+                
+            this.current = LOADING; invalidate(this, 'current');
+            
+            await plan()
+                .then(res => {
+                    if (thisRequestId === this.latestRequestId) {
+                        this.current = res; invalidate(this, 'current');
+                    }
+                })
+        }, undefined)
+    }
+
+    private latestRequestId: string|undefined;
+    public current: Planned<T> = LOADING;
+}
 
 
 // Errors

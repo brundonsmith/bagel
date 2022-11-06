@@ -1,6 +1,14 @@
 
-from './scratch' import { USD }
 
-func foo(amount: USD): number => 2 * amount.value
+const myPlan = timeout(1000)
 
-const bar = foo(USD(12))
+func planner() => (
+  const res = planned(myPlan),
+  res
+)
+
+proc main() {
+  autorun {
+    log(planner());
+  } forever;
+}

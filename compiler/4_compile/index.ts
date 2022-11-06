@@ -9,7 +9,7 @@ import { Module, AST, Block, PlainIdentifier } from "../_model/ast.ts";
 import { Context, ModuleName } from "../_model/common.ts";
 import { TestExprDeclaration, TestBlockDeclaration, FuncDeclaration, ProcDeclaration } from "../_model/declarations.ts";
 import { Expression, Proc, Func, JsFunc, JsProc } from "../_model/expressions.ts";
-import { FuncType, GenericFuncType, GenericProcType, NIL_TYPE, ProcType, TRUTHINESS_SAFE_TYPES, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
+import { FuncType, GenericFuncType, GenericProcType, ProcType, TRUTHINESS_SAFE_TYPES, TypeExpression, TypeParam, UNKNOWN_TYPE } from "../_model/type-expressions.ts";
 
 export type CompileContext =  Pick<Context, "allModules"|"canonicalModuleName"> & { moduleName: ModuleName, transpilePath: (module: string) => string, includeTests?: boolean, excludeTypes?: boolean }
 
@@ -25,12 +25,12 @@ export const compile = (ctx: CompileContext, ast: Module, excludeJsPrelude?: boo
 
 export const IMPORTED_ITEMS: readonly string[] = [
     // reactivity
-    'observe', 'invalidate', 'memo', 'autorun', 'action', 'WHOLE_OBJECT', 
+    'observe', 'invalidate', 'memo', 'planned', 'LOADING', 'autorun', 'action', 'WHOLE_OBJECT', 
 
     // used in compiler output
     'range', 'Iter', 'Plan', 'Error', 'ERROR_SYM',
     
-    // runtime type-checking 
+    // runtime type-checking
     'instanceOf', 'RT_UNKNOWN', 
     'RT_NIL', 'RT_BOOLEAN', 'RT_NUMBER', 'RT_STRING', 'RT_LITERAL', 'RT_ITERATOR',
     'RT_PLAN', 'RT_ARRAY', 'RT_RECORD', 'RT_OBJECT', 'RT_NOMINAL',
