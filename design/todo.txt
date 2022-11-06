@@ -4,6 +4,7 @@ Final checklist for alpha:
 - get time sorted out
 
 - Overwrite import paths in the config
+- Prevent config from referencing anything outside itself (for now) to solve import/compile crisscrossing
 - Bagel tests
     - Mocking system
     - "type tests"
@@ -12,10 +13,6 @@ Final checklist for alpha:
 - debugging utils (functional logging, etc)
 - implement more platform APIs
 - implement web server integration
-- autoruns only allowed in index.bgl?
-    - maybe also in files that completely declare their "let" dependencies?
-    - only in project directory?
-      - This. TODO: forbid autoruns found in non-local modules.
 
 Things to stew on:
 - Mocking
@@ -36,9 +33,7 @@ Ideas
 - some sort of previewing of constant values, and/or "explain" CLI for declarations
 - `if (cond) a else b` instead of `if cond { a } else { b }`?
 - "context" 
-
-Cleanup tasks:
-- Generalize const wrapper-type
+- "Procedural expressions"- self-contained procedural blocks that only assemble a value, so they can be used in expression contexts?
 
 Improvement
 - Continue to flesh out various parts of type inference
