@@ -185,7 +185,7 @@ const RULES = {
         },
         autofix: undefined
     },
-    // TODO: Lint against derivations, remotes, and autoruns that don't actually reference any observable values
+    // TODO: Lint against autoruns that don't actually reference any observable values
 
     // 'pureFunctions': {
     //     message: (ctx: Pick<Context, "allModules" | "canonicalModuleName">, ast: AST) => `Function declarations should not reference global state (referencing '${format(ast)}'). Convert "let" to "const" if the value is never mutated, or consider passing state in as an explicit function argument.`,

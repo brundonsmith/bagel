@@ -287,8 +287,7 @@ const formatInner = (options: FormatOptions, indent: number, parent: AST|undefin
         case "nominal-type": return ast.name ?? '<unnamed nominal>';
         case "iterator-type":
         case "plan-type":
-        case "error-type":
-        case "remote-type": {
+        case "error-type": {
             const segment = ast.kind.split('-')[0]
             const typeName = segment[0].toUpperCase() + segment.slice(1)
 

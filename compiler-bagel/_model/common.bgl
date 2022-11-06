@@ -16,7 +16,6 @@ export nominal type ModuleName(string)
 //         | ValueDeclarationStatement
 //         | InlineConstDeclaration
 //         | DeriveDeclaration
-//         | RemoteDeclaration
 //         | AwaitStatement
 //         | ForLoop
 //         | Func
