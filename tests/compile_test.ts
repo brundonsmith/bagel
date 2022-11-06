@@ -323,7 +323,7 @@ Deno.test({
 
         for (const item of items.inner) { 
           if ((___observe(item, 'foo') != null && (___observe(item, 'foo') as unknown) !== false && (___observe(item, 'foo') as any).kind !== ___ERROR_SYM)) { 
-            count.value = (___observe(count, 'value') + 1); ___invalidate(count, 'value');
+            ___invalidate(count, 'value', (___observe(count, 'value') + 1));
           };
 
           if ((___observe(count, 'value') > 12)) { 
@@ -464,7 +464,7 @@ Deno.test({
     }`,
     `
     export const setItem = function ___fn_setItem(key: string, value: string): void{ 
-      _localStorage[key] = value; ___invalidate(_localStorage, key);
+      ___invalidate(_localStorage, key, value);
       setLocalStorage(key, value);
     };`)
   }
@@ -484,10 +484,10 @@ Deno.test({
     `
     const foo = function ___fn_foo(): void{ 
       const n = { value: 0 };
-      n.value *= 2; ___invalidate(n, 'value');
+      ___invalidate(n, 'value', n.value * 2);
 
       const s = { value: "foo" };
-      s.value += " other"; ___invalidate(s, 'value');
+      ___invalidate(s, 'value', s.value + " other");
     };`)
   }
 })

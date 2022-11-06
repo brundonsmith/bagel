@@ -188,7 +188,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
                 const binding = resolve(ctx, ast.target.name, ast.target, true)
 
                 if ((binding?.owner.kind === 'value-declaration' || binding?.owner.kind === 'declaration-statement') && !binding.owner.isConst) {
-                    return `${ast.target.name}.value ${op}= ${value}; ${INT}invalidate(${ast.target.name}, 'value')`
+                    return `${INT}invalidate(${ast.target.name}, 'value', ${op ? `${ast.target.name}.value ${op} ` : ''}${value})`
                 } else {
                     return `${ast.target.name} ${op}= ${value}`
                 }
@@ -201,7 +201,7 @@ function compileOne(ctx: CompileContext, ast: AST): string {
 
                 const propertyExpr = propertyAsExpression(ctx, ast.target.property)
 
-                return `${c(ast.target.subject)}${property} ${op}= ${value}; ${INT}invalidate(${c(ast.target.subject)}, ${propertyExpr})`
+                return `${INT}invalidate(${c(ast.target.subject)}, ${propertyExpr}, ${op ? `${c(ast.target.subject)}${property} ${op} ` : ''}${value})`
             }
         }
         case "if-else-statement": return 'if ' + ast.cases

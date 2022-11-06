@@ -31,12 +31,12 @@ class Remote<T> {
         autorun(async () => {
             const thisRequestId = this.latestRequestId = String(Math.random())
                 
-            this.current = LOADING; invalidate(this, 'current');
+            invalidate(this, 'current', LOADING);
             
             await plan()
                 .then(res => {
                     if (thisRequestId === this.latestRequestId) {
-                        this.current = res; invalidate(this, 'current');
+                        invalidate(this, 'current', res);
                     }
                 })
         }, undefined)

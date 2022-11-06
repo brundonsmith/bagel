@@ -144,7 +144,16 @@ export function observe<O extends object, K extends (keyof O & string|number) | 
     }
 }
 
-export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT = WHOLE_OBJECT) {
+export function invalidate(obj: object, prop: string|number|typeof COMPUTED_RESULT|typeof WHOLE_OBJECT = WHOLE_OBJECT, value?: any) {
+    if (arguments.length === 3 && obj != null) {
+        if ((obj as any)[prop as any] === value) {
+            // if new value is the same as old value, don't invalidate
+            return
+        } else if (prop !== WHOLE_OBJECT && prop !== COMPUTED_RESULT) {
+            (obj as any)[prop as any] = value
+        }
+    }
+
     const topOfAction = queuedReactions == null
     queuedReactions = queuedReactions ?? new Set()
     // TODO: Don't invalidate if the new value is the same as the previous value

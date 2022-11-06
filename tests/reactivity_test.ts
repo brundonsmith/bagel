@@ -13,9 +13,9 @@ Deno.test({
             outcomes.push(observe(obj, 'count'))
         }, undefined)
 
-        obj.count++; invalidate(obj, 'count')
-        obj.count++; invalidate(obj, 'count')
-        obj.count++; invalidate(obj, 'count')
+        invalidate(obj, 'count', obj.count + 1)
+        invalidate(obj, 'count', obj.count + 1)
+        invalidate(obj, 'count', obj.count + 1)
 
         assertEquals(outcomes, [0, 1, 2, 3])
     }
@@ -32,9 +32,9 @@ Deno.test({
             outcomes.push(observe(obj, 'count'))
         }, () => observe(obj, 'count') > 1)
 
-        obj.count++; invalidate(obj, 'count')
-        obj.count++; invalidate(obj, 'count')
-        obj.count++; invalidate(obj, 'count')
+        invalidate(obj, 'count', obj.count + 1)
+        invalidate(obj, 'count', obj.count + 1)
+        invalidate(obj, 'count', obj.count + 1)
 
         assertEquals(outcomes, [0, 1])
     }
@@ -46,7 +46,7 @@ Deno.test({
         const obj = { count: 0 }
 
         const interval = setInterval(() => {
-            obj.count++; invalidate(obj, 'count')
+            invalidate(obj, 'count', obj.count + 1)
         }, 0)
 
         await when(() =>
@@ -72,9 +72,9 @@ Deno.test({
             outcomes.push(doubledDoubledCount())
         }, undefined)
 
-        obj.count++; invalidate(obj, 'count')
-        obj.count++; invalidate(obj, 'count')
-        obj.count++; invalidate(obj, 'count')
+        invalidate(obj, 'count', obj.count + 1)
+        invalidate(obj, 'count', obj.count + 1)
+        invalidate(obj, 'count', obj.count + 1)
 
         assertEquals(outcomes, [0, 4, 8, 12])
     }
@@ -88,9 +88,9 @@ Deno.test({
         const obj = { count: 0 }
 
         const increment = action(() => {
-            obj.count++; invalidate(obj, 'count')
-            obj.count++; invalidate(obj, 'count')
-            obj.count++; invalidate(obj, 'count')
+            invalidate(obj, 'count', obj.count + 1)
+            invalidate(obj, 'count', obj.count + 1)
+            invalidate(obj, 'count', obj.count + 1)
         })
 
         autorun(() => {
@@ -115,9 +115,9 @@ Deno.test({
         }, undefined)
 
         runInAction(() => {
-            obj.count++; invalidate(obj, 'count')
-            obj.count++; invalidate(obj, 'count')
-            obj.count++; invalidate(obj, 'count')
+            invalidate(obj, 'count', obj.count + 1)
+            invalidate(obj, 'count', obj.count + 1)
+            invalidate(obj, 'count', obj.count + 1)
         })
 
 
